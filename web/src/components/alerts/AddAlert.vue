@@ -1289,23 +1289,7 @@ export default defineComponent({
         this.formData.tz_offset = this.getTimezoneOffset();
       }
 
-      if (
-        this.formData.is_real_time == "false" &&
-        this.formData.query_condition.type == "sql"
-      ) {
-        try {
-          // Wait for the promise to resolve
-          // Storing the SQL query validation promise in a variable
-          // Case: When user edits the query and directly saves it without waiting for the validation to complete
-          // So waiting here for sql validation to complete
-          await this.validateSqlQueryPromise;
-        } catch (e) {
-          console.log("Error while validating sql query");
-          return false;
-        }
-      }
-
-      this.addAlertForm.validate().then((valid: any) => {
+      this.addAlertForm.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
@@ -1318,6 +1302,23 @@ export default defineComponent({
           message: "Please wait...",
           timeout: 2000,
         });
+
+        if (
+          this.formData.is_real_time == "false" &&
+          this.formData.query_condition.type == "sql"
+        ) {
+          try {
+            // Wait for the promise to resolve
+            // Storing the SQL query validation promise in a variable
+            // Case: When user edits the query and directly saves it without waiting for the validation to complete
+            // So waiting here for sql validation to complete
+            await this.validateSqlQueryPromise;
+          } catch (e) {
+            dismiss();
+            console.log("Error while validating sql query");
+            return false;
+          }
+        }
 
         if (this.beingUpdated) {
           callAlert = alertsService.update(
