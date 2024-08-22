@@ -82,16 +82,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="savePanelData.execute()"
           :loading="savePanelData.isLoading.value"
         />
-        <q-btn
+        <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          class="q-ml-md text-bold no-border"
-          data-test="dashboard-apply"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t('panel.apply')"
-          @click="runQuery"
-        />
+        >
+          <q-btn
+            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+            class="q-ml-md text-bold no-border"
+            data-test="dashboard-apply"
+            padding="sm lg"
+            color="negative"
+            no-caps
+            :label="t('panel.cancel')"
+            @click="cancelQuery"
+          />
+          <q-btn
+            v-else
+            class="q-ml-md text-bold no-border"
+            data-test="dashboard-apply"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t('panel.apply')"
+            @click="runQuery"
+          />
+        </template>
       </div>
     </div>
     <q-separator></q-separator>
@@ -354,6 +368,9 @@ import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import queryService from "@/services/search";
+import { useQuasar } from "quasar";
+import config from "@/aws-exports";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -424,6 +441,7 @@ export default defineComponent({
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
+    const $q = useQuasar();
 
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
@@ -1171,6 +1189,66 @@ export default defineComponent({
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    const searchRequestTraceIds = computed(() => {
+      const searchIds = Object.values(
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+      ).filter((item: any) => item.length > 0);
+
+      return searchIds.flat() as string[];
+    });
+
+    // [START] cancel running queries
+
+    const cancelQuery = () => {
+      if (searchRequestTraceIds.value.length === 0) {
+        console.error("No trace IDs to cancel");
+        return;
+      }
+      queryService
+        .delete_running_queries(
+          store.state.selectedOrganization.identifier,
+          searchRequestTraceIds.value,
+        )
+        .then((res) => {
+          const isCancelled = res.data.some((item: any) => item.is_success);
+
+          $q.notify({
+            message: isCancelled
+              ? "Running query cancelled successfully"
+              : "Query execution was completed before cancellation.",
+            color: "positive",
+            position: "bottom",
+            timeout: 1500,
+          });
+        })
+        .catch((error) => {
+          console.error("cancelQuery error:", error);
+          $q.notify({
+            message:
+              error.response?.data?.message || "Failed to cancel running query",
+            color: "negative",
+            position: "bottom",
+            timeout: 1500,
+          });
+        })
+        .finally(() => {
+          console.log("cancelQuery finally");
+        });
+    };
+
     return {
       t,
       updateDateTime,
@@ -1208,6 +1286,9 @@ export default defineComponent({
       initialVariableValues,
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,
+      searchRequestTraceIds,
+      cancelQuery,
+      config,
     };
   },
   methods: {
