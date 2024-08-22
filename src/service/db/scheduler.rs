@@ -18,11 +18,17 @@ use infra::{
     errors::Result,
     scheduler::{self as infra_scheduler},
 };
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
     infra::errors::Error, o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
     o2_enterprise::enterprise::super_cluster,
 };
+
+#[derive(Default, Serialize, Deserialize, Debug)]
+pub struct DerivedTriggerData {
+    pub period_end_time: i64,
+}
 
 #[inline]
 pub async fn push(trigger: Trigger) -> Result<()> {
