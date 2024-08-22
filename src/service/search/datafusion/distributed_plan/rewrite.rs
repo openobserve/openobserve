@@ -102,9 +102,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     self.req.clone(),
                     self.nodes.clone(),
                 ));
-                let partitioning = Partitioning::RoundRobinBatch(self.nodes.len());
-                let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
-                let new_node = node.with_new_children(vec![repartition])?;
+                let new_node = node.with_new_children(vec![remote_scan])?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
