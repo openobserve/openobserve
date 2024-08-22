@@ -446,8 +446,13 @@ pub async fn generate_context(
 
 pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
     for (stream_name, schema) in &sql.schemas {
+        let schema = schema
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(HashMap::new());
         let table = Arc::new(
-            NewEmptyTable::new(stream_name, schema.schema().clone())
+            NewEmptyTable::new(stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())
                 .with_sorted_by_time(sql.sorted_by_time),
         );

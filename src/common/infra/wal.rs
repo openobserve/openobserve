@@ -405,6 +405,7 @@ pub fn release_request(trace_id: &str) {
     log::info!("[trace_id {}] release_request for wal files", trace_id);
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);
+    locker.shrink_to_fit();
     drop(locker);
     if let Some(files) = files {
         release_files(&files);

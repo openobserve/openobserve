@@ -203,23 +203,24 @@ impl Stream for FlightSenderStream {
     ) -> Poll<Option<Self::Item>> {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => {
-                // clear session data
-                crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
-                // release wal lock files
-                crate::common::infra::wal::release_request(&self.trace_id);
-                Poll::Ready(None)
-            }
+            Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(e))) => {
-                // clear session data
-                crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
-                // release wal lock files
-                crate::common::infra::wal::release_request(&self.trace_id);
-                Poll::Ready(Some(Err(FlightError::Tonic(Status::internal(
-                    e.to_string(),
-                )))))
-            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(FlightError::Tonic(
+                Status::internal(e.to_string()),
+            )))),
         }
+    }
+}
+
+impl Drop for FlightSenderStream {
+    fn drop(&mut self) {
+        log::info!(
+            "[trace_id {}] flight->search: drop FlightSenderStream",
+            self.trace_id
+        );
+        // clear session data
+        crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
+        // release wal lock files
+        crate::common::infra::wal::release_request(&self.trace_id);
     }
 }
