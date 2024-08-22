@@ -287,7 +287,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.49", features = ["serde", "visitor"] }
+sqlparser = { version = "0.50", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"
