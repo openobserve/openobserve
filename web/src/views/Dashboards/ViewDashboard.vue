@@ -177,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
+        :folderId="route.query.folder"
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
@@ -718,6 +719,7 @@ export default defineComponent({
       t,
       getDashboard,
       store,
+      route,
       // date variables
       dateTimePicker,
       selectedDate,

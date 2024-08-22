@@ -20,7 +20,7 @@ import {
   toRefs,
   onMounted,
   onUnmounted,
-  inject,
+  toRaw,
 } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
@@ -36,6 +36,8 @@ import {
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { b64EncodeUnicode, generateTraceContext, escapeSingleQuotes } from "@/utils/zincutils";
+import { usePanelCache } from "./usePanelCache";
+import { isEqual } from "lodash-es"
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -49,12 +51,34 @@ export const usePanelDataLoader = (
   chartPanelRef: any,
   forceLoad: any,
   searchType: any,
+  dashboardId: any,
+  folderId: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (true) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
+
+  /**
+   * Calculate cache key for panel 
+   * @returns cache key
+   */
+  const getCacheKey = () => ({
+    panelSchema,
+    selectedTimeObj,
+    variablesData,
+    forceLoad,
+    searchType,
+    dashboardId,
+    folderId,
+  })
+
+  const { getPanelCache, savePanelCache } = usePanelCache(
+    folderId,
+    dashboardId,
+    panelSchema.value.id,
+  );
 
   const state = reactive({
     data: [] as any,
@@ -1187,8 +1211,60 @@ export const usePanelDataLoader = (
     }
   });
 
-  log("PanelSchema/Time Initial: should load the data");
-  loadData(); // Loading the data
+  // when state changes and data is loaded, save it to cache
+  watch(
+    state,
+    () => {
+      log("usePanelDataLoader: panelcache: state changed");
+      if (state.loading == false) {
+        log("usePanelDataLoader: panelcache: updating cache");
+        savePanelCache(getCacheKey(), { ...toRaw(state) });
+      }
+    },
+    { deep: true },
+  );
+
+  onMounted(() => {
+
+    // check if we have a cache available
+    const cache = getPanelCache();
+    if(!cache) {
+      // cache is not there, we need to load the data
+      loadData(); // Loading the data
+      return;
+    }
+
+    // now we have a cache
+    const { key: tempPanelCacheKey, value: tempPanelCacheValue} = cache
+    log("tempPanelCache", tempPanelCacheValue);
+    
+    let isRestoredFromCache = false
+    
+    // check if it is stale or not
+    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && isEqual(getCacheKey(), tempPanelCacheKey)) {
+
+      // const cache = getPanelCache();
+      state.data = tempPanelCacheValue.data;
+      state.loading = tempPanelCacheValue.loading;
+      state.errorDetail = tempPanelCacheValue.errorDetail;
+      state.metadata = tempPanelCacheValue.metadata;
+      state.resultMetaData = tempPanelCacheValue.resultMetaData;    
+
+      // set that the cache is restored
+      isRestoredFromCache = true
+      
+      log(
+        "usePanelDataLoader: panelcache: panel data loaded from cache",
+        JSON.stringify(state, null, 2),
+      );
+    }
+
+    // If cache was there, but cache wasn't restored due to outdated, then load the data
+    if (!isRestoredFromCache) {
+      log("PanelSchema/Time Initial: should load the data");
+      loadData(); // Loading the data
+    }
+  });
 
   return {
     ...toRefs(state),

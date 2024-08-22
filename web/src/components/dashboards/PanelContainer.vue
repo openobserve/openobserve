@@ -192,6 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :variablesData="props.variablesData"
       :forceLoad="props.forceLoad"
       :searchType="searchType"
+      :dashboard-id="props.dashboardId"
+      :folder-id="props.folderId"
       @metadata-update="metaDataValue"
       @result-metadata-update="handleResultMetadataUpdate"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
@@ -262,6 +264,7 @@ export default defineComponent({
     "metaData",
     "forceLoad",
     "searchType",
+    "folderId",
   ],
   components: {
     PanelSchemaRenderer,

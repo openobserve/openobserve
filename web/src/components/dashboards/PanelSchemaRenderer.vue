@@ -215,6 +215,14 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
+    dashboardId: {
+      default: null,
+      type: String || null,
+    },
+    folderId: {
+      default: null,
+      type: String || null,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -242,6 +250,8 @@ export default defineComponent({
       variablesData,
       forceLoad,
       searchType,
+      dashboardId,
+      folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let { data, loading, errorDetail, metadata, resultMetaData } =
@@ -252,6 +262,8 @@ export default defineComponent({
         chartPanelRef,
         forceLoad,
         searchType,
+        dashboardId,
+        folderId,
       );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -286,6 +298,7 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
+        console.log('data updated')
         // emit vrl function field list
         if (data.value.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes

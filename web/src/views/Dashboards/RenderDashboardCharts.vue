@@ -78,7 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @onViewPanel="onViewPanel"
               :viewOnly="viewOnly"
               :data="item"
-              :dashboardId="dashboardData.id"
+              :dashboardId="dashboardData.dashboardId"
+              :folderId="folderId"
               :selectedTimeDate="currentTimeObj"
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
@@ -165,6 +166,7 @@ export default defineComponent({
   props: {
     viewOnly: {},
     dashboardData: {},
+    folderId: {},
     currentTimeObj: {},
     initialVariableValues: { value: {} },
     selectedDateForViewPanel: {},
