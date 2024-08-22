@@ -153,7 +153,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
-        cfg.limit.cpu_num,
+        cfg.limit.real_cpu_num,
         cfg.limit.mem_total / 1024 / 1024,
         cfg.limit.disk_total / 1024 / 1024 / 1024,
         cfg.limit.disk_free / 1024 / 1024 / 1024,
