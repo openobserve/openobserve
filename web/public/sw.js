@@ -1,7 +1,7 @@
 // sw.js
 
 // Version identifier for cache and update management
-const cacheVersion = `O2-cache-v10`;
+const cacheVersion = `O2-cache-v23`;
 // Function to fetch the asset manifest
 async function fetchManifest() {
   const response = await fetch("/web/manifest.json");
@@ -100,6 +100,8 @@ self.addEventListener('activate', function(event) {
     event.respondWith(
       caches
         .open(cacheVersion).then(function (cache) {
+          console.log("event.request", event.request);
+          console.log("cache", cache);
           return cache.match(event.request);
         })
         .then(function (response) {
@@ -107,9 +109,11 @@ self.addEventListener('activate', function(event) {
             console.log(response,"res in fetch")
             return response.clone();
           }
+          console.log(event.request, "event.request 2 in fetch");
           var fetchRequest = event.request;
           return fetch(fetchRequest)
             .then(function (response) {
+              console.log("response", JSON.stringify(response));
               if (
                 !response ||
                 response.status !== 200 ||
@@ -118,11 +122,14 @@ self.addEventListener('activate', function(event) {
                 let staleFlag = false;
                 self.clients.matchAll().then((clients) => {
                   clients.forEach((client) => {
-                    staleFlag = true;
-                    if (staleFlag) {
-                      // self.skipWaiting();
-                      // caches.delete("cache-name");
-                      client.postMessage("staledata");
+                    console.log("client", JSON.stringify(client));
+                    if (event.request.url.endsWith('.js')) {
+                      staleFlag = true;
+                      if (staleFlag) {
+                        // self.skipWaiting();
+                        // caches.delete("cache-name");
+                        client.postMessage("staledata");
+                      }
                     }
                   });
                 });
