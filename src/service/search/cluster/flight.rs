@@ -148,6 +148,8 @@ pub async fn search(
         println!("{}", plan);
     }
 
+    // TODO: run clean on every node: do_action
+
     let data = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx()).await?;
 
     Ok((data, ScanStats::new(), 0, false, 0))

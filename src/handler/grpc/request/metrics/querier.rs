@@ -186,7 +186,7 @@ impl Metrics for MetricsQuerier {
                     .to_string()
             })
             .collect::<Vec<_>>();
-        wal::lock_files(&files).await;
+        wal::lock_files(&files);
 
         for file in files.iter() {
             // check time range by filename
@@ -201,7 +201,7 @@ impl Metrics for MetricsQuerier {
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(&[file.clone()]).await;
+                wal::release_files(&[file.clone()]);
                 continue;
             }
             // filter by partition keys
@@ -224,7 +224,7 @@ impl Metrics for MetricsQuerier {
             )
             .await
             {
-                wal::release_files(&[file.clone()]).await;
+                wal::release_files(&[file.clone()]);
                 continue;
             }
             // check time range by parquet metadata
@@ -259,7 +259,7 @@ impl Metrics for MetricsQuerier {
         }
 
         // release all files
-        wal::release_files(&files).await;
+        wal::release_files(&files);
 
         // append arrow files
         resp.files.extend(arrow_files);

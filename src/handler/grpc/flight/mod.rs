@@ -74,7 +74,7 @@ impl FlightService for FlightServiceImpl {
                 // clear session data
                 crate::service::search::datafusion::storage::file_list::clear(&req.trace_id);
                 // release wal lock files
-                crate::common::infra::wal::release_request(&req.trace_id).await;
+                crate::common::infra::wal::release_request(&req.trace_id);
                 log::error!(
                     "[trace_id {}] flight->search: do_get physical plan generate error: {e:?}",
                     req.trace_id,
@@ -103,6 +103,7 @@ impl FlightService for FlightServiceImpl {
             .with_schema(schema)
             .with_options(write_options)
             .build(FlightSenderStream::new(
+                req.trace_id.to_string(),
                 execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
                     log::error!(
                         "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
@@ -112,11 +113,6 @@ impl FlightService for FlightServiceImpl {
                 })?,
             ))
             .map_err(|err| Status::from_error(Box::new(err)));
-
-        // clear session data
-        crate::service::search::datafusion::storage::file_list::clear(&req.trace_id);
-        // release wal lock files
-        crate::common::infra::wal::release_request(&req.trace_id).await;
 
         Ok(Response::new(
             Box::pin(flight_data_stream) as Self::DoGetStream
@@ -188,12 +184,13 @@ impl FlightService for FlightServiceImpl {
 }
 
 struct FlightSenderStream {
+    trace_id: String,
     stream: SendableRecordBatchStream,
 }
 
 impl FlightSenderStream {
-    fn new(stream: SendableRecordBatchStream) -> Self {
-        Self { stream }
+    fn new(trace_id: String, stream: SendableRecordBatchStream) -> Self {
+        Self { trace_id, stream }
     }
 }
 
@@ -206,11 +203,23 @@ impl Stream for FlightSenderStream {
     ) -> Poll<Option<Self::Item>> {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(None) => {
+                // clear session data
+                crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
+                // release wal lock files
+                crate::common::infra::wal::release_request(&self.trace_id);
+                Poll::Ready(None)
+            }
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(FlightError::Tonic(
-                Status::internal(e.to_string()),
-            )))),
+            Poll::Ready(Some(Err(e))) => {
+                // clear session data
+                crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
+                // release wal lock files
+                crate::common::infra::wal::release_request(&self.trace_id);
+                Poll::Ready(Some(Err(FlightError::Tonic(Status::internal(
+                    e.to_string(),
+                )))))
+            }
         }
     }
 }

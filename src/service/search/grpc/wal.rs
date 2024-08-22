@@ -110,7 +110,7 @@ pub async fn search_parquet(
     for file in files_metadata {
         if let Some((min_ts, max_ts)) = query.time_range {
             if file.meta.is_empty() {
-                wal::release_files(&[file.key.clone()]).await;
+                wal::release_files(&[file.key.clone()]);
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
@@ -122,7 +122,7 @@ pub async fn search_parquet(
                     file.meta.min_ts,
                     file.meta.max_ts
                 );
-                wal::release_files(&[file.key.clone()]).await;
+                wal::release_files(&[file.key.clone()]);
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
@@ -134,7 +134,7 @@ pub async fn search_parquet(
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
         // release all files
-        wal::release_files(&lock_files).await;
+        wal::release_files(&lock_files);
         return Ok((vec![], scan_stats));
     }
 
@@ -151,7 +151,7 @@ pub async fn search_parquet(
         Err(err) => {
             log::error!("[trace_id {}] get schema error: {}", query.trace_id, err);
             // release all files
-            wal::release_files(&lock_files).await;
+            wal::release_files(&lock_files);
             return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
                 query.stream_name.clone(),
             )));
@@ -159,7 +159,7 @@ pub async fn search_parquet(
     };
     if schema_versions.is_empty() {
         // release all files
-        wal::release_files(&lock_files).await;
+        wal::release_files(&lock_files);
         return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
@@ -173,7 +173,7 @@ pub async fn search_parquet(
             Ok(size) => size,
             Err(err) => {
                 // release all files
-                wal::release_files(&lock_files).await;
+                wal::release_files(&lock_files);
                 log::error!(
                     "[trace_id {}] calculate files size error: {}",
                     query.trace_id,
@@ -228,7 +228,7 @@ pub async fn search_parquet(
     if cfg.common.memory_circuit_breaker_enable {
         if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
             // release all files
-            wal::release_files(&lock_files).await;
+            wal::release_files(&lock_files);
             return Err(e);
         }
     }
@@ -276,14 +276,14 @@ pub async fn search_parquet(
             Ok(v) => tables.push(v),
             Err(e) => {
                 // release all files
-                wal::release_files(&lock_files).await;
+                wal::release_files(&lock_files);
                 return Err(e.into());
             }
         }
     }
 
     // lock these files for this request
-    wal::lock_request(&query.trace_id, &lock_files).await;
+    wal::lock_request(&query.trace_id, &lock_files);
 
     Ok((tables, scan_stats))
 }
@@ -431,7 +431,7 @@ async fn get_file_list_inner(
                 .to_string()
         })
         .collect::<Vec<_>>();
-    wal::lock_files(&files).await;
+    wal::lock_files(&files);
 
     let stream_params = StreamParams::new(&query.org_id, &query.stream_name, query.stream_type);
     let search_partition_keys = search_partition_keys.unwrap_or_default();
@@ -453,7 +453,7 @@ async fn get_file_list_inner(
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(&[file.clone()]).await;
+                wal::release_files(&[file.clone()]);
                 continue;
             }
         }
@@ -469,7 +469,7 @@ async fn get_file_list_inner(
         {
             result.push(file_key);
         } else {
-            wal::release_files(&[file.clone()]).await;
+            wal::release_files(&[file.clone()]);
         }
     }
     Ok(result)
