@@ -233,7 +233,7 @@ import {
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { QTable, useQuasar, type QTableProps } from "quasar";
+import { QTable, date, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -330,6 +330,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "owner",
+        field: "owner",
+        label: t("alerts.owner"),
+        align: "center",
+        sortable: true,
+      },
+      {
         name: "conditions",
         field: "conditions",
         label: t("alerts.condition"),
@@ -342,6 +349,13 @@ export default defineComponent({
         label: t("alerts.description"),
         align: "center",
         sortable: false,
+      },
+      {
+        name: "last_triggered_at",
+        field: "last_triggered_at",
+        label: t("alerts.lastTriggered"),
+        align: "left",
+        sortable: true,
       },
       {
         name: "actions",
@@ -403,6 +417,8 @@ export default defineComponent({
               conditions: conditions,
               description: data.description,
               uuid: data.uuid,
+              owner: data.owner,
+              last_triggered_at:convertUnixToQuasarFormat(data.last_triggered_at),
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
@@ -501,6 +517,15 @@ export default defineComponent({
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
+    
+    function convertUnixToQuasarFormat(unixMicroseconds) {
+      if(!unixMicroseconds) return "";
+        const unixSeconds = unixMicroseconds / 1e6;
+        const dateToFormat = new Date(unixSeconds * 1000);
+        const formattedDate = dateToFormat.toISOString();
+        return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
+
     const addAlert = () => {
       showAddAlertDialog.value = true;
     };
