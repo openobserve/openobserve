@@ -405,12 +405,6 @@ fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_
             .hits
             .sort_by_key(|a| get_ts_value(ts_column, a));
     }
-    // Deduplicate the hits by ts_column
-    let mut seen = hashbrown::HashSet::new();
-    cache_response.hits.retain(|hit| {
-        let ts_value = get_ts_value(ts_column, hit);
-        seen.insert(ts_value)
-    });
 }
 
 #[allow(clippy::too_many_arguments)]
