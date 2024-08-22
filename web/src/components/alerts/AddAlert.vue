@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  errormsg : {{ sqlQueryErrorMsg }}
   <div class="full-width">
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
@@ -188,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="filteredColumns"
                 :conditions="formData.query_condition.conditions"
                 :alertData="formData"
-                :isValidSqlQuery="isValidSqlQuery"
+                :sqlQueryErrorMsg="sqlQueryErrorMsg"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
@@ -586,7 +587,7 @@ export default defineComponent({
 
     const previewQuery = ref("");
 
-    const isValidSqlQuery = ref(true);
+    const sqlQueryErrorMsg = ref("");
 
     const validateSqlQueryPromise = ref<Promise<unknown>>();
 
@@ -944,7 +945,11 @@ export default defineComponent({
     };
     const getParser = (sqlQuery: string) => {
       try {
-        const columns = parser.astify(sqlQuery).columns;
+        // As default is a reserved keyword in sql-parser, we are replacing it with default1
+        const regex = /\bdefault\b/g;
+        const columns = parser.astify(
+          sqlQuery.replace(regex, "default1"),
+        ).columns;
         for (const column of columns) {
           if (column.expr.column === "*") {
             return false;
@@ -952,8 +957,11 @@ export default defineComponent({
         }
         return true;
       } catch (error) {
+        // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
+        // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
+        // Query will be validated in the backend
         console.log(error);
-        return false;
+        return true;
       }
     };
 
@@ -1009,9 +1017,10 @@ export default defineComponent({
         payload.query_condition.sql = "";
       }
 
-      payload.query_condition.vrl_function = b64EncodeUnicode(
-        formData.value.query_condition.vrl_function,
-      );
+      if (formData.value.query_condition.vrl_function)
+        payload.query_condition.vrl_function = b64EncodeUnicode(
+          formData.value.query_condition.vrl_function,
+        );
 
       if (beingUpdated) {
         payload.updatedAt = new Date().toISOString();
@@ -1107,22 +1116,25 @@ export default defineComponent({
             query,
             page_type: "logs",
           })
-          .then((res: any) => {
-            isValidSqlQuery.value = true;
+          .then(() => {
+            sqlQueryErrorMsg.value = "";
             resolve("");
           })
           .catch((err: any) => {
-            if (err.response.data.code === 500) {
-              isValidSqlQuery.value = false;
+            sqlQueryErrorMsg.value = err.response?.data?.message
+              ? err.response?.data?.message
+              : "Invalid SQL Query";
+
+            // Show error only if it is not real time alert
+            // This case happens when user enters invalid query and then switches to real time alert
+            if (!formData.value.is_real_time)
               q.notify({
                 type: "negative",
-                message: "Invalid SQL Query : " + err.response.data.message,
+                message: "Invalid SQL Query : " + err.response?.data?.message,
                 timeout: 3000,
               });
-              reject("");
-            } else isValidSqlQuery.value = true;
 
-            resolve("");
+            reject("");
           });
       });
     };
@@ -1182,9 +1194,9 @@ export default defineComponent({
       getTimezoneOffset,
       showVrlFunction,
       validateSqlQuery,
-      isValidSqlQuery,
       validateSqlQueryPromise,
       isValidResourceName,
+      sqlQueryErrorMsg,
     };
   },
 
@@ -1206,12 +1218,12 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
-      this.formData.query_condition.vrl_function = b64DecodeUnicode(
-        this.formData.query_condition.vrl_function,
-      );
 
-      if (this.formData.query_condition.vrl_function?.trim()?.length) {
+      if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
+        this.formData.query_condition.vrl_function = b64DecodeUnicode(
+          this.formData.query_condition.vrl_function,
+        );
       }
     }
 
@@ -1251,7 +1263,8 @@ export default defineComponent({
 
     async onSubmit() {
       if (
-        this.formData.is_real_time == "false" && this.formData.query_condition.type == 'sql' && 
+        this.formData.is_real_time == "false" &&
+        this.formData.query_condition.type == "sql" &&
         !this.getParser(this.formData.query_condition.sql)
       ) {
         this.q.notify({
@@ -1277,10 +1290,20 @@ export default defineComponent({
         this.formData.tz_offset = this.getTimezoneOffset();
       }
 
-      try {
-        await this.validateSqlQueryPromise;
-      } catch (e) {
-        return false;
+      if (
+        this.formData.is_real_time == "false" &&
+        this.formData.query_condition.type == "sql"
+      ) {
+        try {
+          // Wait for the promise to resolve
+          // Storing the SQL query validation promise in a variable
+          // Case: When user edits the query and directly saves it without waiting for the validation to complete
+          // So waiting here for sql validation to complete
+          await this.validateSqlQueryPromise;
+        } catch (e) {
+          console.log("Error while validating sql query");
+          return false;
+        }
       }
 
       this.addAlertForm.validate().then((valid: any) => {

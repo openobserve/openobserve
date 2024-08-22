@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="queryEditorRef"
               editor-id="alerts-query-editor"
               class="monaco-editor"
+              :debounceTime="300"
               v-model:query="query"
               :class="
                 query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
@@ -88,8 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @focus="queryEditorPlaceholderFlag = false"
               @blur="onBlurQueryEditor"
             />
-            <div class="text-negative q-mb-xs" style="height: 21px">
-              <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
+            <div class="text-negative q-mb-xs invalid-sql-error">
+              <span v-show="!!sqlQueryErrorMsg">
+                Error: {{ sqlQueryErrorMsg }}</span
+              >
             </div>
           </div>
         </template>
@@ -729,7 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, type Ref, defineAsyncComponent } from "vue";
+import { ref, watch, computed, defineAsyncComponent } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -738,8 +741,6 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
-import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
@@ -759,7 +760,7 @@ const props = defineProps([
   "promql_condition",
   "vrl_function",
   "showVrlFunction",
-  "isValidSqlQuery",
+  "sqlQueryErrorMsg",
   "disableThreshold",
   "disableVrlFunction",
   "disableQueryTypeSelection",
@@ -1108,5 +1109,9 @@ defineExpose({
     background-repeat: no-repeat;
     background-size: 170px;
   }
+}
+
+.invalid-sql-error {
+  min-height: 21px;
 }
 </style>
