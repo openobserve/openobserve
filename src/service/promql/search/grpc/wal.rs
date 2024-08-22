@@ -19,7 +19,7 @@ use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
 use config::{
     get_config,
     meta::{
-        search::{ScanStats, SearchType, Session as SearchSession, StorageType},
+        search::{ScanStats, Session as SearchSession, StorageType},
         stream::StreamType,
     },
     FILE_EXT_PARQUET,
@@ -132,8 +132,7 @@ pub(crate) async fn create_context(
         })?;
     for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
         if !record_batches.is_empty() {
-            let ctx = prepare_datafusion_context(None, &SearchType::Normal, vec![], false, 0, None)
-                .await?;
+            let ctx = prepare_datafusion_context(None, vec![], false, 0, None).await?;
             // calculate schema diff
             let mut diff_fields = HashMap::new();
             let group_fields = arrow_schema.fields();
@@ -176,7 +175,6 @@ pub(crate) async fn create_context(
     let session = SearchSession {
         id: trace_id.to_string(),
         storage_type: StorageType::Tmpfs,
-        search_type: SearchType::Normal,
         work_group: None,
         target_partitions: 0,
     };

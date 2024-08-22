@@ -19,7 +19,7 @@ use arrow::array::{new_null_array, ArrayRef};
 use config::{
     get_config,
     meta::{
-        search::{ScanStats, SearchType, StorageType},
+        search::{ScanStats, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition},
     },
     utils::{
@@ -57,6 +57,7 @@ pub async fn search_parquet(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
     search_partition_keys: Option<Vec<(String, String)>>,
+    sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
@@ -256,19 +257,17 @@ pub async fn search_parquet(
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
-            search_type: SearchType::Normal, // TODO: search_type
-            work_group: Some(query.work_group.to_string()),
-            target_partitions: 0,
+            work_group: query.work_group.clone(),
+            target_partitions: cfg.limit.cpu_num,
         };
 
-        // TODO: leader need to match source file_list by partition key
         let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
         match exec::create_parquet_table(
             &session,
             schema_latest.clone(),
             &files,
             diff_fields,
-            &[], // TODO: add order_by to query
+            sorted_by_time,
             file_stat_cache.clone(),
         )
         .await

@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     get_config,
     meta::{
-        search::{SearchType, Session as SearchSession, StorageType},
+        search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
@@ -81,7 +81,7 @@ pub async fn convert_parquet_file(
     ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, vec![], false, 0, None).await?;
+    let ctx = prepare_datafusion_context(None, vec![], false, 0, None).await?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -190,7 +190,7 @@ pub async fn merge_parquet_files(
     };
 
     // create datafusion context
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, vec![], false, 0, None).await?;
+    let ctx = prepare_datafusion_context(None, vec![], false, 0, None).await?;
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -221,7 +221,6 @@ pub async fn merge_parquet_files(
 }
 
 pub fn create_session_config(
-    search_type: &SearchType,
     sorted_by_time: bool,
     target_partitions: usize,
     limit: Option<usize>,
@@ -241,10 +240,11 @@ pub fn create_session_config(
         .execution
         .listing_table_ignore_subdirectory = false;
     config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
-    if search_type == &SearchType::Normal {
-        config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
-        config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
-    }
+
+    // based on data distributing, it only works for the data on a few records
+    // config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
+    // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
+
     if cfg.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
@@ -308,7 +308,6 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
 
 pub async fn prepare_datafusion_context(
     _work_group: Option<String>,
-    search_type: &SearchType,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
     target_partitions: usize,
@@ -339,8 +338,7 @@ pub async fn prepare_datafusion_context(
         }
     }
 
-    let session_config =
-        create_session_config(search_type, sorted_by_time, target_partition, limit)?;
+    let session_config = create_session_config(sorted_by_time, target_partition, limit)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     if !optimizer_rules.is_empty() {
         let state = SessionStateBuilder::new()
@@ -406,7 +404,6 @@ pub async fn register_table(
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
-        &session.search_type,
         vec![],
         sorted_by_time,
         session.target_partitions,
@@ -419,7 +416,7 @@ pub async fn register_table(
         schema.clone(),
         files,
         rules.clone(),
-        sort_key,
+        sorted_by_time,
         ctx.runtime_env().cache_manager.get_file_statistic_cache(),
     )
     .await?;
@@ -433,7 +430,7 @@ pub async fn create_parquet_table(
     schema: Arc<Schema>,
     files: &[FileKey],
     rules: HashMap<String, DataType>,
-    sort_key: &[(String, bool)],
+    sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
@@ -442,10 +439,6 @@ pub async fn create_parquet_table(
     } else {
         std::cmp::max(DATAFUSION_MIN_PARTITION, session.target_partitions)
     };
-
-    // only sort by timestamp desc
-    let sorted_by_time =
-        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
 
     // Configure listing options
     let file_format = ParquetFormat::default();

@@ -33,7 +33,7 @@ message FlightSearchRequest {
     int64                     start_time = 10;
     int64                       end_time = 11;
     int64                        timeout = 12;
-    string                    work_group = 13;
+    optional string           work_group = 13;
     optional string              user_id = 14;
 }
 

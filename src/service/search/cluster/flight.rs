@@ -20,16 +20,19 @@ use config::{
     get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
-        search::{ScanStats, SearchEventType, SearchType},
+        search::{ScanStats, SearchEventType},
         stream::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
+    metrics,
 };
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::displayable, prelude::SessionContext,
 };
+use hashbrown::HashSet;
 use infra::{
+    dist_lock,
     errors::{Error, Result},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
@@ -52,9 +55,9 @@ use crate::{
 pub async fn search(
     trace_id: &str,
     sql: Arc<NewSql>,
-    req: cluster_rpc::SearchRequest,
+    mut req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
-    let _start = std::time::Instant::now();
+    let start = std::time::Instant::now();
     log::info!(
         "[trace_id {trace_id}] search->flight[leader]: start, sql: {}",
         sql
@@ -76,6 +79,8 @@ pub async fn search(
     }
 
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+    let user_id = req.user_id.clone();
+    let user_id = user_id.as_deref();
     let node_group = req
         .search_event_type
         .as_ref()
@@ -91,10 +96,112 @@ pub async fn search(
     }
 
     // 2. get file list
-    let file_lists = get_file_lists(&req, sql.clone()).await?;
+    let file_list = get_file_lists(&req, sql.clone()).await?;
 
     // 3. partition file list
-    let partition_file_lists = partition_file_lists(file_lists, &nodes, node_group).await?;
+    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
+
+    let file_list_vec = partition_file_lists
+        .values()
+        .flatten()
+        .flatten()
+        .collect::<Vec<_>>();
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] search->flight[leader]: get file_list time_range: {:?}, num: {}, took: {} ms",
+        sql.time_range,
+        file_list_vec.len(),
+        file_list_took,
+    );
+
+    // waiting in work group queue
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&req.org_id])
+        .inc();
+
+    #[cfg(not(feature = "enterprise"))]
+    let work_group: Option<String> = None;
+    // 1. get work group
+    #[cfg(feature = "enterprise")]
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
+        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list_vec),
+    );
+    #[cfg(feature = "enterprise")]
+    super::super::SEARCH_SERVER
+        .add_work_group(&trace_id, work_group.clone())
+        .await;
+    // 2. check concurrency
+    let work_group_str = if let Some(wg) = &work_group {
+        wg.to_string()
+    } else {
+        "global".to_string()
+    };
+
+    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    // get a cluster search queue lock
+    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
+        None
+    } else {
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.uuid.to_string())
+            .collect::<HashSet<_>>();
+        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
+            .await
+            .map_err(|e| {
+                metrics::QUERY_PENDING_NUMS
+                    .with_label_values(&[&req.org_id])
+                    .dec();
+                Error::Message(e.to_string())
+            })?
+    };
+
+    // check global concurrency
+    #[cfg(feature = "enterprise")]
+    super::work_group_checking(&trace_id, start, &req, &work_group, &locker, None).await?;
+
+    // check user concurrency
+    #[cfg(feature = "enterprise")]
+    if user_id.is_some() {
+        super::work_group_checking(&trace_id, start, &req, &work_group, &locker, user_id).await?;
+    }
+
+    // 3. process the search in the work group
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = work_group
+        .as_ref()
+        .unwrap()
+        .process(&trace_id, user_id)
+        .await
+    {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        dist_lock::unlock(&locker).await?;
+        return Err(Error::Message(e.to_string()));
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = dist_lock::unlock(&locker).await {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(&trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        return Err(e);
+    }
+    // done in the queue
+    let took_wait = start.elapsed().as_millis() as usize - file_list_took;
+    log::info!(
+        "[trace_id {trace_id}] search: wait in queue took: {} ms",
+        took_wait,
+    );
+
+    // reset work_group
+    req.work_group = work_group_str;
 
     // 4. construct physical plan
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -419,14 +526,14 @@ pub async fn generate_context(
     sql: &Arc<NewSql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
-    // TODO: work_group
-    let work_group = None;
-    // TODO: search_type
-    let search_type = SearchType::Normal;
+    let work_group = if !req.work_group.is_empty() {
+        Some(req.work_group.clone())
+    } else {
+        None
+    };
     let optimizer_rules = generate_optimizer_rules(sql, req);
     let ctx = prepare_datafusion_context(
         work_group,
-        &search_type,
         optimizer_rules,
         sql.sorted_by_time,
         target_partitions,

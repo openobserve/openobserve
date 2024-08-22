@@ -57,6 +57,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
+    let use_query_fn = req.query.as_ref().unwrap().uses_zo_fn;
     let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
@@ -162,16 +163,16 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
             sources = super::handle_metrics_response(sources);
         }
 
-        // if sql.uses_zo_fn {
-        //     for source in sources {
-        //         result
-        //             .add_hit(&flatten::flatten(source).map_err(|e|
-        // Error::Message(e.to_string()))?);     }
-        // } else {
-        for source in sources {
-            result.add_hit(&source);
+        if use_query_fn {
+            for source in sources {
+                result
+                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
+            }
+        } else {
+            for source in sources {
+                result.add_hit(&source);
+            }
         }
-        // }
     }
 
     let total = if !track_total_hits {

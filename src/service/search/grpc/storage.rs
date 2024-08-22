@@ -19,7 +19,7 @@ use arrow_schema::Schema;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
-        search::{ScanStats, SearchType, StorageType},
+        search::{ScanStats, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
 };
@@ -45,6 +45,7 @@ pub async fn search(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
     file_list: &[FileKey],
+    sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
@@ -216,19 +217,17 @@ pub async fn search(
         let session = config::meta::search::Session {
             id: format!("{}-{ver}", query.trace_id),
             storage_type: StorageType::Memory,
-            search_type: SearchType::Normal, // TODO: add search_type to query
-            work_group: Some(query.work_group.to_string()),
+            work_group: query.work_group.clone(),
             target_partitions,
         };
 
-        // TODO: leader need to match source file_list by partition key
         let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
         let table = exec::create_parquet_table(
             &session,
             schema_latest.clone(),
             &files,
             diff_fields,
-            &[], // TODO: add order_by to query
+            sorted_by_time,
             file_stat_cache.clone(),
         )
         .await?;

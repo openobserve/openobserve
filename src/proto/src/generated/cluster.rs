@@ -3191,8 +3191,8 @@ pub struct FlightSearchRequest {
     pub end_time: i64,
     #[prost(int64, tag = "12")]
     pub timeout: i64,
-    #[prost(string, tag = "13")]
-    pub work_group: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "13")]
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "14")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
 }

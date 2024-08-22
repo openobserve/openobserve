@@ -23,7 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        search::{ScanStats, SearchType},
+        search::ScanStats,
         stream::{FileKey, StreamType},
     },
 };
@@ -58,15 +58,9 @@ pub async fn search(
     let trace_id = Arc::new(req.trace_id.to_string());
 
     // create datafusion context, just used for decode plan, the params can use default
-    let ctx = prepare_datafusion_context(
-        Some(work_group.clone()),
-        &SearchType::Normal,
-        vec![],
-        false,
-        cfg.limit.cpu_num,
-        None,
-    )
-    .await?;
+    let ctx =
+        prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num, None)
+            .await?;
 
     // register UDF
     register_udf(&ctx, &org_id).await;
@@ -141,7 +135,7 @@ pub async fn search(
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: Some((req.start_time, req.end_time)),
-        work_group: work_group.to_string(),
+        work_group: work_group.clone(),
     });
 
     // get all tables
@@ -156,6 +150,7 @@ pub async fn search(
             query_params.clone(),
             schema_latest.clone(),
             &file_list,
+            empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
         )
         .await
@@ -182,6 +177,7 @@ pub async fn search(
             query_params.clone(),
             schema_latest.clone(),
             search_partition_keys.clone(),
+            empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
         )
         .await

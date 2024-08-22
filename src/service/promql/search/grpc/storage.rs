@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
-        search::{ScanStats, SearchType, Session as SearchSession, StorageType},
+        search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
 };
@@ -153,7 +153,6 @@ pub(crate) async fn create_context(
     let session = SearchSession {
         id: trace_id.to_string(),
         storage_type: StorageType::Memory,
-        search_type: SearchType::Normal,
         work_group: None,
         target_partitions,
     };

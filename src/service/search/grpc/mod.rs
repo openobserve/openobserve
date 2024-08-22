@@ -34,7 +34,7 @@ pub struct QueryParams {
     pub stream_type: StreamType,
     pub stream_name: String,
     pub time_range: Option<(i64, i64)>,
-    pub work_group: String,
+    pub work_group: Option<String>,
 }
 
 fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Result<()> {

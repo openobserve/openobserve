@@ -50,7 +50,7 @@ pub mod super_cluster;
 
 #[cfg(feature = "enterprise")]
 #[tracing::instrument(name = "work_group:checking", skip_all, fields(user_id = user_id))]
-async fn work_group_checking(
+pub async fn work_group_checking(
     trace_id: &str,
     start: std::time::Instant,
     req: &cluster_rpc::SearchRequest,
@@ -103,7 +103,7 @@ async fn work_group_checking(
 
 #[cfg(feature = "enterprise")]
 #[tracing::instrument(name = "work_group:need_wait", skip_all, fields(user_id = user_id))]
-async fn work_group_need_wait(
+pub async fn work_group_need_wait(
     trace_id: &str,
     start: std::time::Instant,
     req: &cluster_rpc::SearchRequest,

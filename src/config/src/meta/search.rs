@@ -35,15 +35,8 @@ pub enum StorageType {
 pub struct Session {
     pub id: String,
     pub storage_type: StorageType,
-    pub search_type: SearchType,
     pub work_group: Option<String>,
     pub target_partitions: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SearchType {
-    Normal,
-    Aggregation,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

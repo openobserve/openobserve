@@ -226,8 +226,7 @@ async fn recursive_process_multiple_metas(
                 if !remaining_metas.is_empty() {
                      return Ok(());
                 };
-                let _ = recursive_process_multiple_metas(&remaining_metas[..], trace_id, cache_req, results, query_key, file_path).await;                    
+                let _ = recursive_process_multiple_metas(&remaining_metas[..], trace_id, cache_req, results, query_key, file_path).await;
     }
     Ok(())
 }
-

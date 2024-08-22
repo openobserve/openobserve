@@ -218,7 +218,11 @@ async fn get_remote_batch(
         start_time: req.query.as_ref().unwrap().start_time,
         end_time: req.query.as_ref().unwrap().end_time,
         timeout: req.timeout,
-        work_group: req.work_group,
+        work_group: if !req.work_group.is_empty() {
+            Some(req.work_group.clone())
+        } else {
+            None
+        },
         user_id: None,
     };
 
