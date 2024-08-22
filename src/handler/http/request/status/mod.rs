@@ -448,7 +448,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
-                        "name": res.0.user_name,
+                        "username": res.0.username,
                         "family_name": res.0.family_name,
                         "given_name": res.0.given_name,
                         "is_valid": res.0.is_valid,

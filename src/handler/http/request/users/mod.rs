@@ -118,21 +118,20 @@ pub async fn save(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User's email id"),
+        ("username" = String, Path, description = "User's username"),
     ),
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/users/{email_id}")]
+#[put("/{org_id}/users/{username}")]
 pub async fn update(
     params: web::Path<(String, String)>,
     user: web::Json<UpdateUser>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_string();
+    let (org_id, username) = params.into_inner();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
     #[cfg(feature = "enterprise")]
@@ -150,8 +149,7 @@ pub async fn update(
         user.role = Some(meta::user::UserRole::Admin);
     }
     let initiator_id = &user_email.user_id;
-    let self_update = user_email.user_id.eq(&email_id);
-    users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
+    users::update_user(&org_id, &username, initiator_id, user).await
 }
 
 /// AddUserToOrganization
@@ -164,23 +162,23 @@ pub async fn update(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User's email id"),
+        ("username" = String, Path, description = "User's username"),
     ),
     request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/users/{email_id}")]
+#[post("/{org_id}/users/{username}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
     role: web::Json<UserOrgRole>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
+    let (org_id, username) = params.into_inner();
     let initiator_id = user_email.user_id;
     let role = role.into_inner().role;
-    users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
+    users::add_user_to_org(&org_id, &username, role, &initiator_id).await
 }
 
 fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
@@ -212,21 +210,21 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User name"),
+        ("username" = String, Path, description = "User's username"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/users/{email_id}")]
+#[delete("/{org_id}/users/{username}")]
 pub async fn delete(
     path: web::Path<(String, String)>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = path.into_inner();
+    let (org_id, username) = path.into_inner();
     let initiator_id = user_email.user_id;
-    users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+    users::remove_user_from_org(&org_id, &username, &initiator_id).await
 }
 
 /// AuthenticateUser
@@ -278,12 +276,12 @@ pub async fn authentication(
                 let auth_header = _req.headers().get("Authorization");
                 if auth_header.is_some() {
                     let auth_header = auth_header.unwrap().to_str().unwrap();
-                    if let Some((name, password)) =
+                    if let Some((email, password)) =
                         o2_enterprise::enterprise::dex::service::auth::get_user_from_token(
                             auth_header,
                         )
                     {
-                        SignInUser { name, password }
+                        SignInUser { email, password }
                     } else {
                         audit_unauthorized_error(audit_message).await;
                         return unauthorized_error(resp);
@@ -302,12 +300,16 @@ pub async fn authentication(
 
     #[cfg(feature = "enterprise")]
     {
-        audit_message.user_email = auth.name.clone();
+        audit_message.user_email = auth.email.clone();
     }
 
-    match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
+    match crate::handler::http::auth::validator::validate_user(&auth.email, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
+                resp.username = v.username;
+                resp.family_name = v.family_name;
+                resp.given_name = v.given_name;
+                resp.role = v.user_role.map_or("".to_string(), |role| role.to_string());
                 resp.status = true;
             } else {
                 #[cfg(feature = "enterprise")]
@@ -321,41 +323,35 @@ pub async fn authentication(
             return unauthorized_error(resp);
         }
     };
-    if resp.status {
-        let cfg = get_config();
 
-        let access_token = format!(
-            "Basic {}",
-            base64::encode(&format!("{}:{}", auth.name, auth.password))
-        );
-        let tokens = json::to_string(&AuthTokens {
-            access_token,
-            refresh_token: "".to_string(),
-        })
-        .unwrap();
+    let cfg = get_config();
+    let access_token = format!(
+        "Basic {}",
+        base64::encode(&format!("{}:{}", auth.email, auth.password))
+    );
+    let tokens = json::to_string(&AuthTokens {
+        access_token,
+        refresh_token: "".to_string(),
+    })
+    .unwrap();
 
-        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
-        auth_cookie.set_expires(
-            cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
-        );
-        auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-        auth_cookie.set_path("/");
-        if cfg.auth.cookie_same_site_lax {
-            auth_cookie.set_same_site(cookie::SameSite::Lax);
-        } else {
-            auth_cookie.set_same_site(cookie::SameSite::None);
-        }
-        // audit the successful login
-        #[cfg(feature = "enterprise")]
-        audit(audit_message).await;
-        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
+    let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+    auth_cookie.set_expires(
+        cookie::time::OffsetDateTime::now_utc()
+            + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+    );
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if cfg.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(cookie::SameSite::Lax);
     } else {
-        #[cfg(feature = "enterprise")]
-        audit_unauthorized_error(audit_message).await;
-        unauthorized_error(resp)
+        auth_cookie.set_same_site(cookie::SameSite::None);
     }
+    // audit the successful login
+    #[cfg(feature = "enterprise")]
+    audit(audit_message).await;
+    Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
 }
 
 #[derive(serde::Deserialize)]
@@ -445,7 +441,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             _timestamp: chrono::Utc::now().timestamp_micros(),
         };
 
-        let (name, password) = {
+        let (email_id, password) = {
             let auth_header = if let Some(s) = query.get("auth") {
                 match query.get("request_time") {
                     Some(req_time_str) => {
@@ -497,26 +493,36 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 validate_user, validate_user_for_query_params,
             };
 
-            let (name, password) = if let Some((name, password)) = get_user_from_token(&auth_header)
+            let (email_id, password) = if let Some((email_id, password)) =
+                get_user_from_token(&auth_header)
             {
                 let token_validation_response = match request_time {
                     Some(req_ts) => {
                         log::debug!("Validating user for query params");
-                        validate_user_for_query_params(&name, &password, Some(req_ts), expires_in)
-                            .await
+                        validate_user_for_query_params(
+                            &email_id,
+                            &password,
+                            Some(req_ts),
+                            expires_in,
+                        )
+                        .await
                     }
                     None => {
                         log::debug!("Validating user for basic auth header");
-                        validate_user(&name, &password).await
+                        validate_user(&email_id, &password).await
                     }
                 };
 
-                audit_message.user_email = name.clone();
+                audit_message.user_email = email_id.clone();
                 match token_validation_response {
                     Ok(v) => {
                         if v.is_valid {
                             resp.status = true;
-                            (name, password)
+                            resp.username = v.username;
+                            resp.family_name = v.family_name;
+                            resp.given_name = v.given_name;
+                            resp.role = v.user_role.map_or("".to_string(), |role| role.to_string());
+                            (email_id, password)
                         } else {
                             audit_unauthorized_error(audit_message).await;
                             return unauthorized_error(resp);
@@ -531,20 +537,20 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 audit_unauthorized_error(audit_message).await;
                 return unauthorized_error(resp);
             };
-            (name, password)
+            (email_id, password)
         };
 
         if resp.status {
             let cfg = get_config();
             let id_token = config::utils::json::json!({
-                "email": name,
-                "name": name,
+                "email": email_id,
+                "name": email_id,
             });
             let cookie_name = "auth_tokens";
             let auth_cookie = if req_ts == 0 {
                 let access_token = format!(
                     "Basic {}",
-                    base64::encode(&format!("{}:{}", &name, &password))
+                    base64::encode(&format!("{}:{}", &email_id, &password))
                 );
                 let tokens = AuthTokens {
                     access_token,
@@ -553,14 +559,14 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {} - {}", email_id, cookie_name);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
                 let auth_ext = format!(
                     "{} {}",
                     cookie_name,
-                    base64::encode(&format!("{}:{}", &name, &password))
+                    base64::encode(&format!("{}:{}", &email_id, &password))
                 );
 
                 let tokens = AuthTokensExt {
@@ -572,7 +578,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(req_ts);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {} - {}", email_id, cookie_name);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 

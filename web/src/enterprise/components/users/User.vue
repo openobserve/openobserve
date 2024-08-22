@@ -189,9 +189,9 @@ export default defineComponent({
         align: "left",
       },
       {
-        name: "email",
-        field: "email",
-        label: t("user.email"),
+        name: "username",
+        field: "username",
+        label: t("user.username"),
         align: "left",
         sortable: true,
       },
@@ -239,36 +239,36 @@ export default defineComponent({
         .orgUsers(
           0,
           1000,
-          "email",
+          "username",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res) => {
           resultTotal.value = res.data.data.length;
 
           let counter = 1;
           orgMembers.value = res.data.data.map((data: any) => {
-            if (store.state.userInfo.email == data.email) {
+            if (store.state.userInfo.username == data.username) {
               currentUserRole.value = data.role;
             }
 
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
-              email: maskText(data.email),
+              username: data.username,
               first_name: data.first_name,
               last_name: data.last_name,
               role: data.role,
               member_created: date.formatDate(
                 parseInt(data.member_created),
-                "YYYY-MM-DDTHH:mm:ssZ"
+                "YYYY-MM-DDTHH:mm:ssZ",
               ),
               member_updated: date.formatDate(
                 parseInt(data.member_updated),
-                "YYYY-MM-DDTHH:mm:ssZ"
+                "YYYY-MM-DDTHH:mm:ssZ",
               ),
               org_member_id: data.org_member_id,
-              isLoggedinUser: store.state.userInfo.email == data.email,
+              isLoggedinUser: store.state.userInfo.username == data.username,
               status: data.status,
             };
           });
@@ -314,7 +314,7 @@ export default defineComponent({
         .filter((email: any) => email.trim().length > 0)
         .map((email: any) => email.trim().toLowerCase());
       const validationArray = emailArray.map((email: any) =>
-        validateEmail(email)
+        validateEmail(email),
       );
 
       if (!validationArray.includes(false)) {
@@ -327,7 +327,7 @@ export default defineComponent({
         organizationsService
           .add_members(
             { member_lists: emailArray, role: selectedRole.value },
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           )
           .then((res: { data: any }) => {
             const data = res.data;
@@ -387,10 +387,10 @@ export default defineComponent({
           {
             id: parseInt(row.orgMemberId ? row.orgMemberId : row.org_member_id),
             role: row.role,
-            email: row.email,
+            username: row.username,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
@@ -447,7 +447,7 @@ export default defineComponent({
           if (
             rows[i]["first_name"]?.toLowerCase().includes(terms) ||
             rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
+            rows[i]["username"]?.toLowerCase().includes(terms) ||
             rows[i]["role"].toLowerCase().includes(terms)
           ) {
             filtered.push(rows[i]);
