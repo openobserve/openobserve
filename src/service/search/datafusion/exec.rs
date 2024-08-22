@@ -36,7 +36,6 @@ use datafusion::{
     catalog::TableProvider,
     common::{tree_node::TreeNode, Column},
     datasource::{
-        empty::EmptyTable,
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
@@ -285,7 +284,9 @@ pub async fn merge_partitions(
         log::info!("Merge sql: {sql}");
     }
 
-    let memtable = Arc::new(EmptyTable::new(schema).with_partitions(cfg.limit.cpu_num));
+    // register empty table
+    let memtable =
+        Arc::new(NewEmptyTable::new("tbl", schema, false).with_partitions(cfg.limit.cpu_num));
     ctx.register_table("tbl", memtable)?;
 
     let plan = ctx.state().create_logical_plan(sql).await?;
