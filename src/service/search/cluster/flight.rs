@@ -79,7 +79,9 @@ pub async fn search(
     }
 
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+    #[cfg(feature = "enterprise")]
     let user_id = req.user_id.clone();
+    #[cfg(feature = "enterprise")]
     let user_id = user_id.as_deref();
     let node_group = req
         .search_event_type
@@ -204,14 +206,79 @@ pub async fn search(
     req.work_group = work_group_str;
 
     // 4. construct physical plan
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
+            return Err(e);
+        }
+    };
 
     // 5. register table
-    register_table(&ctx, &sql).await?;
+    if let Err(e) = register_table(&ctx, &sql).await {
+        // search done, release lock
+        #[cfg(not(feature = "enterprise"))]
+        dist_lock::unlock(&locker).await?;
+        #[cfg(feature = "enterprise")]
+        {
+            work_group
+                .as_ref()
+                .unwrap()
+                .done(trace_id, user_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        return Err(e);
+    }
 
     // 5. create physical plan
-    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
-    let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    let plan = match ctx.state().create_logical_plan(&sql.sql).await {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
+            return Err(e.into());
+        }
+    };
+    let mut physical_plan = match ctx.state().create_physical_plan(&plan).await {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
+            return Err(e.into());
+        }
+    };
 
     if cfg.common.print_key_sql {
         let plan = displayable(physical_plan.as_ref())
@@ -238,7 +305,24 @@ pub async fn search(
         partition_keys,
         match_all_keys,
     );
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+    physical_plan = match physical_plan.rewrite(&mut rewrite) {
+        Ok(v) => v.data,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
+            return Err(e.into());
+        }
+    };
 
     // add remote scan exec to top if physical plan is not changed
     if !rewrite.is_changed {
@@ -264,6 +348,56 @@ pub async fn search(
         println!("{}", plan);
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let mut records = 0;
+        let mut original_size = 0;
+        let mut compressed_size = 0;
+        for file in file_list.iter() {
+            let file_meta = &file.meta;
+            records += file_meta.records;
+            original_size += file_meta.original_size;
+            compressed_size += file_meta.compressed_size;
+        }
+        original_size += idx_scan_size as i64;
+        super::SEARCH_SERVER
+            .add_file_stats(
+                trace_id,
+                file_list.len() as i64,
+                records,
+                original_size,
+                compressed_size,
+            )
+            .await;
+    }
+
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .dec();
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .inc();
+
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if super::SEARCH_SERVER
+        .insert_sender(&trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::info!("[trace_id {trace_id}] search->grpc: search canceled before call search->grpc");
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(&trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
+        ))));
+    }
+
     let datafusion_span = info_span!(
         "service:search:flight:datafusion",
         org_id = sql.org_id,
@@ -286,17 +420,44 @@ pub async fn search(
                 },
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
                     log::error!("[trace_id {trace_id2}] search->flight[leader]: search timeout");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] search->flight[leader]: task timeout")))
+                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] search->flight[leader]: search timeout")))
                 },
+                _ = async {
+                    #[cfg(feature = "enterprise")]
+                    let _ = abort_receiver.await;
+                    #[cfg(not(feature = "enterprise"))]
+                    futures::future::pending::<()>().await;
+                } => {
+                    log::info!("[trace_id {trace_id2}] search->flight[leader]: search canceled");
+                     Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] search->flight[leader]: search canceled")))
+                }
             }
         }
         .instrument(datafusion_span),
     );
 
     let data = match task.await {
-        Ok(Ok(data)) => data,
-        Ok(Err(err)) => return Err(err.into()),
-        Err(err) => return Err(Error::Message(err.to_string())),
+        Ok(Ok(data)) => Ok(data),
+        Ok(Err(err)) => Err(err.into()),
+        Err(err) => Err(Error::Message(err.to_string())),
+    };
+    let data = match data {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
+            return Err(e);
+        }
     };
 
     log::info!("[trace_id {trace_id}] search->flight[leader]: search finished");
