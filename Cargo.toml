@@ -227,8 +227,8 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "6.0", features = ["serde"] }
-datafusion = "41"
-datafusion-proto = "41"
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "e6e1eb229440591263c82bb2b913a4d5a16f9b70" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "e6e1eb229440591263c82bb2b913a4d5a16f9b70" }
 arrow = { version = "52.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "52.2.0"
 arrow-json = "52.2.0"
