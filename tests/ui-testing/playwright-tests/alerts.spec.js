@@ -214,6 +214,7 @@ test.describe("Alerts testcases", () => {
       '[data-test="add-template-name-input"]').fill("test");
     await page.click(".view-line")
     await page.keyboard.type('test');
+    await page.waitForTimeout(500);
     await page.locator(
       '[data-test="add-template-submit-btn"]').click({ force: true }); await expect(page.locator(
         ".q-notification__message").getByText(/Please enter valid JSON/).first()).toBeVisible();
