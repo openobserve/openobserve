@@ -773,6 +773,7 @@ pub struct Common {
 pub struct Limit {
     // no need set by environment
     pub cpu_num: usize,
+    pub real_cpu_num: usize,
     pub mem_total: usize,
     pub disk_total: usize,
     pub disk_free: usize,
@@ -1212,8 +1213,10 @@ pub fn init() -> Config {
         cfg.common.node_role_group = "".to_string();
     }
 
-    // set cpu num
-    let cpu_num = cgroup::get_cpu_limit();
+    // set real cpu num
+    cfg.limit.real_cpu_num = cgroup::get_cpu_limit();
+    // set at least 2 threads
+    let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;
