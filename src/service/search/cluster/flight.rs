@@ -698,11 +698,6 @@ pub async fn generate_context(
         optimizer_rules,
         sql.sorted_by_time,
         target_partitions,
-        if sql.limit >= 0 {
-            Some(sql.limit as usize)
-        } else {
-            None
-        },
     )
     .await?;
 

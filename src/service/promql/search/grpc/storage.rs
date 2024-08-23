@@ -164,7 +164,6 @@ pub(crate) async fn create_context(
         &files,
         HashMap::default(),
         &[],
-        None,
     )
     .await?;
     Ok((ctx, schema, scan_stats))

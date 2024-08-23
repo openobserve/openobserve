@@ -58,7 +58,6 @@ use super::{
     table_provider::NewListingTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::service::search::datafusion::ExtLimit;
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
@@ -81,7 +80,7 @@ pub async fn convert_parquet_file(
     ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx = prepare_datafusion_context(None, vec![], false, 0, None).await?;
+    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -190,7 +189,7 @@ pub async fn merge_parquet_files(
     };
 
     // create datafusion context
-    let ctx = prepare_datafusion_context(None, vec![], false, 0, None).await?;
+    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -223,7 +222,6 @@ pub async fn merge_parquet_files(
 pub fn create_session_config(
     sorted_by_time: bool,
     target_partitions: usize,
-    limit: Option<usize>,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
     let target_partitions = if target_partitions == 0 {
@@ -253,12 +251,6 @@ pub fn create_session_config(
     }
     if sorted_by_time {
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
-        config = config.with_round_robin_repartition(false);
-        config = config.with_coalesce_batches(false);
-        if let Some(limit) = limit {
-            config = config.with_coalesce_batches(limit == 0 || limit >= PARQUET_BATCH_SIZE);
-            config.set_extension::<ExtLimit>(Arc::new(ExtLimit(limit)));
-        }
     }
     Ok(config)
 }
@@ -311,7 +303,6 @@ pub async fn prepare_datafusion_context(
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
     target_partitions: usize,
-    limit: Option<usize>,
 ) -> Result<SessionContext, DataFusionError> {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
@@ -338,7 +329,7 @@ pub async fn prepare_datafusion_context(
         }
     }
 
-    let session_config = create_session_config(sorted_by_time, target_partition, limit)?;
+    let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     if !optimizer_rules.is_empty() {
         let state = SessionStateBuilder::new()
@@ -395,7 +386,6 @@ pub async fn register_table(
     files: &[FileKey],
     rules: HashMap<String, DataType>,
     sort_key: &[(String, bool)],
-    limit: Option<usize>,
 ) -> Result<SessionContext> {
     let cfg = get_config();
     // only sort by timestamp desc
@@ -407,7 +397,6 @@ pub async fn register_table(
         vec![],
         sorted_by_time,
         session.target_partitions,
-        limit,
     )
     .await?;
 

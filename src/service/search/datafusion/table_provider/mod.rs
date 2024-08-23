@@ -30,7 +30,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{any::Any, cmp::Ordering, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
@@ -269,32 +269,22 @@ impl TableProvider for NewListingTable {
             .flatten()
         {
             Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
-            Some(Ok(groups)) => {
-                if groups.len() <= self.options.target_partitions {
-                    let query_limit = state
-                        .config()
-                        .get_extension::<super::ExtLimit>()
-                        .map(|x| x.0)
-                        .unwrap_or(0);
-                    let partition_num =
-                        if query_limit == 0 || query_limit >= config::PARQUET_BATCH_SIZE {
-                            self.options.target_partitions
-                        } else {
-                            config::get_config().limit.cpu_num
-                        };
-                    if partition_num > groups.len() {
-                        partitioned_file_lists = repartition_sorted_groups(groups, partition_num);
-                    } else {
-                        partitioned_file_lists = groups;
-                    }
-                } else {
+            Some(Ok(groups)) => match self.options.target_partitions.cmp(&groups.len()) {
+                Ordering::Equal => {
+                    partitioned_file_lists = groups;
+                }
+                Ordering::Greater => {
+                    partitioned_file_lists =
+                        repartition_sorted_groups(groups, self.options.target_partitions);
+                }
+                Ordering::Less => {
                     log::info!(
                         "attempted to split file groups by statistics, but there were more file groups: {} than target_partitions: {}",
                         groups.len(),
                         self.options.target_partitions
                     )
                 }
-            }
+            },
             None => {} // no ordering required
         };
 
