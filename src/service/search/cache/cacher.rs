@@ -155,7 +155,12 @@ pub async fn check_cache(
 
         multi_res.sort_by_key(|meta| meta.response_start_time);
 
-        let deltas = calculate_deltas_multi(&multi_res, req.query.start_time, req.query.end_time);
+        let deltas = calculate_deltas_multi(
+            &multi_res,
+            req.query.start_time,
+            req.query.end_time,
+            discard_interval,
+        );
 
         for res in multi_res {
             if res.has_cached_data {
@@ -567,6 +572,7 @@ fn calculate_deltas_multi(
     results: &[CachedQueryResponse],
     start_time: i64,
     end_time: i64,
+    histogram_interval: i64,
 ) -> Vec<QueryDelta> {
     let mut deltas = Vec::new();
 
@@ -580,11 +586,23 @@ fn calculate_deltas_multi(
             meta.response_end_time,
             meta.cached_response.hits.len()
         );
+
+        let delta_end_time = if current_end_time != start_time && histogram_interval > 0 {
+            // If there is a histogram interval, we need to adjust the end time to the nearest
+            // interval
+            let mut end_time = meta.response_start_time;
+            if end_time % histogram_interval != 0 {
+                end_time = end_time - (end_time % histogram_interval);
+            }
+            end_time
+        } else {
+            meta.response_start_time
+        };
         if meta.response_start_time > current_end_time {
             // There is a gap (delta) between current coverage and the next meta
             deltas.push(QueryDelta {
                 delta_start_time: current_end_time,
-                delta_end_time: meta.response_start_time,
+                delta_end_time,
                 delta_removed_hits: false,
             });
         }
