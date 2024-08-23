@@ -1126,7 +1126,7 @@ export default defineComponent({
 
             // Show error only if it is not real time alert
             // This case happens when user enters invalid query and then switches to real time alert
-            if (!formData.value.is_real_time)
+            if (formData.value.query_condition.type === "sql")
               q.notify({
                 type: "negative",
                 message: "Invalid SQL Query : " + err.response?.data?.message,
