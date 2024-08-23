@@ -398,7 +398,6 @@ export const usePanelDataLoader = (
             // loop on all partitions and call search api for each partition
             for (const it of panelSchema.value.queries) {
               const partitionResult: any = [];
-              const responseMetaData: any = {};
 
               // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
               state.data.push([]);
@@ -410,6 +409,12 @@ export const usePanelDataLoader = (
               // copy of current abortController
               // which is used to check whether the current query has been aborted
               const abortControllerRef = abortController;
+
+              // Update the metadata for the current query
+              Object.assign(
+                state.metadata.queries[currentQueryIndex],
+                metadata,
+              );
 
               for (const partition of partitionArr) {
                 if (abortControllerRef?.signal?.aborted) {
@@ -438,34 +443,54 @@ export const usePanelDataLoader = (
                   searchType.value ?? "Dashboards",
                 );
 
+                // remove past error detail
+                state.errorDetail = "";
+
+                // if there is an function error and which not related to stream range, throw error
+                if (
+                  searchRes.data.function_error &&
+                  searchRes.data.is_partial != true
+                ) {
+                  // abort on unmount
+                  if (abortController) {
+                    // this will stop partition api call
+                    abortController.abort();
+                  }
+
+                  // throw error
+                  throw new Error(
+                    `Function error: ${searchRes.data.function_error}`,
+                  );
+                }
+
+                // if the query is aborted, break the loop
                 if (abortControllerRef?.signal?.aborted) {
                   break;
                 }
+
                 partitionResult.push(...searchRes.data.hits);
-                Object.assign(responseMetaData, searchRes.data);
 
                 // Update the state with the new data after each partition API call
                 state.data[currentQueryIndex] = JSON.parse(
                   JSON.stringify(partitionResult),
                 );
 
-                // Update the metadata and resultMetaData after each partition API call
-                Object.assign(
-                  state.metadata.queries[currentQueryIndex],
-                  metadata,
-                );
-                Object.assign(
-                  state.resultMetaData[currentQueryIndex],
-                  responseMetaData,
-                );
+                // update result metadata
+                state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
               }
             }
-
-            state.loading = false;
           } catch (error) {
             // Process API error for "sql"
             processApiError(error, "sql");
             return { result: null, metadata: metadata };
+          } finally {
+            // set loading to false
+            state.loading = false;
+
+            // abort on done
+            if (abortController) {
+              abortController.abort();
+            }
           }
         }
 
