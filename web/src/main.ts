@@ -104,59 +104,37 @@ const getConfig = async () => {
 
 getConfig();
 
-if ('serviceWorker' in navigator) {
-  // if (window.Worker) {
-  //   worker.value = new Worker(
-  //     new URL("./sw.js", import.meta.url),
-  //     { type: "module" }
-  //   );
-
-  //   // navigator.serviceWorker.register('./sw.js').then(registration => {
-  //   //   console.log('Service Worker registered:', registration);
-
-  //     worker.value.addEventListener('updatefound', () => {
-  //       // const installingWorker = registration.installing;
-  //       // if (installingWorker) {
-  //         // installingWorker.onstatechange = () => {
-  //           // if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-  //             // A new service worker is installed and ready to take over
-  //             console.log('New service worker installed, prompting reload...');
-  //             // Notify the service worker to skip waiting and activate
-  //             // worker.value.postMessage('skipWaiting');
-  //           // }
-  //         // };
-  //       // }
-  //     });
-  //   // }).catch(error => {
-  //   //   console.error('Service Worker registration failed:', error);
-  //   // });
-  // }
-  navigator.serviceWorker.register('/web/sw.js', {
-    scope: '/web/'
-  }).then(registration => {
-      console.log('Service Worker registered:', registration);
-      // setInterval(() => {
-      //   console.log("inside setinertval", registration)
-      //   registration.update();
-      //   registration?.waiting?.postMessage('skipWaiting');
-      // }, 6000);
-
-      registration.addEventListener('updatefound', () => {
+if ("serviceWorker" in navigator) {
+  let swPath: string = "/sw.js";
+  let scopePath: string = "/";
+  if (window.location.pathname.includes("/web/")) {
+    swPath = "/web/sw.js";
+    scopePath = "/web/";
+  }
+  navigator.serviceWorker
+    .register(swPath, {
+      scope: scopePath,
+    })
+    .then((registration) => {
+      registration.addEventListener("updatefound", () => {
         const installingWorker = registration.installing;
         if (installingWorker) {
           installingWorker.onstatechange = () => {
-            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            if (
+              installingWorker.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
               // A new service worker is installed and ready to take over
-              console.log('New service worker installed, prompting reload...');
               // Notify the service worker to skip waiting and activate
-              registration?.waiting?.postMessage('skipWaiting');
+              registration?.waiting?.postMessage("skipWaiting");
             }
           };
         }
+      });
+    })
+    .catch((error) => {
+      console.error("Service Worker registration failed:", error);
     });
-  }).catch(error => {
-    console.error('Service Worker registration failed:', error);
-  });
 }
 
 app.mount("#app");

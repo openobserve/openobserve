@@ -4,6 +4,8 @@
     "cancel": "Cancel",
     "ok": "Ok",
     "apply": "Apply",
+    "dismiss": "Dismiss",
+    "refresh": "Refresh",
     "startTime": "Start time",
     "endTime": "End time",
     "datetimeMessage": "* You can choose multiple date",
@@ -55,7 +57,9 @@
     "date": "Date",
     "description": "Description",
     "cancelChanges": "Cancel Changes",
-    "logs": "Logs"
+    "logs": "Logs",
+    "swNewContentMsg": "A new version of the application is available. Reload now?",
+    "swUpdateContentMsg": "Updated content is available. Please refresh the page."
   },
   "search": {
     "selectIndex": "Select Stream First",

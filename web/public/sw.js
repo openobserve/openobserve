@@ -1,10 +1,16 @@
 // sw.js
 
 // Version identifier for cache and update management
-const cacheVersion = `O2-cache-v23`;
+const cacheVersion = `O2-cache-v1`;
 // Function to fetch the asset manifest
+
+let pathPrefix = "/";
+
+if(window.location.pathname.indexOf("/web") > -1) {
+  pathPrefix = "/web/";
+}
 async function fetchManifest() {
-  const response = await fetch("/web/manifest.json");
+  const response = await fetch(`${pathPrefix}manifest.json`);
   return response.json();
 }
 self.addEventListener("install", function (event) {
@@ -17,10 +23,10 @@ self.addEventListener("install", function (event) {
 
       Object.keys(manifest).forEach((key) => {
         if (key == "index.html") {
-          filesToCache.push("/web/");
-          filesToCache.push("/web/favicon.ico");
-          filesToCache.push(`/web/${manifest[key]["file"]}`);
-          filesToCache.push("/web/sw.js");
+          filesToCache.push(`${pathPrefix}`);
+          filesToCache.push(`${pathPrefix}favicon.ico`);
+          filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          filesToCache.push(`${pathPrefix}sw.js`);
         }
         if (
           typeof manifest[key] == "object" &&
@@ -52,8 +58,6 @@ self.addEventListener("install", function (event) {
                 `Request for ${file} failed with status ${response.status}`
               );
             }
-            console.log(file, "added to cache with a res", response.clone());
-
 
             await cache.put(file, response.clone());
           } catch (error) {
@@ -61,8 +65,6 @@ self.addEventListener("install", function (event) {
           }
         })
       );
-
-      // self.skipWaiting(); // Uncomment if you want the SW to take control immediately
     })()
   );
 });
@@ -76,7 +78,6 @@ self.addEventListener('activate', function(event) {
           // Check if cacheName starts with the cacheVersion or contains it as part of the name
           return !cacheName.startsWith(cacheVersion);
         }).map(function(cacheName) {
-          console.log('Deleting cache:', cacheName); // Debug: Log cache being deleted
           return caches.delete(cacheName);
         })
       );
@@ -87,41 +88,20 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-
-
-// self.addEventListener('fetch', function(event) {
-//   // Intercept fetch requests and serve from cache if available
-//   event.respondWith(
-//     caches.match(event.request).then(function(response) {
-//       return response || fetch(event.request);
-//     })
-//   );
-// });
-
   self.addEventListener("fetch", function (event) {
-    console.log(event.request,"event request")
-    caches
-        .open(cacheVersion).then(function (cache) {
-          console.log(cache,"cache")
-        })
-    
     event.respondWith(
       caches
         .open(cacheVersion).then(function (cache) {
-          console.log("event.request", event.request);
-          console.log("cache", cache);
           return cache.match(event.request);
         })
         .then(function (response) {
           if (response) {
-            console.log(response,"res in fetch")
             return response.clone();
           }
-          console.log(event.request, "event.request 2 in fetch");
+
           var fetchRequest = event.request;
           return fetch(fetchRequest)
             .then(function (response) {
-              console.log("response", JSON.stringify(response));
               if (
                 !response ||
                 response.status !== 200 ||
@@ -130,7 +110,6 @@ self.addEventListener('activate', function(event) {
                 let staleFlag = false;
                 self.clients.matchAll().then((clients) => {
                   clients.forEach((client) => {
-                    console.log("client", JSON.stringify(client));
                     if (event.request.url.endsWith('.js')) {
                       staleFlag = true;
                       if (staleFlag) {
@@ -141,21 +120,19 @@ self.addEventListener('activate', function(event) {
                     }
                   });
                 });
-                console.log(response, "res 2 in fetch");
                 return response;
               }
               if (event.request.method === 'POST') {
                 // Do not cache POST requests
                 event.respondWith(
                   fetch(event.request).catch(function(error) {
-                    console.error('Fetch failed:', error);
                     throw error;
                   })
                 );
                 return;
               }
               var responseToCache = response.clone();
-              console.log(responseToCache, "res 3 in fetch");
+
               caches
                 .open(cacheVersion)
                 .then(function (cache) {
@@ -183,7 +160,6 @@ self.addEventListener('activate', function(event) {
   });
 
 self.addEventListener("message", function (event) {
-  console.log(event.data);
   if (event.data === "skipWaiting") {
     caches.delete(cacheVersion);
     self.skipWaiting();
