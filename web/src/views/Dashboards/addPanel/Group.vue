@@ -8,6 +8,7 @@
     :options="filterOptions"
     @update:model-value="emitLogicalOperatorChange"
     class="condition-logical-operator"
+    data-test="dashboard-add-group-logical-operator"
   />
   <div class="group" :style="`--group-index: ${groupNestedIndex}`">
     <div class="group-conditions">
@@ -42,7 +43,14 @@
           :condition-index="index"
         />
       </div>
-      <q-btn icon="add" color="primary" size="xs" round class="add-btn">
+      <q-btn
+        icon="add"
+        color="primary"
+        size="xs"
+        round
+        class="add-btn"
+        data-test="dashboard-add-condition-add"
+      >
         <q-menu v-model="showAddMenu">
           <q-list>
             <q-item clickable @click="emitAddCondition">
@@ -56,7 +64,14 @@
       </q-btn>
     </div>
     <div v-if="groupNestedIndex !== 0" class="group-remove">
-      <q-btn flat size="xs" dense @click="$emit('remove-group')" icon="close" />
+      <q-btn
+        flat
+        size="xs"
+        dense
+        @click="$emit('remove-group')"
+        icon="close"
+        data-test="dashboard-add-group-remove"
+      />
     </div>
   </div>
 </template>

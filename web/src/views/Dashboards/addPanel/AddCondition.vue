@@ -9,6 +9,7 @@
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
+      data-test="dashboard-add-condition-logical-operator"
     />
     <q-btn-group>
       <q-btn
@@ -21,6 +22,7 @@
         size="sm"
         :label="computedLabel(condition)"
         class="q-pl-sm"
+        data-test="dashboard-add-condition-label"
       >
         <q-menu
           class="q-pa-md"
@@ -43,8 +45,15 @@
               emit-value
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
+              data-test="dashboard-add-condition-column"
             />
-            <q-btn size="xs" dense @click="removeColumnName" icon="close" />
+            <q-btn
+              size="xs"
+              dense
+              @click="removeColumnName"
+              icon="close"
+              data-test="dashboard-add-condition-remove-column"
+            />
           </div>
           <div style="height: 100%">
             <div class="q-pa-xs" style="height: 100%">
@@ -55,12 +64,14 @@
                     name="list"
                     :label="t('common.list')"
                     style="width: auto"
+                    data-test="dashboard-add-condition-list"
                   ></q-tab>
                   <q-tab
                     dense
                     name="condition"
                     :label="t('common.condition')"
                     style="width: auto"
+                    data-test="dashboard-add-condition-condition"
                   ></q-tab>
                 </q-tabs>
                 <q-separator></q-separator>
@@ -79,6 +90,7 @@
                         :options="operators"
                         :label="t('common.operator')"
                         style="width: 100%"
+                        data-test="dashboard-add-condition-operator"
                       />
                       <CommonAutoComplete
                         v-if="
@@ -109,6 +121,7 @@
                       ]"
                       use-input
                       @filter="filterListFn"
+                      data-test="dashboard-add-condition-list"
                     >
                       <template v-slot:selected>
                         {{
@@ -136,6 +149,7 @@
                               dense
                               :model-value="selected"
                               @update:model-value="toggleOption(opt)"
+                              data-test="dashboard-add-condition-list-item"
                             ></q-checkbox>
                           </q-item-section>
                           <q-item-section>
@@ -151,7 +165,13 @@
           </div>
         </q-menu>
       </q-btn>
-      <q-btn size="xs" dense @click="$emit('remove-condition')" icon="close" />
+      <q-btn
+        size="xs"
+        dense
+        @click="$emit('remove-condition')"
+        icon="close"
+        data-test="dashboard-add-condition-remove"
+      />
     </q-btn-group>
   </div>
 </template>
@@ -221,7 +241,7 @@ export default defineComponent({
 
     const computedLabel = (condition: any) => {
       if (condition.operator === "match_all") {
-        return condition.operator + "("  + condition.value + ")";
+        return condition.operator + "(" + condition.value + ")";
       } else {
         return props.condition.column;
       }
