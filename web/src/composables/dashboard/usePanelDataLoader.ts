@@ -373,7 +373,9 @@ export const usePanelDataLoader = (
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
                 sql: await changeHistogramInterval(query, histogramInterval),
-                query_fn: it.vrlFunctionQuery ? it.vrlFunctionQuery : null,
+                query_fn: it.vrlFunctionQuery
+                  ? b64EncodeUnicode(it.vrlFunctionQuery)
+                  : null,
                 sql_mode: "full",
                 start_time: startISOTimestamp,
                 end_time: endISOTimestamp,
