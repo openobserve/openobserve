@@ -35,7 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-drag"
         />
         <div :title="props.data.title" class="panelHeader">
-          {{ props.data.title }}
+          {{ props.data.title }} 
+          <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+            <span class="lastRefreshedAtIcon">🕑</span><RelativeTime :timestamp="lastTriggeredAt" fullTimePrefix="Last Refreshed At: "/></span>
         </div>
         <q-space />
         <q-icon
@@ -196,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :folder-id="props.folderId"
       @metadata-update="metaDataValue"
       @result-metadata-update="handleResultMetadataUpdate"
+      @last-triggered-at-update="handleLastTriggeredAtUpdate"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
       @update:initial-variable-values="
         (...args) => $emit('update:initial-variable-values', ...args)
@@ -236,6 +239,7 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 
@@ -271,6 +275,7 @@ export default defineComponent({
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
+    RelativeTime
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -307,6 +312,12 @@ export default defineComponent({
         }
       });
       maxQueryRange.value = combinedWarnings;
+    };
+
+    // to store and show when the panel was last loaded
+    const lastTriggeredAt = ref(null)
+    const handleLastTriggeredAtUpdate = (data: any) => {
+      lastTriggeredAt.value = data;
     };
 
     const showText = ref(false);
@@ -415,6 +426,8 @@ export default defineComponent({
       store,
       metaDataValue,
       handleResultMetadataUpdate,
+      handleLastTriggeredAtUpdate,
+      lastTriggeredAt,
       maxQueryRange,
       metaData,
       showViewPanel,
@@ -458,5 +471,22 @@ export default defineComponent({
 
 .warning {
   color: var(--q-warning);
+}
+
+.lastRefreshedAt {
+  font-size: smaller;
+  margin-left: 5px;
+
+  &::after {
+    content: ")";
+  }
+
+  &::before {
+    content: "(";
+  }
+
+  & .lastRefreshedAtIcon {
+    font-size: smaller;
+  }
 }
 </style>

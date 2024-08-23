@@ -229,6 +229,7 @@ export default defineComponent({
     "error",
     "metadata-update",
     "result-metadata-update",
+    "last-triggered-at-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
   ],
@@ -254,7 +255,7 @@ export default defineComponent({
       folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } =
+    let { data, loading, errorDetail, metadata, resultMetaData, lastTriggeredAt } =
       usePanelDataLoader(
         panelSchema,
         selectedTimeObj,
@@ -375,6 +376,10 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    watch(lastTriggeredAt, () => {
+      emit("last-triggered-at-update", lastTriggeredAt.value);
+    });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(

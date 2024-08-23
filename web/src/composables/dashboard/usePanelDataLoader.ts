@@ -65,18 +65,17 @@ export const usePanelDataLoader = (
    * @returns cache key
    */
   const getCacheKey = () => ({
-    panelSchema,
-    selectedTimeObj,
-    variablesData,
-    forceLoad,
-    searchType,
-    dashboardId,
-    folderId,
+    panelSchema: toRaw(panelSchema.value),
+    variablesData: toRaw(variablesData.value),
+    forceLoad: toRaw(forceLoad.value),
+    searchType: toRaw(searchType.value),
+    dashboardId: toRaw(dashboardId?.value),
+    folderId: toRaw(folderId?.value),
   })
 
   const { getPanelCache, savePanelCache } = usePanelCache(
-    folderId,
-    dashboardId,
+    folderId?.value,
+    dashboardId?.value,
     panelSchema.value.id,
   );
 
@@ -88,6 +87,7 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     resultMetaData: [] as any,
+    lastTriggeredAt: null as any
   });
 
   // observer for checking if panel is visible on the screen
@@ -282,6 +282,7 @@ export const usePanelDataLoader = (
       }
 
       state.loading = true;
+      state.lastTriggeredAt = new Date().getTime();
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
@@ -1249,13 +1250,13 @@ export const usePanelDataLoader = (
       state.errorDetail = tempPanelCacheValue.errorDetail;
       state.metadata = tempPanelCacheValue.metadata;
       state.resultMetaData = tempPanelCacheValue.resultMetaData;    
+      state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
 
       // set that the cache is restored
       isRestoredFromCache = true
       
       log(
-        "usePanelDataLoader: panelcache: panel data loaded from cache",
-        JSON.stringify(state, null, 2),
+        "usePanelDataLoader: panelcache: panel data loaded from cache"
       );
     }
 
