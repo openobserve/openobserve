@@ -148,7 +148,6 @@ pub async fn handle_trace_request(
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
-                let span2 = span.clone(); // TODO: remove this clone
                 let span_id: String = SpanId::from_bytes(
                     span.span_id
                         .try_into()
@@ -205,22 +204,22 @@ pub async fn handle_trace_request(
                     for link_att in link.attributes {
                         link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
                     }
+                    let span_id: String = SpanId::from_bytes(
+                        link.span_id
+                            .try_into()
+                            .expect("slice with incorrect length"),
+                    )
+                    .to_string();
+                    let trace_id: String = TraceId::from_bytes(
+                        link.trace_id
+                            .try_into()
+                            .expect("slice with incorrect length"),
+                    )
+                    .to_string();
                     links.push(SpanLink {
                         context: SpanLinkContext {
-                            span_id: match String::from_utf8(link.span_id){
-                                Ok(v) => v,
-                                Err(_) => {
-                                    log::error!("Error while converting span_id to string: {:?}", span2);
-                                    panic!("Error while converting span_id to string");
-                                }
-                            },
-                            trace_id: match String::from_utf8(link.trace_id){
-                                Ok(v) => v,
-                                Err(_) => {
-                                    log::error!("Error while converting trace_id to string: {:?}", span2);
-                                    panic!("Error while converting trace_id to string");
-                                }
-                            },
+                            span_id,
+                            trace_id,
                             trace_flags: Some(link.flags),
                             trace_state: Some(link.trace_state),
                         },
