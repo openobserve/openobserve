@@ -199,8 +199,12 @@ export const convertPromQLData = async (
 
         const date = new Date(name[0].data[0]);
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
+        // sort tooltip array based on value
+        name.sort((a: any, b: any) => {
+          return (b.value[1] || 0) - (a.value[1] || 0);
+        });
+
+        // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
@@ -208,11 +212,14 @@ export const convertPromQLData = async (
               it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
-          // swap current hovered series index to top in tooltip
+          // if hovered series index is not -1 then take it to very first position
           if (currentSeriesIndex != -1) {
-            const temp = name[0];
-            name[0] = name[currentSeriesIndex];
-            name[currentSeriesIndex] = temp;
+            // shift all series to next position and place current series at first position
+            const temp = name[currentSeriesIndex];
+            for (let i = currentSeriesIndex; i > 0; i--) {
+              name[i] = name[i - 1];
+            }
+            name[0] = temp;
           }
         }
 
@@ -576,10 +583,7 @@ export const convertPromQLData = async (
                   return {
                     type: "text",
                     style: {
-                      text:
-                        (parseFloat(unitValue?.value)?.toFixed(
-                          panelSchema.config.decimals ?? 2,
-                        ) ?? 0) + unitValue.unit,
+                      text: formatUnitValue(unitValue),
                       fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",

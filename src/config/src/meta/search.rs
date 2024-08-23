@@ -329,6 +329,8 @@ pub struct SearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -553,6 +555,8 @@ pub struct MultiSearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

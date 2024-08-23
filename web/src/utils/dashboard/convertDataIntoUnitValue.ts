@@ -97,9 +97,36 @@ export const getUnitValue = (
   value: any,
   unit: string,
   customUnit: string,
-  decimals: number = 2
+  decimals: number = 2,
 ) => {
   // console.time("getUnitValue:");
+  let formattedValue;
+  if (
+    [
+      "currency-dollar",
+      "currency-euro",
+      "currency-pound",
+      "currency-yen",
+      "currency-rupee",
+    ].includes(unit)
+  ) {
+    const numericValue = parseFloat(value) || 0;
+    const formattedNumber = numericValue.toFixed(decimals);
+
+    const localeMap: any = {
+      "currency-dollar": "en-US", // US Dollar
+      "currency-euro": "de-DE", // Euro
+      "currency-pound": "en-GB", // British Pound
+      "currency-yen": "ja-JP", // Japanese Yen
+      "currency-rupee": "en-IN", // Indian Rupee
+    };
+
+    formattedValue = new Intl.NumberFormat(localeMap[unit], {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(Number(formattedNumber));
+  }
+
   // value sign: positive = 1, negative = -1
   const sign = Math.sign(value);
   // abs value
@@ -162,14 +189,44 @@ export const getUnitValue = (
         unit: "%",
       };
     }
+    case "currency-pound": {
+      return {
+        value: `${formattedValue}`,
+        unit: "£",
+      };
+    }
+    case "currency-dollar": {
+      return {
+        value: `${formattedValue}`,
+        unit: "$",
+      };
+    }
+    case "currency-euro": {
+      return {
+        value: `${formattedValue}`,
+        unit: "€",
+      };
+    }
+    case "currency-yen": {
+      return {
+        value: `${formattedValue}`,
+        unit: "¥",
+      };
+    }
+    case "currency-rupee": {
+      return {
+        value: `${formattedValue}`,
+        unit: "₹",
+      };
+    }
     case "default":
     default: {
       return {
         value: isNaN(value)
           ? value
           : value === ""
-          ? "-"
-          : (+value)?.toFixed(decimals) ?? 0,
+            ? "-"
+            : ((+value)?.toFixed(decimals) ?? 0),
         unit: "",
       };
     }
@@ -183,6 +240,11 @@ export const getUnitValue = (
  * @return {string} The formatted unit value.
  */
 export const formatUnitValue = (obj: any) => {
+  const { unit } = obj;
+
+  if (["$", "€", "£", "¥", "₹"].includes(unit)) {
+    return `${obj.unit}${obj.value}`;
+  }
   return `${obj.value}${obj.unit}`;
 };
 
@@ -215,6 +277,6 @@ export const isTimeSeries = (sample: any) => {
 export const isTimeStamp = (sample: any) => {
   const microsecondsPattern = /^\d{16}$/;
   return sample.every((value: any) =>
-    microsecondsPattern.test(value?.toString())
+    microsecondsPattern.test(value?.toString()),
   );
 };

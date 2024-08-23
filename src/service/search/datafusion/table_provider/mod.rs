@@ -62,6 +62,7 @@ use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
 
+pub mod empty_table;
 mod helpers;
 pub mod memtable;
 

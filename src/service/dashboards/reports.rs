@@ -31,9 +31,12 @@ use crate::{
     common::{
         meta::{
             authz::Authz,
-            dashboards::reports::{
-                HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
-                ReportFrequencyType, ReportTimerangeType,
+            dashboards::{
+                datetime_now,
+                reports::{
+                    HttpReportPayload, Report, ReportDashboard, ReportDestination,
+                    ReportEmailDetails, ReportFrequencyType, ReportTimerangeType,
+                },
             },
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
@@ -100,10 +103,13 @@ pub async fn save(
     }
 
     match db::dashboards::reports::get(org_id, &report.name).await {
-        Ok(_) => {
+        Ok(old_report) => {
             if create {
                 return Err(anyhow::anyhow!("Report already exists"));
             }
+            report.last_triggered_at = old_report.last_triggered_at;
+            report.owner = old_report.owner;
+            report.updated_at = Some(datetime_now());
         }
         Err(_) => {
             if !create {

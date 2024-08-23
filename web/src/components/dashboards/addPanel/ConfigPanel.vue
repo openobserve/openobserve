@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding-bottom: 30px;">
+  <div style="padding-bottom: 30px">
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.unit
             ? unitOptions.find(
-                (it) => it.value == dashboardPanelData.data.config.unit
+                (it) => it.value == dashboardPanelData.data.config.unit,
               )?.label
             : 'Default'
         }`"
@@ -201,8 +201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         min="0"
         max="100"
         @update:model-value="
-        (value: any) => (dashboardPanelData.data.config.decimals = ( typeof value == 'number' && value >= 0) ? value : 2)
-      "
+          (value: any) =>
+            (dashboardPanelData.data.config.decimals =
+              typeof value == 'number' && value >= 0 ? value : 2)
+        "
         :rules="[
           (val: any) =>
             (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
@@ -328,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 1,
-                'min'
+                'min',
               )
             "
             :label="t('dashboard.minimum')"
@@ -359,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 100,
-                'max'
+                'max',
               )
             "
             :label="t('dashboard.maximum')"
@@ -389,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             handleBlur(
               dashboardPanelData.data.config.map_symbol_style,
               2,
-              'size_fixed'
+              'size_fixed',
             )
           "
           :label="t('dashboard.fixedValue')"
@@ -497,6 +499,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
+      <div class="space"></div>
+      <q-input
+        v-if="
+          [
+            'area',
+            'bar',
+            'line',
+            'h-bar',
+            'h-stacked',
+            'scatter',
+            'area-stacked',
+            'stacked',
+          ].includes(dashboardPanelData.data.type) && !promqlMode
+        "
+        v-model.number="dashboardPanelData.data.config.top_results"
+        :min="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.top_results = value ? value : null)
+        "
+        label="Top Results"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="ALL"
+        :type="'number'"
+        :disable="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.breakdown.length == 0
+        "
+        data-test="dashboard-config-top_results"
+        ><template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            Show top n values
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-top_results-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+                max-width="250px"
+              >
+                <b
+                  >This is only applicable when breakdown field is available</b
+                >
+                <br />
+                <br />
+                Specify the number of top N values to show when breakdown field
+                is available.
+              </q-tooltip>
+            </div>
+          </div>
+        </template></q-input
+      >
+
+      <div
+        class="row items-center"
+        v-if="
+          [
+            'area',
+            'bar',
+            'line',
+            'h-bar',
+            'h-stacked',
+            'scatter',
+            'area-stacked',
+            'stacked',
+          ].includes(dashboardPanelData.data.type) && !promqlMode
+        "
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.top_results_others"
+          label="Add 'others' series"
+          data-test="dashboard-config-top_results_others"
+          :disable="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown.length == 0
+          "
+        />
+
+        <q-icon
+          class="q-ml-xs"
+          size="20px"
+          name="info"
+          data-test="dashboard-config-top_results-others-info"
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            Include an 'others' series for values outside the top results when
+            using breakdown fields.
+          </q-tooltip>
+        </q-icon>
+      </div>
+
+      <div class="space"></div>
+
       <CommonAutoComplete
         v-if="promqlMode"
         :label="t('common.legend')"
@@ -548,7 +662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="
           ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
@@ -561,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-input
         v-if="
           ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
@@ -637,7 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config,
             1,
-            'weight_fixed'
+            'weight_fixed',
           )
         "
         :label="t('common.weight')"
@@ -768,7 +882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         :variablesData="variablesData"
@@ -832,6 +946,11 @@ export default defineComponent({
 
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
+      }
+
+      // by default, use top_results_others as false
+      if (!dashboardPanelData.data.config.top_results_others) {
+        dashboardPanelData.data.config.top_results_others = false;
       }
 
       // Ensure that the nested structure is initialized
@@ -981,6 +1100,27 @@ export default defineComponent({
         value: "percent",
       },
       {
+        label: t("dashboard.currencyDollar"),
+        value: "currency-dollar",
+      },
+      {
+        label: t("dashboard.currencyEuro"),
+        value: "currency-euro",
+      },
+      {
+        label: t("dashboard.currencyPound"),
+        value: "currency-pound",
+      },
+      {
+        label: t("dashboard.currencyYen"),
+        value: "currency-yen",
+      },
+      {
+        label: t("dashboard.currencyRupees"),
+        value: "currency-rupee",
+      },
+
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },
@@ -1028,8 +1168,8 @@ export default defineComponent({
             label: it.name,
             value: it.name,
           };
-        }
-      )
+        },
+      ),
     );
 
     return {

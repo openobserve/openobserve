@@ -427,6 +427,7 @@ test.describe("Sanity testcases", () => {
     const jsonString = '{"text": "{alert_name} is active"}';
     await page.click(".view-line");
     await page.keyboard.type(jsonString);
+    await page.waitForTimeout(500);
     await page
       .locator('[data-test="add-template-submit-btn"]')
       .click({ force: true });
