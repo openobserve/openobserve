@@ -2496,7 +2496,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2531,7 +2531,7 @@ dependencies = [
  "half",
  "hashbrown 0.14.5",
  "indexmap 2.2.6",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "num_cpus",
  "object_store",
@@ -2553,7 +2553,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow-schema",
  "async-trait",
@@ -2566,7 +2566,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2588,7 +2588,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common-runtime"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "tokio",
 ]
@@ -2596,7 +2596,7 @@ dependencies = [
 [[package]]
 name = "datafusion-execution"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "chrono",
@@ -2616,7 +2616,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2637,7 +2637,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -2647,7 +2647,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "arrow-buffer",
@@ -2660,7 +2660,7 @@ dependencies = [
  "datafusion-expr",
  "hashbrown 0.14.5",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "md-5",
  "rand",
@@ -2673,7 +2673,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2693,7 +2693,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2706,7 +2706,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-nested"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -2718,7 +2718,7 @@ dependencies = [
  "datafusion-expr",
  "datafusion-functions",
  "datafusion-functions-aggregate",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "paste",
  "rand",
@@ -2727,7 +2727,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "datafusion-common",
  "datafusion-expr",
@@ -2738,7 +2738,7 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "async-trait",
@@ -2748,7 +2748,7 @@ dependencies = [
  "datafusion-physical-expr",
  "hashbrown 0.14.5",
  "indexmap 2.2.6",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "paste",
  "regex-syntax 0.8.4",
@@ -2757,7 +2757,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2778,7 +2778,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "hex",
  "indexmap 2.2.6",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "paste",
  "petgraph",
@@ -2788,7 +2788,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2801,7 +2801,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-functions-aggregate"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2816,19 +2816,19 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-optimizer"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "datafusion-common",
  "datafusion-execution",
  "datafusion-physical-expr",
  "datafusion-physical-plan",
- "itertools 0.12.1",
+ "itertools 0.13.0",
 ]
 
 [[package]]
 name = "datafusion-physical-plan"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2851,7 +2851,7 @@ dependencies = [
  "half",
  "hashbrown 0.14.5",
  "indexmap 2.2.6",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "once_cell",
  "parking_lot",
@@ -2863,7 +2863,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "chrono",
@@ -2878,7 +2878,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto-common"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "chrono",
@@ -2890,7 +2890,7 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "41.0.0"
-source = "git+https://github.com/openobserve/datafusion?rev=e6e1eb229440591263c82bb2b913a4d5a16f9b70#e6e1eb229440591263c82bb2b913a4d5a16f9b70"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
 dependencies = [
  "arrow",
  "arrow-array",
