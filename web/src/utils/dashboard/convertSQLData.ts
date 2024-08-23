@@ -217,9 +217,7 @@ export const convertSQLData = async (
 
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
 
-  console.time("processData Time");
   const processedData = processData(searchQueryData, panelSchema);
-  console.timeEnd("processData Time");
 
   const missingValue = () => {
     // Get the interval in minutes
