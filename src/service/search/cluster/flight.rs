@@ -217,7 +217,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(trace_id, user_id)
+                    .done(&trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
@@ -235,11 +235,65 @@ pub async fn search(
             work_group
                 .as_ref()
                 .unwrap()
-                .done(trace_id, user_id)
+                .done(&trace_id, user_id)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
         }
         return Err(e);
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        // TODO
+        let idx_scan_size = 0;
+        let mut records = 0;
+        let mut original_size = 0;
+        let mut compressed_size = 0;
+        for file in file_list_vec.iter() {
+            let file_meta = &file.meta;
+            records += file_meta.records;
+            original_size += file_meta.original_size;
+            compressed_size += file_meta.compressed_size;
+        }
+        original_size += idx_scan_size as i64;
+        super::super::SEARCH_SERVER
+            .add_file_stats(
+                &trace_id,
+                file_list_vec.len() as i64,
+                records,
+                original_size,
+                compressed_size,
+            )
+            .await;
+    }
+
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .dec();
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .inc();
+
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if super::super::SEARCH_SERVER
+        .insert_sender(&trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::info!("[trace_id {trace_id}] search->grpc: search canceled before call search->grpc");
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(&trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        return Err(Error::ErrorCode(
+            infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
+            )),
+        ));
     }
 
     // 5. create physical plan
@@ -254,7 +308,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(trace_id, user_id)
+                    .done(&trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
@@ -272,7 +326,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(trace_id, user_id)
+                    .done(&trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
@@ -316,7 +370,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(trace_id, user_id)
+                    .done(&trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
@@ -346,56 +400,6 @@ pub async fn search(
         println!("leader physical plan after rewrite");
         println!("+---------------------------+----------+");
         println!("{}", plan);
-    }
-
-    #[cfg(feature = "enterprise")]
-    {
-        let mut records = 0;
-        let mut original_size = 0;
-        let mut compressed_size = 0;
-        for file in file_list.iter() {
-            let file_meta = &file.meta;
-            records += file_meta.records;
-            original_size += file_meta.original_size;
-            compressed_size += file_meta.compressed_size;
-        }
-        original_size += idx_scan_size as i64;
-        super::SEARCH_SERVER
-            .add_file_stats(
-                trace_id,
-                file_list.len() as i64,
-                records,
-                original_size,
-                compressed_size,
-            )
-            .await;
-    }
-
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&sql.org_id])
-        .dec();
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[&sql.org_id])
-        .inc();
-
-    #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if super::SEARCH_SERVER
-        .insert_sender(&trace_id, abort_sender)
-        .await
-        .is_err()
-    {
-        log::info!("[trace_id {trace_id}] search->grpc: search canceled before call search->grpc");
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(&trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
-        ))));
     }
 
     let datafusion_span = info_span!(
@@ -452,7 +456,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(trace_id, user_id)
+                    .done(&trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
