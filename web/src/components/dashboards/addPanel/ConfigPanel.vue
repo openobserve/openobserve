@@ -553,11 +553,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 max-width="250px"
               >
                 <b
-                  >This is only applicable when breakdown fields is available</b
+                  >This is only applicable when breakdown field is available</b
                 >
                 <br />
                 <br />
-                Specify the number of top values to show when breakdown fields
+                Specify the number of top N values to show when breakdown field
                 is available.
               </q-tooltip>
             </div>
@@ -603,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             self="bottom middle"
             max-width="250px"
           >
-            Include an 'Others' series for values outside the top results when
+            Include an 'others' series for values outside the top results when
             using breakdown fields.
           </q-tooltip>
         </q-icon>
