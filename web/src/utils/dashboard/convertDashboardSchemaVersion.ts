@@ -126,21 +126,31 @@ export function convertDashboardSchemaVersion(data: any) {
       data.version = 4;
     }
     case 4: {
+      // Migrate the filter property from an array of {type, values, column, operator, value} to
+      // an object with filterType: "group", logicalOperator: "AND", and conditions: [...]
       data.tabs.forEach((tabItem: any) => {
         tabItem.panels.forEach((panelItem: any) => {
           panelItem.queries.forEach((queryItem: any) => {
             if (queryItem.fields.filter) {
               if (queryItem.fields.filter.length > 0) {
+                // If the filter array is not empty, convert it to the new format
                 const newFilter = {
                   filterType: "group",
                   logicalOperator: "AND",
                   conditions: queryItem.fields.filter.map((filter: any) => ({
+                    // The type of the filter
                     type: filter.type,
+                    // The values of the filter
                     values: filter.values,
+                    // The column of the filter
                     column: filter.column,
+                    // The operator of the filter
                     operator: filter.operator,
+                    // The value of the filter
                     value: filter.value,
+                    // The logical operator of the filter
                     logicalOperator: "AND",
+                    // The type of the filter
                     filterType: "condition",
                   })),
                 };
@@ -160,6 +170,7 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 5;
     }
+
   }
 
   // return converted data

@@ -1663,22 +1663,41 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     updateQueryValue();
   };
 
-  const formatValue = (value: any) => {
+  /**
+   * Format a value to be used in a SQL query.
+   * @param value - the value to format
+   * @returns the formatted value
+   */
+  const formatValue = (value: any): string | null => {
     if (value == null) {
+      // if value is null or undefined, return it as is
       return value;
     }
 
+    // if value is a string, remove any single quotes and add double quotes
     let tempValue = value;
     if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
       tempValue = value.substring(1, value.length - 1);
     }
+    // escape any single quotes in the value
     tempValue = escapeSingleQuotes(tempValue);
+    // add double quotes around the value
     tempValue = `'${tempValue}'`;
     return tempValue;
   };
 
+  /**
+   * Format a value for an IN clause in a SQL query.
+   * If the value contains a variable, e.g. $variable, it will be returned as is.
+   * Otherwise, if the value is a string, it will be split into individual values
+   * using the `splitQuotedString` util function. Each value will be escaped and
+   * enclosed in single quotes, and the resulting array of strings will be joined
+   * with commas.
+   * @param value - the value to format
+   * @returns the formatted value
+   */
   const formatINValue = (value: any) => {
-    //if variable is present dont want to use splitQuotedString
+    // if variable is present, don't want to use splitQuotedString
     if (value?.includes("$")) {
       if (value.startsWith("(") && value.endsWith(")")) {
         return value.substring(1, value.length - 1);
@@ -1693,7 +1712,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
+  /**
+   * Build a WHERE clause from the given filter data.
+   * @param {array} filterData - an array of filter objects, each with properties
+   *   for column, operator, value, and logicalOperator.
+   * @returns {string} - the WHERE clause as a string.
+   */
   const buildWhereClause = (filterData: any) => {
+    /**
+     * Build a single condition from the given condition object.
+     * @param {object} condition - a filter object with properties for column,
+     *   operator, value, and logicalOperator.
+     * @returns {string} - the condition as a string.
+     */
     const buildCondition = (condition: any) => {
       if (condition.filterType === "group") {
         const groupConditions = condition.conditions
@@ -2574,11 +2605,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         );
       }
 
-      // if there are filters
+      /**
+       * Validate the filters in the panel
+       * @param conditions the conditions array
+       * @param errors the array to push the errors to
+       */
       function validateConditions(conditions: any, errors: any) {
         conditions.forEach((it: any) => {
           if (it.filterType === "condition") {
-            // check if at least 1 item from the list is selected
+            // If the condition is a list, check if at least 1 item is selected
             if (it.type == "list" && !it.values?.length) {
               errors.push(
                 `Filter: ${it.column}: Select at least 1 item from the list`,
@@ -2586,13 +2621,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             }
 
             if (it.type == "condition") {
-              // check if condition operator is selected
+              // Check if condition operator is selected
               if (it.operator == null) {
                 errors.push(
                   `Filter: ${it.column}: Operator selection required`,
                 );
               }
 
+              // Check if condition value is required based on the operator
               if (
                 !["Is Null", "Is Not Null"].includes(it.operator) &&
                 (it.value == null || it.value == "")
@@ -2601,10 +2637,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               }
             }
           } else if (it.filterType === "group") {
+            // Recursively validate the conditions in the group
             validateConditions(it.conditions, errors);
           }
         });
       }
+
 
       if (
         dashboardPanelData.data.queries[
