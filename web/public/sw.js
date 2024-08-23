@@ -7,6 +7,10 @@ const cacheVersion = `O2-cache-v1`;
 let pathPrefix = "/";
 
 async function fetchManifest() {
+  if(window.location.pathname.indexOf("/web") > -1) {
+    pathPrefix = "/web/";
+  }
+  
   const response = await fetch(`${pathPrefix}manifest.json`);
   return response.json();
 }
