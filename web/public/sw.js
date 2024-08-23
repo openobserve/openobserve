@@ -6,9 +6,6 @@ const cacheVersion = `O2-cache-v1`;
 
 let pathPrefix = "/";
 
-if(window.location.pathname.indexOf("/web") > -1) {
-  pathPrefix = "/web/";
-}
 async function fetchManifest() {
   const response = await fetch(`${pathPrefix}manifest.json`);
   return response.json();
@@ -20,6 +17,10 @@ self.addEventListener("install", function (event) {
 
       // List of files to cache
       const filesToCache = [];
+
+      if(window.location.pathname.indexOf("/web") > -1) {
+        pathPrefix = "/web/";
+      }
 
       Object.keys(manifest).forEach((key) => {
         if (key == "index.html") {
