@@ -58,6 +58,11 @@ impl FlightService for FlightServiceImpl {
         let _start = std::time::Instant::now();
         let cfg = config::get_config();
 
+        // follow node
+        // follow cluster leader:
+        // TODO
+        // if follow cluster leader -> call: flight_leader.rs
+
         // 1. decnode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);

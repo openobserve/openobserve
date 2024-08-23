@@ -43,7 +43,7 @@ use crate::{common::infra::cluster as infra_cluster, service::file_list};
 pub mod cache_multi;
 pub mod cacher;
 pub mod flight;
-pub mod grpc;
+pub mod flight_leader;
 pub mod http;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
