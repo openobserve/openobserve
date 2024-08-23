@@ -130,6 +130,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
+                icon="content_copy"
+                :title="t('dashboard.duplicate')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click.stop="duplicateAlert(props.row)"
+                data-test="dashboard-duplicate"
+              ></q-btn>
+            <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
               :icon="outlinedDelete"
               class="q-ml-xs"
@@ -218,6 +230,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <template>
+  <q-dialog class="q-pa-md"  v-model="showForm" persistent>
+    <q-card>
+      <q-card-section>
+        <div class="text-h6">Duplicate Alert</div>
+      </q-card-section>
+      <q-card-section>
+        <q-form @submit="submitForm">
+          <q-input v-model="toBeCloneAlertName" label="Alert Name" />
+          <q-select
+            v-model="toBeClonestreamType"
+            label="Stream Type"
+            :options="streamTypes"
+            @update:model-value="updateStreams()"
+          />
+          <q-select
+            v-model="toBeClonestreamName"
+            :loading="isFetchingStreams"
+            label="Stream Name"
+            :options="streamNames"
+            @change="updateStreamName"
+            @update:model-value="changeStreamName(toBeCloneStreamName)"
+            @filter="filterStreams"
+          />
+          <q-btn type="submit" class="q-ma-md" color="primary" label="Submit" />
+          <q-btn
+            type="button"
+            color="negative"
+            label="Cancel"
+            v-close-popup
+          />
+        </q-form>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
+</template>
+
   </div>
 </template>
 
@@ -233,6 +282,8 @@ import {
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import useStreams from "@/composables/useStreams";
+
 import { QTable, date, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
@@ -279,12 +330,27 @@ export default defineComponent({
     const alerts: Ref<Alert[]> = ref([]);
     const alertsRows: Ref<AlertListItem[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
+    const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(220);
+    const showForm  = ref(false);
+    const indexOptions = ref([]);
+    const schemaList = ref([]);
+    const streams: any = ref({});
+    const isFetchingStreams = ref(false);
+
+    const { getStreams } = useStreams();
+
+      const toBeCloneAlertName  = ref ("");
+      const toBeCloneUUID = ref("");
+      const toBeClonestreamType =  ref('');
+      const toBeClonestreamName =  ref('');
+      const streamTypes =  ref(['logs', 'metrics', 'traces']);
+      const streamNames  :  Ref<string[]> =  ref([]);
     const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
     const folders = ref([
       {
@@ -529,6 +595,59 @@ export default defineComponent({
     const addAlert = () => {
       showAddAlertDialog.value = true;
     };
+    const duplicateAlert = (row) =>{
+      toBeCloneUUID.value = row.uuid
+      toBeCloneAlertName.value = row.name;
+      showForm.value = true;
+    }
+    const submitForm = () =>{
+      const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value)
+      alertToBeCloned.name = toBeCloneAlertName.value;
+
+      try{
+        alertsService.create(
+            store.state.selectedOrganization.identifier,
+            toBeClonestreamName.value.value,
+            toBeClonestreamType.value,
+            alertToBeCloned,
+          ).then((res) => {
+            if (res.data.code == 200) {
+              $q.notify({
+                type: "positive",
+                message: "Duplicated Alert",
+                timeout: 2000,
+              });
+              showForm.value = false;
+              getAlerts();
+            } else {
+              $q.notify({
+                type: "negative",
+                message: res.data.message,
+                timeout: 2000,
+              });
+            }
+          })
+          .catch((e) => {
+            console.error(e);
+            $q.notify({
+              type: "negative",
+              message: e.response.data.message,
+              timeout: 2000,
+            }); 
+          });
+
+      }
+      catch(e){
+        showForm.value = true;
+        console.log(e)
+      $q.notify({
+              type: "negative",
+              message: e.data.message,
+              timeout: 2000,
+            });
+      }
+
+    }
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
         (alert: any) => alert.uuid === props.row?.uuid
@@ -624,6 +743,68 @@ export default defineComponent({
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
+    const filterColumns = (options: any[], val: String, update: Function) => {
+      let filteredOptions: any[] = [];
+      if (val === "") {
+        update(() => {
+          filteredOptions = [...options];
+        });
+        return filteredOptions;
+      }
+      update(() => {
+        const value = val.toLowerCase();
+        filteredOptions = options.filter(
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
+        );
+      });
+      return filteredOptions;
+    };
+    const updateStreamName = (selectedOption)=> {
+      console.log("selectedOption", selectedOption);
+    toBeClonestreamName.value = selectedOption;
+  }
+  const changeStreamName = (name) =>{
+
+    console.log(toBeClonestreamName.value)
+  }
+    const updateStreams = (resetStream = true) => {
+      if (resetStream) toBeClonestreamName.value = "";
+      if (streams.value[toBeClonestreamType.value]) {
+        schemaList.value = streams.value[toBeClonestreamType.value];
+        indexOptions.value = streams.value[toBeClonestreamType.value].map(
+          (data: any) => {
+            return data.name;
+          },
+        );
+        updateStreamName(toBeClonestreamName.value);
+
+        return;
+      }
+
+      if (!toBeClonestreamType) return Promise.resolve();
+
+      isFetchingStreams.value = true;
+      return getStreams (toBeClonestreamType.value, false)
+        .then((res: any) => {
+          streams.value[toBeClonestreamType.value] = res.list;
+          schemaList.value = res.list;
+          console.log(indexOptions,"index")
+          indexOptions.value = res.list.map((data: any) => {
+            return data.name;
+          });
+
+          return Promise.resolve();
+        })
+        .catch(() => Promise.reject())
+        .finally(() => (isFetchingStreams.value = false));
+    };
+    const filterStreams = (val: string, update: any) => {
+      streamNames.value = filterColumns(indexOptions.value, val, update).map((option) => ({
+        value: option,
+        label: option,
+      }));
+      console.log(streamNames.value.length,"streamNames")
+    };
 
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
@@ -670,6 +851,9 @@ export default defineComponent({
       hideForm,
       confirmDelete,
       selectedDelete,
+      updateStreams,
+      changeStreamName,
+      updateStreamName,
       getAlerts,
       pagination,
       resultTotal,
@@ -681,9 +865,24 @@ export default defineComponent({
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
+      duplicateAlert,
       changePagination,
       maxRecordToReturn,
       showAddAlertDialog,
+      showForm,
+      toBeCloneAlertName,
+      toBeCloneUUID,
+      toBeClonestreamType,
+      toBeClonestreamName,
+      streamTypes,
+      filterColumns,
+      filterStreams,
+      streamNames,
+      submitForm,
+      schemaList,
+      indexOptions,
+      streams,
+      isFetchingStreams,
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery: ref(""),
