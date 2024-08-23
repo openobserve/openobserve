@@ -51,11 +51,13 @@ pub async fn search(
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>), Error> {
     let cfg = get_config();
     // let start = std::time::Instant::now();
+
     let org_id = req.org_id.to_string();
     let stream_type = StreamType::from(req.stream_type.as_str());
     let work_group = req.work_group.clone();
 
     let trace_id = Arc::new(req.trace_id.to_string());
+    log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
     let ctx =
@@ -74,7 +76,7 @@ pub async fn search(
     let mut visitor = NewEmptyExecVisitor::default();
     if physical_plan.visit(&mut visitor).is_err() || visitor.get_data().is_none() {
         return Err(Error::Message(
-            "search->storage: physical plan visit error: there is no EmptyTable".to_string(),
+            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
         ));
     }
     let empty_exec = visitor
@@ -155,7 +157,7 @@ pub async fn search(
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
                 log::error!(
-                    "[trace_id {}] search->storage: search storage parquet error: {}",
+                    "[trace_id {}] flight->search: search storage parquet error: {}",
                     trace_id,
                     e
                 );
@@ -182,7 +184,7 @@ pub async fn search(
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
                 log::error!(
-                    "[trace_id {}] search->storage: search wal parquet error: {}",
+                    "[trace_id {}] flight->search: search wal parquet error: {}",
                     trace_id,
                     e
                 );
@@ -206,7 +208,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] search->storage: search wal memtable error: {}",
+                    "[trace_id {}] flight->search: search wal memtable error: {}",
                     trace_id,
                     e
                 );
@@ -231,7 +233,7 @@ pub async fn search(
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 
-    log::info!("[trace_id {trace_id}] flight->search: finish generate physical plan",);
+    log::info!("[trace_id {trace_id}] flight->search: generated physical plan");
 
     Ok((ctx, physical_plan))
 }

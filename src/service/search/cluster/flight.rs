@@ -59,10 +59,7 @@ pub async fn search(
     mut req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id {trace_id}] search->flight[leader]: start, sql: {}",
-        sql
-    );
+    log::info!("[trace_id {trace_id}] flight->leader: start {}", sql);
 
     let cfg = get_config();
     let timeout = if req.timeout > 0 {
@@ -119,7 +116,7 @@ pub async fn search(
         .collect::<Vec<_>>();
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search->flight[leader]: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->leader: get file_list time_range: {:?}, num: {}, took: {} ms",
         sql.time_range,
         file_list_vec.len(),
         file_list_took,
@@ -291,7 +288,9 @@ pub async fn search(
         .await
         .is_err()
     {
-        log::info!("[trace_id {trace_id}] search->grpc: search canceled before call search->grpc");
+        log::info!(
+            "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+        );
         work_group
             .as_ref()
             .unwrap()
@@ -300,7 +299,7 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
+                "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
             )),
         ));
     }
@@ -436,14 +435,14 @@ pub async fn search(
                     match ret {
                         Ok(ret) => Ok(ret),
                         Err(err) => {
-                            log::error!("[trace_id {trace_id2}] search->flight[leader]: datafusion execute error: {}", err); 
+                            log::error!("[trace_id {trace_id2}] flight->leader: datafusion execute error: {}", err); 
                             Err(err)
                         }
                     }
                 },
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-                    log::error!("[trace_id {trace_id2}] search->flight[leader]: search timeout");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] search->flight[leader]: search timeout")))
+                    log::error!("[trace_id {trace_id2}] flight->leader: search timeout");
+                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] flight->leader: search timeout")))
                 },
                 _ = async {
                     #[cfg(feature = "enterprise")]
@@ -451,8 +450,8 @@ pub async fn search(
                     #[cfg(not(feature = "enterprise"))]
                     futures::future::pending::<()>().await;
                 } => {
-                    log::info!("[trace_id {trace_id2}] search->flight[leader]: search canceled");
-                     Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] search->flight[leader]: search canceled")))
+                    log::info!("[trace_id {trace_id2}] flight->leader: search canceled");
+                     Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] flight->leader: search canceled")))
                 }
             }
         }
@@ -483,7 +482,7 @@ pub async fn search(
         }
     };
 
-    log::info!("[trace_id {trace_id}] search->flight[leader]: search finished");
+    log::info!("[trace_id {trace_id}] flight->leader: search finished");
 
     // search done, release lock
     #[cfg(not(feature = "enterprise"))]
@@ -509,7 +508,7 @@ pub async fn get_online_querier_nodes(
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
-            log::error!("[trace_id {trace_id}] service:search:cluster:run: no querier node online");
+            log::error!("[trace_id {trace_id}] flight->leader: no querier node online");
             return Err(Error::Message("no querier node online".to_string()));
         }
     };

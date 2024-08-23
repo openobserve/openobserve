@@ -94,6 +94,11 @@ impl FlightService for FlightServiceImpl {
             }
         };
 
+        log::info!(
+            "[trace_id {}] flight->search: executing stream",
+            req.trace_id
+        );
+
         let schema = physical_plan.schema();
 
         if cfg.common.print_key_sql {
