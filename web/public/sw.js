@@ -4,13 +4,13 @@
 const cacheVersion = `O2-cache-v1`;
 // Function to fetch the asset manifest
 
-let pathPrefix = "/";
+let pathPrefix = "/web/";
 
 async function fetchManifest() {
-  if(window.location.pathname.indexOf("/web") > -1) {
-    pathPrefix = "/web/";
+  if(window.location.pathname.indexOf("/web") == -1) {
+    pathPrefix = "/";
   }
-  
+
   const response = await fetch(`${pathPrefix}manifest.json`);
   return response.json();
 }
@@ -22,8 +22,8 @@ self.addEventListener("install", function (event) {
       // List of files to cache
       const filesToCache = [];
 
-      if(window.location.pathname.indexOf("/web") > -1) {
-        pathPrefix = "/web/";
+      if(window.location.pathname.indexOf("/web") == -1) {
+        pathPrefix = "/";
       }
 
       Object.keys(manifest).forEach((key) => {
