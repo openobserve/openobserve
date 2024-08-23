@@ -28,7 +28,6 @@ use config::{
     },
     metrics,
     utils::{base64, sql::is_aggregate_query, str::find},
-    FxIndexSet,
 };
 use hashbrown::HashMap;
 use infra::{
