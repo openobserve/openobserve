@@ -220,6 +220,7 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: [],
         };
+        state.resultMetaData = [];
         return;
       }
 
