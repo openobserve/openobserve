@@ -32,10 +32,6 @@ self.addEventListener("install", function (event) {
       // List of files to cache
       const filesToCache = [];
 
-      if(window.location.pathname.indexOf("/web") == -1) {
-        pathPrefix = "/";
-      }
-
       Object.keys(manifest).forEach((key) => {
         if (key == "index.html") {
           filesToCache.push(`${pathPrefix}`);
