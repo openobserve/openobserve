@@ -27,7 +27,8 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{sql::is_aggregate_query, str::find},
+    utils::{base64, sql::is_aggregate_query, str::find},
+    FxIndexSet,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -38,6 +39,7 @@ use new_sql::NewSql;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
+use regex::Regex;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -63,6 +65,11 @@ pub(crate) mod grpc;
 pub(crate) mod new_sql;
 pub(crate) mod sql;
 
+// Checks for #ResultArray#
+pub static RESULT_ARRAY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
+
+// search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 
 #[cfg(not(feature = "enterprise"))]
@@ -288,10 +295,23 @@ pub async fn search_partition(
         partitions: vec![],
     };
 
+    // check for vrl
+    let apply_over_hits = match req.query_fn.as_ref() {
+        None => false,
+        Some(v) => {
+            if v.is_empty() {
+                false
+            } else {
+                let v = base64::decode_url(v).unwrap_or(v.to_string());
+                RESULT_ARRAY.is_match(&v)
+            }
+        }
+    };
+
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
-    if ts_column.is_none() {
+    if ts_column.is_none() || apply_over_hits {
         resp.partitions.push([req.start_time, req.end_time]);
         return Ok(resp);
     };
@@ -720,9 +740,10 @@ pub async fn search_partition_multi(
                 start_time: req.start_time,
                 end_time: req.end_time,
                 sql: query.to_string(),
+                encoding: req.encoding,
                 regions: req.regions.clone(),
                 clusters: req.clusters.clone(),
-                encoding: req.encoding,
+                query_fn: req.query_fn.clone(),
             },
         )
         .await

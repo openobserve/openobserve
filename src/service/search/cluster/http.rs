@@ -25,19 +25,13 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes, Result};
-use once_cell::sync::Lazy;
 use proto::cluster_rpc;
-use regex::Regex;
 use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{cluster::flight, new_sql::NewSql},
 };
-
-// Checks for #ResultArray#
-pub static RESULT_ARRAY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^#[ \s]*Result[ \s]*Array[ \s]*#$").unwrap());
 
 #[tracing::instrument(
     name = "service:search:cluster",
@@ -84,9 +78,9 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
             // compile vrl function & apply the same before returning the response
             let input_fn = query_fn.trim();
 
-            let apply_over_hits = RESULT_ARRAY.is_match(input_fn);
+            let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
             if apply_over_hits {
-                query_fn = RESULT_ARRAY.replace(input_fn, "").to_string();
+                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
             }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
