@@ -37,7 +37,7 @@ use {
     infra::errors::{Error, ErrorCodes},
 };
 
-use super::new_sql::NewSql;
+use super::{match_file, new_sql::NewSql};
 use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
 pub mod cache_multi;
@@ -161,18 +161,21 @@ pub(crate) async fn get_file_list(
     .await
     .unwrap_or_default();
 
+    let empty = vec![];
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
-        if sql
-            .match_source(
-                stream_name,
-                &file,
-                false,
-                false,
-                stream_type,
-                partition_keys,
-            )
-            .await
+        if match_file(
+            stream_name,
+            sql.org_id.as_str(),
+            sql.time_range,
+            &file,
+            false,
+            false,
+            stream_type,
+            partition_keys,
+            sql.equal_items.get(stream_name).unwrap_or(&empty),
+        )
+        .await
         {
             files.push(file.to_owned());
         }

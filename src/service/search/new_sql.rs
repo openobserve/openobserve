@@ -18,10 +18,7 @@ use std::{collections::HashSet, ops::ControlFlow, sync::Arc};
 use arrow_schema::FieldRef;
 use config::{
     get_config,
-    meta::{
-        sql::resolve_stream_names,
-        stream::{FileKey, StreamPartition, StreamType},
-    },
+    meta::{sql::resolve_stream_names, stream::StreamType},
     utils::sql::AGGREGATE_UDF_LIST,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -42,10 +39,8 @@ use sqlparser::{
     parser::Parser,
 };
 
-use super::{generate_filter_from_equal_items, match_source};
-use crate::{
-    common::meta::stream::StreamParams,
-    service::search::sql::{convert_histogram_interval_to_seconds, generate_histogram_interval},
+use crate::service::search::sql::{
+    convert_histogram_interval_to_seconds, generate_histogram_interval,
 };
 
 #[derive(Clone, Debug, Serialize)]
@@ -176,43 +171,6 @@ impl NewSql {
             histogram_interval: histogram_interval_visitor.interval,
             sorted_by_time: need_sort_by_time,
         })
-    }
-
-    // TODO remove this function
-    /// match a source is a valid file or not
-    pub async fn match_source(
-        &self,
-        stream_name: &str,
-        source: &FileKey,
-        match_min_ts_only: bool,
-        is_wal: bool,
-        stream_type: StreamType,
-        partition_keys: &[StreamPartition],
-    ) -> bool {
-        let empty_fliters: Vec<(String, String)> = Vec::new();
-        let mut filters: Vec<(&str, Vec<String>)> = generate_filter_from_equal_items(
-            self.equal_items.get(stream_name).unwrap_or(&empty_fliters),
-        );
-        let partition_keys: HashMap<&str, &StreamPartition> = partition_keys
-            .iter()
-            .map(|v| (v.field.as_str(), v))
-            .collect();
-        for (key, value) in filters.iter_mut() {
-            if let Some(partition_key) = partition_keys.get(key) {
-                for val in value.iter_mut() {
-                    *val = partition_key.get_partition_value(val);
-                }
-            }
-        }
-        match_source(
-            StreamParams::new(&self.org_id, stream_name, stream_type),
-            self.time_range,
-            filters.as_slice(),
-            source,
-            is_wal,
-            match_min_ts_only,
-        )
-        .await
     }
 }
 
