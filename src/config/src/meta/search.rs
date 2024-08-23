@@ -359,6 +359,9 @@ pub struct SearchPartitionResponse {
     pub records: usize,
     pub original_size: usize,
     pub compressed_size: usize,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub histogram_interval: Option<i64>, // seconds, for histogram
     pub partitions: Vec<[i64; 2]>,
 }
 
