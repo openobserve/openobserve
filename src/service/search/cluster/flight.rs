@@ -69,6 +69,7 @@ pub async fn search(
     } else {
         cfg.limit.query_timeout
     };
+    req.timeout = timeout as _;
 
     if sql
         .schemas
