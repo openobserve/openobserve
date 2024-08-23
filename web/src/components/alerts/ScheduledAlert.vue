@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Toggle Function Editor"
           class="q-pl-xs"
           size="30px"
+          @update:model-value="updateFunctionVisibility"
           :disable="tab === 'promql'"
         />
       </div>
@@ -183,7 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isFunctionErrorExpanded"
                 class="q-px-sm q-pb-sm"
-                style="background: #efefef"
+                :class="
+                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                "
               >
                 <pre class="q-my-none" style="white-space: pre-wrap">{{
                   vrlFunctionError
@@ -857,6 +860,8 @@ const aggregationData = ref(props.aggregation);
 
 const filteredFields = ref(props.columns);
 
+const fnEditorRef = ref<any>(null);
+
 const getNumericColumns = computed(() => {
   if (
     _isAggregationEnabled.value &&
@@ -931,7 +936,7 @@ watch(
 
 const vrlFunctionContent = computed({
   get() {
-    return props.vrl_function;
+    return props.vrl_function || "";
   },
   set(value) {
     emits("update:vrl_function", value);
@@ -944,8 +949,16 @@ const isVrlFunctionEnabled = computed({
   },
   set(value) {
     emits("update:showVrlFunction", value);
+    updateFunctionVisibility(value);
   },
 });
+
+const updateFunctionVisibility = (isEnabled: boolean) => {
+  if (!isEnabled) {
+    vrlFunctionContent.value = null;
+    selectedFunction.value = "";
+  }
+};
 
 const updateQuery = () => {
   if (tab.value === "promql") {
@@ -1037,7 +1050,7 @@ const filterFunctionOptions = (val: string, update: any) => {
   });
 };
 
-const onBlurQueryEditor = () => {
+const onBlurQueryEditor = async () => {
   queryEditorPlaceholderFlag.value = true;
   emits("validate-sql");
 };
@@ -1094,7 +1107,7 @@ const validateInputs = (notify: boolean = true) => {
   return true;
 };
 
-const onBlurFunctionEditor = () => {
+const onBlurFunctionEditor = async () => {
   functionEditorPlaceholderFlag.value = true;
   emits("validate-sql");
 };
