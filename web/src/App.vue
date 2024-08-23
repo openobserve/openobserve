@@ -23,32 +23,33 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { Notify } from 'quasar'
 import { mdiCached } from '@quasar/extras/mdi-v6'
+import { useI18n } from "vue-i18n";
 export default {
   mounted() {
+    const { t } = useI18n();
     navigator.serviceWorker.addEventListener('message', event => {
       if (event.data === 'reloadApp') {
-        if (confirm('A new version of the application is available. Reload now?')) {
+        if (confirm(t("common.swNewContentMsg"))) {
           window.location.reload(); // Reload the page
         }
       } else {
-        console.log("change done********************")
         Notify.create({
       color: 'negative',
       icon: mdiCached,
-      message: 'Updated content is available. Please refresh the page.',
-      timeout: 0,
+      message: t("common.swUpdateContentMsg"),
+      timeout: 60,
       multiLine: true,
-      position: 'top',
+      position: 'bottom-right',
       actions: [
         {
-          label: 'Refresh',
+          label: t("common.refresh"),
           color: 'yellow',
           handler: () => {
-            window.location.reload()
+            window.location.reload(true);
           }
         },
         {
-          label: 'Dismiss',
+          label: t("common.dismiss"),
           color: 'white',
           handler: () => {}
         }
