@@ -948,6 +948,7 @@ export default defineComponent({
         dashboardPanelData.data.config.axis_border_show = false;
       }
 
+      // by default, use top_results_others as false
       if (!dashboardPanelData.data.config.top_results_others) {
         dashboardPanelData.data.config.top_results_others = false;
       }

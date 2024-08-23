@@ -94,7 +94,52 @@ export const convertSQLData = async (
   const breakDownKeys = getBreakDownKeys();
   console.log("breakDownKeys-------", breakDownKeys);
 
-  const processData = (data: any[], panelSchema: any) => {
+  /**
+   * Process the SQL data and convert it into a format suitable for the echarts
+   * library.
+   *
+   * This function takes in the raw data returned from the SQL query and the
+   * panel schema, and returns a processed data array that can be fed into the
+   * echarts library.
+   *
+   * Here's a step-by-step breakdown of what this function does:
+   *
+   * 1. It checks if the data is empty or if the first item in the array is not
+   * an object. If either condition is true, it returns an empty array.
+   *
+   * 2. It extracts the top_results and top_results_others values from the
+   * panel schema config.
+   *
+   * 3. If top_results is not enabled, it simply returns the inner data array
+   * without any modifications.
+   *
+   * 4. It extracts the breakdown key, y-axis key, and x-axis key from the
+   * panel schema.
+   *
+   * 5. It aggregates the y-axis values by breakdown, ignoring items without a
+   * breakdown key. This is done using the reduce() method.
+   *
+   * 6. It sorts the breakdown object by value in descending order and extracts
+   * the top keys based on the configured number of top results. This is done
+   * using the Object.entries() and sort() methods.
+   *
+   * 7. It initializes an empty result array and an empty others object.
+   *
+   * 8. It loops through the inner data array and checks if the breakdown value
+   * is in the top keys. If it is, it adds the item to the result array. If it's
+   * not, and top_results_others is enabled, it adds the item to the others
+   * object.
+   *
+   * 9. If top_results_others is enabled, it loops through the others object and
+   * adds the aggregated values to the result array.
+   *
+   * 10. Finally, it returns the result array.
+   *
+   * @param {any[]} data - The data returned from the SQL query.
+   * @param {any} panelSchema - The schema of the panel.
+   * @returns {any[]} - The processed data array.
+   */
+  const processData = (data: any[], panelSchema: any): any[] => {
     console.log("Processing data...");
     console.log("Data:", data);
     console.log("Panel schema:", panelSchema);
