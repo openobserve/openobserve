@@ -734,12 +734,13 @@ export default defineComponent({
             }
           }
 
-          searchObj.data.query = addOrderByToQuery(
-            searchObj.data.query,
-            store.state.zoConfig.timestamp_column,
-            "DESC",
-            searchObj.data.stream.selectedStream.join(","),
-          );
+          // Removed order by as it creating problem while clicking on the URL generated from the Alert. It's appending order by and that is causing issue if _timestamp column not added in select clause
+          // searchObj.data.query = addOrderByToQuery(
+          //   searchObj.data.query,
+          //   store.state.zoConfig.timestamp_column,
+          //   "DESC",
+          //   searchObj.data.stream.selectedStream.join(","),
+          // );
 
           searchObj.data.editorValue = searchObj.data.query;
 
@@ -1201,6 +1202,7 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
+
       if (
         this.searchObj.meta.showHistogram &&
         !this.searchObj.shouldIgnoreWatcher
@@ -1212,13 +1214,23 @@ export default defineComponent({
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
           // this.handleRunQuery();
+          this.searchObj.loadingHistogram = true;
+
           this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
             (res: any) => {
-              this.searchResultRef.reDrawChart();
-            },
-          );
+                 this.refreshTimezone();
+                 this.searchResultRef.reDrawChart();
+
+            }          
+            ).catch((err: any) => {
+            console.log(err,"err in updating chart");
+          }).finally(() => {
+            this.searchObj.loadingHistogram = false;
+
+          })
         }
       }
+
       this.updateUrlQueryParams();
     },
     moveSplitter() {

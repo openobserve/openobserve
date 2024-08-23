@@ -25,3 +25,11 @@ impl From<Vec<serde_json::Value>> for cluster_rpc::UsageData {
         }
     }
 }
+
+impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
+    fn from(usages: Vec<serde_json::Value>) -> Self {
+        Self {
+            data: serde_json::to_vec(&usages).unwrap(),
+        }
+    }
+}

@@ -39,7 +39,7 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts,
+        alerts::alert,
         http::HttpResponse as MetaHttpResponse,
         prom::*,
         stream::{SchemaRecords, StreamParams},
@@ -96,7 +96,7 @@ pub async fn handle_grpc_request(
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
-    let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
@@ -373,7 +373,7 @@ pub async fn handle_grpc_request(
                         if let Some(alerts) = stream_alerts_map.get(&key) {
                             let mut trigger_alerts: TriggerAlertData = Vec::new();
                             for alert in alerts {
-                                if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                                if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
                                     trigger_alerts.push((alert.clone(), v));
                                 }
                             }

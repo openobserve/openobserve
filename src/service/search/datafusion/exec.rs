@@ -22,7 +22,10 @@ use config::{
         search::{SearchType, Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{
+        parquet::new_parquet_writer, record_batch_ext::format_recordbatch_by_schema,
+        schema_ext::SchemaExt,
+    },
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -30,9 +33,9 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
+    catalog::TableProvider,
     common::{tree_node::TreeNode, Column},
     datasource::{
-        empty::EmptyTable,
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
@@ -40,14 +43,15 @@ use datafusion::{
     error::{DataFusionError, Result},
     execution::{
         cache::cache_manager::CacheManagerConfig,
-        context::{SessionConfig, SessionState},
+        context::SessionConfig,
         memory_pool::{FairSpillPool, GreedyMemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
+        session_state::SessionStateBuilder,
     },
     physical_plan::{collect, collect_partitioned},
     prelude::{Expr, SessionContext},
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
 
@@ -58,7 +62,12 @@ use super::{
     udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::{plan::UpdateOffsetExec, ExtLimit},
+    datafusion::{
+        physical_plan::{empty_exec::NewEmptyExec, NewEmptyExecVisitor, ReplaceTableScanExec},
+        plan::UpdateOffsetExec,
+        table_provider::empty_table::NewEmptyTable,
+        ExtLimit,
+    },
     sql::{Sql, RE_SELECT_WILDCARD},
 };
 
@@ -78,47 +87,68 @@ pub async fn sql(
         return Ok(vec![]);
     }
 
+    let cfg = get_config();
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
-    let mut ctx = if !file_type.eq(&FileType::ARROW) {
-        register_table(
-            session,
-            schema.clone(),
-            "tbl",
-            files,
-            file_type.clone(),
-            rules.clone(),
-            false,
-            &sql.meta.order_by,
-            Some(sql.meta.limit as usize),
-        )
-        .await?
-    } else {
-        let ctx = prepare_datafusion_context(
-            session.work_group.clone(),
-            &session.search_type,
-            false,
-            false,
-            session.target_partitions,
-            None,
-        )
-        .await?;
-        let record_batches = in_records_batches.unwrap();
-        let mem_table = Arc::new(NewMemTable::try_new(
-            schema.clone(),
-            vec![record_batches],
-            rules.clone(),
-        )?);
-        // Register the MemTable as a table in the DataFusion context
-        ctx.register_table("tbl", mem_table)?;
-        ctx
-    };
+    let origin_sql: &str = sql.origin_sql.as_ref();
+
+    // Hack for limit 0
+    if origin_sql.ends_with("LIMIT 0") {
+        return Ok(vec![]);
+    }
+
+    // only sort by timestamp desc
+    let sort_by_timestamp_desc = sql.meta.order_by.len() == 1
+        && sql.meta.order_by[0].0 == cfg.common.column_timestamp
+        && sql.meta.order_by[0].1;
+
+    let mut ctx = prepare_datafusion_context(
+        session.work_group.clone(),
+        &session.search_type,
+        false,
+        sort_by_timestamp_desc,
+        session.target_partitions,
+        Some(sql.meta.limit as usize),
+    )
+    .await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
 
+    // create table
+    let (real_table, is_memtable) = if !file_type.eq(&FileType::ARROW) {
+        let mut table = create_parquet_table(
+            session,
+            schema.clone(),
+            files,
+            rules.clone(),
+            &sql.meta.order_by,
+        )
+        .await?;
+
+        if session.storage_type != StorageType::Tmpfs {
+            table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
+        }
+        (Arc::new(table) as Arc<dyn TableProvider>, false)
+    } else {
+        let record_batches = in_records_batches.unwrap();
+        (
+            Arc::new(NewMemTable::try_new(
+                schema.clone(),
+                vec![record_batches],
+                rules.clone(),
+            )?) as Arc<dyn TableProvider>,
+            true,
+        )
+    };
+
+    // register empty table
+    let empty_table =
+        NewEmptyTable::new("tbl", schema.clone(), is_memtable).with_partitions(cfg.limit.cpu_num);
+    ctx.register_table("tbl", Arc::new(empty_table))?;
+
     // query sql
-    let result = exec_query(&ctx, session, sql).await?;
+    let result = exec_query(&ctx, session, sql, real_table).await?;
 
     // drop table
     ctx.deregister_table("tbl")?;
@@ -134,6 +164,7 @@ async fn exec_query(
     ctx: &SessionContext,
     session: &SearchSession,
     sql: &Arc<Sql>,
+    table: Arc<dyn TableProvider>,
 ) -> Result<Vec<Vec<RecordBatch>>> {
     let sql: &str = sql.origin_sql.as_ref();
     let start = std::time::Instant::now();
@@ -145,17 +176,12 @@ async fn exec_query(
         log::info!("[trace_id {trace_id}] Query sql: {}", sql);
     }
 
-    // Hack for limit 0
-    if sql.ends_with("LIMIT 0") {
-        return Ok(vec![]);
-    }
-
     let plan = ctx.state().create_logical_plan(sql).await?;
     if cfg.common.print_key_sql {
         println!("+---------------------------+----------+");
         println!("logic plan");
         println!("+---------------------------+----------+");
-        println!("{:?}", plan);
+        println!("{}", plan);
     }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     if cfg.common.print_key_sql {
@@ -169,12 +195,41 @@ async fn exec_query(
         println!("{}", plan);
     }
 
-    let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
+    let partial_plan = match super::plan::get_partial_plan(&physical_plan)? {
         Some(plan) => plan,
         None => super::plan::get_empty_partial_plan(&physical_plan),
     };
+
+    // replace table scan exec
+    let mut empty_exec_visitor = NewEmptyExecVisitor::new();
+    partial_plan.visit(&mut empty_exec_visitor)?;
+    let empty_exec = match empty_exec_visitor.get_data() {
+        Some(v) => match v.as_any().downcast_ref::<NewEmptyExec>() {
+            Some(v) => v,
+            None => {
+                return Err(DataFusionError::Execution(
+                    "Failed to downcast NewEmptyExec".to_string(),
+                ));
+            }
+        },
+        None => {
+            return Ok(vec![]);
+        }
+    };
+    let table_scan_exec = table
+        .scan(
+            &ctx.state(),
+            empty_exec.projection(),
+            empty_exec.filters(),
+            empty_exec.limit(),
+        )
+        .await?;
+
+    let mut replace_table_visitor = ReplaceTableScanExec::new(table_scan_exec);
+    let partial_plan = partial_plan.rewrite(&mut replace_table_visitor)?.data;
+
     if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(partial_paln.as_ref())
+        let plan = datafusion::physical_plan::displayable(partial_plan.as_ref())
             .set_show_schema(false)
             .indent(false)
             .to_string();
@@ -184,7 +239,7 @@ async fn exec_query(
         println!("{}", plan);
     }
 
-    let data = match collect_partitioned(partial_paln, ctx.task_ctx()).await {
+    let data = match collect_partitioned(partial_plan, ctx.task_ctx()).await {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -217,7 +272,88 @@ pub async fn merge_partitions(
         return Ok(vec![]);
     }
 
+    let mut ctx =
+        prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None).await?;
+
+    // register UDF
+    register_udf(&mut ctx, org_id).await;
+
+    // Debug SQL
     let cfg = get_config();
+    if cfg.common.print_key_sql {
+        log::info!("Merge sql: {sql}");
+    }
+
+    // register empty table
+    let memtable =
+        Arc::new(NewEmptyTable::new("tbl", schema, false).with_partitions(cfg.limit.cpu_num));
+    ctx.register_table("tbl", memtable)?;
+
+    let plan = ctx.state().create_logical_plan(sql).await?;
+    if cfg.common.print_key_sql {
+        println!("+---------------------------+----------+");
+        println!("logic plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
+            .set_show_schema(false)
+            .indent(true)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("physical plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
+
+    // get partial plan schema and format all the record batches
+    let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
+        Some(plan) => plan,
+        None => super::plan::get_empty_partial_plan(&physical_plan),
+    };
+    let mut schema_exec = partial_paln.schema();
+    let schema_fields = schema_exec
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let mut new_fields = HashSet::new();
+    let mut need_format = false;
+    for batch in batches.iter() {
+        if batch.num_rows() == 0 {
+            continue;
+        }
+        if batch.schema().fields() != schema_exec.fields() {
+            need_format = true;
+        }
+        for field in batch.schema().fields() {
+            if !schema_fields.contains(field.name()) {
+                new_fields.insert(field.clone());
+            }
+        }
+    }
+    drop(schema_fields);
+    if !new_fields.is_empty() {
+        need_format = true;
+        let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
+        schema_exec =
+            Arc::new(Schema::try_merge(vec![schema_exec.as_ref().clone(), new_schema]).unwrap());
+    }
+    let batches = if need_format {
+        let mut new_batches = Vec::new();
+        for batch in batches {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+            new_batches.push(format_recordbatch_by_schema(schema_exec.clone(), batch));
+        }
+        new_batches
+    } else {
+        batches
+    };
+
     // repartition batches
     let chunk_size = std::cmp::max(1, (batches.len() + cfg.limit.cpu_num) / cfg.limit.cpu_num);
     let mut new_batches: Vec<Vec<RecordBatch>> = Vec::with_capacity(batches.len() / chunk_size);
@@ -232,39 +368,7 @@ pub async fn merge_partitions(
     }
     let batches = new_batches;
 
-    let mut ctx =
-        prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None).await?;
-
-    // register UDF
-    register_udf(&mut ctx, org_id).await;
-
-    // Debug SQL
-    if cfg.common.print_key_sql {
-        log::info!("Merge sql: {sql}");
-    }
-
-    let memtable = Arc::new(EmptyTable::new(schema).with_partitions(cfg.limit.cpu_num));
-    ctx.register_table("tbl", memtable)?;
-
-    let plan = ctx.state().create_logical_plan(sql).await?;
-    if cfg.common.print_key_sql {
-        println!("+---------------------------+----------+");
-        println!("logic plan");
-        println!("+---------------------------+----------+");
-        println!("{:?}", plan);
-    }
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("physical plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-    }
-
+    // get final physical plan
     let final_plan = match super::plan::get_final_plan(&physical_plan, &batches) {
         Ok((Some(plan), v)) => {
             if v {
@@ -489,7 +593,6 @@ pub fn create_session_config(
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
     if sort_by_timestamp_desc {
-        println!("---------------- sort_by_timestamp_desc ----------------");
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
         config = config.with_round_robin_repartition(false);
         config = config.with_coalesce_batches(false);
@@ -579,16 +682,19 @@ pub async fn prepare_datafusion_context(
 
     let session_config =
         create_session_config(search_type, sort_by_timestamp_desc, target_partition, limit)?;
-    let runtime_env = create_runtime_env(memory_size).await?;
+    let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     if without_optimizer {
-        let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
+        let state = SessionStateBuilder::new()
+            .with_config(session_config)
+            .with_runtime_env(runtime_env)
             .with_optimizer_rules(vec![])
-            .with_analyzer_rules(vec![]);
+            .with_analyzer_rules(vec![])
+            .build();
         Ok(SessionContext::new_with_state(state))
     } else {
         Ok(SessionContext::new_with_config_rt(
             session_config,
-            Arc::new(runtime_env),
+            runtime_env,
         ))
     }
 }
@@ -626,7 +732,6 @@ pub async fn register_table(
     schema: Arc<Schema>,
     table_name: &str,
     files: &[FileKey],
-    file_type: FileType,
     rules: HashMap<String, DataType>,
     without_optimizer: bool,
     sort_key: &[(String, bool)],
@@ -647,28 +752,40 @@ pub async fn register_table(
     )
     .await?;
 
-    // Configure listing options
-    let mut listing_options = match file_type {
-        FileType::PARQUET => {
-            let file_format = ParquetFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(ctx.state().config().target_partitions())
-                .with_collect_stat(true)
-        }
-        FileType::JSON => {
-            let file_format = JsonFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(ctx.state().config().target_partitions())
-                .with_collect_stat(true)
-        }
-        _ => {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {file_type:?}",
-            )));
-        }
+    let mut table =
+        create_parquet_table(session, schema.clone(), files, rules.clone(), sort_key).await?;
+    if session.storage_type != StorageType::Tmpfs {
+        table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
+    }
+    ctx.register_table(table_name, Arc::new(table))?;
+
+    Ok(ctx)
+}
+
+pub async fn create_parquet_table(
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    files: &[FileKey],
+    rules: HashMap<String, DataType>,
+    sort_key: &[(String, bool)],
+) -> Result<NewListingTable> {
+    let cfg = get_config();
+    let target_partitions = if session.target_partitions == 0 {
+        cfg.limit.cpu_num
+    } else {
+        std::cmp::max(DATAFUSION_MIN_PARTITION, session.target_partitions)
     };
+
+    // only sort by timestamp desc
+    let sort_by_timestamp_desc =
+        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+
+    // Configure listing options
+    let file_format = ParquetFormat::default();
+    let mut listing_options = ListingOptions::new(Arc::new(file_format))
+        .with_file_extension(FileType::PARQUET.get_ext())
+        .with_target_partitions(target_partitions)
+        .with_collect_stat(true);
 
     if sort_by_timestamp_desc {
         // specify sort columns for parquet file
@@ -694,7 +811,8 @@ pub async fn register_table(
         format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
-            "Unsupported file type scheme {file_type:?}",
+            "Unsupported storage_type {:?}",
+            session.storage_type,
         )));
     };
     let prefix = match ListingTableUrl::parse(prefix) {
@@ -707,40 +825,27 @@ pub async fn register_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    if cfg.common.feature_query_infer_schema
-        && (cfg.limit.query_optimization_num_fields > 0
-            && schema.fields().len() > cfg.limit.query_optimization_num_fields)
-    {
-        config = config.infer_schema(&ctx.state()).await?;
+    let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
+    let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+        let new_fields = schema
+            .fields()
+            .iter()
+            .map(|x| {
+                if x.name() == &cfg.common.column_timestamp {
+                    Arc::new(Field::new(
+                        cfg.common.column_timestamp.clone(),
+                        DataType::Int64,
+                        false,
+                    ))
+                } else {
+                    x.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        Arc::new(Schema::new(new_fields))
     } else {
-        let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
-        let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
-            let new_fields = schema
-                .fields()
-                .iter()
-                .map(|x| {
-                    if x.name() == &cfg.common.column_timestamp {
-                        Arc::new(Field::new(
-                            cfg.common.column_timestamp.clone(),
-                            DataType::Int64,
-                            false,
-                        ))
-                    } else {
-                        x.clone()
-                    }
-                })
-                .collect::<Vec<_>>();
-            Arc::new(Schema::new(new_fields))
-        } else {
-            schema
-        };
-        config = config.with_schema(schema);
-    }
-    let mut table = NewListingTable::try_new(config, rules)?;
-    if session.storage_type != StorageType::Tmpfs {
-        table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
-    }
-    ctx.register_table(table_name, Arc::new(table))?;
-
-    Ok(ctx)
+        schema
+    };
+    config = config.with_schema(schema);
+    NewListingTable::try_new(config, rules)
 }

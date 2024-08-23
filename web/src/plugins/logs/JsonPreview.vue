@@ -11,7 +11,7 @@
     />
 
     <div
-      v-if="filteredStreamOptions.length"
+      v-if="showViewTraceBtn"
       class="o2-input flex items-center logs-trace-selector"
     >
       <q-select
@@ -20,7 +20,7 @@
         :label="
           searchObj.meta.selectedTraceStream ? '' : t('search.selectIndex')
         "
-        :options="filteredStreamOptions"
+        :options="filteredTracesStreamOptions"
         data-cy="stream-selection"
         input-debounce="0"
         behavior="menu"
@@ -203,7 +203,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -228,7 +228,7 @@ export default {
     },
   },
   components: { NotEqualIcon, EqualIcon },
-  emits: ["copy", "addSearchTerm", "addFieldToTable"],
+  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
@@ -237,7 +237,7 @@ export default {
 
     const { getStreams } = useStreams();
 
-    const filteredStreamOptions = ref([]);
+    const filteredTracesStreamOptions = ref([]);
 
     const tracesStreams = ref([]);
 
@@ -268,7 +268,7 @@ export default {
       await getStreams("traces", false)
         .then((res: any) => {
           tracesStreams.value = res.list.map((option: any) => option.name);
-          filteredStreamOptions.value = JSON.parse(
+          filteredTracesStreamOptions.value = JSON.parse(
             JSON.stringify(tracesStreams.value),
           );
 
@@ -282,7 +282,7 @@ export default {
     };
 
     const filterStreamFn = (val: any = "") => {
-      filteredStreamOptions.value = tracesStreams.value.filter(
+      filteredTracesStreamOptions.value = tracesStreams.value.filter(
         (stream: any) => {
           return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
         },
@@ -292,6 +292,17 @@ export default {
     const redirectToTraces = () => {
       emit("view-trace");
     };
+
+    const showViewTraceBtn = computed(() => {
+      return (
+        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
+        filteredTracesStreamOptions.value.length && // Check if traces streams are available
+        props.value[
+          store.state.organizationData?.organizationSettings
+            ?.trace_id_field_name
+        ] // Check if trace_id_field_name is available in the log fields
+      );
+    });
 
     return {
       t,
@@ -304,9 +315,10 @@ export default {
       searchObj,
       multiStreamFields,
       redirectToTraces,
-      filteredStreamOptions,
+      filteredTracesStreamOptions,
       filterStreamFn,
       streamSearchValue,
+      showViewTraceBtn,
     };
   },
 };

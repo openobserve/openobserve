@@ -19,8 +19,7 @@ use std::{
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_http::header::HeaderName;
-use actix_web::web::Query;
+use actix_web::{http::header::HeaderName, web::Query};
 use awc::http::header::HeaderMap;
 use config::meta::{search::SearchEventType, stream::StreamType};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
@@ -63,6 +62,7 @@ pub(crate) fn get_search_type_from_request(
             "alerts" => Some(SearchEventType::Alerts),
             "values" => Some(SearchEventType::Values),
             "rum" => Some(SearchEventType::RUM),
+            "derived_stream" => Some(SearchEventType::DerivedStream),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,

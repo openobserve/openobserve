@@ -717,8 +717,8 @@ pub struct Common {
     pub report_server_skip_tls_verify: bool,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
-    #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
-    pub skip_formatting_bulk_stream_name: bool,
+    #[env_config(name = "ZO_SKIP_FORMAT_STREAM_NAME", default = false)]
+    pub skip_formatting_stream_name: bool,
     #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
@@ -754,6 +754,12 @@ pub struct Common {
     )]
     pub result_cache_enabled: bool,
     #[env_config(
+        name = "ZO_USE_MULTIPLE_RESULT_CACHE",
+        default = false,
+        help = "Enable to use mulple result caches for query results"
+    )]
+    pub use_multi_result_cache: bool,
+    #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
         default = "60",
         help = "Discard data of last n seconds from cached results"
@@ -767,6 +773,7 @@ pub struct Common {
 pub struct Limit {
     // no need set by environment
     pub cpu_num: usize,
+    pub real_cpu_num: usize,
     pub mem_total: usize,
     pub disk_total: usize,
     pub disk_free: usize,
@@ -872,6 +879,8 @@ pub struct Limit {
     pub alert_schedule_timeout: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
+    #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
+    pub derived_stream_schedule_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
     pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
@@ -916,6 +925,12 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_LIMIT",
+        default = 256,
+        help = "Maximum size of a single enrichment table in mb"
+    )]
+    pub max_enrichment_table_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1202,8 +1217,10 @@ pub fn init() -> Config {
         cfg.common.node_role_group = "".to_string();
     }
 
-    // set cpu num
-    let cpu_num = cgroup::get_cpu_limit();
+    // set real cpu num
+    cfg.limit.real_cpu_num = cgroup::get_cpu_limit();
+    // set at least 2 threads
+    let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;

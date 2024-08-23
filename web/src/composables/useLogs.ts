@@ -1727,15 +1727,18 @@ const useLogs = () => {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
-                setTimeout(async () => {
-                  await generateHistogramData();
-                  refreshPartitionPagination(true);
-                }, 100);
+                if(partitions.length > 1) {
+                  setTimeout(async () => {
+                    await generateHistogramData();
+                    refreshPartitionPagination(true);
+                  }, 100);
+                }
               }
               searchObj.loadingHistogram = false;
             }
           }
-          refreshPartitionPagination(true);
+          await generateHistogramData();
+          refreshPartitionPagination(true);          
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
             xData: [],
@@ -2369,12 +2372,7 @@ const useLogs = () => {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
-        searchObj.data.histogram.errorCode = 429;
         notificationMsg.value = "Search operation was cancelled";
-        searchObj.data.histogram.errorMsg =
-          "Error while fetching histogram data.";
-        searchObj.data.histogram.errorDetail = "Search operation was cancelled";
-
         return;
       }
 
@@ -2398,11 +2396,15 @@ const useLogs = () => {
             removeTraceId(traceId);
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
+            if(searchObj.data.queryResults.aggs == null)  {
+                searchObj.data.queryResults.aggs = [];                
+            }
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
               res.data.result_cache_ratio;
+
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
@@ -2438,47 +2440,43 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loadingHistogram = false;
             let trace_id = "";
-            searchObj.data.histogram.errorMsg =
-              typeof err == "string" && err
-                ? err
-                : "Error while processing histogram request.";
-            if (err.response != undefined) {
-              searchObj.data.histogram.errorMsg = err.response.data.error;
-              if (err.response.data.hasOwnProperty("trace_id")) {
-                trace_id = err.response.data?.trace_id;
+            
+            if (err?.request?.status != 429) {
+              searchObj.data.histogram.errorMsg =
+                typeof err == "string" && err
+                  ? err
+                  : "Error while processing histogram request.";
+              if (err.response != undefined) {
+                searchObj.data.histogram.errorMsg = err.response.data.error;
+                if (err.response.data.hasOwnProperty("trace_id")) {
+                  trace_id = err.response.data?.trace_id;
+                }
+              } else {
+                searchObj.data.histogram.errorMsg = err.message;
+                if (err.hasOwnProperty("trace_id")) {
+                  trace_id = err?.trace_id;
+                }
               }
-            } else {
-              searchObj.data.histogram.errorMsg = err.message;
-              if (err.hasOwnProperty("trace_id")) {
-                trace_id = err?.trace_id;
-              }
-            }
 
-            const customMessage = logsErrorMessage(err?.response?.data.code);
-            searchObj.data.histogram.errorCode = err?.response?.data.code;
-            searchObj.data.histogram.errorDetail =
-              err?.response?.data?.error_detail;
-
-            if (customMessage != "") {
-              searchObj.data.histogram.errorMsg = t(customMessage);
-            }
-
-            notificationMsg.value = searchObj.data.histogram.errorMsg;
-
-            if (err?.request?.status >= 429) {
-              notificationMsg.value = err?.response?.data?.message;
-              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
+              const customMessage = logsErrorMessage(err?.response?.data.code);
+              searchObj.data.histogram.errorCode = err?.response?.data.code;
               searchObj.data.histogram.errorDetail =
                 err?.response?.data?.error_detail;
-            }
 
-            if (trace_id) {
-              searchObj.data.histogram.errorMsg +=
-                " <br><span class='text-subtitle1'>TraceID:" +
-                trace_id +
-                "</span>";
-              notificationMsg.value += " TraceID:" + trace_id;
-              trace_id = "";
+              if (customMessage != "") {
+                searchObj.data.histogram.errorMsg = t(customMessage);
+              }
+
+              notificationMsg.value = searchObj.data.histogram.errorMsg;
+
+              if (trace_id) {
+                searchObj.data.histogram.errorMsg +=
+                  " <br><span class='text-subtitle1'>TraceID:" +
+                  trace_id +
+                  "</span>";
+                notificationMsg.value += " TraceID:" + trace_id;
+                trace_id = "";
+              }
             }
 
             reject(false);
@@ -2488,11 +2486,12 @@ const useLogs = () => {
           });
       } catch (e: any) {
         dismiss();
-        searchObj.data.histogram.errorMsg = e.message;
-        searchObj.data.histogram.errorCode = e.code;
+        // searchObj.data.histogram.errorMsg = e.message;
+        // searchObj.data.histogram.errorCode = e.code;
         searchObj.loadingHistogram = false;
         notificationMsg.value = searchObj.data.histogram.errorMsg;
         showErrorNotification("Error while fetching histogram data");
+
         reject(false);
       }
     });
@@ -2705,7 +2704,11 @@ const useLogs = () => {
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas != "all_fields"
-                ? stream.settings?.defined_schema_fields
+                ? [
+                    store.state.zoConfig?.timestamp_column,
+                    ...stream.settings?.defined_schema_fields,
+                    store.state.zoConfig?.all_fields_name,
+                  ]
                 : stream.schema.map((obj: any) => obj.name);
             for (const field of fields) {
               fieldObj = {
@@ -2855,8 +2858,20 @@ const useLogs = () => {
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
+            //here we check whether timestamp field is present or not 
+            //as we append timestamp dynamically for userDefined schema we need to check this
+              if(userDefineSchemaSettings.includes(
+                store.state.zoConfig?.timestamp_column,
+              )){
+                searchObj.data.hasSearchDataTimestampField = true;
 
-            searchObj.data.hasSearchDataTimestampField = false;
+              }
+              else{
+                searchObj.data.hasSearchDataTimestampField = false;
+
+              }
+
+
             // check for user defined schema is false then only consider checking new fields from result set
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&

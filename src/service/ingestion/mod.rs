@@ -30,6 +30,7 @@ use config::{
     utils::{flatten, json::*},
     SIZE_IN_MB,
 };
+use proto::cluster_rpc::IngestionType;
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -43,8 +44,9 @@ use crate::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
         meta::{
-            alerts::Alert,
+            alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+            ingestion::IngestionRequest,
             stream::{SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,
@@ -53,6 +55,7 @@ use crate::{
 };
 
 pub mod grpc;
+pub mod ingestion_service;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -146,7 +149,8 @@ pub async fn get_stream_functions<'a>(
         if stream_after_functions_map.contains_key(&key)
             || stream_before_functions_map.contains_key(&key)
         {
-            return;
+            // functions for this stream already fetched
+            continue;
         }
         //   let mut _local_trans: Vec<StreamTransform> = vec![];
         // let local_stream_vrl_map;
@@ -572,6 +576,19 @@ pub async fn get_user_defined_schema(
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }
         }
+    }
+}
+
+pub fn create_log_ingestion_req(
+    ingestion_type: i32,
+    data: &bytes::Bytes,
+) -> Result<IngestionRequest> {
+    match IngestionType::try_from(ingestion_type) {
+        Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),
+        Ok(IngestionType::Multi) => Ok(IngestionRequest::Multi(data)),
+        Ok(IngestionType::Usage) => Ok(IngestionRequest::Usage(data)),
+        Ok(IngestionType::Rum) => Ok(IngestionRequest::RUM(data)),
+        _ => Err(anyhow::anyhow!("Not yet supported")),
     }
 }
 

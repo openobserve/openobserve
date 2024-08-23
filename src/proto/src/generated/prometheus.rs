@@ -16,9 +16,8 @@ pub struct MetricMetadata {
 }
 /// Nested message and enum types in `MetricMetadata`.
 pub mod metric_metadata {
+    #[derive(serde::Deserialize, serde::Serialize)]
     #[derive(
-        serde::Deserialize,
-        serde::Serialize,
         Clone,
         Copy,
         Debug,
@@ -27,7 +26,7 @@ pub mod metric_metadata {
         Hash,
         PartialOrd,
         Ord,
-        ::prost::Enumeration,
+        ::prost::Enumeration
     )]
     #[repr(i32)]
     pub enum MetricType {
@@ -164,7 +163,17 @@ pub struct Histogram {
 }
 /// Nested message and enum types in `Histogram`.
 pub mod histogram {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum ResetHint {
         /// Need to test for a counter reset explicitly.
@@ -283,7 +292,17 @@ pub struct LabelMatcher {
 }
 /// Nested message and enum types in `LabelMatcher`.
 pub mod label_matcher {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum Type {
         Eq = 0,
@@ -360,7 +379,17 @@ pub struct Chunk {
 /// Nested message and enum types in `Chunk`.
 pub mod chunk {
     /// We require this to match chunkenc.Encoding.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum Encoding {
         Unknown = 0,
@@ -418,20 +447,29 @@ pub struct ReadRequest {
     pub queries: ::prost::alloc::vec::Vec<Query>,
     /// accepted_response_types allows negotiating the content type of the response.
     ///
-    /// Response types are taken from the list in the FIFO order. If no response type in
-    /// `accepted_response_types` is implemented by server, error is returned.
-    /// For request that do not contain `accepted_response_types` field the SAMPLES response type
-    /// will be used.
+    /// Response types are taken from the list in the FIFO order. If no response type in `accepted_response_types` is
+    /// implemented by server, error is returned.
+    /// For request that do not contain `accepted_response_types` field the SAMPLES response type will be used.
     #[prost(enumeration = "read_request::ResponseType", repeated, tag = "2")]
     pub accepted_response_types: ::prost::alloc::vec::Vec<i32>,
 }
 /// Nested message and enum types in `ReadRequest`.
 pub mod read_request {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
     #[repr(i32)]
     pub enum ResponseType {
-        /// Server will return a single ReadResponse message with matched series that includes list
-        /// of raw samples. It's recommended to use streamed response types instead.
+        /// Server will return a single ReadResponse message with matched series that includes list of raw samples.
+        /// It's recommended to use streamed response types instead.
         ///
         /// Response headers:
         /// Content-Type: "application/x-protobuf"
@@ -496,17 +534,15 @@ pub struct QueryResult {
     pub timeseries: ::prost::alloc::vec::Vec<TimeSeries>,
 }
 /// ChunkedReadResponse is a response when response_type equals STREAMED_XOR_CHUNKS.
-/// We strictly stream full series after series, optionally split by time. This means that a single
-/// frame can contain partition of the single series, but once a new series is started to be
-/// streamed it means that no more chunks will be sent for previous one. Series are returned sorted
-/// in the same way TSDB block are internally.
+/// We strictly stream full series after series, optionally split by time. This means that a single frame can contain
+/// partition of the single series, but once a new series is started to be streamed it means that no more chunks will
+/// be sent for previous one. Series are returned sorted in the same way TSDB block are internally.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChunkedReadResponse {
     #[prost(message, repeated, tag = "1")]
     pub chunked_series: ::prost::alloc::vec::Vec<ChunkedSeries>,
-    /// query_index represents an index of the query from ReadRequest.queries these chunks relates
-    /// to.
+    /// query_index represents an index of the query from ReadRequest.queries these chunks relates to.
     #[prost(int64, tag = "2")]
     pub query_index: i64,
 }

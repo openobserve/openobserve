@@ -47,6 +47,8 @@ const getDefaultDashboardPanelData: any = () => ({
       unit: null,
       unit_custom: null,
       decimals: 2,
+      top_results: null,
+      top_results_others: false,
       axis_width: null,
       axis_border_show: false,
       legend_width: {
@@ -70,6 +72,7 @@ const getDefaultDashboardPanelData: any = () => ({
         size_fixed: 2,
       },
       drilldown: [],
+      mark_line: [],
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
@@ -244,6 +247,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const promqlMode = computed(
     () => dashboardPanelData.data.queryType == "promql",
   );
+
+  const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
+    if (
+      store.state.zoConfig.user_defined_schemas_enabled &&
+      dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+      dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+        "user_defined_schema"
+    ) {
+      return dashboardPanelData.meta.stream.userDefinedSchema ?? [];
+    }
+
+    return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
+  });
 
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
@@ -2651,7 +2667,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.x.filter(
           (it: any) =>
             ![
-              ...dashboardPanelData.meta.stream.selectedStreamFields,
+              ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
               ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ].find((i: any) => i.name == it.column),
         );
@@ -2669,7 +2685,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.y.filter(
           (it: any) =>
             ![
-              ...dashboardPanelData.meta.stream.selectedStreamFields,
+              ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
               ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ].find((i: any) => i.name == it.column),
         );
@@ -2819,7 +2835,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery,
-      dashboardPanelData.meta.stream.selectedStreamFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
       // Only continue if the current mode is "show custom query"
@@ -2904,6 +2920,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentXLabel,
     currentYLabel,
     generateLabelFromName,
+    selectedStreamFieldsBasedOnUserDefinedSchema,
   };
 };
 export default useDashboardPanelData;

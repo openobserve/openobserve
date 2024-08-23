@@ -17,6 +17,7 @@ use std::str::FromStr;
 
 pub mod exec;
 pub mod file_type;
+pub mod physical_plan;
 pub mod plan;
 pub mod storage;
 pub mod table_provider;

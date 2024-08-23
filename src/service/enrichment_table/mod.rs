@@ -30,6 +30,7 @@ use config::{
         usage::UsageType,
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
+    SIZE_IN_MB,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::{
@@ -41,10 +42,11 @@ use infra::{
 };
 
 use crate::{
-    common::meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         compact::retention,
-        db, format_stream_name,
+        db::{self, enrichment_table},
+        format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
@@ -56,7 +58,7 @@ pub mod geoip;
 pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
-    mut payload: Multipart,
+    payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -90,6 +92,25 @@ pub async fn save_enrichment_data(
         );
     }
 
+    let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
+    let max_enrichment_table_size = get_config().limit.max_enrichment_table_size;
+    log::info!(
+        "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
+        stats,
+        max_enrichment_table_size
+    );
+    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as f64 {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!(
+                    "enrichment table [{stream_name}] storage size {} exceeds max storage size {}",
+                    stats.storage_size, max_enrichment_table_size
+                ),
+            )),
+        );
+    }
+
     let mut schema_evolved = false;
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
@@ -106,98 +127,55 @@ pub async fn save_enrichment_data(
 
     let mut records = vec![];
     let mut records_size = 0;
-    let timestamp = if !append_data {
-        Utc::now().timestamp_micros()
-    } else {
-        let schema = stream_schema_map.get(stream_name).unwrap();
-        schema
-            .schema()
-            .metadata()
-            .get("created_at")
-            .unwrap()
-            .parse::<i64>()
-            .unwrap()
-    };
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition();
-        let filename = content_disposition.get_filename();
-        let mut data = bytes::Bytes::new();
+    let timestamp = Utc::now().timestamp_micros();
+    for mut json_record in payload {
+        let timestamp = match json_record.get(&get_config().common.column_timestamp) {
+            Some(v) => v.as_i64().unwrap_or(timestamp),
+            None => timestamp,
+        };
+        json_record.insert(
+            get_config().common.column_timestamp.clone(),
+            json::Value::Number(timestamp.into()),
+        );
 
-        if filename.is_some() {
-            while let Some(chunk) = field.next().await {
-                let chunked_data = chunk.unwrap();
-                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
-                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
-            }
-            let mut rdr = csv::Reader::from_reader(data.as_ref());
-            let headers: csv::StringRecord = rdr
-                .headers()?
-                .iter()
-                .map(|x| {
-                    let mut x = x.trim().to_string();
-                    format_key(&mut x);
-                    x
-                })
-                .collect::<Vec<_>>()
-                .into();
-
-            for result in rdr.records() {
-                // The iterator yields Result<StringRecord, Error>, so we check the
-                // error here.
-                let record = result?;
-                // Transform the record to a JSON value
-                let mut json_record = json::Map::new();
-
-                for (header, field) in headers.iter().zip(record.iter()) {
-                    json_record.insert(header.into(), json::Value::String(field.into()));
-                }
-                json_record.insert(
-                    get_config().common.column_timestamp.clone(),
-                    json::Value::Number(timestamp.into()),
-                );
-
-                // check for schema evolution
-                if !schema_evolved
-                    && check_for_schema(
-                        org_id,
-                        stream_name,
-                        StreamType::EnrichmentTables,
-                        &mut stream_schema_map,
-                        vec![&json_record],
-                        timestamp,
-                    )
-                    .await
-                    .is_ok()
-                {
-                    schema_evolved = true;
-                }
-
-                if records.is_empty() {
-                    let schema = stream_schema_map.get(stream_name).unwrap();
-                    let schema_key = schema.hash_key();
-                    hour_key = super::ingestion::get_wal_time_key(
-                        timestamp,
-                        &vec![],
-                        PartitionTimeLevel::Unset,
-                        &json_record,
-                        Some(schema_key),
-                    );
-                }
-                let record = json::Value::Object(json_record);
-                let record_size = json::estimate_json_bytes(&record);
-                records.push(Arc::new(record));
-                records_size += record_size;
-            }
+        // check for schema evolution
+        if !schema_evolved
+            && check_for_schema(
+                org_id,
+                stream_name,
+                StreamType::EnrichmentTables,
+                &mut stream_schema_map,
+                vec![&json_record],
+                timestamp,
+            )
+            .await
+            .is_ok()
+        {
+            schema_evolved = true;
         }
+
+        if records.is_empty() {
+            let schema = stream_schema_map.get(stream_name).unwrap();
+            let schema_key = schema.hash_key();
+            hour_key = super::ingestion::get_wal_time_key(
+                timestamp,
+                &vec![],
+                PartitionTimeLevel::Unset,
+                &json_record,
+                Some(schema_key),
+            );
+        }
+        let record = json::Value::Object(json_record);
+        let record_size = json::estimate_json_bytes(&record);
+        records.push(Arc::new(record));
+        records_size += record_size;
     }
 
     if records.is_empty() {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "No records to ingest for look up table".to_string(),
-            )),
-        );
+        return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
+            StatusCode::OK.into(),
+            "Saved enrichment table".to_string(),
+        )));
     }
 
     let schema = stream_schema_map
@@ -229,7 +207,22 @@ pub async fn save_enrichment_data(
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
+    // notifiy update
+    if stream_schema.has_fields {
+        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
+            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
+        };
+    }
+
     req_stats.response_time = start.elapsed().as_secs_f64();
+    log::info!(
+        "save enrichment data to: {}/{}/{} success with stats {:?}",
+        org_id,
+        table_name,
+        append_data,
+        req_stats
+    );
+
     // metric + data usage
     report_request_usage_stats(
         req_stats,
@@ -276,7 +269,58 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     w.remove(&key);
     drop(w);
 
+    // delete stream key
+    let _ = enrichment_table::delete(org_id, stream_name).await;
+
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);
     log::info!("deleted enrichment table  {stream_name}");
+}
+
+pub async fn extract_multipart(
+    mut payload: Multipart,
+) -> Result<Vec<json::Map<String, json::Value>>, Error> {
+    let mut records = Vec::new();
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let content_disposition = field.content_disposition();
+        let filename = content_disposition.get_filename();
+        let mut data = bytes::Bytes::new();
+
+        if filename.is_some() {
+            while let Some(chunk) = field.next().await {
+                let chunked_data = chunk.unwrap();
+                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
+                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+            }
+            let mut rdr = csv::Reader::from_reader(data.as_ref());
+            let headers: csv::StringRecord = rdr
+                .headers()?
+                .iter()
+                .map(|x| {
+                    let mut x = x.trim().to_string();
+                    format_key(&mut x);
+                    x
+                })
+                .collect::<Vec<_>>()
+                .into();
+
+            for result in rdr.records() {
+                // The iterator yields Result<StringRecord, Error>, so we check the
+                // error here.
+                let record = result?;
+                // Transform the record to a JSON value
+                let mut json_record = json::Map::new();
+
+                for (header, field) in headers.iter().zip(record.iter()) {
+                    json_record.insert(header.into(), json::Value::String(field.into()));
+                }
+
+                if !json_record.is_empty() {
+                    records.push(json_record);
+                }
+            }
+        }
+    }
+
+    Ok(records)
 }

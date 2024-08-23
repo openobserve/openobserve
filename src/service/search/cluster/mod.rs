@@ -28,7 +28,7 @@ use config::{
         },
     },
     metrics,
-    utils::{inverted_index::split_token, json, record_batch_ext::format_recordbatch_by_schema},
+    utils::{inverted_index::split_token, json},
     INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use hashbrown::{HashMap, HashSet};
@@ -49,9 +49,15 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster as infra_cluster,
-    service::{file_list, search::sql::RE_SELECT_WILDCARD},
+    service::{
+        file_list,
+        search::{
+            generate_search_schema, generate_select_start_search_schema, sql::RE_SELECT_WILDCARD,
+        },
+    },
 };
 
+pub mod cache_multi;
 pub mod cacher;
 pub mod grpc;
 pub mod http;
@@ -553,25 +559,35 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, mut scan_stats, is_partial) =
-        match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
-            Ok(v) => v,
-            Err(e) => {
-                // search done, release lock
-                #[cfg(not(feature = "enterprise"))]
-                dist_lock::unlock(&locker).await?;
-                #[cfg(feature = "enterprise")]
-                {
-                    work_group
-                        .as_ref()
-                        .unwrap()
-                        .done(trace_id, user_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                }
-                return Err(e);
+    let trace_id_span = trace_id.to_string();
+    let meta_span = meta.clone();
+    let handle = match tokio::task::spawn(async move {
+        merge_grpc_result(&trace_id_span, meta_span, results, is_final_phase).await
+    })
+    .await
+    {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(Error::Message(e.to_string())),
+    };
+    let (merge_batches, mut scan_stats, is_partial) = match handle {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
             }
-        };
+            return Err(e);
+        }
+    };
     log::info!("[trace_id {trace_id}] final merge task finish");
 
     // search done, release lock
@@ -705,74 +721,25 @@ async fn merge_grpc_result(
         }
     }
 
-    // convert select field to schema::Field
-    let select_fields = sql
-        .meta
-        .fields
-        .iter()
-        .filter_map(|f| {
-            sql.schema
-                .field_with_name(f)
-                .ok()
-                .map(|f| Arc::new(f.clone()))
-        })
-        .collect::<Vec<_>>();
-
-    // format recordbatch with same schema
-    let mut schema_latest = Arc::new(sql.schema.clone());
+    // get the using schema
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-    if !batches.is_empty() {
-        let mut schema = batches[0].schema();
-        let schema_fields = schema
-            .fields()
-            .iter()
-            .map(|f| f.name())
-            .collect::<HashSet<_>>();
-        let mut new_fields = HashSet::new();
-        let mut need_format = false;
-        if select_wildcard {
-            for field in select_fields {
-                if !schema_fields.contains(field.name()) {
-                    new_fields.insert(field.clone());
-                    need_format = true;
-                }
-            }
-        }
-        for batch in batches.iter() {
-            if batch.num_rows() == 0 {
-                continue;
-            }
-            if batch.schema().fields() != schema.fields() {
-                need_format = true;
-            }
-            for field in batch.schema().fields() {
-                if !schema_fields.contains(field.name()) {
-                    new_fields.insert(field.clone());
-                }
-            }
-        }
-        drop(schema_fields);
-        if !new_fields.is_empty() {
-            need_format = true;
-            let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
-            schema =
-                Arc::new(Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).unwrap());
-        }
-        if need_format {
-            let mut new_batches = Vec::new();
-            for batch in batches {
-                if batch.num_rows() == 0 {
-                    continue;
-                }
-                new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
-            }
-            batches = new_batches;
-        }
-        // reset schema_latest only when select wildcard
-        if select_wildcard {
-            schema_latest = schema.clone();
-        }
+    let schema_latest = Arc::new(sql.schema.clone());
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
+    for field in schema_latest.fields() {
+        schema_latest_map.insert(field.name(), field);
     }
+    let (schema_latest, _) = if select_wildcard {
+        generate_select_start_search_schema(
+            &sql,
+            schema_latest.clone(),
+            &schema_latest_map,
+            &defined_schema_fields,
+        )?
+    } else {
+        generate_search_schema(&sql, schema_latest.clone(), &schema_latest_map)?
+    };
 
     // only final phase need merge partitions
     if !is_final_phase {

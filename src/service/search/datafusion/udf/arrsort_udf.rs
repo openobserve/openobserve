@@ -23,11 +23,10 @@ use datafusion::{
     },
     common::cast::as_string_array,
     error::DataFusionError,
-    logical_expr::{ScalarUDF, Volatility},
+    logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// The name of the arrsort UDF given to DataFusion.

@@ -31,12 +31,15 @@ use crate::{
     common::{
         meta::{
             authz::Authz,
-            dashboards::reports::{
-                HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
-                ReportFrequencyType, ReportTimerangeType,
+            dashboards::{
+                datetime_now,
+                reports::{
+                    HttpReportPayload, Report, ReportDashboard, ReportDestination,
+                    ReportEmailDetails, ReportFrequencyType, ReportTimerangeType,
+                },
             },
         },
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::db,
 };
@@ -67,6 +70,13 @@ pub async fn save(
     if !name.is_empty() {
         report.name = name.to_string();
     }
+
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&report.name) {
+        return Err(anyhow::anyhow!(
+            "Report name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
+        ));
+    }
     if report.name.is_empty() {
         return Err(anyhow::anyhow!("Report name is required"));
     }
@@ -93,10 +103,13 @@ pub async fn save(
     }
 
     match db::dashboards::reports::get(org_id, &report.name).await {
-        Ok(_) => {
+        Ok(old_report) => {
             if create {
                 return Err(anyhow::anyhow!("Report already exists"));
             }
+            report.last_triggered_at = old_report.last_triggered_at;
+            report.owner = old_report.owner;
+            report.updated_at = Some(datetime_now());
         }
         Err(_) => {
             if !create {

@@ -329,6 +329,8 @@ pub struct SearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -506,18 +508,20 @@ pub enum SearchEventType {
     Values,
     Other,
     RUM,
+    DerivedStream,
 }
 
 impl std::fmt::Display for SearchEventType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            SearchEventType::UI => write!(f, "UI"),
-            SearchEventType::Dashboards => write!(f, "Dashboards"),
-            SearchEventType::Reports => write!(f, "Reports"),
-            SearchEventType::Alerts => write!(f, "Alerts"),
-            SearchEventType::Other => write!(f, "Other"),
+            SearchEventType::UI => write!(f, "ui"),
+            SearchEventType::Dashboards => write!(f, "dashboards"),
+            SearchEventType::Reports => write!(f, "reports"),
+            SearchEventType::Alerts => write!(f, "alerts"),
             SearchEventType::Values => write!(f, "_values"),
-            SearchEventType::RUM => write!(f, "RUM"),
+            SearchEventType::Other => write!(f, "other"),
+            SearchEventType::RUM => write!(f, "rum"),
+            SearchEventType::DerivedStream => write!(f, "derived_stream"),
         }
     }
 }
@@ -531,9 +535,10 @@ impl FromStr for SearchEventType {
             "dashboards" => Ok(SearchEventType::Dashboards),
             "reports" => Ok(SearchEventType::Reports),
             "alerts" => Ok(SearchEventType::Alerts),
-            "values" => Ok(SearchEventType::Values),
+            "values" | "_values" => Ok(SearchEventType::Values),
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
+            "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
             _ => Err(format!("Invalid search event type: {s}")),
         }
     }
@@ -550,6 +555,8 @@ pub struct MultiSearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

@@ -103,6 +103,7 @@ import {
   PolarComponent,
   VisualMapComponent,
   DataZoomComponent,
+  MarkLineComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
@@ -128,6 +129,7 @@ import type {
   PolarComponentOption,
   VisualMapComponentOption,
   DataZoomComponentOption,
+  MarkLineComponentOption,
 } from "echarts/components";
 
 type ECOption = ComposeOption<
@@ -149,6 +151,7 @@ type ECOption = ComposeOption<
   | PolarComponentOption
   | VisualMapComponentOption
   | DataZoomComponentOption
+  | MarkLineComponentOption
 >;
 
 echarts.use([
@@ -161,6 +164,7 @@ echarts.use([
   PolarComponent,
   VisualMapComponent,
   DataZoomComponent,
+  MarkLineComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -331,7 +335,7 @@ export default defineComponent({
               dataIndex,
               seriesIndex,
               props?.data?.extras?.panelId || -1,
-              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
+              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0],
             );
           }
         }
@@ -416,7 +420,7 @@ export default defineComponent({
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime
+              hoveredSeriesState?.value?.hoveredTime,
             );
           }
 
@@ -436,7 +440,7 @@ export default defineComponent({
         ) {
           restoreChart();
         }
-      }
+      },
     );
 
     watch(
@@ -446,7 +450,7 @@ export default defineComponent({
           type: "highlight",
           seriesName: hoveredSeriesState?.value?.hoveredSeriesName,
         });
-      }
+      },
     );
 
     watch(
@@ -476,7 +480,7 @@ export default defineComponent({
         }
 
         chartInitialSetUp();
-      }
+      },
     );
 
     onMounted(async () => {
@@ -573,7 +577,7 @@ export default defineComponent({
           emit("error", e);
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef, hoveredSeriesState };
   },

@@ -45,3 +45,15 @@ pub struct CacheQueryRequest {
     pub discard_interval: i64,
     pub is_descending: bool,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct MultiCachedQueryResponse {
+    pub cached_response: Vec<Response>,
+    pub deltas: Vec<QueryDelta>,
+    pub has_cached_data: bool,
+    pub cache_query_response: bool,
+    pub ts_column: String,
+    pub is_descending: bool,
+    pub limit: i64,
+    pub took: usize,
+}

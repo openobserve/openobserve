@@ -75,9 +75,11 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                 .collect()
         } else {
             // compile vrl function & apply the same before returning the response
-            let apply_over_hits = query_fn.trim().starts_with("#ResultArray#");
+            let input_fn = query_fn.trim();
+
+            let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
             if apply_over_hits {
-                query_fn = query_fn.trim().replace("#ResultArray#", "");
+                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
             }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =

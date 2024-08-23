@@ -32,8 +32,9 @@ use openobserve::{
             request::{
                 event::Eventer,
                 file_list::Filelister,
+                ingest::Ingester,
                 logs::LogsServer,
-                metrics::{ingester::Ingester, querier::Querier},
+                metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
                 query_cache::QueryCacheServerImpl,
                 traces::TraceServer,
                 usage::UsageServerImpl,
@@ -53,8 +54,9 @@ use opentelemetry_proto::tonic::collector::{
 };
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
 use proto::cluster_rpc::{
-    event_server::EventServer, filelist_server::FilelistServer, metrics_server::MetricsServer,
-    query_cache_server::QueryCacheServer, search_server::SearchServer, usage_server::UsageServer,
+    event_server::EventServer, filelist_server::FilelistServer, ingest_server::IngestServer,
+    metrics_server::MetricsServer, query_cache_server::QueryCacheServer,
+    search_server::SearchServer, usage_server::UsageServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -151,7 +153,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
-        cfg.limit.cpu_num,
+        cfg.limit.real_cpu_num,
         cfg.limit.mem_total / 1024 / 1024,
         cfg.limit.disk_total / 1024 / 1024 / 1024,
         cfg.limit.disk_free / 1024 / 1024 / 1024,
@@ -213,6 +215,10 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("migrate dashboards failed: {}", e);
             }
+
+            migration::upgrade_resource_names()
+                .await
+                .expect("migrate resource names into supported ofga format failed");
 
             // ingester init
             if let Err(e) = ingester::init().await {
@@ -376,14 +382,18 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip);
     let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let filelist_svc = FilelistServer::new(Filelister)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let metrics_svc = MetricsServer::new(Querier)
+    let metrics_svc = MetricsServer::new(MetricsQuerier)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let metrics_ingest_svc = MetricsServiceServer::new(Ingester)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let usage_svc = UsageServer::new(UsageServerImpl)
@@ -395,8 +405,13 @@ async fn init_common_grpc_server(
     let tracer = TraceServer::default();
     let trace_svc = TraceServiceServer::new(tracer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let ingest_svc = IngestServer::new(Ingester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
@@ -413,6 +428,7 @@ async fn init_common_grpc_server(
         .add_service(usage_svc)
         .add_service(logs_svc)
         .add_service(query_cache_svc)
+        .add_service(ingest_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");

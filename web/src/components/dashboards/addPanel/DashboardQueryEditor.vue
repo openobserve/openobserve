@@ -146,9 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:query="currentQuery"
                 data-test="dashboard-panel-query-editor"
                 v-model:functions="dashboardPanelData.meta.stream.functions"
-                v-model:fields="
-                  dashboardPanelData.meta.stream.selectedStreamFields
-                "
+                v-model:fields="selectedStreamFieldsBasedOnUserDefinedSchema"
                 :keywords="
                   dashboardPanelData.data.queryType === 'promql'
                     ? autoCompletePromqlKeywords
@@ -367,8 +365,13 @@ export default defineComponent({
       showPositiveNotification(`${val.name} function applied successfully.`);
     };
 
-    const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const {
+      dashboardPanelData,
+      promqlMode,
+      addQuery,
+      removeQuery,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const splitterModel = ref(
       promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
@@ -571,6 +574,7 @@ export default defineComponent({
       selectedFunction,
       filterFunctionOptions,
       onFunctionSelect,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
     };
   },
 });
