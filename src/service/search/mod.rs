@@ -27,7 +27,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{sql::is_aggregate_query, str::find},
+    utils::{base64, sql::is_aggregate_query, str::find},
     FxIndexSet,
 };
 use hashbrown::HashMap;
@@ -64,7 +64,7 @@ pub(crate) mod sql;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^#[ \s]*Result[ \s]*Array[ \s]*#$").unwrap());
+    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
@@ -294,7 +294,8 @@ pub async fn search_partition(
             if v.is_empty() {
                 false
             } else {
-                RESULT_ARRAY.is_match(v)
+                let v = base64::decode_url(v).unwrap_or(v.to_string());
+                RESULT_ARRAY.is_match(&v)
             }
         }
     };
