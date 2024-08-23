@@ -112,7 +112,6 @@ pub async fn search(
 
     // 3. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
-
     let file_list_vec = partition_file_lists
         .values()
         .flatten()
@@ -485,6 +484,19 @@ pub async fn search(
     };
 
     log::info!("[trace_id {trace_id}] search->flight[leader]: search finished");
+
+    // search done, release lock
+    #[cfg(not(feature = "enterprise"))]
+    dist_lock::unlock(&locker).await?;
+    #[cfg(feature = "enterprise")]
+    {
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+    }
 
     Ok((data, ScanStats::new(), 0, false, 0))
 }
