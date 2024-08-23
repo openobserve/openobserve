@@ -291,7 +291,7 @@ pub async fn search_partition(
         records: records as usize,
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
-        histogram_interval: meta.histogram_interval,
+        histogram_interval: sql.histogram_interval,
         partitions: vec![],
     };
 
