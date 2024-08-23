@@ -93,19 +93,16 @@ self.addEventListener('activate', function(event) {
     event.respondWith(
       caches
         .open(cacheVersion).then(function (cache) {
-          console.log("event.request", event.request);
-          console.log("cache", cache);
           return cache.match(event.request);
         })
         .then(function (response) {
           if (response) {
             return response.clone();
           }
-          console.log(event.request, "event.request 2 in fetch");
+
           var fetchRequest = event.request;
           return fetch(fetchRequest)
             .then(function (response) {
-              console.log("response", JSON.stringify(response));
               if (
                 !response ||
                 response.status !== 200 ||
