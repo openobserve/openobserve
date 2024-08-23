@@ -342,30 +342,6 @@ export const usePanelDataLoader = (
           };
 
           try {
-            // timerange different to find histogram interval
-            let timestampDifference = endISOTimestamp - startISOTimestamp;
-
-            const histogramIntervals = [
-              { threshold: 1000000 * 60 * 30, value: "15 second" },
-              { threshold: 1000000 * 60 * 60, value: "30 second" },
-              { threshold: 1000000 * 3600 * 2, value: "1 minute" },
-              { threshold: 1000000 * 3600 * 6, value: "5 minute" },
-              { threshold: 1000000 * 3600 * 24, value: "30 minute" },
-              { threshold: 1000000 * 86400 * 7, value: "1 hour" },
-              { threshold: 1000000 * 86400 * 30, value: "1 day" },
-            ];
-
-            // default histogram interval is 10 second
-            let histogramInterval = "10 second";
-
-            for (let i = 0; i < histogramIntervals.length; i++) {
-              if (timestampDifference >= histogramIntervals[i].threshold) {
-                histogramInterval = histogramIntervals[i].value;
-              } else {
-                break;
-              }
-            }
-
             // trace context
             const { traceparent } = generateTraceContext();
 
@@ -373,7 +349,7 @@ export const usePanelDataLoader = (
             const res = await queryService.partition({
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
-                sql: await changeHistogramInterval(query, histogramInterval),
+                sql: query,
                 query_fn: it.vrlFunctionQuery
                   ? b64EncodeUnicode(it.vrlFunctionQuery)
                   : null,
@@ -386,7 +362,13 @@ export const usePanelDataLoader = (
               traceparent,
             });
 
+            // partition array from api response
             const partitionArr = res?.data?.partitions ?? [];
+
+            // histogram_interval from partition api response
+            const histogramInterval = res?.data?.histogram_interval
+              ? `${res?.data?.histogram_interval} seconds`
+              : null;
 
             // reset old state data
             state.data = [];

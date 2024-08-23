@@ -467,6 +467,11 @@ export const changeHistogramInterval = async (
   query: any,
   histogramInterval: any,
 ) => {
+  // if histogramInterval is null or query is null or query is empty, return query
+  if (histogramInterval === null || query === null || query === "") {
+    return query;
+  }
+
   await importSqlParser();
   const ast: any = parser.astify(query);
 
