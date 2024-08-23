@@ -148,6 +148,7 @@ pub async fn handle_trace_request(
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
+                let span2 = span.clone(); // TODO: remove this clone
                 let span_id: String = SpanId::from_bytes(
                     span.span_id
                         .try_into()
@@ -206,8 +207,20 @@ pub async fn handle_trace_request(
                     }
                     links.push(SpanLink {
                         context: SpanLinkContext {
-                            span_id: String::from_utf8(link.span_id).unwrap(),
-                            trace_id: String::from_utf8(link.trace_id).unwrap(),
+                            span_id: match String::from_utf8(link.span_id){
+                                Ok(v) => v,
+                                Err(_) => {
+                                    log::error!("Error while converting span_id to string: {:?}", span2);
+                                    panic!("Error while converting span_id to string");
+                                }
+                            },
+                            trace_id: match String::from_utf8(link.trace_id){
+                                Ok(v) => v,
+                                Err(_) => {
+                                    log::error!("Error while converting trace_id to string: {:?}", span2);
+                                    panic!("Error while converting trace_id to string");
+                                }
+                            },
                             trace_flags: Some(link.flags),
                             trace_state: Some(link.trace_state),
                         },
