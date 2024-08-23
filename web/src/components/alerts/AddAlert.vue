@@ -1127,6 +1127,11 @@ export default defineComponent({
 
             if (res.data.function_error) {
               vrlFunctionError.value = res.data.function_error;
+              q.notify({
+                type: "negative",
+                message: "Invalid VRL Function",
+                timeout: 3000,
+              });
               reject("");
             } else vrlFunctionError.value = "";
 
