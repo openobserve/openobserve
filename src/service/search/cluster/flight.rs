@@ -358,6 +358,7 @@ pub async fn search(
         partition_file_lists,
         partition_keys,
         match_all_keys,
+        false, // for super cluster
     );
     physical_plan = match physical_plan.rewrite(&mut rewrite) {
         Ok(v) => v.data,
@@ -386,6 +387,7 @@ pub async fn search(
             rewrite.file_lists.get(table_name).unwrap().clone(),
             rewrite.partition_keys.clone(),
             rewrite.match_all_keys.clone(),
+            false,
             rewrite.req,
             rewrite.nodes,
         ));
@@ -469,7 +471,7 @@ pub async fn search(
     Ok((data, ScanStats::new(), 0, false, 0))
 }
 
-async fn get_online_querier_nodes(
+pub async fn get_online_querier_nodes(
     trace_id: &str,
     node_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
@@ -495,7 +497,7 @@ async fn get_online_querier_nodes(
     Ok(nodes)
 }
 
-async fn get_file_lists(
+pub async fn get_file_lists(
     req: &cluster_rpc::SearchRequest,
     meta: Arc<NewSql>,
 ) -> Result<HashMap<String, Vec<FileKey>>> {
@@ -625,7 +627,7 @@ pub(crate) fn partition_file_by_nums(
     partitions
 }
 
-fn distribute(total: usize, n: usize) -> Vec<usize> {
+pub fn distribute(total: usize, n: usize) -> Vec<usize> {
     let base_value = total / n;
     let remainder = total % n;
     let mut buckets = vec![base_value; n];

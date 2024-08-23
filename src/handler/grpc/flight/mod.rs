@@ -72,6 +72,12 @@ impl FlightService for FlightServiceImpl {
 
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
+        if req.is_leader {
+            // follow leader
+            // TODO
+            return Err(Status::unimplemented("Implement follow leader"));
+        }
+
         // 2. prepare dataufion context
         let (ctx, physical_plan) = match grpcFlight::search(&req).await {
             Ok(v) => v,

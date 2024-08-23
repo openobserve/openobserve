@@ -57,6 +57,7 @@ pub struct RemoteScanExec {
     file_list: Vec<Vec<FileKey>>,
     partition_keys: Vec<PartitionKeys>,
     match_all_keys: Vec<String>,
+    is_leader: bool,
     req: SearchRequest,
     nodes: Vec<Node>,
     partitions: usize,
@@ -70,6 +71,7 @@ impl RemoteScanExec {
         file_list: Vec<Vec<FileKey>>,
         partition_keys: Vec<PartitionKeys>,
         match_all_keys: Vec<String>,
+        is_leader: bool,
         req: SearchRequest,
         nodes: Vec<Node>,
     ) -> Self {
@@ -81,6 +83,7 @@ impl RemoteScanExec {
             file_list,
             partition_keys,
             match_all_keys,
+            is_leader,
             nodes,
             partitions: output_partitions,
             cache,
@@ -173,6 +176,7 @@ impl ExecutionPlan for RemoteScanExec {
             file_list,
             self.partition_keys.clone(),
             self.match_all_keys.clone(),
+            self.is_leader,
             req,
         );
         let stream = futures::stream::once(fut).try_flatten();
@@ -187,6 +191,7 @@ impl ExecutionPlan for RemoteScanExec {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn get_remote_batch(
     input: Arc<dyn ExecutionPlan>,
     partition: usize,
@@ -194,6 +199,7 @@ async fn get_remote_batch(
     file_list: Vec<FileKey>,
     partition_keys: Vec<PartitionKeys>,
     match_all_keys: Vec<String>,
+    is_leader: bool,
     req: SearchRequest,
 ) -> Result<SendableRecordBatchStream> {
     let proto = ComposedPhysicalExtensionCodec {
@@ -215,6 +221,7 @@ async fn get_remote_batch(
         file_list: file_list.iter().map(cluster_rpc::FileKey::from).collect(),
         partition_keys,
         match_all_keys,
+        is_leader,
         start_time: req.query.as_ref().unwrap().start_time,
         end_time: req.query.as_ref().unwrap().end_time,
         timeout: req.timeout,
