@@ -82,7 +82,7 @@ export const convertSQLData = async (
       ? panelSchema?.queries[0]?.fields?.breakdown.map((it: any) => it.alias)
       : [];
   };
-  console.log("getBreakDownKeys", getBreakDownKeys());
+
   // Step 1: Get the X-Axis key
   const xAxisKeys = getXAxisKeys();
 
@@ -92,7 +92,6 @@ export const convertSQLData = async (
   const zAxisKeys = getZAxisKeys();
 
   const breakDownKeys = getBreakDownKeys();
-  console.log("breakDownKeys-------", breakDownKeys);
 
   /**
    * Process the SQL data and convert it into a format suitable for the echarts
@@ -140,19 +139,13 @@ export const convertSQLData = async (
    * @returns {any[]} - The processed data array.
    */
   const processData = (data: any[], panelSchema: any): any[] => {
-    console.log("Processing data...");
-    console.log("Data:", data);
-    console.log("Panel schema:", panelSchema);
-
     if (!data.length || !Array.isArray(data[0])) {
-      console.log("No data or invalid data format. Returning empty array.");
       return [];
     }
 
     const { top_results, top_results_others } = panelSchema.config;
     const innerDataArray = data[0];
     if (!top_results || !breakDownKeys.length) {
-      console.log("No top results configured. Returning inner data array.");
       return innerDataArray;
     }
 
@@ -160,12 +153,7 @@ export const convertSQLData = async (
     const yAxisKey = yAxisKeys[0];
     const xAxisKey = xAxisKeys[0];
 
-    console.log(
-      `Using xAxisKey: ${xAxisKey}, yAxisKey: ${yAxisKey}, breakdownKey: ${breakdownKey}`,
-    );
-
     // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
-    console.log("Aggregating data...");
     const breakdown = innerDataArray.reduce((acc, item) => {
       const breakdownValue = item[breakdownKey];
       const yAxisValue = item[yAxisKey];
@@ -174,25 +162,20 @@ export const convertSQLData = async (
       }
       return acc;
     }, {});
-    console.log("Breakdown:", breakdown);
 
     // Step 2: Sort and extract the top keys based on the configured number of top results
-    console.log("Sorting and extracting top keys...");
     const topKeys = Object.entries(breakdown)
       .sort(([, a]: any, [, b]: any) => b - a)
       .slice(0, top_results)
       .map(([key]) => key);
-    console.log("Top keys:", topKeys);
 
     // Step 3: Initialize result array and others object for aggregation
-    console.log("Initializing result array and others object...");
     const resultArray: any[] = [];
     const othersObj: any = {};
 
     innerDataArray.forEach((item) => {
       const breakdownValue = item[breakdownKey];
       if (topKeys.includes(breakdownValue)) {
-        console.log("Adding item to result array:", item);
         resultArray.push(item);
       } else if (top_results_others) {
         const xAxisValue = String(item[xAxisKey]);
@@ -203,13 +186,7 @@ export const convertSQLData = async (
 
     // Step 4: Add 'others' aggregation to the result array if enabled
     if (top_results_others) {
-      console.log("Adding 'others' aggregation to the result array...");
       Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
-        console.log("Adding item to result array:", {
-          [breakdownKey]: "others",
-          [xAxisKey]: xAxisValue,
-          [yAxisKey]: yAxisValue,
-        });
         resultArray.push({
           [breakdownKey]: "others",
           [xAxisKey]: xAxisValue,
@@ -218,7 +195,6 @@ export const convertSQLData = async (
       });
     }
 
-    console.log("Result array:", resultArray);
     return resultArray;
   };
 
