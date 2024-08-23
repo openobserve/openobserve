@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::ControlFlow,
-    sync::Arc,
-};
+use std::{collections::HashSet, ops::ControlFlow, sync::Arc};
 
 use arrow_schema::FieldRef;
 use config::{
@@ -29,6 +25,7 @@ use config::{
     utils::sql::AGGREGATE_UDF_LIST,
 };
 use datafusion::arrow::datatypes::Schema;
+use hashbrown::HashMap;
 use infra::{
     errors::Error,
     schema::{get_stream_setting_fts_fields, unwrap_stream_settings, SchemaCache},
@@ -45,7 +42,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-use super::match_source;
+use super::{generate_filter_from_equal_items, match_source};
 use crate::{
     common::meta::stream::StreamParams,
     service::search::sql::{convert_histogram_interval_to_seconds, generate_histogram_interval},
@@ -181,6 +178,7 @@ impl NewSql {
         })
     }
 
+    // TODO remove this function
     /// match a source is a valid file or not
     pub async fn match_source(
         &self,
@@ -326,18 +324,6 @@ fn generate_schema_fields(
         }
     }
     fields
-}
-
-/// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
-/// after [("a", ["3", "4"]), ("b", ["5", "6"])]
-pub fn generate_filter_from_equal_items(
-    equal_items: &Vec<(String, String)>,
-) -> Vec<(&str, Vec<String>)> {
-    let mut filters: HashMap<&str, Vec<String>> = HashMap::new();
-    for (field, value) in equal_items {
-        filters.entry(field).or_default().push(value.to_string());
-    }
-    filters.into_iter().collect()
 }
 
 /// visit a sql to get all columns

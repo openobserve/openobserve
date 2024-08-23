@@ -111,22 +111,18 @@ pub async fn search(
     }
 
     // construct partition filters
-    let search_partition_keys = req
+    let search_partition_keys: Option<Vec<(String, String)>> = req
         .partition_keys
         .iter()
-        .find(|v| v.stream_name == stream_name)
-        .map(|v| {
-            v.fields
-                .iter()
-                .filter_map(|v| {
-                    if schema_latest_map.contains_key(&v.key) {
-                        Some((v.key.to_string(), v.value.to_string()))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<(String, String)>>()
-        });
+        .filter_map(|v| {
+            if schema_latest_map.contains_key(&v.key) {
+                Some((v.key.to_string(), v.value.to_string()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+        .into();
 
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),

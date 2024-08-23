@@ -45,8 +45,7 @@ use crate::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_search_schema_diff, match_source,
-            new_sql::generate_filter_from_equal_items,
+            generate_filter_from_equal_items, generate_search_schema_diff, match_source,
         },
     },
 };

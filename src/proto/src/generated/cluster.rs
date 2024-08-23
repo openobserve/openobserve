@@ -3202,14 +3202,6 @@ pub struct FlightSearchRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PartitionKeys {
     #[prost(string, tag = "1")]
-    pub stream_name: ::prost::alloc::string::String,
-    #[prost(message, repeated, tag = "2")]
-    pub fields: ::prost::alloc::vec::Vec<KvPair>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct KvPair {
-    #[prost(string, tag = "1")]
     pub key: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub value: ::prost::alloc::string::String,

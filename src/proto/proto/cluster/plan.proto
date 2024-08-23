@@ -39,11 +39,6 @@ message FlightSearchRequest {
 }
 
 message PartitionKeys {
-     string     stream_name = 1;
-     repeated KvPair fields = 2;
-}
-
-message KvPair {
     string   key = 1;
     string value = 2;
 }

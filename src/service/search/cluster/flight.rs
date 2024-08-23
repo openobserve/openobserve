@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use arrow::array::RecordBatch;
 use config::{
@@ -30,11 +30,11 @@ use config::{
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::displayable, prelude::SessionContext,
 };
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, Result},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings, SchemaCache},
 };
 use proto::cluster_rpc::{self, SearchRequest};
 use tracing::{info_span, Instrument};
@@ -48,6 +48,7 @@ use crate::{
             optimizer::generate_optimizer_rules,
             table_provider::empty_table::NewEmptyTable,
         },
+        match_file,
         new_sql::NewSql,
     },
 };
@@ -98,7 +99,15 @@ pub async fn search(
     }
 
     // 2. get file list
-    let file_list = get_file_lists(&req, sql.clone()).await?;
+    let file_list = get_file_lists(
+        &sql.stream_names,
+        &sql.schemas,
+        &sql.org_id,
+        sql.stream_type,
+        sql.time_range,
+        &sql.equal_items,
+    )
+    .await?;
 
     // 3. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
@@ -350,8 +359,16 @@ pub async fn search(
     let partition_keys = sql
         .equal_items
         .iter()
-        .map(|(stream_name, fields)| cluster_rpc::PartitionKeys::new(stream_name, fields.clone()))
-        .collect::<Vec<_>>();
+        .map(|(stream_name, fields)| {
+            (
+                stream_name.clone(),
+                fields
+                    .iter()
+                    .map(|(k, v)| cluster_rpc::PartitionKeys::new(k, v))
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes,
@@ -385,7 +402,7 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             rewrite.file_lists.get(table_name).unwrap().clone(),
-            rewrite.partition_keys.clone(),
+            rewrite.partition_keys.get(table_name).unwrap().clone(),
             rewrite.match_all_keys.clone(),
             false,
             rewrite.req,
@@ -498,24 +515,29 @@ pub async fn get_online_querier_nodes(
 }
 
 pub async fn get_file_lists(
-    req: &cluster_rpc::SearchRequest,
-    meta: Arc<NewSql>,
+    stream_names: &[String],
+    schemas: &HashMap<String, Arc<SchemaCache>>,
+    org_id: &str,
+    stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
+    equal_items: &HashMap<String, Vec<(String, String)>>,
 ) -> Result<HashMap<String, Vec<FileKey>>> {
-    let _trace_id = req.job.as_ref().unwrap().trace_id.clone();
-    let mut file_lists = HashMap::with_capacity(meta.stream_names.len());
-
-    for name in &meta.stream_names {
+    let mut file_lists = HashMap::with_capacity(stream_names.len());
+    for name in stream_names {
         // stream settings
         let stream_settings =
-            unwrap_stream_settings(meta.schemas.get(name).unwrap().schema()).unwrap_or_default();
+            unwrap_stream_settings(schemas.get(name).unwrap().schema()).unwrap_or_default();
         let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, meta.stream_type);
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
+        let empty_filters = vec![];
         // get file list
         let file_list = get_file_list(
             name,
-            &meta,
-            meta.stream_type,
+            org_id,
+            stream_type,
+            time_range,
+            equal_items.get(name).unwrap_or(&empty_filters),
             partition_time_level,
             &stream_settings.partition_keys,
         )
@@ -525,11 +547,13 @@ pub async fn get_file_lists(
     Ok(file_lists)
 }
 
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
+#[tracing::instrument(fields(org_id = org_id, stream_name = stream_name))]
 pub(crate) async fn get_file_list(
     stream_name: &str,
-    sql: &NewSql,
+    org_id: &str,
     stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
+    equal_items: &[(String, String)],
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
@@ -539,9 +563,9 @@ pub(crate) async fn get_file_list(
             .unwrap_or_default()
             .len()
             <= 1;
-    let (time_min, time_max) = sql.time_range.unwrap();
+    let (time_min, time_max) = time_range.unwrap();
     let file_list = crate::service::file_list::query(
-        &sql.org_id,
+        org_id,
         stream_name,
         stream_type,
         time_level,
@@ -554,16 +578,18 @@ pub(crate) async fn get_file_list(
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
-        if sql
-            .match_source(
-                stream_name,
-                &file,
-                false,
-                false,
-                stream_type,
-                partition_keys,
-            )
-            .await
+        if match_file(
+            stream_name,
+            org_id,
+            time_range,
+            &file,
+            false,
+            false,
+            stream_type,
+            partition_keys,
+            equal_items,
+        )
+        .await
         {
             files.push(file.to_owned());
         }
@@ -719,7 +745,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
             .schema()
             .as_ref()
             .clone()
-            .with_metadata(HashMap::new());
+            .with_metadata(std::collections::HashMap::new());
         let table = Arc::new(
             NewEmptyTable::new(stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())

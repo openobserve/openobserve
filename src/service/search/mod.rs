@@ -23,7 +23,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
-        stream::{FileKey, StreamType},
+        stream::{FileKey, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
@@ -616,6 +616,54 @@ pub async fn cancel_query(
         trace_id: trace_id.to_string(),
         is_success,
     })
+}
+
+/// match a source is a valid file or not
+#[allow(clippy::too_many_arguments)]
+pub async fn match_file(
+    stream_name: &str,
+    org_id: &str,
+    time_range: Option<(i64, i64)>,
+    source: &FileKey,
+    match_min_ts_only: bool,
+    is_wal: bool,
+    stream_type: StreamType,
+    partition_keys: &[StreamPartition],
+    equal_items: &[(String, String)],
+) -> bool {
+    let mut filters: Vec<(&str, Vec<String>)> = generate_filter_from_equal_items(equal_items);
+    let partition_keys: HashMap<&str, &StreamPartition> = partition_keys
+        .iter()
+        .map(|v| (v.field.as_str(), v))
+        .collect();
+    for (key, value) in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(key) {
+            for val in value.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
+    match_source(
+        StreamParams::new(org_id, stream_name, stream_type),
+        time_range,
+        filters.as_slice(),
+        source,
+        is_wal,
+        match_min_ts_only,
+    )
+    .await
+}
+
+/// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
+/// after [("a", ["3", "4"]), ("b", ["5", "6"])]
+pub fn generate_filter_from_equal_items(
+    equal_items: &[(String, String)],
+) -> Vec<(&str, Vec<String>)> {
+    let mut filters: HashMap<&str, Vec<String>> = HashMap::new();
+    for (field, value) in equal_items {
+        filters.entry(field).or_default().push(value.to_string());
+    }
+    filters.into_iter().collect()
 }
 
 /// match a source is a valid file or not

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use config::meta::{cluster::Node, stream::FileKey};
 use datafusion::{
@@ -23,6 +23,7 @@ use datafusion::{
     },
     physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
 };
+use hashbrown::HashMap;
 use proto::cluster_rpc::{PartitionKeys, SearchRequest};
 
 use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
@@ -32,7 +33,7 @@ pub struct RemoteScanRewriter {
     pub req: SearchRequest,
     pub nodes: Vec<Node>,
     pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
-    pub partition_keys: Vec<PartitionKeys>,
+    pub partition_keys: HashMap<String, Vec<PartitionKeys>>,
     pub match_all_keys: Vec<String>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
@@ -44,7 +45,7 @@ impl RemoteScanRewriter {
         req: SearchRequest,
         nodes: Vec<Node>,
         file_lists: HashMap<String, Vec<Vec<FileKey>>>,
-        partition_keys: Vec<PartitionKeys>,
+        partition_keys: HashMap<String, Vec<PartitionKeys>>,
         match_all_keys: Vec<String>,
         is_leader: bool,
     ) -> Self {
@@ -68,14 +69,16 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
             if visitor.is_remote_scan {
+                let empty = vec![];
+                let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     input.clone(),
-                    self.file_lists
-                        .get(&visitor.table_name.clone().unwrap())
-                        .unwrap()
+                    self.file_lists.get(&table_name).unwrap().clone(),
+                    self.partition_keys
+                        .get(&table_name)
+                        .unwrap_or(&empty)
                         .clone(),
-                    self.partition_keys.clone(),
                     self.match_all_keys.clone(),
                     self.is_leader,
                     self.req.clone(),
@@ -91,6 +94,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
             if visitor.is_remote_scan {
+                let table_name = visitor.table_name.clone().unwrap();
+                let empty = vec![];
                 let follow_merge_node = node.clone();
                 let new_input =
                     follow_merge_node.with_new_children(vec![node.children()[0].clone()])?;
@@ -101,7 +106,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .get(&visitor.table_name.clone().unwrap())
                         .unwrap()
                         .clone(),
-                    self.partition_keys.clone(),
+                    self.partition_keys
+                        .get(&table_name)
+                        .unwrap_or(&empty)
+                        .clone(),
                     self.match_all_keys.clone(),
                     self.is_leader,
                     self.req.clone(),
