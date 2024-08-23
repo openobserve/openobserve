@@ -6,6 +6,16 @@ const cacheVersion = `O2-cache-v1`;
 
 let pathPrefix = "/web/";
 
+// Function to adjust pathPrefix based on the current URL
+function adjustPathPrefix(requestUrl) {
+  const url = new URL(requestUrl);
+  
+  // Check if the URL path contains "/web"
+  if (url.pathname.indexOf("/web") === -1) {
+    pathPrefix = "/";
+  }
+}
+
 async function fetchManifest() {
   // if(window.location.pathname.indexOf("/web") == -1) {
   //   pathPrefix = "/";
@@ -17,14 +27,13 @@ async function fetchManifest() {
 self.addEventListener("install", function (event) {
   event.waitUntil(
     (async () => {
+      // You can manually provide a URL here to set the pathPrefix
+      adjustPathPrefix(self.location.href); // or use a default URL
+      
       const manifest = await fetchManifest();
 
       // List of files to cache
       const filesToCache = [];
-
-      if(window.location.pathname.indexOf("/web") == -1) {
-        pathPrefix = "/";
-      }
 
       Object.keys(manifest).forEach((key) => {
         if (key == "index.html") {
