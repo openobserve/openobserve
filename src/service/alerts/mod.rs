@@ -72,6 +72,7 @@ impl QueryCondition {
         stream_param: &StreamParams,
         trigger_condition: &TriggerCondition,
         query_condition: &QueryCondition,
+        start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
@@ -98,11 +99,14 @@ impl QueryCondition {
                 if v.is_empty() {
                     return Ok((None, now));
                 }
-                let start = now
-                    - Duration::try_minutes(trigger_condition.period)
+                let start = if let Some(start_time) = start_time {
+                    start_time
+                } else {
+                    now - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
                         .num_microseconds()
-                        .unwrap();
+                        .unwrap()
+                };
                 let end = now;
                 let condition = self.promql_condition.as_ref().unwrap();
                 let req = promql::MetricsQueryRequest {
@@ -182,11 +186,14 @@ impl QueryCondition {
                 } else {
                     std::cmp::max(100, trigger_condition.threshold)
                 },
-                start_time: now
-                    - Duration::try_minutes(trigger_condition.period)
+                start_time: if let Some(start_time) = start_time {
+                    start_time
+                } else {
+                    now - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
                         .num_microseconds()
-                        .unwrap(),
+                        .unwrap()
+                },
                 end_time: now,
                 sort_by: None,
                 quick_mode: false,

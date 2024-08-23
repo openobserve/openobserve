@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     get_config,
     utils::json::{Map, Value},
@@ -120,7 +120,7 @@ pub async fn save(
     }
 
     // test derived_stream
-    if let Err(e) = &derived_stream.evaluate(None).await {
+    if let Err(e) = &derived_stream.evaluate(None, None).await {
         return Err(anyhow::anyhow!(
             "DerivedStream not saved due to failed test run caused by {}",
             e.to_string()
@@ -128,11 +128,7 @@ pub async fn save(
     };
 
     // Save the trigger to db
-    let next_run_at = Utc::now().timestamp_micros()
-        + Duration::try_minutes(derived_stream.trigger_condition.frequency)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+    let next_run_at = Utc::now().timestamp_micros();
     let trigger = db::scheduler::Trigger {
         org: derived_stream.source.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
@@ -185,12 +181,18 @@ impl DerivedStreamMeta {
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition
-                .evaluate_scheduled(&self.source, &self.trigger_condition, &self.query_condition)
+                .evaluate_scheduled(
+                    &self.source,
+                    &self.trigger_condition,
+                    &self.query_condition,
+                    start_time,
+                )
                 .await
         }
     }
