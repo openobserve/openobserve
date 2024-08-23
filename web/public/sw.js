@@ -171,21 +171,19 @@ self.addEventListener("fetch", function (event) {
                     console.error("Cache put failed:", error);
                   });
                 });
-                console.log(response, "res 2 in fetch");
                 return response;
               }
               if (event.request.method === 'POST') {
                 // Do not cache POST requests
                 event.respondWith(
                   fetch(event.request).catch(function(error) {
-                    console.error('Fetch failed:', error);
                     throw error;
                   })
                 );
                 return;
               }
               var responseToCache = response.clone();
-              console.log(responseToCache, "res 3 in fetch");
+
               caches
                 .open(cacheVersion)
                 .then(function (cache) {
