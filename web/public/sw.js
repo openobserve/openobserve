@@ -33,15 +33,15 @@ self.addEventListener("install", function (event) {
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`/web/${manifest[key]["file"]}`);
-          filesToCache.push("/web/sw.js");
+          filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          filesToCache.push(`${pathPrefix}sw.js`);
         }
         if (
           typeof manifest[key] == "object" &&
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
+          filesToCache.push(`${pathPrefix}assets/${manifest[key]["file"]}`);
         }
       });
 
