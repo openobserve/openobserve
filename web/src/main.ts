@@ -105,16 +105,25 @@ const getConfig = async () => {
 getConfig();
 
 if ("serviceWorker" in navigator) {
-  const swPath: string = "/web/sw.js";
-  const scopePath: string = "/web/";
-  // if (window.location.pathname.includes("/web/")) {
-  //   swPath = "/web/sw.js";
-  //   scopePath = "/web/";
-  // }
+  let swPath: string = "/sw.js";
+  let scopePath: string = "/";
+  let isWebPath: string = "false";
+  if (window.location.pathname.includes("/web/")) {
+    swPath = "/web/sw.js";
+    scopePath = "/web/";
+    isWebPath = "true";
+  }
   navigator.serviceWorker
-    .register(swPath + "?version=" + import.meta.env.VITE_COMMIT_HASH, {
-      scope: scopePath,
-    })
+    .register(
+      swPath +
+        "?version=" +
+        import.meta.env.VITE_COMMIT_HASH +
+        "&webpath=" +
+        isWebPath,
+      {
+        scope: scopePath,
+      },
+    )
     .then((registration) => {
       registration.addEventListener("updatefound", () => {
         const installingWorker = registration.installing;
