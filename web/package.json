@@ -8,7 +8,7 @@
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
     "build-alpha1": "run-p type-check build-only-alpha1",
     "build-cloud-prod": "run-p type-check build-only-cloud-prod",
-    "build": "run-p type-check build-only",
+    "build": "VITE_COMMIT_HASH=v$(git rev-parse --short HEAD) run-p type-check build-only",
     "postbuild": "run-p copy copy-manifest",
     "preview": "vite preview",
     "copy": "cd dist && mkdir src && cd src && mkdir assets && cd assets && mkdir workers && cd .. && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
@@ -22,6 +22,7 @@
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "copy-manifest": "cp -r dist/.vite/manifest.json dist/"
+
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
