@@ -105,12 +105,12 @@ const getConfig = async () => {
 getConfig();
 
 if ("serviceWorker" in navigator) {
-  let swPath: string = "/sw.js";
-  let scopePath: string = "/";
-  if (window.location.pathname.includes("/web/")) {
-    swPath = "/web/sw.js";
-    scopePath = "/web/";
-  }
+  const swPath: string = "/web/sw.js";
+  const scopePath: string = "/web/";
+  // if (window.location.pathname.includes("/web/")) {
+  //   swPath = "/web/sw.js";
+  //   scopePath = "/web/";
+  // }
   navigator.serviceWorker
     .register(swPath, {
       scope: scopePath,
