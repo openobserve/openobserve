@@ -48,6 +48,10 @@ jobs:
         - uses: actions/setup-node@v4
           with:
             node-version: 18
+
+        - name: Set VITE_COMMIT_HASH env
+          run: |
+            echo "VITE_COMMIT_HASH=$(git rev-parse --short=7 HEAD)" >> $VITE_COMMIT_HASH
         
         - name: Build frontend code
           run: cd web && npm install && npm run build
