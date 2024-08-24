@@ -51,7 +51,7 @@ jobs:
 
         - name: Set VITE_COMMIT_HASH env
           run: |
-            echo "VITE_COMMIT_HASH=$(git rev-parse --short=7 HEAD)" >> $VITE_COMMIT_HASH
+            echo "VITE_COMMIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
         
         - name: Build frontend code
           run: cd web && npm install && npm run build
