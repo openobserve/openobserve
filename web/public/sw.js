@@ -3,30 +3,20 @@
 // Version identifier for cache and update management
 const swURL = new URL(self.location.href);
 const version = swURL.searchParams.get('version');
+const isWebPath = swURL.searchParams.get('webpath');
 const cacheVersion = `O2-cache-${version}`;
 // Function to fetch the asset manifest
 
-let pathPrefix = "/web/";
-
-// Function to adjust pathPrefix based on the current URL
-function adjustPathPrefix(requestUrl) {
-  const url = new URL(requestUrl);
-  
-  // Check if the URL path contains "/web"
-  if (url.pathname.indexOf("/web") === -1) {
-    pathPrefix = "/";
-  }
+let pathPrefix = "/";
+if (isWebPath == "true" || isWebPath == true) {
+  pathPrefix = "/web/";
 }
-
 async function fetchManifest() {
-  // if(window.location.pathname.indexOf("/web") == -1) {
-  //   pathPrefix = "/";
-  // }
-
   const response = await fetch(`${pathPrefix}manifest.json`);
   return response.json();
 }
 self.addEventListener("install", function (event) {
+  self.skipWaiting();
   event.waitUntil(
     (async () => {
       // You can manually provide a URL here to set the pathPrefix
@@ -39,31 +29,32 @@ self.addEventListener("install", function (event) {
 
       Object.keys(manifest).forEach((key) => {
         if (key == "index.html") {
-          // filesToCache.push(`${pathPrefix}`);
-          // filesToCache.push(`${pathPrefix}favicon.ico`);
-          // filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
-          // filesToCache.push(`${pathPrefix}sw.js`);
-          filesToCache.push("/web/");
-          filesToCache.push("/web/favicon.ico");
-          filesToCache.push(`/web/${manifest[key]["file"]}`);
-          filesToCache.push("/web/sw.js");
+          filesToCache.push(`${pathPrefix}`);
+          filesToCache.push(`${pathPrefix}favicon.ico`);
+          filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          filesToCache.push(`${pathPrefix}sw.js`);
+          // filesToCache.push("/web/");
+          // filesToCache.push("/web/favicon.ico");
+          // filesToCache.push(`/web/${manifest[key]["file"]}`);
+          // filesToCache.push("/web/sw.js");
         }
         if (
           typeof manifest[key] == "object" &&
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          // filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
-          // filesToCache.push(`${pathPrefix}sw.js`);
-          filesToCache.push(`/web/${manifest[key]["file"]}`);
-          filesToCache.push(`/web/sw.js`);
+          filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          filesToCache.push(`${pathPrefix}sw.js`);
+          // filesToCache.push(`/web/${manifest[key]["file"]}`);
+          // filesToCache.push(`/web/sw.js`);
         }
         if (
           typeof manifest[key] == "object" &&
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
+          filesToCache.push(`${pathPrefix}assets/${manifest[key]["file"]}`);
+          // filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
         }
       });
 
