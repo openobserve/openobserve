@@ -112,7 +112,7 @@ if ("serviceWorker" in navigator) {
   //   scopePath = "/web/";
   // }
   navigator.serviceWorker
-    .register(swPath, {
+    .register(swPath + "?version=" + import.meta.env.VITE_COMMIT_HASH, {
       scope: scopePath,
     })
     .then((registration) => {
