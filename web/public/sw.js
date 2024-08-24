@@ -28,7 +28,7 @@ self.addEventListener("install", function (event) {
   event.waitUntil(
     (async () => {
       // You can manually provide a URL here to set the pathPrefix
-      adjustPathPrefix(self.location.href); // or use a default URL
+      // adjustPathPrefix(self.location.href); // or use a default URL
       
       const manifest = await fetchManifest();
 
@@ -37,25 +37,31 @@ self.addEventListener("install", function (event) {
 
       Object.keys(manifest).forEach((key) => {
         if (key == "index.html") {
-          filesToCache.push(`${pathPrefix}`);
-          filesToCache.push(`${pathPrefix}favicon.ico`);
-          filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
-          filesToCache.push(`${pathPrefix}sw.js`);
+          // filesToCache.push(`${pathPrefix}`);
+          // filesToCache.push(`${pathPrefix}favicon.ico`);
+          // filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          // filesToCache.push(`${pathPrefix}sw.js`);
+          filesToCache.push("/web/");
+          filesToCache.push("/web/favicon.ico");
+          filesToCache.push(`/web/${manifest[key]["file"]}`);
+          filesToCache.push("/web/sw.js");
         }
         if (
           typeof manifest[key] == "object" &&
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
-          filesToCache.push(`${pathPrefix}sw.js`);
+          // filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          // filesToCache.push(`${pathPrefix}sw.js`);
+          filesToCache.push(`/web/${manifest[key]["file"]}`);
+          filesToCache.push(`/web/sw.js`);
         }
         if (
           typeof manifest[key] == "object" &&
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`${pathPrefix}assets/${manifest[key]["file"]}`);
+          filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
         }
       });
 
