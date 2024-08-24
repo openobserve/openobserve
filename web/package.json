@@ -22,6 +22,7 @@
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "copy-manifest": "cp -r dist/.vite/manifest.json dist/"
+
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
