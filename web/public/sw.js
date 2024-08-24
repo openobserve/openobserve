@@ -1,7 +1,9 @@
 // sw.js
 
 // Version identifier for cache and update management
-const cacheVersion = `O2-cache-v1`;
+const swURL = new URL(self.location.href);
+const version = swURL.searchParams.get('version');
+const cacheVersion = `O2-cache-${version}`;
 // Function to fetch the asset manifest
 
 let pathPrefix = "/web/";
@@ -74,6 +76,7 @@ self.addEventListener("install", function (event) {
           try {
             const response = await fetch(file);
             if (!response.ok) {
+              self.client.postMessage("staledata");
               throw new Error(
                 `Request for ${file} failed with status ${response.status}`
               );
