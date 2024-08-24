@@ -26,7 +26,6 @@ self.addEventListener("install", function (event) {
     (async () => {
       // You can manually provide a URL here to set the pathPrefix
       // adjustPathPrefix(self.location.href); // or use a default URL
-
       const manifest = await fetchManifest();
 
       // List of files to cache
