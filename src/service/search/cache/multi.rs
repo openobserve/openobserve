@@ -195,7 +195,12 @@ async fn recursive_process_multiple_metas(
 
                 let discard_ts = if cache_req.is_descending {
                     if cache_req.discard_interval > 0 {
-                        first_ts
+                        if Utc::now().timestamp_micros() - cache_req.discard_interval < first_ts { 
+                            first_ts
+                        } else {
+                            first_ts + 1
+                        }
+                        
                     } else {
                         let m_first_ts = round_down_to_nearest_minute(first_ts);
                         if Utc::now().timestamp_micros() - discard_duration < m_first_ts {
@@ -205,7 +210,11 @@ async fn recursive_process_multiple_metas(
                         }
                     }
                 } else if cache_req.discard_interval > 0 {
-                    last_ts
+                     if Utc::now().timestamp_micros() - cache_req.discard_interval < last_ts { 
+                        last_ts
+                     } else {
+                         last_ts + 1
+                     }
                 } else {
                     let m_last_ts = round_down_to_nearest_minute(last_ts);
                     if Utc::now().timestamp_micros() - discard_duration < last_ts {
@@ -217,15 +226,9 @@ async fn recursive_process_multiple_metas(
 
                 cached_response.hits.retain(|hit| {
                     let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                    if cache_req.discard_interval > 0 {
-                        hit_ts <=  hits_allowed_end_time
-                        && hit_ts >= hits_allowed_start_time
-                        && hit_ts <= discard_ts
-                    } else {
                     hit_ts <=  hits_allowed_end_time
                         && hit_ts >= hits_allowed_start_time
                         && hit_ts < discard_ts
-                    }
                 });
 
                 cached_response.total = cached_response.hits.len();
