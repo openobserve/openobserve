@@ -375,15 +375,9 @@ pub async fn get_cached_results(
 
                         cached_response.hits.retain(|hit| {
                             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                            if cache_req.discard_interval > 0 {
-                                hit_ts <=  hits_allowed_end_time
-                                && hit_ts >= hits_allowed_start_time
-                                && hit_ts <= discard_ts
-                            }else{
                             hit_ts <=  hits_allowed_end_time
                                 && hit_ts >= hits_allowed_start_time
                                 && hit_ts < discard_ts
-                            }
                         });
 
                         cached_response.total = cached_response.hits.len();
