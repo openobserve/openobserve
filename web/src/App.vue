@@ -37,7 +37,7 @@ export default {
       color: 'negative',
       icon: mdiCached,
       message: t("common.swUpdateContentMsg"),
-      timeout: 60,
+      timeout: 0,
       multiLine: true,
       position: 'bottom-right',
       actions: [
