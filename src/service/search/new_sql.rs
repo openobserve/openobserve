@@ -557,26 +557,17 @@ impl MatchVisitor {
 impl VisitorMut for MatchVisitor {
     type Break = ();
 
-    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
-                let exprs = split_conjunction(expr);
-                for e in exprs {
-                    if let Expr::Function(func) = e {
-                        let name = func.name.to_string().to_lowercase();
-                        if name == "match_all"
-                            || name == "match_all_raw"
-                            || name == "match_all_raw_ignore_case"
-                        {
-                            if let FunctionArguments::List(list) = &func.args {
-                                if list.args.len() == 1 {
-                                    let value = trim_quotes(list.args[0].to_string().as_str());
-                                    match &mut self.match_items {
-                                        Some(items) => items.push(value),
-                                        None => self.match_items = Some(vec![value]),
-                                    }
-                                }
-                            }
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr {
+            let name = func.name.to_string().to_lowercase();
+            if name == "match_all" || name == "match_all_raw" || name == "match_all_raw_ignore_case"
+            {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() == 1 {
+                        let value = trim_quotes(list.args[0].to_string().as_str());
+                        match &mut self.match_items {
+                            Some(items) => items.push(value),
+                            None => self.match_items = Some(vec![value]),
                         }
                     }
                 }
