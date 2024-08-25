@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use async_recursion::async_recursion;
 use chrono::Utc;
 use config::{get_config, meta::search::Response, utils::json};
@@ -20,7 +22,7 @@ use infra::cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta};
 
 use super::cacher::get_results;
 use crate::{
-    common::meta::search::CacheQueryRequest,
+    common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
         result_utils::{get_ts_value, round_down_to_nearest_minute},
         CachedQueryResponse,
@@ -77,6 +79,10 @@ async fn recursive_process_multiple_metas(
         );
         return Ok(());
     }
+    let selection_strategy: ResultCacheSelectionStrategy = ResultCacheSelectionStrategy::from_str(
+        &get_config().common.result_cache_selection_strategy,
+    )
+    .unwrap_or_default();
 
     // Filter relevant metas that are within the overall query range
     let relevant_metas: Vec<ResultCacheMeta> = cache_metas
@@ -108,7 +114,31 @@ async fn recursive_process_multiple_metas(
             cache_meta.start_time <= cache_req.q_end_time
                 && cache_meta.end_time >= cache_req.q_start_time
         })
-        .max_by_key(|result| result.end_time - result.start_time)
+        .max_by_key(|result|
+            match selection_strategy{
+                ResultCacheSelectionStrategy::Overlap => {
+                    let overlap_start = result.start_time.max(cache_req.q_start_time);
+                    let overlap_end = result.end_time.min(cache_req.q_end_time);
+                    overlap_end - overlap_start
+                }
+                ResultCacheSelectionStrategy::Duration => {
+                   result.end_time - result.start_time
+                }
+                ResultCacheSelectionStrategy::Both => {
+                    let overlap_start = cache_req.q_start_time.max(result.start_time);
+                    let overlap_end = cache_req.q_end_time.min(result.end_time);
+                    let overlap_duration = overlap_end - overlap_start;
+                    let cache_duration = result.end_time - result.start_time;
+                     // Calculate the ratio of overlap duration to cache duration as a percentage
+                    let overlap_percentage = if cache_duration > 0 {
+                        (overlap_duration * 100) / cache_duration
+                    } else {
+                        0
+                    };
+                    overlap_percentage
+                }
+            }
+        )
     {
         let file_name = format!(
             "{}_{}_{}_{}.json",
