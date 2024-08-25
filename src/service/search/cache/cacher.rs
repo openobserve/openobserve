@@ -155,8 +155,11 @@ pub async fn check_cache(
             },
         )
         .await;
-
-        multi_res.sort_by_key(|meta| meta.response_start_time);
+        if is_descending {
+            multi_res.sort_by_key(|meta| meta.response_end_time);
+        } else {
+            multi_res.sort_by_key(|meta| meta.response_start_time);
+        }
 
         let deltas = calculate_deltas_multi(
             &multi_res,
