@@ -461,7 +461,7 @@ pub async fn search(
             rewrite
                 .partition_keys
                 .get(table_name)
-                .map(|v| v.clone())
+                .cloned()
                 .unwrap_or_default(),
             rewrite.match_all_keys.clone(),
             false,
