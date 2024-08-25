@@ -114,6 +114,7 @@ pub async fn sql(
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // create table
     let (real_table, is_memtable) = if !file_type.eq(&FileType::ARROW) {
@@ -277,6 +278,7 @@ pub async fn merge_partitions(
 
     // register UDF
     register_udf(&mut ctx, org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Debug SQL
     let cfg = get_config();
