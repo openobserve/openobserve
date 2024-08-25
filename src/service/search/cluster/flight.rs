@@ -188,9 +188,6 @@ pub async fn search(
         return Err(Error::Message("no querier node online".to_string()));
     }
 
-    // 3. partition file list
-    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
-
     // waiting in work group queue
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -280,6 +277,9 @@ pub async fn search(
     // reset work_group
     req.work_group = work_group_str;
 
+    // 3. partition file list
+    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
+
     // 4. construct physical plan
     let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,
@@ -322,10 +322,10 @@ pub async fn search(
         super::super::SEARCH_SERVER
             .add_file_stats(
                 &trace_id,
-                file_list_vec.len() as i64,
-                records,
-                original_size,
-                compressed_size,
+                scan_stats.files,
+                scan_stats.records,
+                scan_stats.original_size,
+                scan_stats.compressed_size,
             )
             .await;
     }
