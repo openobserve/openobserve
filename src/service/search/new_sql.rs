@@ -25,7 +25,10 @@ use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{
     errors::Error,
-    schema::{get_stream_setting_fts_fields, unwrap_stream_settings, SchemaCache},
+    schema::{
+        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_settings,
+        SchemaCache,
+    },
 };
 use proto::cluster_rpc;
 use serde::Serialize;
@@ -60,7 +63,8 @@ pub struct NewSql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, bool)>,
     pub histogram_interval: Option<i64>,
-    pub sorted_by_time: bool, // if only order by _timestamp
+    pub sorted_by_time: bool,     // if only order by _timestamp
+    pub use_inverted_index: bool, // if can use inverted index
 }
 
 impl NewSql {
@@ -119,6 +123,7 @@ impl NewSql {
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == get_config().common.column_timestamp
             && !order_by[0].1;
+        let use_inverted_index = column_visitor.use_inverted_index;
 
         // 4. get match_all() value
         let mut match_visitor = MatchVisitor::new();
@@ -170,6 +175,7 @@ impl NewSql {
             order_by,
             histogram_interval: histogram_interval_visitor.interval,
             sorted_by_time: need_sort_by_time,
+            use_inverted_index,
         })
     }
 }
@@ -290,11 +296,12 @@ struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
     columns_alias: HashSet<(String, String)>,
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
+    group_by: Vec<String>,
+    order_by: Vec<(String, bool)>, // field_name, asc
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
-    group_by: Vec<String>,
-    order_by: Vec<(String, bool)>, // field_name, asc
+    use_inverted_index: bool,
 }
 
 impl<'a> ColumnVisitor<'a> {
@@ -303,11 +310,12 @@ impl<'a> ColumnVisitor<'a> {
             columns: HashMap::new(),
             columns_alias: HashSet::new(),
             schemas,
+            group_by: Vec::new(),
+            order_by: Vec::new(),
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
-            group_by: Vec::new(),
-            order_by: Vec::new(),
+            use_inverted_index: false,
         }
     }
 }
@@ -398,6 +406,20 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
             }
             if select.distinct.is_some() {
                 self.is_distinct = true;
+            }
+            if let Some(expr) = select.selection.as_ref() {
+                // TODO: match_all only support single stream
+                if self.schemas.len() == 1 {
+                    for (_, schema) in self.schemas.iter() {
+                        let stream_settings = unwrap_stream_settings(schema.schema());
+                        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                        let index_fields = get_stream_setting_index_fields(&stream_settings);
+                        let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
+                            .collect::<HashSet<_>>();
+                        self.use_inverted_index =
+                            checking_inverted_index_inner(&index_fields, expr);
+                    }
+                }
             }
         }
         ControlFlow::Continue(())
@@ -714,4 +736,31 @@ fn trim_quotes(s: &str) -> String {
         .and_then(|s| s.strip_suffix('\''))
         .unwrap_or(s)
         .to_string()
+}
+
+fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
+    match expr {
+        Expr::Identifier(Ident {
+            value,
+            quote_style: _,
+        }) => index_fields.contains(value),
+        Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
+        Expr::BinaryOp { left, op, right } => match op {
+            BinaryOperator::And => true,
+            BinaryOperator::Or => {
+                checking_inverted_index_inner(index_fields, left)
+                    && checking_inverted_index_inner(index_fields, right)
+            }
+            BinaryOperator::Eq => checking_inverted_index_inner(index_fields, left),
+            _ => false,
+        },
+        Expr::Like {
+            negated: _,
+            expr,
+            pattern: _,
+            escape_char: _,
+        } => checking_inverted_index_inner(index_fields, expr),
+        Expr::Function(f) => f.name.to_string().starts_with("match_all"),
+        _ => false,
+    }
 }

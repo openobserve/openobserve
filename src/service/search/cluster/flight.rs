@@ -106,13 +106,15 @@ pub async fn search(
     } else {
         vec![]
     };
-    let is_inverted_index = cfg.common.inverted_index_enabled
+    let use_inverted_index = sql.stream_type != StreamType::Index
+        && sql.use_inverted_index
+        && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
         && (sql.match_items.is_some() || !index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] flight->leader: is_inverted_index {}",
-        is_inverted_index
+        "[trace_id {trace_id}] flight->leader: use_inverted_index {}",
+        use_inverted_index
     );
 
     // 1. get file list
@@ -140,7 +142,7 @@ pub async fn search(
     // then filter the file list based on the inverted index.
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if is_inverted_index {
+    if use_inverted_index {
         let stream_file_list;
         let stream_name = sql.stream_names.first().unwrap();
         let match_terms = sql.match_items.clone().unwrap_or_default();
