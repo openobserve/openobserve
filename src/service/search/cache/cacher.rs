@@ -161,12 +161,22 @@ pub async fn check_cache(
             multi_res.sort_by_key(|meta| meta.response_start_time);
         }
 
-        let deltas = calculate_deltas_multi(
-            &multi_res,
-            req.query.start_time,
-            req.query.end_time,
-            discard_interval,
-        );
+        let total_hits = multi_res
+            .iter()
+            .map(|v| v.cached_response.total)
+            .sum::<usize>();
+
+        let deltas = if total_hits == (meta.meta.limit as usize) {
+            *should_exec_query = false;
+            vec![]
+        } else {
+            calculate_deltas_multi(
+                &multi_res,
+                req.query.start_time,
+                req.query.end_time,
+                discard_interval,
+            )
+        };
 
         for res in multi_res {
             if res.has_cached_data {
