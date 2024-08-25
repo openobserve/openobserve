@@ -117,8 +117,8 @@ async fn recursive_process_multiple_metas(
         .max_by_key(|result|
             match selection_strategy{
                 ResultCacheSelectionStrategy::Overlap => {
-                    let overlap_start = result.start_time.max(cache_req.q_start_time);
-                    let overlap_end = result.end_time.min(cache_req.q_end_time);
+                    let overlap_start = cache_req.q_start_time.max(result.start_time);
+                    let overlap_end = cache_req.q_end_time.min(result.end_time);
                     overlap_end - overlap_start
                 }
                 ResultCacheSelectionStrategy::Duration => {

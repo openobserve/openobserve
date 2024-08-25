@@ -13,14 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use std::str::FromStr;
+
+use config::{cluster::LOCAL_NODE, get_config};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::meta::search::{CacheQueryRequest, CachedQueryResponse},
+    common::meta::search::{CacheQueryRequest, CachedQueryResponse, ResultCacheSelectionStrategy},
     service::search::infra_cluster,
 };
 
@@ -238,6 +240,10 @@ fn recursive_process_muliple_metas(
     if cache_metas.is_empty() {
         return;
     }
+    let selection_strategy: ResultCacheSelectionStrategy = ResultCacheSelectionStrategy::from_str(
+        &get_config().common.result_cache_selection_strategy,
+    )
+    .unwrap_or_default();
 
     // Filter relevant metas that are within the overall query range
     let relevant_metas: Vec<_> = cache_metas
@@ -255,8 +261,28 @@ fn recursive_process_muliple_metas(
 
     // Find the largest overlapping meta within the query time range
     if let Some(largest_meta) = sorted_metas.clone().iter().max_by_key(|meta| {
-        meta.response_end_time.min(cache_req.q_end_time)
-            - meta.response_start_time.max(cache_req.q_start_time)
+        match selection_strategy {
+            ResultCacheSelectionStrategy::Overlap => {
+                let overlap_start = meta.response_start_time.max(cache_req.q_start_time);
+                let overlap_end = meta.response_end_time.min(cache_req.q_end_time);
+                overlap_end - overlap_start
+            }
+            ResultCacheSelectionStrategy::Duration => {
+                meta.response_end_time - meta.response_start_time
+            }
+            ResultCacheSelectionStrategy::Both => {
+                let overlap_start = meta.response_start_time.max(cache_req.q_start_time);
+                let overlap_end = meta.response_end_time.min(cache_req.q_end_time);
+                let overlap_duration = overlap_end - overlap_start;
+                let cache_duration = meta.response_end_time - meta.response_start_time;
+                // Calculate the ratio of overlap duration to cache duration as a percentage
+                if cache_duration > 0 {
+                    (overlap_duration * 100) / cache_duration
+                } else {
+                    0
+                }
+            }
+        }
     }) {
         results.push(largest_meta.clone());
 
