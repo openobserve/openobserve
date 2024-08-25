@@ -130,12 +130,11 @@ async fn recursive_process_multiple_metas(
                     let overlap_duration = overlap_end - overlap_start;
                     let cache_duration = result.end_time - result.start_time;
                      // Calculate the ratio of overlap duration to cache duration as a percentage
-                    let overlap_percentage = if cache_duration > 0 {
+                    if cache_duration > 0 {
                         (overlap_duration * 100) / cache_duration
                     } else {
                         0
-                    };
-                    overlap_percentage
+                    }
                 }
             }
         )
