@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
-    "build-alpha1": "run-p type-check build-only-alpha1",
+    "build-alpha1": "VITE_COMMIT_HASH=v$(git rev-parse --short HEAD) run-p type-check build-only-alpha1",
     "build-cloud-prod": "run-p type-check build-only-cloud-prod",
     "build": "VITE_COMMIT_HASH=v$(git rev-parse --short HEAD) run-p type-check build-only",
     "postbuild": "run-p copy copy-manifest",
