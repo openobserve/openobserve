@@ -71,8 +71,8 @@ pub async fn convert_parquet_file(
     rules: HashMap<String, DataType>,
     file_type: FileType,
 ) -> Result<()> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
 
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",

@@ -32,9 +32,9 @@ impl TraceService for TraceServer {
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
         let start = std::time::Instant::now();
+        let cfg = config::get_config();
         let (metadata, extensions, message) = request.into_parts();
 
-        let cfg = config::get_config();
         // basic validation
         if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(format!(

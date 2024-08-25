@@ -49,8 +49,8 @@ use crate::service::{
 pub async fn search(
     req: &cluster_rpc::FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>), Error> {
-    let cfg = get_config();
     // let start = std::time::Instant::now();
+    let cfg = get_config();
 
     let org_id = req.org_id.to_string();
     let stream_type = StreamType::from(req.stream_type.as_str());

@@ -16,9 +16,11 @@
 use std::{str::FromStr, sync::Arc};
 
 use arrow::array::RecordBatch;
+use async_recursion::async_recursion;
 use config::{
     get_config,
     meta::{
+        bitvec::BitVec,
         cluster::{Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         stream::{
@@ -26,6 +28,8 @@ use config::{
         },
     },
     metrics,
+    utils::inverted_index::split_token,
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::displayable, prelude::SessionContext,
@@ -34,7 +38,10 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, Result},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings, SchemaCache},
+    schema::{
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+        SchemaCache,
+    },
 };
 use proto::cluster_rpc::{self, SearchRequest};
 use tracing::{info_span, Instrument};
@@ -48,20 +55,26 @@ use crate::{
             optimizer::generate_optimizer_rules,
             table_provider::empty_table::NewEmptyTable,
         },
-        match_file,
+        generate_filter_from_equal_items, match_file,
         new_sql::NewSql,
     },
 };
 
+#[async_recursion]
+#[tracing::instrument(
+    name = "service:search:flight:leader",
+    skip_all,
+    fields(org_id = req.org_id)
+)]
 pub async fn search(
     trace_id: &str,
     sql: Arc<NewSql>,
     mut req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->leader: start {}", sql);
 
-    let cfg = get_config();
     let timeout = if req.timeout > 0 {
         req.timeout as u64
     } else {
@@ -82,22 +95,28 @@ pub async fn search(
     let user_id = req.user_id.clone();
     #[cfg(feature = "enterprise")]
     let user_id = user_id.as_deref();
-    let node_group = req
-        .search_event_type
-        .as_ref()
-        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
-        .unwrap_or(None);
 
-    // 1. get nodes
-    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
-    let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
-    if querier_num == 0 {
-        log::error!("no querier node online");
-        return Err(Error::Message("no querier node online".to_string()));
-    }
+    // filter euqal_items with index_fields
+    // -- only support single table query for inverted index
+    let index_terms = if sql.equal_items.len() == 1 {
+        let schema = sql.schemas.values().next().unwrap().schema();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema);
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
+    } else {
+        vec![]
+    };
+    let is_inverted_index = cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && (sql.match_items.is_some() || !index_terms.is_empty());
 
-    // 2. get file list
-    let file_list = get_file_lists(
+    log::info!(
+        "[trace_id {trace_id}] flight->leader: is_inverted_index {}",
+        is_inverted_index
+    );
+
+    // 1. get file list
+    let mut file_list = get_file_lists(
         &sql.stream_names,
         &sql.schemas,
         &sql.org_id,
@@ -107,13 +126,7 @@ pub async fn search(
     )
     .await?;
 
-    // 3. partition file list
-    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
-    let file_list_vec = partition_file_lists
-        .values()
-        .flatten()
-        .flatten()
-        .collect::<Vec<_>>();
+    let mut file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] flight->leader: get file_list time_range: {:?}, num: {}, took: {} ms",
@@ -121,6 +134,59 @@ pub async fn search(
         file_list_vec.len(),
         file_list_took,
     );
+
+    // 1.1 use inverted index to filter file list
+    // If the query is of type inverted index and this is not an aggregations request,
+    // then filter the file list based on the inverted index.
+    let mut idx_scan_size = 0;
+    let mut idx_took = 0;
+    if is_inverted_index {
+        let stream_file_list;
+        let stream_name = sql.stream_names.first().unwrap();
+        let match_terms = sql.match_items.clone().unwrap_or_default();
+        let index_terms = generate_filter_from_equal_items(&index_terms);
+        (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
+            req.clone(),
+            stream_name,
+            &file_list_vec,
+            &match_terms,
+            &index_terms,
+        )
+        .await?;
+        log::info!(
+            "[trace_id {trace_id}] flight->leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+            sql.time_range,
+            stream_file_list.len(),
+            idx_scan_size,
+            idx_took,
+        );
+        file_list.insert(stream_name.to_string(), stream_file_list);
+        file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
+    }
+
+    // 1.2 calculate records, original_size, compressed_size
+    let mut scan_stats = ScanStats::new();
+    scan_stats.files = file_list_vec.len() as i64;
+    for file in file_list_vec.iter() {
+        let file_meta = &file.meta;
+        scan_stats.records += file_meta.records;
+        scan_stats.original_size += file_meta.original_size;
+        scan_stats.compressed_size += file_meta.compressed_size;
+    }
+    scan_stats.original_size += idx_scan_size as i64;
+
+    // 2. get nodes
+    let node_group = req
+        .search_event_type
+        .as_ref()
+        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
+        .unwrap_or(None);
+    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+    let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
+    if querier_num == 0 {
+        log::error!("no querier node online");
+        return Err(Error::Message("no querier node online".to_string()));
+    }
 
     // waiting in work group queue
     metrics::QUERY_PENDING_NUMS
@@ -211,6 +277,9 @@ pub async fn search(
     // reset work_group
     req.work_group = work_group_str;
 
+    // 3. partition file list
+    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
+
     // 4. construct physical plan
     let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,
@@ -250,25 +319,13 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        // TODO
-        let idx_scan_size = 0;
-        let mut records = 0;
-        let mut original_size = 0;
-        let mut compressed_size = 0;
-        for file in file_list_vec.iter() {
-            let file_meta = &file.meta;
-            records += file_meta.records;
-            original_size += file_meta.original_size;
-            compressed_size += file_meta.compressed_size;
-        }
-        original_size += idx_scan_size as i64;
         super::super::SEARCH_SERVER
             .add_file_stats(
                 &trace_id,
-                file_list_vec.len() as i64,
-                records,
-                original_size,
-                compressed_size,
+                scan_stats.files,
+                scan_stats.records,
+                scan_stats.original_size,
+                scan_stats.compressed_size,
             )
             .await;
     }
@@ -401,7 +458,11 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             rewrite.file_lists.get(table_name).unwrap().clone(),
-            rewrite.partition_keys.get(table_name).unwrap().clone(),
+            rewrite
+                .partition_keys
+                .get(table_name)
+                .cloned()
+                .unwrap_or_default(),
             rewrite.match_all_keys.clone(),
             false,
             rewrite.req,
@@ -497,7 +558,7 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    Ok((data, ScanStats::new(), 0, false, 0))
+    Ok((data, scan_stats, took_wait, false, idx_took))
 }
 
 pub async fn get_online_querier_nodes(
@@ -766,6 +827,177 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
         ctx.register_table(stream_name, table)?;
     }
     Ok(())
+}
+
+pub fn filter_index_fields(
+    items: &[(String, String)],
+    index_fields: &[String],
+) -> Vec<(String, String)> {
+    let mut result = Vec::new();
+    for item in items {
+        if index_fields.contains(&item.0) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+async fn get_file_list_by_inverted_index(
+    mut req: cluster_rpc::SearchRequest,
+    stream_name: &str,
+    file_list: &[&FileKey],
+    match_terms: &[String],
+    index_terms: &[(&str, Vec<String>)],
+) -> Result<(Vec<FileKey>, usize, usize)> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+
+    let org_id = req.org_id.clone();
+    let stream_type = StreamType::from(req.stream_type.as_str());
+    let file_list = file_list
+        .iter()
+        .map(|f| (&f.key, &f.meta))
+        .collect::<HashMap<_, _>>();
+
+    // Get all the unique terms which the user has searched.
+    let terms = match_terms
+        .iter()
+        .map(|t| {
+            let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+            tokens
+                .into_iter()
+                .max_by_key(|key| key.len())
+                .unwrap_or_default()
+        })
+        .collect::<HashSet<String>>();
+
+    let fts_condition = terms
+        .iter()
+        .map(|x| format!("term LIKE '{x}%'"))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let fts_condition = if fts_condition.is_empty() {
+        fts_condition
+    } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
+        format!(
+            "((field = '{}' OR field IS NULL) AND ({}))",
+            INDEX_FIELD_NAME_FOR_ALL, fts_condition
+        )
+    } else {
+        format!(
+            "(field = '{}' AND ({}))",
+            INDEX_FIELD_NAME_FOR_ALL, fts_condition
+        )
+    };
+
+    // Process index terms
+    let index_terms = index_terms
+        .iter()
+        .map(|(field, values)| {
+            if values.len() > 1 {
+                format!("(field = '{field}' AND term IN ('{}'))", values.join("','"))
+            } else {
+                format!(
+                    "(field = '{field}' AND term = '{}')",
+                    values.first().unwrap()
+                )
+            }
+        })
+        .collect::<Vec<_>>();
+    let index_condition = index_terms.join(" OR ");
+    let search_condition = if fts_condition.is_empty() {
+        index_condition
+    } else if index_condition.is_empty() {
+        fts_condition
+    } else {
+        format!("{} OR {}", fts_condition, index_condition)
+    };
+
+    let index_stream_name =
+        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+            stream_name.to_string()
+        } else {
+            format!("{}_{}", stream_name, stream_type)
+        };
+    let query = format!(
+        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
+        index_stream_name, search_condition,
+    );
+
+    req.stream_type = StreamType::Index.to_string();
+    req.query.as_mut().unwrap().sql = query;
+    req.query.as_mut().unwrap().from = 0;
+    req.query.as_mut().unwrap().size = QUERY_WITH_NO_LIMIT;
+    req.query.as_mut().unwrap().track_total_hits = false;
+    req.query.as_mut().unwrap().uses_zo_fn = false;
+    req.query.as_mut().unwrap().query_fn = "".to_string();
+
+    let resp = super::http::search(req).await?;
+    // get deleted file
+    let deleted_files = resp
+        .hits
+        .iter()
+        .filter_map(|hit| {
+            if hit.get("deleted").unwrap().as_bool().unwrap() {
+                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>();
+
+    // Merge bitmap segment_ids of the same file
+    let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
+    for item in resp.hits.iter() {
+        let filename = match item.get("file_name") {
+            None => continue,
+            Some(v) => v.as_str().unwrap(),
+        };
+        if deleted_files.contains(filename) {
+            continue;
+        }
+        let prefixed_filename = format!(
+            "files/{}/{}/{}/{}",
+            &org_id, stream_type, stream_name, filename
+        );
+        let Some(file_meta) = file_list.get(&prefixed_filename) else {
+            continue;
+        };
+        let segment_ids = match item.get("segment_ids") {
+            None => None,
+            Some(v) => hex::decode(v.as_str().unwrap()).ok(),
+        };
+        let entry = idx_file_list
+            .entry(prefixed_filename.clone())
+            .or_insert(FileKey {
+                key: prefixed_filename,
+                meta: (*file_meta).clone(),
+                deleted: false,
+                segment_ids: None,
+            });
+        match (&entry.segment_ids, &segment_ids) {
+            (Some(_), None) => {}
+            (Some(bin_data), Some(segment_ids)) => {
+                let mut bv = BitVec::from_slice(bin_data);
+                bv |= BitVec::from_slice(segment_ids);
+                entry.segment_ids = Some(bv.into_vec());
+            }
+            (None, _) => {
+                entry.segment_ids = segment_ids;
+            }
+        }
+    }
+    let mut idx_file_list = idx_file_list
+        .into_iter()
+        .map(|(_, f)| f)
+        .collect::<Vec<_>>();
+    // sorted by _timestamp
+    idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    Ok((
+        idx_file_list,
+        resp.scan_size,
+        start.elapsed().as_millis() as usize,
+    ))
 }
 
 #[cfg(test)]

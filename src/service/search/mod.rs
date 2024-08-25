@@ -85,6 +85,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
     let cfg = get_config();
+
     let trace_id = if trace_id.is_empty() {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
