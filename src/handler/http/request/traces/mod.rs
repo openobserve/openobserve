@@ -129,8 +129,9 @@ pub async fn get_latest_traces(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(

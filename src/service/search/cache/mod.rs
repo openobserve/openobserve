@@ -56,8 +56,8 @@ pub async fn search(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<search::Response, Error> {
-    let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
 
     // Result caching check start

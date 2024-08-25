@@ -111,9 +111,10 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
-    let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
@@ -313,9 +314,10 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let started_at = Utc::now().timestamp_micros();
     let (org_id, stream_name) = path.into_inner();
-    let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -733,6 +735,7 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -748,7 +751,6 @@ async fn values_v1(
         }
     }
 
-    let cfg = get_config();
     let default_sql = format!(
         "SELECT {} FROM \"{stream_name}\"",
         cfg.common.column_timestamp
@@ -1269,6 +1271,7 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone(),)
     } else {

@@ -127,8 +127,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn scan_wal_files(
     worker_tx: tokio::sync::mpsc::Sender<(String, Vec<FileKey>)>,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
     let pattern = wal_dir.join("files/");
 
