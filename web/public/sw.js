@@ -205,8 +205,104 @@ self.addEventListener("fetch", function (event) {
           console.error("Caches match failed:", error);
           throw error;
         }),
-    );
-  });
+      );
+    })(),
+  );
+});
+
+self.addEventListener("activate", function (event) {
+  event.waitUntil(
+    caches
+      .keys()
+      .then(function (cacheNames) {
+        return Promise.all(
+          cacheNames
+            .filter(function (cacheName) {
+              // Check if cacheName starts with the cacheVersion or contains it as part of the name
+              return !cacheName.startsWith(cacheVersion);
+            })
+            .map(function (cacheName) {
+              return caches.delete(cacheName);
+            }),
+        );
+      })
+      .then(function () {
+        // Claim clients immediately for the updated service worker
+        return self.clients.claim();
+      }),
+  );
+});
+
+self.addEventListener("fetch", function (event) {
+  event.respondWith(
+    caches
+      .open(cacheVersion)
+      .then(function (cache) {
+        return cache.match(event.request);
+      })
+      .then(function (response) {
+        if (response) {
+          return response.clone();
+        }
+
+        var fetchRequest = event.request;
+        return fetch(fetchRequest)
+          .then(function (response) {
+            if (
+              !response ||
+              response.status !== 200 ||
+              response.type !== "basic"
+            ) {
+              let staleFlag = false;
+              self.clients.matchAll().then((clients) => {
+                clients.forEach((client) => {
+                  if (event.request.url.endsWith(".js")) {
+                    staleFlag = true;
+                    if (staleFlag) {
+                      // self.skipWaiting();
+                      // caches.delete("cache-name");
+                      client.postMessage("staledata");
+                    }
+                  }
+                });
+              });
+              return response;
+            }
+            if (event.request.method === "POST") {
+              // Do not cache POST requests
+              event.respondWith(
+                fetch(event.request).catch(function (error) {
+                  throw error;
+                }),
+              );
+              return;
+            }
+            var responseToCache = response.clone();
+            caches
+              .open(cacheVersion)
+              .then(function (cache) {
+                cache
+                  .put(event.request, responseToCache)
+                  .catch(function (error) {
+                    console.error("Cache put failed:", error);
+                  });
+              })
+              .catch(function (error) {
+                console.error("Cache open failed:", error);
+              });
+            return response;
+          })
+          .catch(function (error) {
+            console.error("Fetch failed:", error);
+            throw error;
+          });
+      })
+      .catch(function (error) {
+        console.error("Caches match failed:", error);
+        throw error;
+      }),
+  );
+});
 
 self.addEventListener("message", function (event) {
   if (event.data === "skipWaiting") {
