@@ -251,7 +251,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Stream Name"
             :options="streamNames"
             @change="updateStreamName"
-            @update:model-value="changeStreamName(toBeCloneStreamName)"
             @filter="filterStreams"
           />
           <q-btn type="submit" class="q-ma-md" color="primary" label="Submit" />
@@ -603,12 +602,14 @@ export default defineComponent({
     const submitForm = () =>{
       const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value)
       alertToBeCloned.name = toBeCloneAlertName.value;
+      alertToBeCloned.stream_name = toBeClonestreamName.value;
+      alertToBeCloned.stream_type = toBeClonestreamType.value;
 
       try{
         alertsService.create(
             store.state.selectedOrganization.identifier,
-            toBeClonestreamName.value.value,
-            toBeClonestreamType.value,
+            alertToBeCloned.stream_name,
+            alertToBeCloned.stream_type,
             alertToBeCloned,
           ).then((res) => {
             if (res.data.code == 200) {
@@ -763,10 +764,6 @@ export default defineComponent({
       console.log("selectedOption", selectedOption);
     toBeClonestreamName.value = selectedOption;
   }
-  const changeStreamName = (name) =>{
-
-    console.log(toBeClonestreamName.value)
-  }
     const updateStreams = (resetStream = true) => {
       if (resetStream) toBeClonestreamName.value = "";
       if (streams.value[toBeClonestreamType.value]) {
@@ -799,11 +796,7 @@ export default defineComponent({
         .finally(() => (isFetchingStreams.value = false));
     };
     const filterStreams = (val: string, update: any) => {
-      streamNames.value = filterColumns(indexOptions.value, val, update).map((option) => ({
-        value: option,
-        label: option,
-      }));
-      console.log(streamNames.value.length,"streamNames")
+      streamNames.value = filterColumns(indexOptions.value, val, update)
     };
 
     const toggleAlertState = (row: any) => {
@@ -852,7 +845,6 @@ export default defineComponent({
       confirmDelete,
       selectedDelete,
       updateStreams,
-      changeStreamName,
       updateStreamName,
       getAlerts,
       pagination,
