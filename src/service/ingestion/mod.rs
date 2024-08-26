@@ -407,6 +407,7 @@ pub async fn write_file(
         in_trace_id = s[1];
     }
     let mut req_stats = RequestStats::default();
+    log::info!("[{in_trace_id}] buf len: {}", buf.len());
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
