@@ -3141,7 +3141,6 @@ const useLogs = () => {
               header: field,
               sortable: true,
               enableResizing: true,
-              size: 250,
               meta: {
                 closable: true,
                 showWrap: true,
