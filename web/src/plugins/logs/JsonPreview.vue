@@ -206,7 +206,7 @@
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'"
             :data-test="`log-expand-detail-key-${key}-text`"
             >{{ key }}:</span
-          ><span class="q-pl-xs" :data-test="`log-expand-detail-value-${value}`"
+          ><span class="q-pl-xs" :data-test="`log-expand-detail-value-${key}`"
             ><template v-if="index < Object.keys(value).length - 1"
               >{{ value[key] }},</template
             >
