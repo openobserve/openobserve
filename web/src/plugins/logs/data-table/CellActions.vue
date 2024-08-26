@@ -1,7 +1,7 @@
 <template>
   <div
     class="field_overlay tw-absolute tw-right-0 tw-top-[50%] table-cell-actions tw-translate-y-[-50%]"
-    :class="store.state.theme === 'dark' ? 'tw-bg-black' : 'tw-bg-white'"
+    :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits } from "vue";
+import { defineProps, defineEmits, computed } from "vue";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -66,4 +66,8 @@ const copyLogToClipboard = (value: any) => {
 const addSearchTerm = (value: string) => {
   emit("addSearchTerm", value);
 };
+
+const backgroundClass = computed(() =>
+  store.state.theme === "dark" ? "tw-bg-black" : "tw-bg-white",
+);
 </script>
