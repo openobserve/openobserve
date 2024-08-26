@@ -90,7 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -184,10 +185,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated
+no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -976,7 +979,10 @@ export default defineComponent({
     };
 
     const prefetch = () => {
-      const href = "/web/assets/editor.api.v1.js";
+      const href =
+        window.location.pathname.indexOf("/web/") > -1
+          ? "/web/assets/editor.api.v1.js"
+          : "/assets/editor.api.v1.js";
       const existingLink = document.querySelector(
         `link[rel="prefetch"][href="${href}"]`,
       );
