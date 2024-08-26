@@ -121,7 +121,7 @@
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
     "flattened": "Flattened",
-    "nested": "Nested"
+    "unflattened": "Unflattened"
   },
   "menu": {
     "home": "Home",

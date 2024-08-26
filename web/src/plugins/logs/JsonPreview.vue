@@ -100,17 +100,17 @@
       />
     </div>
   </div>
-  <div v-show="activeTab === 'nested'" class="q-pl-md">
+  <div v-show="activeTab === 'unflattened'" class="q-pl-md">
     <query-editor
       v-model:query="nestedJson"
       ref="queryEditorRef"
-      editor-id="logs-json-preview-nested-json-editor"
+      editor-id="logs-json-preview-unflattened-json-editor"
       class="monaco-editor"
       language="json"
       @update:query="updateQueryValue"
     />
   </div>
-  <div v-show="activeTab !== 'nested'" class="q-pl-md">
+  <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
     {
     <div
       class="log_json_content"
@@ -282,15 +282,15 @@ export default {
         label: t("search.flattened"),
       },
       {
-        value: "nested",
-        label: t("search.nested"),
+        value: "unflattened",
+        label: t("search.unflattened"),
       },
     ];
 
     const copyLogToClipboard = () => {
       emit(
         "copy",
-        activeTab.value === "nested"
+        activeTab.value === "unflattened"
           ? JSON.parse(nestedJson.value)
           : props.value,
       );
@@ -404,7 +404,7 @@ export default {
     };
 
     const handleTabChange = async () => {
-      if (activeTab.value === "nested") {
+      if (activeTab.value === "unflattened") {
         await nextTick();
         queryEditorRef.value.formatDocument();
       }
