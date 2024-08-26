@@ -176,6 +176,7 @@ pub async fn search(
         scan_stats.compressed_size += file_meta.compressed_size;
     }
     scan_stats.original_size += idx_scan_size as i64;
+    scan_stats.idx_scan_size = idx_scan_size as i64;
 
     // 2. get nodes
     let node_group = req
@@ -560,6 +561,7 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
+    scan_stats.format_to_mb();
     Ok((data, scan_stats, took_wait, false, idx_took))
 }
 
