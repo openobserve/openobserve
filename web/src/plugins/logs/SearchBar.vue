@@ -2215,7 +2215,6 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
-            console.log(res, "res at after view updated  ");
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               //update the payload and view_name in savedViews object based on id
