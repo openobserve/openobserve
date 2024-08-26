@@ -107,7 +107,6 @@
       editor-id="logs-json-preview-unflattened-json-editor"
       class="monaco-editor"
       language="json"
-      @update:query="updateQueryValue"
     />
   </div>
   <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
@@ -415,8 +414,6 @@ export default {
       }
     };
 
-    const updateQueryValue = () => {};
-
     return {
       t,
       copyLogToClipboard,
@@ -435,7 +432,6 @@ export default {
       tabs,
       activeTab,
       nestedJson,
-      updateQueryValue,
       handleTabChange,
       queryEditorRef,
     };
