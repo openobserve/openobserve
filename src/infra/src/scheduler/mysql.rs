@@ -58,12 +58,21 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP
+    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
+    data         LONGTEXT not null
 );
             "#,
         )
         .execute(&pool)
         .await?;
+
+        // create data column for old version <= 0.10.9
+        let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
+            .fetch_one(&pool)
+            .await?;
+        if has_data_column == 0 {
+            add_data_column().await?;
+        }
         Ok(())
     }
 
@@ -119,8 +128,8 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? , ?);
+INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time, data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?);
         "#,
         )
         .bind(&trigger.org)
@@ -133,6 +142,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(trigger.next_run_at)
         .bind(0)
         .bind(0)
+        .bind(&trigger.data)
         .execute(&mut *tx)
         .await
         {
@@ -215,7 +225,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         let pool = CLIENT.clone();
         sqlx::query(
             r#"UPDATE scheduled_jobs
-SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?
+SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
 WHERE org = ? AND module_key = ? AND module = ?;"#,
         )
         .bind(trigger.status)
@@ -223,6 +233,7 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
+        .bind(&trigger.data)
         .bind(&trigger.org)
         .bind(&trigger.module_key)
         .bind(&trigger.module)
@@ -464,4 +475,20 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 
         Ok(())
     }
+}
+
+async fn add_data_column() -> Result<()> {
+    log::info!("[MYSQL] Adding data column to scheduled_jobs table");
+    let pool = CLIENT.clone();
+    if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
+        .execute(&pool)
+        .await
+    {
+        if !e.to_string().contains("Duplicate column name") {
+            // Check for the specific MySQL error code for duplicate column
+            log::error!("[MYSQL] Unexpected error in adding column: {}", e);
+            return Err(e.into());
+        }
+    }
+    Ok(())
 }

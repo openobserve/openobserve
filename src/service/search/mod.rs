@@ -27,7 +27,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{sql::is_aggregate_query, str::find},
+    utils::{base64, sql::is_aggregate_query, str::find},
     FxIndexSet,
 };
 use hashbrown::HashMap;
@@ -38,6 +38,7 @@ use infra::{
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
+use regex::Regex;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -61,6 +62,11 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod sql;
 
+// Checks for #ResultArray#
+pub static RESULT_ARRAY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
+
+// search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 
 #[cfg(not(feature = "enterprise"))]
@@ -129,7 +135,7 @@ pub async fn search(
 
     let req_query = req.clone().query.unwrap();
 
-    let res = {
+    let handle = tokio::task::spawn(async move {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
             cluster::super_cluster::search(req, req_regions, req_clusters).await
@@ -140,7 +146,13 @@ pub async fn search(
         {
             cluster::http::search(req).await
         }
+    });
+    let res = match handle.await {
+        Ok(Ok(res)) => Ok(res),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(Error::Message(e.to_string())),
     };
+    log::info!("[trace_id {trace_id}] in leader task finish");
 
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
@@ -272,14 +284,37 @@ pub async fn search_partition(
         records: records as usize,
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
+        histogram_interval: meta.histogram_interval,
         partitions: vec![],
+    };
+
+    // check for vrl
+    let apply_over_hits = match req.query_fn.as_ref() {
+        None => false,
+        Some(v) => {
+            if v.is_empty() {
+                false
+            } else {
+                let v = base64::decode_url(v).unwrap_or(v.to_string());
+                RESULT_ARRAY.is_match(&v)
+            }
+        }
     };
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    if get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate).is_none() {
+    let ts_column = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
+    if ts_column.is_none() || apply_over_hits {
         resp.partitions.push([req.start_time, req.end_time]);
         return Ok(resp);
+    };
+
+    let mut min_step = Duration::try_seconds(1)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+    if is_aggregate && ts_column.is_some() {
+        min_step *= meta.histogram_interval.unwrap_or(1);
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
@@ -291,27 +326,24 @@ pub async fn search_partition(
         part_num += 1;
     }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
-    // step must be times of second
-    step = step
-        - step
-            % Duration::try_seconds(1)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+    // step must be times of min_step
+    step = step - step % min_step;
 
     // generate partitions
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
+    let mut last_partition_step = end % min_step;
     while end > req.start_time {
-        let start = max(end - step, req.start_time);
+        let start = max(end - step - last_partition_step, req.start_time);
         partitions.push([start, end]);
         end = start;
+        last_partition_step = 0;
     }
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
     if let Some((field, sort)) = meta.meta.order_by.first() {
-        if field == &cfg.common.column_timestamp && !sort {
+        if field == &ts_column.unwrap() && !sort {
             partitions.reverse();
         }
     }
@@ -701,9 +733,10 @@ pub async fn search_partition_multi(
                 start_time: req.start_time,
                 end_time: req.end_time,
                 sql: query.to_string(),
+                encoding: req.encoding,
                 regions: req.regions.clone(),
                 clusters: req.clusters.clone(),
-                encoding: req.encoding,
+                query_fn: req.query_fn.clone(),
             },
         )
         .await

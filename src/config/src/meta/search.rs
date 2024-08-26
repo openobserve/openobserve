@@ -329,6 +329,8 @@ pub struct SearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -357,6 +359,9 @@ pub struct SearchPartitionResponse {
     pub records: usize,
     pub original_size: usize,
     pub compressed_size: usize,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub histogram_interval: Option<i64>, // seconds, for histogram
     pub partitions: Vec<[i64; 2]>,
 }
 
@@ -553,6 +558,8 @@ pub struct MultiSearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

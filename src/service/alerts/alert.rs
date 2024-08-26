@@ -48,6 +48,7 @@ use crate::{
     service::{
         alerts::{build_sql, destinations},
         db,
+        search::sql::RE_ONLY_SELECT,
     },
 };
 
@@ -75,10 +76,12 @@ pub async fn save(
     alert.row_template = alert.row_template.trim().to_string();
 
     match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
-        Ok(Some(_)) => {
+        Ok(Some(old_alert)) => {
             if create {
                 return Err(anyhow::anyhow!("Alert already exists"));
             }
+            alert.last_triggered_at = old_alert.last_triggered_at;
+            alert.owner = old_alert.owner;
         }
         Ok(None) => {
             if !create {
@@ -184,6 +187,13 @@ pub async fn save(
                 || alert.query_condition.sql.as_ref().unwrap().is_empty()
             {
                 return Err(anyhow::anyhow!("Alert with SQL mode should have a query"));
+            }
+            if alert.query_condition.sql.is_some()
+                && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
+            {
+                return Err(anyhow::anyhow!(
+                    "Alert with SQL can not contain SELECT * in the SQL query"
+                ));
             }
         }
         QueryType::PromQL => {
@@ -335,6 +345,7 @@ impl Alert {
                     &self.get_stream_params(),
                     &self.trigger_condition,
                     &self.query_condition,
+                    None,
                 )
                 .await
         }

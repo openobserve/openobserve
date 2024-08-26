@@ -134,7 +134,6 @@ pub async fn traces_json(
     let mut service_name: String = traces_stream_name.to_string();
     let mut json_data = Vec::with_capacity(64);
     let mut partial_success = ExportTracePartialSuccess::default();
-    log::debug!("the spans here: {:#?}", spans);
     for res_span in spans.iter() {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         if res_span.get("resource").is_some() {

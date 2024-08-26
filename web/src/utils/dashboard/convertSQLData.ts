@@ -33,6 +33,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
+
 export const convertSQLData = async (
   panelSchema: any,
   searchQueryData: any,
@@ -82,6 +83,121 @@ export const convertSQLData = async (
       : [];
   };
 
+  // Step 1: Get the X-Axis key
+  const xAxisKeys = getXAxisKeys();
+
+  // Step 2: Get the Y-Axis key
+  const yAxisKeys = getYAxisKeys();
+
+  const zAxisKeys = getZAxisKeys();
+
+  const breakDownKeys = getBreakDownKeys();
+
+  /**
+   * Process the SQL data and convert it into a format suitable for the echarts
+   * library.
+   *
+   * This function takes in the raw data returned from the SQL query and the
+   * panel schema, and returns a processed data array that can be fed into the
+   * echarts library.
+   *
+   * Here's a step-by-step breakdown of what this function does:
+   *
+   * 1. It checks if the data is empty or if the first item in the array is not
+   * an object. If either condition is true, it returns an empty array.
+   *
+   * 2. It extracts the top_results and top_results_others values from the
+   * panel schema config.
+   *
+   * 3. If top_results is not enabled, it simply returns the inner data array
+   * without any modifications.
+   *
+   * 4. It extracts the breakdown key, y-axis key, and x-axis key from the
+   * panel schema.
+   *
+   * 5. It aggregates the y-axis values by breakdown, ignoring items without a
+   * breakdown key. This is done using the reduce() method.
+   *
+   * 6. It sorts the breakdown object by value in descending order and extracts
+   * the top keys based on the configured number of top results. This is done
+   * using the Object.entries() and sort() methods.
+   *
+   * 7. It initializes an empty result array and an empty others object.
+   *
+   * 8. It loops through the inner data array and checks if the breakdown value
+   * is in the top keys. If it is, it adds the item to the result array. If it's
+   * not, and top_results_others is enabled, it adds the item to the others
+   * object.
+   *
+   * 9. If top_results_others is enabled, it loops through the others object and
+   * adds the aggregated values to the result array.
+   *
+   * 10. Finally, it returns the result array.
+   *
+   * @param {any[]} data - The data returned from the SQL query.
+   * @param {any} panelSchema - The schema of the panel.
+   * @returns {any[]} - The processed data array.
+   */
+  const processData = (data: any[], panelSchema: any): any[] => {
+    if (!data.length || !Array.isArray(data[0])) {
+      return [];
+    }
+
+    const { top_results, top_results_others } = panelSchema.config;
+    const innerDataArray = data[0];
+    if (!top_results || !breakDownKeys.length) {
+      return innerDataArray;
+    }
+
+    const breakdownKey = breakDownKeys[0];
+    const yAxisKey = yAxisKeys[0];
+    const xAxisKey = xAxisKeys[0];
+
+    // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
+    const breakdown = innerDataArray.reduce((acc, item) => {
+      const breakdownValue = item[breakdownKey];
+      const yAxisValue = item[yAxisKey];
+      if (breakdownValue) {
+        acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
+      }
+      return acc;
+    }, {});
+
+    // Step 2: Sort and extract the top keys based on the configured number of top results
+    const topKeys = Object.entries(breakdown)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, top_results)
+      .map(([key]) => key);
+
+    // Step 3: Initialize result array and others object for aggregation
+    const resultArray: any[] = [];
+    const othersObj: any = {};
+
+    innerDataArray.forEach((item) => {
+      const breakdownValue = item[breakdownKey];
+      if (topKeys.includes(breakdownValue)) {
+        resultArray.push(item);
+      } else if (top_results_others) {
+        const xAxisValue = String(item[xAxisKey]);
+        othersObj[xAxisValue] =
+          (othersObj[xAxisValue] || 0) + (+item[yAxisKey] || 0);
+      }
+    });
+
+    // Step 4: Add 'others' aggregation to the result array if enabled
+    if (top_results_others) {
+      Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
+        resultArray.push({
+          [breakdownKey]: "others",
+          [xAxisKey]: xAxisValue,
+          [yAxisKey]: yAxisValue,
+        });
+      });
+    }
+
+    return resultArray;
+  };
+
   const getMarkLineData = (panelSchema: any) => {
     return (
       panelSchema?.config?.mark_line?.map((markLine: any) => {
@@ -100,6 +216,9 @@ export const convertSQLData = async (
   };
 
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
+
+  const processedData = processData(searchQueryData, panelSchema);
+
   const missingValue = () => {
     // Get the interval in minutes
     const interval = resultMetaData.value.map(
@@ -111,7 +230,7 @@ export const convertSQLData = async (
       !metadata.queries ||
       !["area-stacked", "line", "area"].includes(panelSchema.type)
     ) {
-      return JSON.parse(JSON.stringify(searchQueryData[0]));
+      return JSON.parse(JSON.stringify(processedData));
     }
 
     // Extract and process metaDataStartTime
@@ -126,7 +245,7 @@ export const convertSQLData = async (
     const intervalMillis = interval * 1000;
 
     // Identify the time-based key
-    const searchQueryDataFirstEntry = searchQueryData[0][0];
+    const searchQueryDataFirstEntry = processedData[0];
 
     const keys = [
       ...getXAxisKeys(),
@@ -134,12 +253,12 @@ export const convertSQLData = async (
       ...getZAxisKeys(),
       ...getBreakDownKeys(),
     ];
-    let timeBasedKey = keys?.find((key) =>
+    const timeBasedKey = keys?.find((key) =>
       isTimeSeries([searchQueryDataFirstEntry?.[key]]),
     );
 
     if (!timeBasedKey) {
-      return JSON.parse(JSON.stringify(searchQueryData[0]));
+      return JSON.parse(JSON.stringify(processedData));
     }
 
     // Extract and process metaDataEndTime
@@ -161,14 +280,14 @@ export const convertSQLData = async (
 
     // Create a set of unique xAxis values
     const uniqueXAxisValues = new Set(
-      searchQueryData[0].map((d: any) => d[uniqueKey]),
+      processedData.map((d: any) => d[uniqueKey]),
     );
 
     const filledData: any = [];
     let currentTime = binnedDate;
     // Create a map of existing data
     const searchDataMap = new Map();
-    searchQueryData[0]?.forEach((d: any) => {
+    processedData?.forEach((d: any) => {
       const key =
         xAxisKeysWithoutTimeStamp.length > 0 ||
         breakdownAxisKeysWithoutTimeStamp.length > 0
@@ -241,7 +360,7 @@ export const convertSQLData = async (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    let data =
+    const data =
       missingValueData?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
@@ -259,20 +378,10 @@ export const convertSQLData = async (
       keyArrays[key] = data.map((obj: any) => obj[key]);
     }
 
-    let result = keyArrays[key] || [];
+    const result = keyArrays[key] || [];
 
     return result;
   };
-
-  // Step 1: Get the X-Axis key
-  const xAxisKeys = getXAxisKeys();
-
-  // Step 2: Get the Y-Axis key
-  const yAxisKeys = getYAxisKeys();
-
-  const zAxisKeys = getZAxisKeys();
-
-  const breakDownKeys = getBreakDownKeys();
 
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
@@ -418,8 +527,12 @@ export const convertSQLData = async (
           return "";
         if (name.length == 0) return "";
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
+        // sort tooltip array based on value
+        name.sort((a: any, b: any) => {
+          return (b.value ?? 0) - (a.value ?? 0);
+        });
+
+        // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
@@ -427,10 +540,15 @@ export const convertSQLData = async (
               it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // if hovered series index is not -1 then take it to very first position
+          if (currentSeriesIndex != -1) {
+            // shift all series to next position and place current series at first position
+            const temp = name[currentSeriesIndex];
+            for (let i = currentSeriesIndex; i > 0; i--) {
+              name[i] = name[i - 1];
+            }
+            name[0] = temp;
+          }
         }
 
         const hoverText: string[] = [];
@@ -719,19 +837,30 @@ export const convertSQLData = async (
             return "";
           if (name.length == 0) return "";
 
-          // if hovered series is not null
-          // then swap the hovered series to top in tooltip
+          // sort tooltip array based on value
+          name.sort((a: any, b: any) => {
+            return (b.value ?? 0) - (a.value ?? 0);
+          });
+
+          // if hovered series name is not null then move it to first position
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
             // get the current series index from name
             const currentSeriesIndex = name.findIndex(
               (it: any) =>
                 it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
             );
-            // swap current hovered series index to top in tooltip
-            const temp = name[0];
-            name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-            name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+            // if hovered series index is not -1 then take it to very first position
+            if (currentSeriesIndex != -1) {
+              // shift all series to next position and place current series at first position
+              const temp = name[currentSeriesIndex];
+              for (let i = currentSeriesIndex; i > 0; i--) {
+                name[i] = name[i - 1];
+              }
+              name[0] = temp;
+            }
           }
+
           const hoverText: string[] = [];
           name.forEach((it: any) => {
             if (it.data != null) {
@@ -994,12 +1123,12 @@ export const convertSQLData = async (
       const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
+        ...new Set(processedData.map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter((it: any) => it[key1] == key);
+        const data = processedData.filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
@@ -1203,12 +1332,12 @@ export const convertSQLData = async (
       const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
+        ...new Set(processedData.map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter((it: any) => it[key1] == key);
+        const data = processedData.filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
@@ -1266,10 +1395,7 @@ export const convertSQLData = async (
             return {
               type: "text",
               style: {
-                text:
-                  (parseFloat(unitValue?.value)?.toFixed(
-                    panelSchema?.config?.decimals ?? 2,
-                  ) ?? 0) + unitValue?.unit,
+                text: formatUnitValue(unitValue),
                 fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
                 align: "center",
@@ -1457,7 +1583,7 @@ export const convertSQLData = async (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      let timeStringCache: any = {};
+      const timeStringCache: any = {};
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
@@ -1508,8 +1634,12 @@ export const convertSQLData = async (
 
         const date = new Date(name[0].data[0]);
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
+        // sort tooltip array based on value
+        name.sort((a: any, b: any) => {
+          return (b.value[1] || 0) - (a.value[1] || 0);
+        });
+
+        // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
@@ -1517,10 +1647,15 @@ export const convertSQLData = async (
               it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // if hovered series index is not -1 then take it to very first position
+          if (currentSeriesIndex != -1) {
+            // shift all series to next position and place current series at first position
+            const temp = name[currentSeriesIndex];
+            for (let i = currentSeriesIndex; i > 0; i--) {
+              name[i] = name[i - 1];
+            }
+            name[0] = temp;
+          }
         }
 
         const hoverText: string[] = [];
@@ -1644,8 +1779,12 @@ export const convertSQLData = async (
 
         const date = new Date(name[0].data[0]);
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
+        // sort tooltip array based on value
+        name.sort((a: any, b: any) => {
+          return (b.value[1] || 0) - (a.value[1] || 0);
+        });
+
+        // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
@@ -1653,10 +1792,15 @@ export const convertSQLData = async (
               it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // if hovered series index is not -1 then take it to very first position
+          if (currentSeriesIndex != -1) {
+            // shift all series to next position and place current series at first position
+            const temp = name[currentSeriesIndex];
+            for (let i = currentSeriesIndex; i > 0; i--) {
+              name[i] = name[i - 1];
+            }
+            name[0] = temp;
+          }
         }
 
         const hoverText: string[] = [];
@@ -1739,9 +1883,9 @@ export const convertSQLData = async (
     );
     if (isYAxisExistInOrderBy) {
       // Calculate the total for each series and combine it with the corresponding x-axis label
-      let totals = new Map();
+      const totals = new Map();
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
-        let total = options?.series?.reduce(
+        const total = options?.series?.reduce(
           (sum: number, currentSeries: any) =>
             sum + currentSeries?.data[i] ?? 0,
           0,
@@ -1751,8 +1895,8 @@ export const convertSQLData = async (
 
       // Sort the indices by total in the specified order
       // ASC for ascending, DESC for descending
-      let sortedIndices = Array.from(totals.keys()).sort((a, b) => {
-        let diff = totals.get(a).total - totals.get(b).total;
+      const sortedIndices = Array.from(totals.keys()).sort((a, b) => {
+        const diff = totals.get(a).total - totals.get(b).total;
         return isYAxisExistInOrderBy == "ASC" ? diff : -diff;
       });
 

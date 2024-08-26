@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Toggle Function Editor"
           class="q-pl-xs"
           size="30px"
+          @update:model-value="updateFunctionVisibility"
           :disable="tab === 'promql'"
         />
       </div>
@@ -80,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="queryEditorRef"
               editor-id="alerts-query-editor"
               class="monaco-editor"
+              :debounceTime="300"
               v-model:query="query"
               :class="
                 query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
@@ -88,8 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @focus="queryEditorPlaceholderFlag = false"
               @blur="onBlurQueryEditor"
             />
-            <div class="text-negative q-mb-xs" style="height: 21px">
-              <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
+            <div class="text-negative q-mb-xs invalid-sql-error">
+              <span v-show="!!sqlQueryErrorMsg">
+                Error: {{ sqlQueryErrorMsg }}</span
+              >
             </div>
           </div>
         </template>
@@ -99,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="queryEditorRef"
             editor-id="alerts-query-editor"
             class="monaco-editor q-mb-md"
+            :debounceTime="300"
             v-model:query="promqlQuery"
             @update:query="updateQueryValue"
           />
@@ -143,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="fnEditorRef"
             editor-id="fnEditor"
             class="monaco-editor"
+            :debounceTime="300"
             v-model:query="vrlFunctionContent"
             :class="
               vrlFunctionContent == '' && functionEditorPlaceholderFlag
@@ -151,8 +157,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             language="ruby"
             @focus="functionEditorPlaceholderFlag = false"
-            @blur="functionEditorPlaceholderFlag = true"
+            @blur="onBlurFunctionEditor"
           />
+
+          <div
+            class="text-subtitle2 q-pb-sm"
+            style="min-height: 21px; width: 500px"
+          >
+            <div v-if="vrlFunctionError">
+              <div class="text-negative q-mb-xs flex items-center">
+                <q-btn
+                  :icon="
+                    isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
+                  "
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  data-test="table-row-expand-menu"
+                  @click.stop="toggleExpandFunctionError"
+                />
+                <div>
+                  <span v-show="vrlFunctionError">Invalid VRL function</span>
+                </div>
+              </div>
+              <div
+                v-if="isFunctionErrorExpanded"
+                class="q-px-sm q-pb-sm"
+                :class="
+                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                "
+              >
+                <pre class="q-my-none" style="white-space: pre-wrap">{{
+                  vrlFunctionError
+                }}</pre>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -729,7 +770,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, type Ref, defineAsyncComponent } from "vue";
+import { ref, watch, computed, defineAsyncComponent } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -738,8 +779,6 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
-import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
@@ -759,10 +798,11 @@ const props = defineProps([
   "promql_condition",
   "vrl_function",
   "showVrlFunction",
-  "isValidSqlQuery",
+  "sqlQueryErrorMsg",
   "disableThreshold",
   "disableVrlFunction",
   "disableQueryTypeSelection",
+  "vrlFunctionError",
 ]);
 
 const emits = defineEmits([
@@ -799,6 +839,8 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 
+const isFunctionErrorExpanded = ref(false);
+
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
@@ -817,6 +859,8 @@ const promqlCondition = ref(props.promql_condition);
 const aggregationData = ref(props.aggregation);
 
 const filteredFields = ref(props.columns);
+
+const fnEditorRef = ref<any>(null);
 
 const getNumericColumns = computed(() => {
   if (
@@ -892,7 +936,7 @@ watch(
 
 const vrlFunctionContent = computed({
   get() {
-    return props.vrl_function;
+    return props.vrl_function || "";
   },
   set(value) {
     emits("update:vrl_function", value);
@@ -905,8 +949,16 @@ const isVrlFunctionEnabled = computed({
   },
   set(value) {
     emits("update:showVrlFunction", value);
+    updateFunctionVisibility(value);
   },
 });
+
+const updateFunctionVisibility = (isEnabled: boolean) => {
+  if (!isEnabled) {
+    vrlFunctionContent.value = null;
+    selectedFunction.value = "";
+  }
+};
 
 const updateQuery = () => {
   if (tab.value === "promql") {
@@ -998,7 +1050,7 @@ const filterFunctionOptions = (val: string, update: any) => {
   });
 };
 
-const onBlurQueryEditor = () => {
+const onBlurQueryEditor = async () => {
   queryEditorPlaceholderFlag.value = true;
   emits("validate-sql");
 };
@@ -1054,6 +1106,16 @@ const validateInputs = (notify: boolean = true) => {
 
   return true;
 };
+
+const onBlurFunctionEditor = async () => {
+  functionEditorPlaceholderFlag.value = true;
+  emits("validate-sql");
+};
+
+const toggleExpandFunctionError = () => {
+  isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
+};
+
 defineExpose({
   tab,
   validateInputs,
@@ -1108,5 +1170,9 @@ defineExpose({
     background-repeat: no-repeat;
     background-size: 170px;
   }
+}
+
+.invalid-sql-error {
+  min-height: 21px;
 }
 </style>

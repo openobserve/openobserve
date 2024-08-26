@@ -1727,14 +1727,17 @@ const useLogs = () => {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
-                setTimeout(async () => {
-                  await generateHistogramData();
-                  refreshPartitionPagination(true);
-                }, 100);
+                if (partitions.length > 1) {
+                  setTimeout(async () => {
+                    await generateHistogramData();
+                    refreshPartitionPagination(true);
+                  }, 100);
+                }
               }
               searchObj.loadingHistogram = false;
             }
           }
+          await generateHistogramData();
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
@@ -2369,7 +2372,9 @@ const useLogs = () => {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
-        notificationMsg.value = "Search operation was cancelled";
+        notificationMsg.value = "Search query was cancelled";
+        searchObj.data.histogram.errorMsg = "Search query was cancelled";
+        searchObj.data.histogram.errorDetail = "Search query was cancelled";
         return;
       }
 
@@ -2393,8 +2398,8 @@ const useLogs = () => {
             removeTraceId(traceId);
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
-            if(searchObj.data.queryResults.aggs == null)  {
-                searchObj.data.queryResults.aggs = [];                
+            if (searchObj.data.queryResults.aggs == null) {
+              searchObj.data.queryResults.aggs = [];
             }
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -2437,7 +2442,7 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loadingHistogram = false;
             let trace_id = "";
-            
+
             if (err?.request?.status != 429) {
               searchObj.data.histogram.errorMsg =
                 typeof err == "string" && err
@@ -2474,6 +2479,13 @@ const useLogs = () => {
                 notificationMsg.value += " TraceID:" + trace_id;
                 trace_id = "";
               }
+            }
+
+            if (err?.request?.status >= 429) {
+              notificationMsg.value = err?.response?.data?.message;
+              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
+              searchObj.data.histogram.errorDetail =
+                err?.response?.data?.error_detail;
             }
 
             reject(false);
@@ -2855,19 +2867,17 @@ const useLogs = () => {
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
-            //here we check whether timestamp field is present or not 
+            //here we check whether timestamp field is present or not
             //as we append timestamp dynamically for userDefined schema we need to check this
-              if(userDefineSchemaSettings.includes(
+            if (
+              userDefineSchemaSettings.includes(
                 store.state.zoConfig?.timestamp_column,
-              )){
-                searchObj.data.hasSearchDataTimestampField = true;
-
-              }
-              else{
-                searchObj.data.hasSearchDataTimestampField = false;
-
-              }
-
+              )
+            ) {
+              searchObj.data.hasSearchDataTimestampField = true;
+            } else {
+              searchObj.data.hasSearchDataTimestampField = false;
+            }
 
             // check for user defined schema is false then only consider checking new fields from result set
             if (
