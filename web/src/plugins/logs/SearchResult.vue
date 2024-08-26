@@ -109,7 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.showHistogram
         "
       >
-        <h6 class="text-center" style="margin:30px 0px" v-if="searchObj.data.histogram.errorCode != 0">
+        <h6
+          class="text-center"
+          style="margin: 30px 0px"
+          v-if="searchObj.data.histogram.errorCode != 0"
+        >
           <q-icon name="warning" color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
           <q-btn
@@ -506,13 +510,6 @@ export default defineComponent({
         (searchObj.config.splitterModel / 100);
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
-
-    watch(
-      () => searchObj.config.splitterModel,
-      (newValue, oldValue) => {
-        console.log(`splitterModel changed from ${oldValue} to ${newValue}`);
-      },
-    );
 
     const scrollTableToTop = (value: number) => {
       searchTableRef.value?.parentRef.scrollTo({ top: value });
