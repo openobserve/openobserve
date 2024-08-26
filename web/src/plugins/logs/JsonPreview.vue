@@ -6,6 +6,7 @@
       data-test="logs-json-preview-tabs"
       :tabs="tabs"
       v-model:active-tab="activeTab"
+      @update:active-tab="handleTabChange"
     />
 
     <q-btn
@@ -105,6 +106,7 @@
       ref="queryEditorRef"
       editor-id="logs-json-preview-nested-json-editor"
       class="monaco-editor"
+      language="json"
       @update:query="updateQueryValue"
     />
   </div>
@@ -227,6 +229,7 @@ import {
   computed,
   onMounted,
   watch,
+  nextTick,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -268,6 +271,8 @@ export default {
     const tracesStreams = ref([]);
 
     const activeTab = ref("flattened");
+
+    const queryEditorRef = ref<any>();
 
     const nestedJson = ref("");
 
@@ -365,10 +370,9 @@ export default {
       const result = {};
 
       Object.keys(props.value).forEach((key) => {
-        const keys = key.split("_");
+        let keys = key.split("_");
 
-        const newKeys = [];
-
+        // If any field starts with _
         let keyWithPrefix = "";
         for (let i = 0; i < keys.length; i++) {
           if (keys[i] === "") {
@@ -382,7 +386,7 @@ export default {
           }
         }
 
-        console.log("newKeys", newKeys);
+        keys = keys.filter((k) => k !== "");
 
         keys.reduce((acc, k, index) => {
           if (index === keys.length - 1) {
@@ -396,8 +400,14 @@ export default {
         }, result);
       });
 
-      console.log("result", props.value, result);
       return JSON.stringify(result);
+    };
+
+    const handleTabChange = async () => {
+      if (activeTab.value === "nested") {
+        await nextTick();
+        queryEditorRef.value.formatDocument();
+      }
     };
 
     const updateQueryValue = () => {};
@@ -421,6 +431,8 @@ export default {
       activeTab,
       nestedJson,
       updateQueryValue,
+      handleTabChange,
+      queryEditorRef,
     };
   },
 };
