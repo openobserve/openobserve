@@ -388,7 +388,12 @@ export default {
 
         keys = keys.filter((k) => k !== "");
 
-        keys.reduce((acc, k, index) => {
+        type NestedObject = {
+          [key: string]: NestedObject | any;
+        };
+
+        // { [key: string]: string }
+        keys.reduce((acc: NestedObject, k: string, index: number) => {
           if (index === keys.length - 1) {
             acc[k] = props.value[key];
           } else {
