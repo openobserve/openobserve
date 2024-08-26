@@ -115,28 +115,7 @@ async fn recursive_process_multiple_metas(
                 && cache_meta.end_time >= cache_req.q_start_time
         })
         .max_by_key(|result|
-            match selection_strategy{
-                ResultCacheSelectionStrategy::Overlap => {
-                    let overlap_start = cache_req.q_start_time.max(result.start_time);
-                    let overlap_end = cache_req.q_end_time.min(result.end_time);
-                    overlap_end - overlap_start
-                }
-                ResultCacheSelectionStrategy::Duration => {
-                   result.end_time - result.start_time
-                }
-                ResultCacheSelectionStrategy::Both => {
-                    let overlap_start = cache_req.q_start_time.max(result.start_time);
-                    let overlap_end = cache_req.q_end_time.min(result.end_time);
-                    let overlap_duration = overlap_end - overlap_start;
-                    let cache_duration = result.end_time - result.start_time;
-                     // Calculate the ratio of overlap duration to cache duration as a percentage
-                    if cache_duration > 0 {
-                        (overlap_duration * 100) / cache_duration
-                    } else {
-                        0
-                    }
-                }
-            }
+            select_cache_meta(result, &cache_req, &selection_strategy)
         )
     {
         let file_name = format!(
@@ -267,4 +246,28 @@ async fn recursive_process_multiple_metas(
                 let _ = recursive_process_multiple_metas(&remaining_metas[..], trace_id, cache_req, results, query_key, file_path).await;
     }
     Ok(())
+}
+
+fn select_cache_meta(meta: &ResultCacheMeta, req: &CacheQueryRequest, strategy: &ResultCacheSelectionStrategy) -> i64 {
+    match strategy {
+        ResultCacheSelectionStrategy::Overlap => {
+            let overlap_start = meta.start_time.max(req.q_start_time);
+            let overlap_end = meta.end_time.min(req.q_end_time);
+            overlap_end - overlap_start
+        },
+        ResultCacheSelectionStrategy::Duration => {
+            meta.end_time - meta.start_time
+        },
+        ResultCacheSelectionStrategy::Both => {
+            let overlap_start = req.q_start_time.max(meta.start_time);
+            let overlap_end = req.q_end_time.min(meta.end_time);
+            let overlap_duration = overlap_end - overlap_start;
+            let cache_duration = meta.end_time - meta.start_time;
+            if cache_duration > 0 {
+                (overlap_duration * 100) / cache_duration
+            } else {
+                0
+            }
+        },
+    }
 }
