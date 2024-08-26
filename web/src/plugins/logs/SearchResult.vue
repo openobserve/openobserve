@@ -205,9 +205,7 @@ import {
   ref,
   onMounted,
   onUpdated,
-  onRenderTracked,
   defineAsyncComponent,
-  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -503,7 +501,6 @@ export default defineComponent({
     };
 
     const getTableWidth = computed(() => {
-      console.log("recalculate");
       const leftSidebarMenu = 56;
       const fieldList =
         (window.innerWidth - leftSidebarMenu) *
