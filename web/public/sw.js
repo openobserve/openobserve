@@ -12,7 +12,7 @@ if (isWebPath == "true" || isWebPath == true) {
   pathPrefix = "/web/";
 }
 async function fetchManifest() {
-  const response = await fetch(`${pathPrefix}manifest.json`);
+  const response = await fetch(`${pathPrefix}/assets/manifest.json`);
   return response.json();
 }
 self.addEventListener("install", function (event) {
