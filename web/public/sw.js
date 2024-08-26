@@ -12,7 +12,12 @@ if (isWebPath == "true" || isWebPath == true) {
   pathPrefix = "/web/";
 }
 async function fetchManifest() {
-  const response = await fetch(`${pathPrefix}assets/manifest.json`);
+  let response;
+  if(pathPrefix == "/web/") {
+    response = await fetch(`${pathPrefix}manifest.json`);
+  } else {
+    response = await fetch(`${pathPrefix}assets/manifest.json`);
+  }
   return response.json();
 }
 self.addEventListener("install", function (event) {
@@ -53,7 +58,11 @@ self.addEventListener("install", function (event) {
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`${pathPrefix}assets/${manifest[key]["file"]}`);
+          if(pathPrefix == "/web/") {
+            filesToCache.push(`${pathPrefix}assets/${manifest[key]["file"]}`);
+          } else {
+            filesToCache.push(`${pathPrefix}${manifest[key]["file"]}`);
+          }
           // filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
         }
       });
