@@ -66,25 +66,6 @@ self.addEventListener("install", function (event) {
         }
       });
 
-      caches
-        .keys()
-        .then(function (cacheNames) {
-          return Promise.all(
-            cacheNames
-              .filter(function (cacheName) {
-                // Check if cacheName starts with the cacheVersion or contains it as part of the name
-                return !cacheName.startsWith(cacheVersion);
-              })
-              .map(function (cacheName) {
-                return caches.delete(cacheName);
-              }),
-          );
-        })
-        .then(function () {
-          // Claim clients immediately for the updated service worker
-          return self.clients.claim();
-        });
-
       // Open the cache
       const cache = await caches.open(cacheVersion);
 
