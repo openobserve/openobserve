@@ -123,6 +123,7 @@
           dense
           class="q-ml-sm pointer"
           :name="'img:' + getImageURL('images/common/add_icon.svg')"
+          aria-label="Add icon"
         >
           <q-list>
             <q-item
