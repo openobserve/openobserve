@@ -767,11 +767,7 @@ pub(crate) async fn generate_index_on_ingester(
         };
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
-            bloom_filter_fields: vec![
-                "field".to_string(),
-                "term".to_string(),
-                "file_name".to_string(),
-            ],
+            bloom_filter_fields: vec!["term".to_string()],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
