@@ -45,7 +45,7 @@ export default {
           label: t("common.refresh"),
           color: 'yellow',
           handler: () => {
-            window.location.reload();
+            location.reload(true);
           }
         },
         {
