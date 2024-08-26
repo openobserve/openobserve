@@ -221,11 +221,11 @@
             }"
             :data-index="virtualRow.index"
             :ref="(node: any) => rowVirtualizer.measureElement(node)"
-            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b"
+            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
             :class="[
               store.state.theme === 'dark'
-                ? 'w-border-gray-800'
-                : 'w-border-gray-100',
+                ? 'w-border-gray-800  hover:tw-bg-zinc-800'
+                : 'w-border-gray-100 hover:tw-bg-zinc-100',
               columnOrder.includes('source') && !wrap
                 ? 'tw-table-row'
                 : 'tw-flex',
