@@ -231,7 +231,12 @@
                 : 'tw-flex',
             ]"
             @click="
-              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
+              !(formattedRows[virtualRow.index]?.original as any)
+                ?.isExpandedRow &&
+                handleDataRowClick(
+                  tableRows[virtualRow.index],
+                  virtualRow.index,
+                )
             "
           >
             <td
