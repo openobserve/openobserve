@@ -135,6 +135,9 @@ export default defineConfig({
     manifest: true,
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
+      input: {
+        manifest: "manifest.json",
+      },
       plugins: [
         nodePolyfills(),
         visualizer({
@@ -204,5 +207,15 @@ export default defineConfig({
     cache: false,
     maxConcurrency: 20,
     update: false,
+  },
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      if (req.url === "/manifest.json") {
+        return server.ssrLoadModule("/manifest.json").then((module) => {
+          res.end(JSON.stringify(module));
+        });
+      }
+      next();
+    });
   },
 });
