@@ -640,7 +640,6 @@ export default defineComponent({
       }
       catch(e){
         showForm.value = true;
-        console.log(e)
       $q.notify({
               type: "negative",
               message: e.data.message,
@@ -761,7 +760,6 @@ export default defineComponent({
       return filteredOptions;
     };
     const updateStreamName = (selectedOption)=> {
-      console.log("selectedOption", selectedOption);
     toBeClonestreamName.value = selectedOption;
   }
     const updateStreams = (resetStream = true) => {
@@ -785,7 +783,6 @@ export default defineComponent({
         .then((res: any) => {
           streams.value[toBeClonestreamType.value] = res.list;
           schemaList.value = res.list;
-          console.log(indexOptions,"index")
           indexOptions.value = res.list.map((data: any) => {
             return data.name;
           });
