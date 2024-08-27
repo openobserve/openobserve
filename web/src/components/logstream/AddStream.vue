@@ -198,13 +198,12 @@ const saveStream = async () => {
   if (isStreamPresent) return;
 
   const payload = getStreamPayload();
-  let modifiedSettings = getUpdatedSettings([], payload);
   streamService
-    .updateSettings(
+    .createSettings(
       store.state.selectedOrganization.identifier,
       streamInputs.value.name,
       streamInputs.value.stream_type,
-      modifiedSettings,
+      payload,
     )
     .then(() => {
       q.notify({
