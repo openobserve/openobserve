@@ -78,22 +78,18 @@ pub async fn tcp_server(listener: TcpListener) {
             };
             log::info!("spawned new syslog tcp receiver for peer {}", peer_addr);
             loop {
-                // TODO: properly handle large size reads
-                let len = match stream.read(&mut buf_tcp).await {
-                    Ok(val) => val,
+                let n = match stream.read(&mut buf_tcp).await {
+                    Ok(0) => {
+                        log::info!("received 0 bytes, closing for peer {}", peer_addr);
+                        break;
+                    }
+                    Ok(n) => n,
                     Err(e) => {
                         log::error!("Error while reading from TCP stream: {}", e);
-                        return;
+                        break;
                     }
                 };
-                if len == 0 {
-                    // technically len==0 does not mean stream has closed,
-                    // but we assume that, as otherwise we can keep looping
-                    // in case the other end closes the socket
-                    log::info!("received 0 bytes, closing for peer {}", peer_addr);
-                    return;
-                }
-                let message = BytesMut::from(&buf_tcp[..len]);
+                let message = BytesMut::from(&buf_tcp[..n]);
                 let input_str = match String::from_utf8(message.to_vec()) {
                     Ok(val) => val,
                     Err(e) => {
