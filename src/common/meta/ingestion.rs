@@ -25,6 +25,11 @@ use utoipa::ToSchema;
 
 use super::stream::SchemaRecords;
 
+// Columns added to ingested records for _INTERNAL_ use only.
+// Used for storing and querying unflattened original data
+pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
+pub const RECORD_ID_COL_NAME: &str = "_record_id";
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
     pub successful: u32,
