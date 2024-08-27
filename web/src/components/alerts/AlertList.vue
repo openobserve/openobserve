@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
             <q-btn
                 icon="content_copy"
-                :title="t('dashboard.duplicate')"
+                :title="t('alerts.clone')"
                 class="q-ml-xs"
                 padding="sm"
                 unelevated
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 @click.stop="duplicateAlert(props.row)"
-                data-test="dashboard-duplicate"
+                data-test="alert-clone"
               ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog class="q-pa-md"  v-model="showForm" persistent>
     <q-card>
       <q-card-section>
-        <div class="text-h6">Duplicate Alert</div>
+        <div class="text-h6">Clone Alert</div>
       </q-card-section>
       <q-card-section>
         <q-form @submit="submitForm">
@@ -615,7 +615,7 @@ export default defineComponent({
             if (res.data.code == 200) {
               $q.notify({
                 type: "positive",
-                message: "Duplicated Alert",
+                message:  "Alert Cloned Successfully",
                 timeout: 2000,
               });
               showForm.value = false;

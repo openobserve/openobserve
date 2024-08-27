@@ -750,6 +750,7 @@
     "header": "Alerts",
     "add": "Add alert",
     "edit": "Edit",
+    "clone": "Clone alert",
     "search": "Search alert",
     "name": "Name",
     "save": "Save",
