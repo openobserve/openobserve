@@ -121,7 +121,7 @@
                       ]"
                       use-input
                       @filter="filterListFn"
-                      data-test="dashboard-add-condition-list"
+                      data-test="dashboard-add-condition-list-tab"
                     >
                       <template v-slot:selected>
                         {{
