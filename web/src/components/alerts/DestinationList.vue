@@ -222,7 +222,7 @@ export default defineComponent({
     ]);
     const destinations: Ref<DestinationPayload[]> = ref([]);
     const templates: Ref<Template[]> = ref([
-      { name: "test", body: "", type: "web_hook" },
+      { name: "test", body: "", type: "http" },
     ]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,

@@ -235,7 +235,7 @@ const splitterModel: Ref<number> = ref(75);
 const formData: Ref<Template> = ref({
   name: "",
   body: "",
-  type: "web_hook",
+  type: "http",
   title: "",
 });
 const store = useStore();
@@ -277,13 +277,13 @@ onBeforeMount(() => {
 const tabs = computed(() => [
   {
     label: "Web Hook",
-    value: "web_hook",
+    value: "http",
     style: {
       width: "fit-content",
       padding: "4px 14px",
-      background: formData.value.type === "web_hook" ? "#5960B2" : "",
+      background: formData.value.type === "http" ? "#5960B2" : "",
       border: "none !important",
-      color: formData.value.type === "web_hook" ? "#ffffff !important" : "",
+      color: formData.value.type === "http" ? "#ffffff !important" : "",
     },
   },
   {
@@ -310,7 +310,7 @@ const setupTemplateData = () => {
   }
 
   if (params.type) {
-    formData.value.type = params.type as "email" | "web_hook";
+    formData.value.type = params.type as "email" | "http";
   }
 };
 

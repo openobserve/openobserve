@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <template v-if="formData.type === 'web_hook'">
+        <template v-if="formData.type === 'http'">
           <div class="col-6 q-py-xs">
             <q-input
               data-test="add-destination-url-input"
@@ -319,7 +319,7 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: "web_hook",
+  type: "http",
 });
 const isUpdatingDestination = ref(false);
 
@@ -341,13 +341,13 @@ const apiHeaders: Ref<
 const tabs = computed(() => [
   {
     label: "Web Hook",
-    value: "web_hook",
+    value: "http",
     style: {
       width: "fit-content",
       padding: "4px 14px",
-      background: formData.value.type === "web_hook" ? "#5960B2" : "",
+      background: formData.value.type === "http" ? "#5960B2" : "",
       border: "none !important",
-      color: formData.value.type === "web_hook" ? "#ffffff !important" : "",
+      color: formData.value.type === "http" ? "#ffffff !important" : "",
     },
   },
   {
@@ -378,7 +378,7 @@ const setupDestinationData = () => {
     formData.value.template = props.destination.template;
     formData.value.headers = props.destination.headers;
     formData.value.emails = (props.destination.emails || []).join(", ");
-    formData.value.type = props.destination.type || "web_hook";
+    formData.value.type = props.destination.type || "http";
 
     if (Object.keys(formData.value.headers).length) {
       apiHeaders.value = [];
@@ -403,7 +403,7 @@ const isValidDestination = computed(
     formData.value.name &&
     ((formData.value.url &&
       formData.value.method &&
-      formData.value.type === "web_hook") ||
+      formData.value.type === "http") ||
       (formData.value.type === "email" && formData.value.emails.length)) &&
     formData.value.template,
 );
