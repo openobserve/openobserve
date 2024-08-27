@@ -541,7 +541,7 @@
     "typeOfVariable": "Type of variable",
     "DefaultSize": "Default max record size(optional)",
     "multiSelect": "Allow multiple selection",
-    "hideVariableInDashboard": "Hide current variable in Dashboard",
+    "hideOnDashboard": "Hide On Dashboard",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",
     "newFolderBtnLabel": "New Folder",
     "folderLabel": "Folders",

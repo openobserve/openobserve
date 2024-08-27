@@ -53,9 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   stack-label
                   :rules="[
-                    (val: any) => !!(val.trim()) || 'Field is required!',
-                    (val: any) => /^[a-zA-Z0-9_-]*$/.test(val) || 'Only letters, numbers, hyphens (-), and underscores (_) are allowed.'
-                ]"
+                    (val: any) => !!val.trim() || 'Field is required!',
+                    (val: any) =>
+                      /^[a-zA-Z0-9_-]*$/.test(val) ||
+                      'Only letters, numbers, hyphens (-), and underscores (_) are allowed.',
+                  ]"
                 ></q-input>
               </div>
               <div class="textbox col">
@@ -70,14 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-input>
               </div>
             </div>
-            <!-- show/hide variable in dashboard -->
-          <div>
-            <q-toggle
-              v-model="variableData.hideOnDashboard"
-              :label="t('dashboard.hideVariableInDashboard')"
-              data-test="dashboard-query_values-hide_in_dashboard"
-            />
-          </div>
             <div
               class="text-body1 text-bold q-mt-lg"
               v-if="variableData.type !== 'dynamic_filters'"
@@ -166,13 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <div>
-                <q-toggle
-                  v-model="variableData.multiSelect"
-                  :label="t('dashboard.multiSelect')"
-                  data-test="dashboard-query_values-show_multiple_values"
-                />
-              </div>
-              <div>
                 <div class="flex flex-row">
                   <div
                     data-test="dashboard-query-values-filter"
@@ -222,7 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="fieldsFilterFn"
                       :placeholder="filter.name ? '' : 'Select Field'"
                       class="textbox col no-case q-ml-sm"
-                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
                       style="max-width: 41%; width: 41%"
                       ><q-tooltip v-if="filter.name">
                         {{ filter.name }}
@@ -243,7 +232,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: 18%"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
-                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
                       :options="[
                         '=',
                         '!=',
@@ -311,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               outlined
               stack-label
-              :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             ></q-input>
           </div>
           <div class="textbox" v-if="['textbox'].includes(variableData.type)">
@@ -325,15 +316,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
             ></q-input>
           </div>
-          <!-- show the auto add variables for the custom fields -->
-          <div v-if="variableData.type == 'custom'">
-            <div>
-              <q-toggle
-                v-model="variableData.multiSelect"
-                :label="t('dashboard.multiSelect')"
-                data-test="dashboard-custom-show_multiple_values"
-              />
-            </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
@@ -344,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 outlined
                 stack-label
-                :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm"
                 v-model="variableData.options[index].label"
                 :label="'Label ' + (index + 1) + ' *'"
@@ -355,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 outlined
                 stack-label
-                :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm"
                 v-model="variableData.options[index].value"
                 :label="'Value ' + (index + 1) + ' *'"
@@ -381,6 +363,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >Add Option</q-btn
               >
             </div>
+          </div>
+          <!-- multiselect toggle for query values and custom variables-->
+          <div v-if="['query_values', 'custom'].includes(variableData.type)">
+            <q-toggle
+              v-model="variableData.multiSelect"
+              :label="t('dashboard.multiSelect')"
+              data-test="dashboard-query_values-show_multiple_values"
+            />
+          </div>
+          <!-- hide on dashboard toggle -->
+          <div>
+            <q-toggle
+              v-model="variableData.hideOnDashboard"
+              :label="t('dashboard.hideOnDashboard')"
+              data-test="dashboard-variable-hide_on_dashboard"
+            />
           </div>
           <div class="flex justify-center q-mt-lg">
             <q-btn
@@ -518,6 +516,11 @@ export default defineComponent({
       variableData.multiSelect = false;
     }
 
+    // by default, use hideOnDashboard as false
+    if (!variableData.hideOnDashboard) {
+      variableData.hideOnDashboard = false;
+    }
+
     const filterUpdated = (index: number, filter: any) => {
       variableData.query_data.filter[index].name = filter.name;
     };
@@ -534,7 +537,7 @@ export default defineComponent({
         if (newVal === "") {
           variableData.query_data.max_record_size = null;
         }
-      }
+      },
     );
 
     // watch for filter changes and set default value for Is Null and Is Not Null operators
@@ -549,7 +552,7 @@ export default defineComponent({
           });
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     onMounted(async () => {
@@ -559,13 +562,17 @@ export default defineComponent({
         // Fetch dashboard data
         const data = JSON.parse(
           JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder,
+            ),
+          ),
         )?.variables?.list;
 
         // Find the variable to edit
         const edit = (data || []).find(
-          (it: any) => it.name === props.variableName
+          (it: any) => it.name === props.variableName,
         );
         // Assign edit data to variableData
         Object.assign(variableData, edit);
@@ -600,7 +607,7 @@ export default defineComponent({
               // get all streams from current stream type
               const streamList: any = await getStreams(
                 variableData?.query_data?.stream_type,
-                false
+                false,
               );
               data.streams = streamList.list ?? [];
 
@@ -610,7 +617,7 @@ export default defineComponent({
                 const fieldWithSchema: any = await getStream(
                   variableData?.query_data?.stream,
                   variableData.query_data.stream_type,
-                  true
+                  true,
                 );
 
                 // assign the schema
@@ -630,7 +637,7 @@ export default defineComponent({
             });
           }
         }
-      }
+      },
     );
 
     const addField = () => {
@@ -658,7 +665,7 @@ export default defineComponent({
             dashId,
             props.variableName,
             toRaw(variableData),
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
@@ -672,7 +679,7 @@ export default defineComponent({
             store,
             dashId,
             variableData,
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
@@ -690,8 +697,12 @@ export default defineComponent({
         // get all variables data.
         let variablesData: any = JSON.parse(
           JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder,
+            ),
+          ),
         )?.variables?.list;
 
         // current updated variable data need to merge/update in above variablesData.
@@ -700,7 +711,7 @@ export default defineComponent({
         if (editMode.value) {
           //if name already exists
           const variableIndex = variablesData.findIndex(
-            (variable: any) => variable.name == props.variableName
+            (variable: any) => variable.name == props.variableName,
           );
 
           // Update the variable data in the list
@@ -723,7 +734,7 @@ export default defineComponent({
         if (hasCycle) {
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->"
+            "->",
           )} -> ${hasCycle[0]}`;
           return true;
         }
@@ -736,7 +747,7 @@ export default defineComponent({
           err?.message ??
             (editMode.value
               ? "Variable update failed"
-              : "Variable creation failed")
+              : "Variable creation failed"),
         );
         return true;
       }
@@ -764,7 +775,7 @@ export default defineComponent({
             err?.message ??
               (editMode.value
                 ? "Variable update failed"
-                : "Variable creation failed")
+                : "Variable creation failed"),
           );
         });
       });
@@ -788,7 +799,7 @@ export default defineComponent({
         // get all streams from current stream type
         const streamList: any = await getStreams(
           variableData?.query_data?.stream_type,
-          false
+          false,
         );
 
         // assign the stream list
@@ -813,7 +824,7 @@ export default defineComponent({
           const fieldWithSchema: any = await getStream(
             variableData?.query_data?.stream,
             variableData.query_data.stream_type,
-            true
+            true,
           );
 
           // assign the schema
@@ -839,7 +850,7 @@ export default defineComponent({
           label: it.name,
           value: "$" + it.name,
         }))
-        .filter((it: any) => it.label !== variableData.name)
+        .filter((it: any) => it.label !== variableData.name),
     );
     return {
       variableData,
