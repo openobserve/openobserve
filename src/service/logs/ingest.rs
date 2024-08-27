@@ -660,7 +660,7 @@ fn deserialize_aws_record_from_str(data: &str, request_id: &str) -> Result<Vec<j
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_and_decompress, deserialize_aws_record_from_str};
+    use super::{decode_and_decompress, deserialize_aws_record_from_str, json};
 
     #[test]
     fn test_decode_and_decompress_success() {
