@@ -654,7 +654,7 @@ impl From<&str> for StreamSettings {
 
         let store_original_data = settings
             .get("store_original_data")
-            .map_or_else(|| default_true(), |v| v.as_bool().unwrap());
+            .map_or_else(default_true, |v| v.as_bool().unwrap());
 
         Self {
             partition_time_level,
