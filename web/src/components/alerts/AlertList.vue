@@ -583,7 +583,7 @@ export default defineComponent({
       maxRecordToReturn.value = val;
     };
     
-    function convertUnixToQuasarFormat(unixMicroseconds) {
+    function convertUnixToQuasarFormat(unixMicroseconds : any) {
       if(!unixMicroseconds) return "";
         const unixSeconds = unixMicroseconds / 1e6;
         const dateToFormat = new Date(unixSeconds * 1000);
@@ -594,16 +594,26 @@ export default defineComponent({
     const addAlert = () => {
       showAddAlertDialog.value = true;
     };
-    const duplicateAlert = (row) =>{
+
+    const duplicateAlert = (row : any) =>{
       toBeCloneUUID.value = row.uuid
       toBeCloneAlertName.value = row.name;
       showForm.value = true;
     }
     const submitForm = () =>{
-      const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value)
-      alertToBeCloned.name = toBeCloneAlertName.value;
-      alertToBeCloned.stream_name = toBeClonestreamName.value;
-      alertToBeCloned.stream_type = toBeClonestreamType.value;
+      const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value) as Alert;
+
+      if (!alertToBeCloned) {
+        $q.notify({
+          type: "negative",
+          message: "Alert not found",
+          timeout: 2000,
+        });
+        return;
+      }
+        alertToBeCloned.name = toBeCloneAlertName.value;
+        alertToBeCloned.stream_name = toBeClonestreamName.value;
+        alertToBeCloned.stream_type = toBeClonestreamType.value;
 
       try{
         alertsService.create(
@@ -628,8 +638,7 @@ export default defineComponent({
               });
             }
           })
-          .catch((e) => {
-            console.error(e);
+          .catch((e: any) => {
             $q.notify({
               type: "negative",
               message: e.response.data.message,
@@ -638,7 +647,7 @@ export default defineComponent({
           });
 
       }
-      catch(e){
+      catch(e : any) {
         showForm.value = true;
       $q.notify({
               type: "negative",
@@ -759,7 +768,7 @@ export default defineComponent({
       });
       return filteredOptions;
     };
-    const updateStreamName = (selectedOption)=> {
+    const updateStreamName = (selectedOption : any)=> {
     toBeClonestreamName.value = selectedOption;
   }
     const updateStreams = (resetStream = true) => {

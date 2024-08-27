@@ -306,7 +306,7 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   reportListTableRef.value?.setPagination(pagination.value);
 };
-function convertUnixToQuasarFormat(unixMicroseconds) {
+function convertUnixToQuasarFormat(unixMicroseconds : any) {
   if(!unixMicroseconds) return "";
     const unixSeconds = unixMicroseconds / 1e6;
     const dateToFormat = new Date(unixSeconds * 1000);
