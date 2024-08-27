@@ -30,7 +30,7 @@ use config::{
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use wal::Writer as WalWriter;
 
 use crate::{
@@ -52,11 +52,44 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     writers
 });
 
+pub struct IngesterLock {
+    cpu_num: usize,
+    counter: std::sync::atomic::AtomicUsize,
+    lock: Vec<RwLock<()>>,
+}
+
+impl Default for IngesterLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IngesterLock {
+    pub fn new() -> Self {
+        let cfg = get_config();
+        let mut locks = Vec::with_capacity(cfg.limit.cpu_num);
+        for _ in 0..cfg.limit.cpu_num {
+            locks.push(RwLock::new(()))
+        }
+
+        IngesterLock {
+            cpu_num: cfg.limit.cpu_num,
+            counter: std::sync::atomic::AtomicUsize::new(0),
+            lock: locks,
+        }
+    }
+
+    pub fn lock(&self) -> &RwLock<()> {
+        let lock_index = self.counter.fetch_add(1, Ordering::SeqCst) % self.cpu_num;
+        &self.lock[lock_index]
+    }
+}
+
 pub struct Writer {
     idx: usize,
     key: WriterKey,
-    wal: Arc<Mutex<WalWriter>>,
-    memtable: Arc<RwLock<MemTable>>,
+    wal: Arc<WalWriter>,
+    memtable: Arc<MemTable>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
 }
@@ -151,7 +184,7 @@ impl Writer {
         Self {
             idx,
             key: key.clone(),
-            wal: Arc::new(Mutex::new(
+            wal: Arc::new(
                 WalWriter::new(
                     wal_dir,
                     &key.org_id,
@@ -160,8 +193,8 @@ impl Writer {
                     cfg.limit.max_file_size_on_disk as u64,
                 )
                 .expect("wal file create error"),
-            )),
-            memtable: Arc::new(RwLock::new(MemTable::new())),
+            ),
+            memtable: Arc::new(MemTable::new()),
             next_seq,
             created_at: AtomicI64::new(now),
         }
@@ -185,26 +218,13 @@ impl Writer {
         } else {
             (Vec::new(), None)
         };
-        let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
-        let wal_lock_time = start.elapsed().as_millis() as f64;
-        log::info!("[{in_trace_id}] wal lock done: {wal_lock_time}",);
-        metrics::INGEST_WAL_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(wal_lock_time);
 
-        let mut mem = self.memtable.write().await;
-        let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
-        log::info!("[{in_trace_id}] mem lock done: {mem_lock_time}",);
-        metrics::INGEST_MEMTABLE_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(mem_lock_time);
-        if self.check_wal_threshold(wal.size(), entry_bytes.len())
-            || self.check_mem_threshold(mem.size(), entry.data_size)
+        if self.check_wal_threshold(self.wal.size(), entry_bytes.len())
+            || self.check_mem_threshold(self.memtable.size(), entry.data_size)
         {
             let cfg = get_config();
             // sync wal before rotation
-            wal.sync().context(WalSnafu)?;
+            self.wal.sync().context(WalSnafu)?;
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -218,18 +238,27 @@ impl Writer {
                 wal_id
             );
             let new_wal = WalWriter::new(
-                wal_dir,
+                wal_dir.clone(),
                 &self.key.org_id,
                 &self.key.stream_type,
                 wal_id,
                 cfg.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
-            let old_wal = std::mem::replace(&mut *wal, new_wal);
+
+            let mut old_wal = WalWriter::new(wal_dir, "", "", 0, 0).context(WalSnafu)?;
+            if let Some(wal) = Arc::get_mut(&mut Arc::clone(&self.wal)) {
+                old_wal = std::mem::replace(&mut *wal, new_wal);
+            }
 
             // rotation memtable
             let new_mem = MemTable::new();
-            let old_mem = std::mem::replace(&mut *mem, new_mem);
+            let mut old_mem = MemTable::new();
+            if let Some(mem) = Arc::get_mut(&mut Arc::clone(&self.memtable)) {
+                // 使用 std::mem::replace 替换 MemTable，并获取旧的 MemTable
+                old_mem = std::mem::replace(&mut *mem, new_mem);
+            }
+
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
@@ -251,13 +280,17 @@ impl Writer {
         if !check_ttl {
             // write into wal
             log::info!("[check_ttl] [{in_trace_id}] start wal write");
-            wal.write(&entry_bytes, false).context(WalSnafu)?;
+            if let Some(wal) = Arc::get_mut(&mut Arc::clone(&self.wal)) {
+                wal.write(&entry_bytes, false).context(WalSnafu)?;
+            }
             log::info!("[check_ttl] [{in_trace_id}] end wal write");
             // write into memtable
             let Some(entry_batch) = entry_batch else {
                 return Ok(());
             };
-            mem.write(schema, entry, entry_batch)?;
+            if let Some(mem) = Arc::get_mut(&mut Arc::clone(&self.memtable)) {
+                mem.write(schema, entry, entry_batch)?;
+            }
             log::info!("[check_ttl] [{in_trace_id}] start mem write");
         }
 
@@ -265,17 +298,18 @@ impl Writer {
     }
 
     pub async fn close(&self) -> Result<()> {
+        let _wal_lock = crate::INGESTER_LOCK.lock();
         // rotation wal
-        let wal = self.wal.lock().await;
-        wal.sync().context(WalSnafu)?;
-        let path = wal.path().clone();
-        drop(wal);
+        self.wal.sync().context(WalSnafu)?;
+        let path = self.wal.path().clone();
 
         // rotation memtable
-        let mut mem = self.memtable.write().await;
         let new_mem = MemTable::new();
-        let old_mem = std::mem::replace(&mut *mem, new_mem);
-        drop(mem);
+        let mut old_mem = MemTable::new();
+        if let Some(mem) = Arc::get_mut(&mut Arc::clone(&self.memtable)) {
+            // 使用 std::mem::replace 替换 MemTable，并获取旧的 MemTable
+            old_mem = std::mem::replace(&mut *mem, new_mem);
+        }
 
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
         IMMUTABLES.write().await.insert(path, table);
@@ -283,8 +317,8 @@ impl Writer {
     }
 
     pub async fn sync(&self) -> Result<()> {
-        let wal = self.wal.lock().await;
-        wal.sync().context(WalSnafu)
+        let _wal_lock = crate::INGESTER_LOCK.lock();
+        self.wal.sync().context(WalSnafu)
     }
 
     pub async fn read(
@@ -292,8 +326,8 @@ impl Writer {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<ReadRecordBatchEntry>> {
-        let memtable = self.memtable.read().await;
-        memtable.read(stream_name, time_range)
+        let _wal_lock = crate::INGESTER_LOCK.lock();
+        self.memtable.read(stream_name, time_range)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
@@ -317,6 +351,10 @@ impl Writer {
         json_size > 0
             && (json_size + data_size > cfg.limit.max_file_size_in_memory
                 || arrow_size + data_size > cfg.limit.max_file_size_in_memory)
+    }
+
+    pub fn key_org_id(&self) -> Arc<str> {
+        self.key.org_id.clone()
     }
 }
 

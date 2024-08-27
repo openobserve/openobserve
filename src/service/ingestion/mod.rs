@@ -27,6 +27,7 @@ use config::{
         stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
+    metrics,
     utils::{flatten, json::*},
     SIZE_IN_MB,
 };
@@ -408,6 +409,14 @@ pub async fn write_file(
     }
     let mut req_stats = RequestStats::default();
     log::info!("[{in_trace_id}] buf len: {}", buf.len());
+    let start = std::time::Instant::now();
+    let _wal_lock = ingester::INGESTER_LOCK.lock();
+    let wal_lock_time = start.elapsed().as_millis() as f64;
+    log::info!("[{in_trace_id}] wal lock done: {wal_lock_time}",);
+    metrics::INGEST_WAL_LOCK_TIME
+        .with_label_values(&[&writer.key_org_id()])
+        .observe(wal_lock_time);
+
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
@@ -434,6 +443,7 @@ pub async fn write_file(
         req_stats.size += entry.records_size as f64 / SIZE_IN_MB;
         req_stats.records += entry_records as i64;
     }
+
     req_stats
 }
 
