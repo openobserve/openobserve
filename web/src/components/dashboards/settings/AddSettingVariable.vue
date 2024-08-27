@@ -70,6 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-input>
               </div>
             </div>
+            <!-- show/hide variable in dashboard -->
+          <div>
+            <q-toggle
+              v-model="variableData.hideOnDashboard"
+              :label="t('dashboard.hideVariableInDashboard')"
+              data-test="dashboard-query_values-hide_in_dashboard"
+            />
+          </div>
             <div
               class="text-body1 text-bold q-mt-lg"
               v-if="variableData.type !== 'dynamic_filters'"
@@ -490,6 +498,7 @@ export default defineComponent({
       value: "",
       options: [],
       multiSelect: false,
+      hideOnDashboard: false,
     });
 
     const filterCycleError: any = ref("");
