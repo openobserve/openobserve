@@ -247,8 +247,7 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
-      //@ts-ignore
-      this.searchObj.data.resultGrid[
+      this.searchObj.data.resultGrid.colSizes[
         this.searchObj.data.stream.selectedStream
       ] = [newColSizes];
     },
