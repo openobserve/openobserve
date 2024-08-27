@@ -292,14 +292,19 @@ import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import type { Template, DestinationData, Headers } from "@/ts/interfaces";
+import type {
+  Template,
+  DestinationData,
+  Headers,
+  DestinationPayload,
+} from "@/ts/interfaces";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 const props = defineProps<{
   templates: Template[] | [];
-  destination: DestinationData | null;
+  destination: DestinationPayload | null;
 }>();
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
@@ -313,7 +318,7 @@ const formData: Ref<DestinationData> = ref({
   skip_tls_verify: false,
   template: "",
   headers: {},
-  emails: [],
+  emails: "",
   type: "web_hook",
 });
 const isUpdatingDestination = ref(false);

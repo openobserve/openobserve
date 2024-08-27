@@ -310,7 +310,7 @@ const setupTemplateData = () => {
   }
 
   if (params.type) {
-    formData.value.type = params.type;
+    formData.value.type = params.type as "email" | "web_hook";
   }
 };
 
