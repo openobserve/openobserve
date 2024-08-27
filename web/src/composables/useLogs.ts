@@ -3051,18 +3051,13 @@ const useLogs = () => {
             size: 225,
           });
         }
-
-        //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
         
         let sizes : any;
         if (
-          searchObj.data.resultGrid.colOrder &&
-          searchObj.data.resultGrid.colOrder.hasOwnProperty(
+          searchObj.data.resultGrid.colSizes &&
+          searchObj.data.resultGrid.colSizes.hasOwnProperty(
             searchObj.data.stream.selectedStream,
-          ) &&
-          searchObj.data.resultGrid.colOrder[
-            searchObj.data.stream.selectedStream
-          ][0].length > 0
+          )
         ){
           sizes  = searchObj.data.resultGrid.colSizes[
             searchObj.data.stream.selectedStream
