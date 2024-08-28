@@ -48,7 +48,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::cluster as infra_cluster,
+    common::{infra::cluster as infra_cluster, meta::ingestion::ID_COL_NAME},
     service::{
         file_list,
         search::{
@@ -1143,8 +1143,30 @@ async fn get_file_list_by_inverted_index(
     ))
 }
 
+/// Extracts the ID and timestamp from a JSON record and modifies the id_timestamps vector.
+/// 1. Removes the `ID_COL_NAME` field from the input record if present.
+/// 2. Retrieves (but does not remove) the timestamp from the record using the provided timestamp
+///    col name.
+/// 3. If an ID was found, pushes a tuple of (ID, timestamp) onto the id_timestamps vector.
+/// 4. Returns the modified record as a json::Value::Object.
+pub(crate) fn extract_id_and_timestamp(
+    mut record: json::Map<String, json::Value>,
+    id_timestamps: &mut Option<Vec<(json::Value, Option<json::Value>)>>,
+    timestamp_col_name: &str,
+) -> json::Value {
+    if let Some(id_value) = record.remove(ID_COL_NAME) {
+        let timestamp = record.get(timestamp_col_name).cloned();
+        id_timestamps
+            .get_or_insert_with(Vec::new)
+            .push((id_value, timestamp));
+    }
+    json::Value::Object(record)
+}
+
 #[cfg(test)]
 mod tests {
+    use config::utils::json::json;
+
     use super::*;
 
     #[test]
@@ -1310,5 +1332,85 @@ mod tests {
         {
             assert_eq!(value.1, expected.get(value.0).unwrap().clone());
         }
+    }
+
+    const TIMESTAMP_COL: &str = "_timestamp";
+
+    #[test]
+    fn test_extract_id_and_timestamp_with_both_fields() {
+        let record = json!({
+            "_id": 12345,
+            "_timestamp": 172486667,
+            "data": "example"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let mut id_timestamps = None;
+        let result = extract_id_and_timestamp(record, &mut id_timestamps, TIMESTAMP_COL);
+
+        assert_eq!(result, json!({"_timestamp": 172486667, "data": "example"}));
+        assert_eq!(
+            id_timestamps,
+            Some(vec![(json!(12345), Some(json!(172486667)))])
+        );
+    }
+
+    #[test]
+    fn test_extract_id_and_timestamp_with_id_only() {
+        let record = json!({
+            "_id": 678980,
+            "data": "example"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let mut id_timestamps = None;
+        let result = extract_id_and_timestamp(record, &mut id_timestamps, TIMESTAMP_COL);
+
+        assert_eq!(result, json!({"data": "example"}));
+        assert_eq!(id_timestamps, Some(vec![(json!(678980), None)]));
+    }
+
+    #[test]
+    fn test_extract_id_and_timestamp_with_neither_field() {
+        let record = json!({
+            "data": "example"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let mut id_timestamps = None;
+        let result = extract_id_and_timestamp(record, &mut id_timestamps, TIMESTAMP_COL);
+
+        assert_eq!(result, json!({"data": "example"}));
+        assert_eq!(id_timestamps, None);
+    }
+
+    #[test]
+    fn test_extract_id_and_timestamp_with_existing_vector() {
+        let record = json!({
+            "_id": 13579,
+            "_timestamp": 172486667,
+            "data": "example"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let mut id_timestamps = Some(vec![(json!(24680), Some(json!(172486687)))]);
+        let result = extract_id_and_timestamp(record, &mut id_timestamps, TIMESTAMP_COL);
+
+        assert_eq!(result, json!({"_timestamp": 172486667, "data": "example"}));
+        assert_eq!(
+            id_timestamps,
+            Some(vec![
+                (json!(24680), Some(json!(172486687))),
+                (json!(13579), Some(json!(172486667)))
+            ])
+        );
     }
 }

@@ -36,8 +36,8 @@ use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus,
-            ORIGINAL_DATA_COL_NAME, RECORD_ID_COL_NAME,
+            BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus, ID_COL_NAME,
+            ORIGINAL_DATA_COL_NAME,
         },
         stream::StreamParams,
     },
@@ -305,7 +305,7 @@ pub async fn ingest(
                     &StreamType::Logs,
                 );
                 local_val.insert(
-                    RECORD_ID_COL_NAME.to_string(),
+                    ID_COL_NAME.to_string(),
                     json::Value::Number(record_id.into()),
                 );
             }
