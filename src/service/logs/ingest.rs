@@ -207,35 +207,13 @@ pub async fn ingest(
         // end row based transformation
 
         // JSON Flattening
-        let item = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
-
-        // Start re-routing if exists
-        let mut routed_stream_name = stream_name.clone();
-        if let Some(routings) = stream_routing_map.get(&routed_stream_name) {
-            if !routings.is_empty() {
-                for route in routings {
-                    let mut is_routed = true;
-                    let val = &route.routing;
-                    for q_condition in val.iter() {
-                        if !q_condition.evaluate(item.as_object().unwrap()).await {
-                            is_routed = false;
-                            break;
-                        }
-                    }
-                    if !val.is_empty() && is_routed {
-                        routed_stream_name = route.destination.clone();
-                        break;
-                    }
-                }
-            }
-        }
-        // End re-routing
+        let flattened_item = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
         let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
         // Start row based transform
         let mut res = if let Some(transforms) = stream_after_functions_map.get(&key) {
             match apply_functions(
-                item,
+                flattened_item,
                 transforms,
                 &stream_vrl_map,
                 org_id,
@@ -250,9 +228,27 @@ pub async fn ingest(
                 }
             }
         } else {
-            item
+            flattened_item
         };
         // end row based transform
+
+        // Update function usage statistics associated with the original stream
+        let (_, fn_num) = json_data_by_stream
+            .entry(stream_name.clone())
+            .or_insert((Vec::new(), None));
+        let function_no = stream_before_functions_map
+            .get(&main_stream_key)
+            .map(|v| v.len())
+            .unwrap_or_default()
+            + stream_after_functions_map
+                .get(&key)
+                .map(|v| v.len())
+                .unwrap_or_default();
+        *fn_num = need_usage_report.then_some(function_no);
+
+        // Find all destination streams based on routing
+        let destination_stream_names =
+            get_destination_streams(&stream_name, &res, &stream_routing_map).await;
 
         // get json object
         let mut local_val = match res.take() {
@@ -260,11 +256,7 @@ pub async fn ingest(
             _ => unreachable!(),
         };
 
-        if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
-            local_val = crate::service::logs::refactor_map(local_val, fields);
-        }
-
-        // handle timestamp
+        // Update or add timestamp
         let timestamp = match handle_timestamp(&mut local_val, min_ts) {
             Ok(ts) => ts,
             Err(e) => {
@@ -274,19 +266,26 @@ pub async fn ingest(
             }
         };
 
-        let function_no = stream_before_functions_map
-            .get(&main_stream_key)
-            .map(|v| v.len())
-            .unwrap_or_default()
-            + stream_after_functions_map
-                .get(&key)
-                .map(|v| v.len())
-                .unwrap_or_default();
-        let (ts_data, fn_num) = json_data_by_stream
-            .entry(routed_stream_name.clone())
-            .or_insert((Vec::new(), None));
-        ts_data.push((timestamp, local_val));
-        *fn_num = need_usage_report.then_some(function_no);
+        // Refactor and assign data to each destination stream.
+        for dest in destination_stream_names {
+            // The data for each of its destination streams since the data may
+            // need to be assigned to multiple streams and may to be refactored
+            // differently to match the user-defined schema of that stream.
+            let local_val_for_dest = local_val.clone();
+
+            // Refactor the data to match the user.defined schema of the
+            // destination stream.
+            let local_val_for_dest = if let Some(fields) = user_defined_schema_map.get(&dest) {
+                crate::service::logs::refactor_map(local_val_for_dest, fields)
+            } else {
+                local_val_for_dest
+            };
+
+            let (ts_data, _) = json_data_by_stream
+                .entry(dest)
+                .or_insert((Vec::new(), None));
+            ts_data.push((timestamp, local_val_for_dest));
+        }
     }
 
     // if no data, fast return
@@ -381,6 +380,11 @@ pub fn apply_functions<'a>(
     }
 }
 
+/// Updates the JSON object so that it contains a timestamp field formatted in
+/// microseconds.
+///
+/// This will update and format an existing timestamp field if one exists or
+/// will add a new timestamp field if none exists already.
 pub fn handle_timestamp(
     local_val: &mut json::Map<String, json::Value>,
     min_ts: i64,
@@ -403,6 +407,44 @@ pub fn handle_timestamp(
         json::Value::Number(timestamp.into()),
     );
     Ok(timestamp)
+}
+
+/// Returns the names of destination streams to which the data item from the
+/// specified stream should be routed.
+async fn get_destination_streams(
+    stream_name: &str,
+    item: &serde_json::Value,
+    stream_routing_map: &HashMap<String, Vec<Routing>>,
+) -> Vec<String> {
+    // If there are no routings defined for the stream, route the data back into
+    // the original stream.
+    let Some(routings) = stream_routing_map.get(stream_name) else {
+        return vec![stream_name.to_string()];
+    };
+
+    // Find any destination streams with routing conditions that match the data.
+    let mut destination_stream_names = vec![];
+    for route in routings {
+        let mut is_routed = true;
+        let val = &route.routing;
+        for q_condition in val.iter() {
+            if !q_condition.evaluate(item.as_object().unwrap()).await {
+                is_routed = false;
+                break;
+            }
+        }
+        if !val.is_empty() && is_routed {
+            destination_stream_names.push(route.destination.clone());
+        }
+    }
+
+    // If the data does not match conditions for any route, route it to the
+    // original stream.
+    if destination_stream_names.is_empty() {
+        destination_stream_names.push(stream_name.to_string())
+    }
+
+    destination_stream_names
 }
 
 impl<'a> Iterator for IngestionDataIter<'a> {
@@ -625,7 +667,11 @@ fn deserialize_aws_record_from_str(data: &str, request_id: &str) -> Result<Vec<j
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_and_decompress, deserialize_aws_record_from_str};
+    use std::collections::HashMap;
+
+    use config::meta::stream::{Operator, Routing, RoutingCondition};
+
+    use super::{decode_and_decompress, deserialize_aws_record_from_str, get_destination_streams};
 
     #[test]
     fn test_decode_and_decompress_success() {
@@ -682,5 +728,103 @@ mod tests {
         for val in result {
             assert_eq!(val.get("owner").unwrap(), "123456789012");
         }
+    }
+
+    #[tokio::test]
+    async fn routes_to_original_stream_when_no_routing_exist() {
+        let original_stream_name = "original_stream";
+        let item = serde_json::json!({
+            "number": 3,
+        });
+        let stream_routing_map = HashMap::new();
+
+        let destination_streams =
+            get_destination_streams(original_stream_name, &item, &stream_routing_map).await;
+        assert_eq!(destination_streams, vec![original_stream_name])
+    }
+
+    #[tokio::test]
+    async fn routes_to_original_stream_when_no_routes_match_conditions() {
+        let original_stream_name = "original_stream";
+        let item = serde_json::json!({
+            "number": 3,
+        });
+
+        let mut stream_routing_map = HashMap::new();
+        stream_routing_map.insert(
+            original_stream_name.to_string(),
+            vec![Routing {
+                destination: "numbers_gt_3".to_string(),
+                routing: vec![RoutingCondition {
+                    column: "number".to_string(),
+                    operator: Operator::GreaterThan,
+                    value: serde_json::json!(3),
+                    ignore_case: true,
+                }],
+            }],
+        );
+
+        let destination_streams =
+            get_destination_streams(original_stream_name, &item, &stream_routing_map).await;
+        assert_eq!(destination_streams, vec![original_stream_name])
+    }
+
+    #[tokio::test]
+    async fn routes_to_all_streams_with_matching_route_conditions() {
+        let original_stream_name = "original_stream";
+        let item = serde_json::json!({
+            "number": 3,
+        });
+
+        let mut stream_routing_map = HashMap::new();
+        let numbers_gt_1_stream_name = "numbers_gt_1";
+        let numbers_gt_2_stream_name = "numbers_gt_2";
+        let numbers_gt_3_stream_name = "numbers_gt_3";
+        stream_routing_map.insert(
+            original_stream_name.to_string(),
+            vec![
+                Routing {
+                    destination: numbers_gt_1_stream_name.to_string(),
+                    routing: vec![RoutingCondition {
+                        column: "number".to_string(),
+                        operator: Operator::GreaterThan,
+                        value: serde_json::json!(1),
+                        ignore_case: true,
+                    }],
+                },
+                Routing {
+                    destination: numbers_gt_2_stream_name.to_string(),
+                    routing: vec![RoutingCondition {
+                        column: "number".to_string(),
+                        operator: Operator::GreaterThan,
+                        value: serde_json::json!(2),
+                        ignore_case: true,
+                    }],
+                },
+                Routing {
+                    destination: numbers_gt_3_stream_name.to_string(),
+                    routing: vec![RoutingCondition {
+                        column: "number".to_string(),
+                        operator: Operator::GreaterThan,
+                        value: serde_json::json!(5),
+                        ignore_case: true,
+                    }],
+                },
+            ],
+        );
+
+        // Destination streams are not guaranteed to be an any particular order
+        // so sort them before comparing against the expected value.
+        let mut destination_streams =
+            get_destination_streams(original_stream_name, &item, &stream_routing_map).await;
+        destination_streams.sort();
+
+        assert_eq!(
+            destination_streams,
+            vec![
+                numbers_gt_1_stream_name.to_string(),
+                numbers_gt_2_stream_name.to_string()
+            ]
+        );
     }
 }
