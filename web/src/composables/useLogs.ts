@@ -165,6 +165,7 @@ const defaultObject = {
       currentPage: 1,
       columns: <any>[],
       colOrder: <any>{},
+      colSizes: <any>{},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -3050,17 +3051,26 @@ const useLogs = () => {
             size: 225,
           });
         }
+        
+        let sizes : any;
+        if (
+          searchObj.data.resultGrid.colSizes &&
+          searchObj.data.resultGrid.colSizes.hasOwnProperty(
+            searchObj.data.stream.selectedStream,
+          )
+        ){
+          sizes  = searchObj.data.resultGrid.colSizes[
+            searchObj.data.stream.selectedStream
+          ];
+        }
 
-        //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
-        //@ts-ignore
-        const sizes = (searchObj.data.resultGrid as any)[
-          searchObj.data.stream.selectedStream
-        ];
+        
 
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
-            let foundKey, foundValue;
+            let foundKey  , foundValue;
 
+          if(sizes.length > 0){
             Object.keys(sizes[0]).forEach((key) => {
               const trimmedKey = key
                 .replace(/^--(header|col)-/, "")
@@ -3070,6 +3080,7 @@ const useLogs = () => {
                 foundValue = sizes[0][key];
               }
             });
+          }
 
             searchObj.data.resultGrid.columns.push({
               name: field,
@@ -3086,7 +3097,7 @@ const useLogs = () => {
                 wrapContent: false,
               },
 
-              size: foundValue,
+              size: foundValue || 150,
             });
           }
         }
