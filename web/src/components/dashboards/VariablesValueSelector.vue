@@ -466,13 +466,17 @@ export default defineComponent({
                       )
                       .map((option: any) => option.value);
 
-                    // if selected values are there, set the selected values; otherwise, set the all values for multiselect
+                    // if selected values are there, set the selected values.
+                    // otherwise, check selectAllValueForMultiSelect configuration.
+                    // if it is true, set the all values for multiselect else set the first value of the dropdown
                     currentVariable.value =
                       selectedValues.length > 0
                         ? selectedValues
-                        : currentVariable?.options?.map(
-                            (variableOption: any) => variableOption.value,
-                          ) ?? [];
+                        : currentVariable?.selectAllValueForMultiSelect === true
+                          ? currentVariable?.options?.map(
+                              (variableOption: any) => variableOption.value,
+                            ) ?? []
+                          : [currentVariable.options[0].value];
                   } else {
                     currentVariable.value = currentVariable.options.some(
                       (option: any) =>
@@ -540,13 +544,17 @@ export default defineComponent({
                   oldVariableSelectedValues.includes(option.value),
                 )
                 .map((option: any) => option.value);
+              // if selected values are there, set the selected values. 
+              // otherwise, check selectAllValueForMultiSelect configuration.
+              // if it is true, set the all values for multiselect else set the first value of the dropdown
               currentVariable.value =
-                // if selected values are there, set the selected values; otherwise, set the all values for multiselect
                 selectedValues.length > 0
                   ? selectedValues
-                  : currentVariable?.options?.map(
-                      (variableOption: any) => variableOption.value,
-                    ) ?? [];
+                  : currentVariable?.selectAllValueForMultiSelect === true
+                    ? currentVariable?.options?.map(
+                        (variableOption: any) => variableOption.value,
+                      ) ?? []
+                    : [currentVariable.options[0].value];
             } else {
               // If multiSelect is false, set the value as a single value from options which is selected
               currentVariable.value =
