@@ -102,8 +102,9 @@
       <query-editor
         v-model:query="nestedJson"
         ref="queryEditorRef"
-        editor-id="logs-json-preview-unflattened-json-editor"
+        :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
         class="monaco-editor"
+        :class="mode"
         language="json"
       />
     </div>
@@ -231,7 +232,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -255,6 +256,10 @@ export default {
       type: Boolean,
       default: true,
     },
+    mode: {
+      type: String,
+      default: "sidebar",
+    },
   },
   components: { NotEqualIcon, EqualIcon, AppTabs, QueryEditor },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
@@ -273,6 +278,8 @@ export default {
     const activeTab = ref("flattened");
 
     const queryEditorRef = ref<any>();
+
+    const previewId = ref("");
 
     const nestedJson = ref("");
 
@@ -313,6 +320,7 @@ export default {
         }
       });
       getTracesStreams();
+      previewId.value = getUUID();
     });
 
     onMounted(() => {
@@ -435,6 +443,7 @@ export default {
       nestedJson,
       handleTabChange,
       queryEditorRef,
+      previewId,
     };
   },
 };
@@ -449,6 +458,11 @@ export default {
 .monaco-editor {
   width: calc(100% - 16px) !important;
   height: calc(100vh - 250px) !important;
+
+  &.expanded {
+    height: 300px !important;
+    max-width: 1024px !important;
+  }
 }
 </style>
 
