@@ -72,258 +72,252 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-input>
               </div>
             </div>
-            <!-- show/hide variable in dashboard -->
-            <div>
-              <div
-                class="text-body1 text-bold q-mt-lg"
-                v-if="variableData.type !== 'dynamic_filters'"
-              >
-                {{ t("dashboard.extraOptions") }}
-              </div>
-              <div v-if="variableData.type == 'query_values'">
-                <div class="row">
-                  <q-select
-                    v-model="variableData.query_data.stream_type"
-                    :label="t('dashboard.selectStreamType') + ' *'"
-                    :options="data.streamType"
-                    input-debounce="0"
-                    behavior="menu"
-                    filled
-                    borderless
-                    dense
-                    stack-label
-                    class="textbox showLabelOnTop col no-case q-mr-sm"
-                    @update:model-value="streamTypeUpdated"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                  ></q-select>
-                  <q-select
-                    v-model="variableData.query_data.stream"
-                    :label="t('dashboard.selectIndex') + ' *'"
-                    :options="streamsFilteredOptions"
-                    input-debounce="0"
-                    behavior="menu"
-                    use-input
-                    filled
-                    borderless
-                    dense
-                    stack-label
-                    @filter="streamsFilterFn"
-                    @update:model-value="streamUpdated"
-                    option-value="name"
-                    option-label="name"
-                    emit-value
-                    class="textbox showLabelOnTop col no-case"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                  >
-                  </q-select>
-                </div>
+            <div
+              class="text-body1 text-bold q-mt-lg"
+              v-if="variableData.type !== 'dynamic_filters'"
+            >
+              {{ t("dashboard.extraOptions") }}
+            </div>
+            <div v-if="variableData.type == 'query_values'">
+              <div class="row">
                 <q-select
-                  v-model="variableData.query_data.field"
-                  :label="t('dashboard.selectField') + ' *'"
+                  v-model="variableData.query_data.stream_type"
+                  :label="t('dashboard.selectStreamType') + ' *'"
+                  :options="data.streamType"
+                  input-debounce="0"
+                  behavior="menu"
                   filled
-                  stack-label
-                  use-input
                   borderless
                   dense
-                  hide-selected
-                  fill-input
-                  behavior="menu"
+                  stack-label
+                  class="textbox showLabelOnTop col no-case q-mr-sm"
+                  @update:model-value="streamTypeUpdated"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                ></q-select>
+                <q-select
+                  v-model="variableData.query_data.stream"
+                  :label="t('dashboard.selectIndex') + ' *'"
+                  :options="streamsFilteredOptions"
                   input-debounce="0"
-                  :options="fieldsFilteredOptions"
-                  @filter="fieldsFilterFn"
-                  class="textbox showLabelOnTop no-case"
+                  behavior="menu"
+                  use-input
+                  filled
+                  borderless
+                  dense
+                  stack-label
+                  @filter="streamsFilterFn"
+                  @update:model-value="streamUpdated"
                   option-value="name"
                   option-label="name"
                   emit-value
+                  class="textbox showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                 >
                 </q-select>
-                <div>
-                  <q-input
-                    class="showLabelOnTop"
-                    type="number"
-                    v-model.number="variableData.query_data.max_record_size"
-                    :label="t('dashboard.DefaultSize')"
-                    dense
-                    filled
-                    outlined
-                    stack-label
+              </div>
+              <q-select
+                v-model="variableData.query_data.field"
+                :label="t('dashboard.selectField') + ' *'"
+                filled
+                stack-label
+                use-input
+                borderless
+                dense
+                hide-selected
+                fill-input
+                behavior="menu"
+                input-debounce="0"
+                :options="fieldsFilteredOptions"
+                @filter="fieldsFilterFn"
+                class="textbox showLabelOnTop no-case"
+                option-value="name"
+                option-label="name"
+                emit-value
+                :rules="[(val: any) => !!val || 'Field is required!']"
+              >
+              </q-select>
+              <div>
+                <q-input
+                  class="showLabelOnTop"
+                  type="number"
+                  v-model.number="variableData.query_data.max_record_size"
+                  :label="t('dashboard.DefaultSize')"
+                  dense
+                  filled
+                  outlined
+                  stack-label
+                >
+                  <q-btn
+                    padding="xs"
+                    round
+                    flat
+                    class="q-ml-sm"
+                    no-caps
+                    icon="info"
                   >
+                    <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
+                  </q-btn>
+                </q-input>
+              </div>
+              <div>
+                <div class="flex flex-row">
+                  <div
+                    data-test="dashboard-query-values-filter"
+                    class="text-body1 text-bold q-mt-lg"
+                  >
+                    Filters
+                  </div>
+                  <q-icon
+                    class=""
+                    style="margin-top: 25px; margin-left: 5px"
+                    size="20px"
+                    name="info_outline"
+                    data-test="dashboard-variables-setting-filter-info"
+                  >
+                    <q-tooltip style="width: 250px">
+                      In filters, you can use the value of another variable to
+                      filter the current variable's value. This can be done by
+                      using the other variable's name. For example:
+                      <span class="bg-highlight">$variableName</span>.
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div class="row items-center" style="width: 100%">
+                  <div
+                    class="row no-wrap items-center q-mb-xs"
+                    style="width: 100%"
+                    v-for="(filter, index) in variableData.query_data.filter"
+                    :key="index"
+                  >
+                    <q-select
+                      filled
+                      outlined
+                      emit-value
+                      dense
+                      hide-selected
+                      fill-input
+                      v-model="filter.name"
+                      :display-value="filter.name ? filter.name : ''"
+                      :options="fieldsFilteredOptions"
+                      input-debounce="0"
+                      behavior="menu"
+                      @update:model-value="filterUpdated(index, $event)"
+                      use-input
+                      stack-label
+                      option-label="name"
+                      data-test="dashboard-query-values-filter-name-selector"
+                      @filter="fieldsFilterFn"
+                      :placeholder="filter.name ? '' : 'Select Field'"
+                      class="textbox col no-case q-ml-sm"
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
+                      style="max-width: 41%; width: 41%"
+                      ><q-tooltip v-if="filter.name">
+                        {{ filter.name }}
+                      </q-tooltip>
+                      <template v-slot:no-option>
+                        <q-item>
+                          <q-item-section class="text-italic text-grey"
+                            >No Data Found</q-item-section
+                          >
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <q-select
+                      dense
+                      filled
+                      v-model="filter.operator"
+                      :display-value="filter.operator ? filter.operator : ''"
+                      style="width: 18%"
+                      class="operator"
+                      data-test="dashboard-query-values-filter-operator-selector"
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
+                      :options="[
+                        '=',
+                        '!=',
+                        '>=',
+                        '<=',
+                        '>',
+                        '<',
+                        'IN',
+                        'Contains',
+                        'Not Contains',
+                        'Is Null',
+                        'Is Not Null',
+                      ]"
+                    />
+                    <CommonAutoComplete
+                      v-if="
+                        !['Is Null', 'Is Not Null'].includes(filter.operator)
+                      "
+                      v-model="filter.value"
+                      :items="dashboardVariablesFilterItems"
+                      searchRegex="(?:^|[^$])\$?(\w+)"
+                      :rules="[(val: any) => val?.length > 0 || 'Required']"
+                      debounce="1000"
+                      style="margin-top: none !important; width: 41% !important"
+                      placeholder="Enter Value"
+                    ></CommonAutoComplete>
                     <q-btn
-                      padding="xs"
-                      round
+                      size="sm"
+                      padding="12px 5px"
+                      style="margin-bottom: 20px"
                       flat
-                      class="q-ml-sm"
-                      no-caps
-                      icon="info"
-                    >
-                      <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
-                    </q-btn>
-                  </q-input>
+                      dense
+                      @click="removeFilter(index)"
+                      icon="close"
+                      :data-test="`dashboard-variable-adhoc-close-${index}`"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <div class="flex flex-row">
-                    <div
-                      data-test="dashboard-query-values-filter"
-                      class="text-body1 text-bold q-mt-lg"
-                    >
-                      Filters
-                    </div>
-                    <q-icon
-                      class=""
-                      style="margin-top: 25px; margin-left: 5px"
-                      size="20px"
-                      name="info_outline"
-                      data-test="dashboard-variables-setting-filter-info"
-                    >
-                      <q-tooltip style="width: 250px">
-                        In filters, you can use the value of another variable to
-                        filter the current variable's value. This can be done by
-                        using the other variable's name. For example:
-                        <span class="bg-highlight">$variableName</span>.
-                      </q-tooltip>
-                    </q-icon>
-                  </div>
-                  <div class="row items-center" style="width: 100%">
-                    <div
-                      class="row no-wrap items-center q-mb-xs"
-                      style="width: 100%"
-                      v-for="(filter, index) in variableData.query_data.filter"
-                      :key="index"
-                    >
-                      <q-select
-                        filled
-                        outlined
-                        emit-value
-                        dense
-                        hide-selected
-                        fill-input
-                        v-model="filter.name"
-                        :display-value="filter.name ? filter.name : ''"
-                        :options="fieldsFilteredOptions"
-                        input-debounce="0"
-                        behavior="menu"
-                        @update:model-value="filterUpdated(index, $event)"
-                        use-input
-                        stack-label
-                        option-label="name"
-                        data-test="dashboard-query-values-filter-name-selector"
-                        @filter="fieldsFilterFn"
-                        :placeholder="filter.name ? '' : 'Select Field'"
-                        class="textbox col no-case q-ml-sm"
-                        :rules="[
-                          (val: any) => !!val.trim() || 'Field is required!',
-                        ]"
-                        style="max-width: 41%; width: 41%"
-                        ><q-tooltip v-if="filter.name">
-                          {{ filter.name }}
-                        </q-tooltip>
-                        <template v-slot:no-option>
-                          <q-item>
-                            <q-item-section class="text-italic text-grey"
-                              >No Data Found</q-item-section
-                            >
-                          </q-item>
-                        </template>
-                      </q-select>
-                      <q-select
-                        dense
-                        filled
-                        v-model="filter.operator"
-                        :display-value="filter.operator ? filter.operator : ''"
-                        style="width: 18%"
-                        class="operator"
-                        data-test="dashboard-query-values-filter-operator-selector"
-                        :rules="[
-                          (val: any) => !!val.trim() || 'Field is required!',
-                        ]"
-                        :options="[
-                          '=',
-                          '!=',
-                          '>=',
-                          '<=',
-                          '>',
-                          '<',
-                          'IN',
-                          'Contains',
-                          'Not Contains',
-                          'Is Null',
-                          'Is Not Null',
-                        ]"
-                      />
-                      <CommonAutoComplete
-                        v-if="
-                          !['Is Null', 'Is Not Null'].includes(filter.operator)
-                        "
-                        v-model="filter.value"
-                        :items="dashboardVariablesFilterItems"
-                        searchRegex="(?:^|[^$])\$?(\w+)"
-                        :rules="[(val: any) => val?.length > 0 || 'Required']"
-                        debounce="1000"
-                        style="
-                          margin-top: none !important;
-                          width: 41% !important;
-                        "
-                        placeholder="Enter Value"
-                      ></CommonAutoComplete>
-                      <q-btn
-                        size="sm"
-                        padding="12px 5px"
-                        style="margin-bottom: 20px"
-                        flat
-                        dense
-                        @click="removeFilter(index)"
-                        icon="close"
-                        :data-test="`dashboard-variable-adhoc-close-${index}`"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <q-btn
-                      no-caps
-                      icon="add"
-                      no-outline
-                      class="q-mt-md"
-                      @click="addFilter"
-                      data-test="dashboard-add-filter-btn"
-                    >
-                      Add Filter
-                    </q-btn>
-                  </div>
+                  <q-btn
+                    no-caps
+                    icon="add"
+                    no-outline
+                    class="q-mt-md"
+                    @click="addFilter"
+                    data-test="dashboard-add-filter-btn"
+                  >
+                    Add Filter
+                  </q-btn>
+                </div>
 
-                  <!-- show error if filter has cycle -->
-                  <div v-show="filterCycleError" style="color: red">
-                    {{ filterCycleError }}
-                  </div>
+                <!-- show error if filter has cycle -->
+                <div v-show="filterCycleError" style="color: red">
+                  {{ filterCycleError }}
                 </div>
               </div>
             </div>
-            <div
-              class="textbox"
-              v-if="['constant'].includes(variableData.type)"
-            >
-              <q-input
-                class="showLabelOnTop"
-                v-model="variableData.value"
-                :label="t('dashboard.ValueOfVariable') + ' *'"
-                dense
-                filled
-                outlined
-                stack-label
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-              ></q-input>
-            </div>
-            <div class="textbox" v-if="['textbox'].includes(variableData.type)">
-              <q-input
-                class="showLabelOnTop"
-                v-model="variableData.value"
-                :label="t('dashboard.DefaultValue')"
-                dense
-                filled
-                outlined
-                stack-label
-              ></q-input>
-            </div>
+          </div>
+          <div class="textbox" v-if="['constant'].includes(variableData.type)">
+            <q-input
+              class="showLabelOnTop"
+              v-model="variableData.value"
+              :label="t('dashboard.ValueOfVariable') + ' *'"
+              dense
+              filled
+              outlined
+              stack-label
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            ></q-input>
+          </div>
+          <div class="textbox" v-if="['textbox'].includes(variableData.type)">
+            <q-input
+              class="showLabelOnTop"
+              v-model="variableData.value"
+              :label="t('dashboard.DefaultValue')"
+              dense
+              filled
+              outlined
+              stack-label
+            ></q-input>
+          </div>
+          <!-- show the auto add variables for the custom fields -->
+          <div v-if="variableData.type == 'custom'">
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
