@@ -234,3 +234,21 @@ impl ExecutionPlan for NewEmptyExec {
         ))
     }
 }
+
+// add some unit tests here
+#[cfg(test)]
+mod tests {
+    use arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
+
+    #[test]
+    fn test_new_empty_exec() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("test", schema, None, &[], None, false);
+        assert_eq!(exec.name(), "test");
+        assert_eq!(exec.projection(), None);
+        assert_eq!(exec.filters().len(), 0);
+        assert_eq!(exec.limit(), None);
+    }
+}
