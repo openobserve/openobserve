@@ -176,7 +176,6 @@ pub async fn ingest(
                 return Err(anyhow::anyhow!("Failed processing: {:?}", e));
             }
         };
-        let mut routed_stream_name = stream_name.clone();
 
         if let Some(extend) = extend_json.as_ref() {
             for (key, val) in extend.iter() {
@@ -193,7 +192,7 @@ pub async fn ingest(
                     transforms,
                     &stream_vrl_map,
                     org_id,
-                    &routed_stream_name,
+                    &stream_name,
                     &mut runtime,
                 ) {
                     Ok(res) => res,
@@ -211,6 +210,7 @@ pub async fn ingest(
         let item = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
         // Start re-routing if exists
+        let mut routed_stream_name = stream_name.clone();
         if let Some(routings) = stream_routing_map.get(&routed_stream_name) {
             if !routings.is_empty() {
                 for route in routings {
@@ -231,7 +231,7 @@ pub async fn ingest(
         }
         // End re-routing
 
-        let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
+        let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
         // Start row based transform
         let mut res = if let Some(transforms) = stream_after_functions_map.get(&key) {
             match apply_functions(
@@ -239,7 +239,7 @@ pub async fn ingest(
                 transforms,
                 &stream_vrl_map,
                 org_id,
-                &routed_stream_name,
+                &stream_name,
                 &mut runtime,
             ) {
                 Ok(res) => res,
