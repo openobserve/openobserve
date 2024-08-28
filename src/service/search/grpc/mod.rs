@@ -33,7 +33,6 @@ use infra::{
 };
 use proto::cluster_rpc;
 
-use super::datafusion;
 use crate::service::{
     db,
     search::{
@@ -116,13 +115,14 @@ pub async fn search(
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
 
+    // binding release lock files
+    let _release_file_guard = ReleaseFileGuard::new(&trace_id);
+
     // search in WAL parquet
     let skip_wal = req.query.as_ref().unwrap().skip_wal;
-    let wal_lock_files;
     if LOCAL_NODE.is_ingester() && !skip_wal {
-        let (tbls, stats, lock_files) =
+        let (tbls, stats) =
             wal::search_parquet(&trace_id, sql.clone(), stream_type, &work_group).await?;
-        wal_lock_files = lock_files;
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
@@ -282,9 +282,6 @@ pub async fn search(
     }
     log::info!("[trace_id {trace_id}] in node merge task finish");
 
-    // clear session data
-    datafusion::storage::file_list::clear(&trace_id);
-
     // final result
     let mut hits_total = 0;
     let mut hits_buf = vec![];
@@ -362,4 +359,29 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+struct ReleaseFileGuard {
+    trace_id: String,
+}
+
+impl ReleaseFileGuard {
+    fn new(trace_id: &str) -> Self {
+        Self {
+            trace_id: trace_id.to_string(),
+        }
+    }
+}
+
+impl Drop for ReleaseFileGuard {
+    fn drop(&mut self) {
+        log::info!(
+            "[trace_id {}] grpc->search: drop ReleaseFileGuard",
+            self.trace_id
+        );
+        // clear session data
+        crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
+        // release wal lock files
+        crate::common::infra::wal::release_request(&self.trace_id);
+    }
 }

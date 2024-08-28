@@ -58,7 +58,7 @@ pub async fn search_parquet(
     sql: Arc<Sql>,
     stream_type: StreamType,
     work_group: &str,
-) -> Result<(Vec<Arc<dyn TableProvider>>, ScanStats, Vec<String>), Error> {
+) -> Result<(Vec<Arc<dyn TableProvider>>, ScanStats), Error> {
     let schema = sql.schema.clone();
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
@@ -74,7 +74,7 @@ pub async fn search_parquet(
     )
     .await?;
     if files.is_empty() {
-        return Ok((vec![], ScanStats::new(), vec![]));
+        return Ok((vec![], ScanStats::new()));
     }
 
     let mut scan_stats = ScanStats::new();
@@ -111,7 +111,7 @@ pub async fn search_parquet(
     for file in files_metadata {
         if let Some((min_ts, max_ts)) = sql.meta.time_range {
             if file.meta.is_empty() {
-                wal::release_files(&[file.key.clone()]).await;
+                wal::release_files(&[file.key.clone()]);
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
@@ -122,7 +122,7 @@ pub async fn search_parquet(
                     file.meta.min_ts,
                     file.meta.max_ts
                 );
-                wal::release_files(&[file.key.clone()]).await;
+                wal::release_files(&[file.key.clone()]);
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
@@ -134,8 +134,8 @@ pub async fn search_parquet(
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
         // release all files
-        wal::release_files(&lock_files).await;
-        return Ok((vec![], scan_stats, vec![]));
+        wal::release_files(&lock_files);
+        return Ok((vec![], scan_stats));
     }
 
     // fetch all schema versions, group files by version
@@ -156,7 +156,7 @@ pub async fn search_parquet(
         }
     };
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new(), vec![]));
+        return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -169,7 +169,7 @@ pub async fn search_parquet(
             Ok(size) => size,
             Err(err) => {
                 // release all files
-                wal::release_files(&lock_files).await;
+                wal::release_files(&lock_files);
                 log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
@@ -218,7 +218,7 @@ pub async fn search_parquet(
     if cfg.common.memory_circuit_breaker_enable {
         if let Err(e) = super::check_memory_circuit_breaker(trace_id, &scan_stats) {
             // release all files
-            wal::release_files(&lock_files).await;
+            wal::release_files(&lock_files);
             return Err(e);
         }
     }
@@ -267,17 +267,20 @@ pub async fn search_parquet(
             Ok(table) => table,
             Err(err) => {
                 // release all files
-                wal::release_files(&lock_files).await;
+                wal::release_files(&lock_files);
                 log::error!("[trace_id {trace_id}] create parquet table error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "create parquet table error".to_string(),
                 )));
             }
         };
-        tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
+        tables.push(Arc::new(table) as _);
     }
 
-    Ok((tables, scan_stats, lock_files))
+    // lock these files for this request
+    wal::lock_request(trace_id, &lock_files);
+
+    Ok((tables, scan_stats))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -423,7 +426,7 @@ async fn get_file_list_inner(
                 .to_string()
         })
         .collect::<Vec<_>>();
-    wal::lock_files(&files).await;
+    wal::lock_files(&files);
 
     let mut result = Vec::with_capacity(files.len());
     let (min_ts, max_ts) = sql.meta.time_range.unwrap_or((0, 0));
@@ -440,7 +443,7 @@ async fn get_file_list_inner(
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(&[file.clone()]).await;
+                wal::release_files(&[file.clone()]);
                 continue;
             }
         }
@@ -450,7 +453,7 @@ async fn get_file_list_inner(
         {
             result.push(file_key);
         } else {
-            wal::release_files(&[file.clone()]).await;
+            wal::release_files(&[file.clone()]);
         }
     }
     Ok(result)
