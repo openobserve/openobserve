@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <!-- default value for multi select variables -->
-           <!-- it can be first value or all values -->
+          <!-- it can be first value or all values -->
           <div
             v-if="
               variableData.multiSelect &&
@@ -385,8 +385,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="button-group multi-select-default-value-toggle">
               <div>By Default Select:</div>
               <div class="row">
-                <div style="align-self: center; padding-right: 4px">
-                </div>
                 <div>
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-first-value"
@@ -710,6 +708,15 @@ export default defineComponent({
       // remove query_data if type is not query_values
       if (variableData.type !== "query_values") {
         delete variableData["query_data"];
+      }
+
+      // reset multi select config if type is not query_values or custom
+      if (
+        variableData.type !== "query_values" &&
+        variableData.type !== "custom"
+      ) {
+        variableData.multiSelect = false;
+        variableData.selectAllValueForMultiSelect = false;
       }
 
       if (editMode.value) {
