@@ -150,7 +150,7 @@ impl Writer {
     }
 
     pub fn sync(&self) -> Result<()> {
-        self.f.sync_all().context(FileSyncSnafu {
+        self.f.sync_data().context(FileSyncSnafu {
             path: self.path.clone(),
         })?;
         Ok(())
