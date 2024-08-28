@@ -249,11 +249,13 @@
               "
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
+              class="tw-w-full"
             >
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
                 class="tw-py-1"
+                mode="expanded"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
