@@ -52,7 +52,7 @@ pub async fn save(
             }
             for email in destination.emails.iter() {
                 // Check if the email is part of the org
-                match user::get(Some(org_id), &email).await {
+                match user::get(Some(org_id), email).await {
                     Ok(user) => {
                         if user.is_none() {
                             return Err((
