@@ -159,7 +159,7 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if crate::service::search::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(&trace_id, abort_sender)
         .await
         .is_err()
     {
