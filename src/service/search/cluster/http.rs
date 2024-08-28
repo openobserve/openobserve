@@ -223,6 +223,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     );
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
     result.set_idx_took(idx_took);
+    result.set_original_cond(id_timestamps);
 
     if query_type == "table" {
         result.response_type = "table".to_string();
