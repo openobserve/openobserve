@@ -461,6 +461,7 @@ export default {
 
   &.expanded {
     height: 300px !important;
+    max-width: 1024px !important;
   }
 }
 </style>

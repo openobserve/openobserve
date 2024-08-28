@@ -229,7 +229,9 @@
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
                 : 'w-border-gray-100 hover:tw-bg-zinc-100',
-              columnOrder.includes('source') && !wrap
+              columnOrder.includes('source') &&
+              !wrap &&
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
                 : 'tw-flex',
             ]"
