@@ -173,53 +173,16 @@ self.addEventListener("fetch", function (event) {
                   console.error("Cache open failed:", error);
                 });
             }
-            var responseToCache = response.clone();
-            caches
-              .open(cacheVersion)
-              .then(function (cache) {
-                cache
-                  .put(event.request, responseToCache)
-                  .catch(function (error) {
-                    console.error("Cache put failed:", error);
-                  });
-                });
-                return response;
-              }
-              if (event.request.method === 'POST') {
-                // Do not cache POST requests
-                event.respondWith(
-                  fetch(event.request).catch(function(error) {
-                    throw error;
-                  })
-                );
-                return;
-              }
-              var responseToCache = response.clone();
-              caches
-                .open(cacheVersion)
-                .then(function (cache) {
-                  cache
-                    .put(event.request, responseToCache)
-                    .catch(function (error) {
-                      console.error("Cache put failed:", error);
-                    });
-                })
-                .catch(function (error) {
-                  console.error("Cache open failed:", error);
-                });
-              return response;
-            })
-            .catch(function (error) {
-              console.error("Fetch failed:", error);
-              throw error;
-            });
-        })
-        .catch(function (error) {
-          console.error("Caches match failed:", error);
-          throw error;
-        }),
-      );
-    })(),
+          })
+          .catch(function (error) {
+            console.error("Fetch failed:", error);
+            throw error;
+          });
+      })
+      .catch(function (error) {
+        console.error("Caches match failed:", error);
+        throw error;
+      }),
   );
 });
 
