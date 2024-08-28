@@ -2351,7 +2351,9 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
-      if (searchObj.data.isOperationCancelled) {
+      if (searchObj.data.isOperationCancelled && searchObj.data.histogram?.xData?.length == 0) {
+
+
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
