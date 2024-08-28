@@ -408,15 +408,24 @@ pub async fn write_file(
         in_trace_id = s[1];
     }
     let mut req_stats = RequestStats::default();
+
     log::info!("[{in_trace_id}] buf len: {}", buf.len());
     let start = std::time::Instant::now();
-    let _wal_lock = ingester::INGESTER_LOCK.lock();
+    let wal = writer.wal_lock();
+    let wal = &mut *wal.lock().await;
     let wal_lock_time = start.elapsed().as_millis() as f64;
     log::info!("[{in_trace_id}] wal lock done: {wal_lock_time}",);
     metrics::INGEST_WAL_LOCK_TIME
         .with_label_values(&[&writer.key_org_id()])
         .observe(wal_lock_time);
 
+    let mem = writer.memtable_lock();
+    let mem = &mut *mem.write().await;
+    let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
+    log::info!("[{in_trace_id}] mem lock done: {mem_lock_time}",);
+    metrics::INGEST_MEMTABLE_LOCK_TIME
+        .with_label_values(&[&writer.key_org_id()])
+        .observe(mem_lock_time);
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
@@ -434,6 +443,8 @@ pub async fn write_file(
                 },
                 false,
                 in_trace_id,
+                wal,
+                mem,
             )
             .await
         {
