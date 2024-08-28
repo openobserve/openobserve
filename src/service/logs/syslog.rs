@@ -37,8 +37,8 @@ use crate::{
             functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
             ingestion::{
-                IngestionResponse, IngestionStatus, StreamStatus, ORIGINAL_DATA_COL_NAME,
-                RECORD_ID_COL_NAME,
+                IngestionResponse, IngestionStatus, StreamStatus, ID_COL_NAME,
+                ORIGINAL_DATA_COL_NAME,
             },
             stream::StreamParams,
             syslog::SyslogRoute,
@@ -241,7 +241,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             &StreamType::Logs,
         );
         local_val.insert(
-            RECORD_ID_COL_NAME.to_string(),
+            ID_COL_NAME.to_string(),
             json::Value::Number(record_id.into()),
         );
     }
