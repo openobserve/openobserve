@@ -1986,10 +1986,18 @@ export default defineComponent({
                 extractedObj.data.stream.selectedFields;
             }
 
-            searchObj.data.resultGrid[searchObj.data.stream.selectedStream] =
-              extractedObj.data.resultGrid[
+            if (
+              extractedObj.data.resultGrid.colSizes &&
+              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ){
+              searchObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream] =
+              extractedObj.data.resultGrid.colSizes[
                 searchObj.data.stream.selectedStream
               ];
+            }
+            
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
