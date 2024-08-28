@@ -374,6 +374,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-query_values-show_multiple_values"
             />
           </div>
+          <!-- default value for multi select variables -->
+           <!-- it can be first value or all values -->
+          <div
+            v-if="
+              variableData.multiSelect &&
+              ['custom', 'query_values'].includes(variableData.type)
+            "
+          >
+            <div class="button-group multi-select-default-value-toggle">
+              <div class="row">
+                <div style="align-self: center; padding-right: 4px">
+                  Default Value:
+                </div>
+                <div>
+                  <button
+                    data-test="dashboard-multi-select-default-value-toggle-first-value"
+                    :class="
+                      variableData?.selectAllValueForMultiSelect === true
+                        ? ''
+                        : 'selected'
+                    "
+                    class="button button-left"
+                    type="button"
+                    @click="variableData.selectAllValueForMultiSelect = false"
+                  >
+                    First value
+                  </button>
+                </div>
+                <div>
+                  <button
+                    data-test="dashboard-multi-select-default-value-toggle-all-values"
+                    :class="
+                      variableData?.selectAllValueForMultiSelect === true
+                        ? 'selected'
+                        : ''
+                    "
+                    type="button"
+                    class="button button-right"
+                    @click="variableData.selectAllValueForMultiSelect = true"
+                  >
+                    All values
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           <!-- hide on dashboard toggle -->
           <div>
             <q-toggle
@@ -499,6 +545,7 @@ export default defineComponent({
       options: [],
       multiSelect: false,
       hideOnDashboard: false,
+      selectAllValueForMultiSelect: false,
     });
 
     const filterCycleError: any = ref("");
@@ -521,6 +568,11 @@ export default defineComponent({
     // by default, use hideOnDashboard as false
     if (!variableData.hideOnDashboard) {
       variableData.hideOnDashboard = false;
+    }
+
+    // by default, use selectAllValueForMultiSelect as false
+    if (!variableData.selectAllValueForMultiSelect) {
+      variableData.selectAllValueForMultiSelect = false;
     }
 
     const filterUpdated = (index: number, filter: any) => {
@@ -901,5 +953,37 @@ export default defineComponent({
 
 .theme-light .bg-highlight {
   background-color: #e7e6e6;
+}
+
+.multi-select-default-value-toggle {
+  .button-group {
+    border: 1px solid gray !important;
+    border-radius: 9px;
+  }
+
+  .button {
+    display: block;
+    cursor: pointer;
+    background-color: #f0eaea;
+    border: none;
+    font-size: 12px;
+    padding: 6px 4px;
+  }
+
+  .button-left {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    color: black;
+  }
+
+  .button-right {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    color: black;
+  }
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
+  }
 }
 </style>

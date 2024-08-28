@@ -304,6 +304,8 @@ pub struct VariableList {
     pub multi_select: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hide_on_dashboard: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub select_all_value_for_multi_select: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
