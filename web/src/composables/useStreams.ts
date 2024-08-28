@@ -416,8 +416,8 @@ const useStreams = () => {
       return objA === objB;
     }
 
-    const keysA = Object.keys(objA);
-    const keysB = Object.keys(objB);
+    const keysA = Object.keys(objA).filter((key) => key !== "disabled");
+    const keysB = Object.keys(objB).filter((key) => key !== "disabled");
 
     if (keysA.length !== keysB.length) return false;
 
