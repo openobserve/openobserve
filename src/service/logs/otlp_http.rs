@@ -38,7 +38,7 @@ use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
         http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionStatus, StreamStatus, ORIGINAL_DATA_COL_NAME, RECORD_ID_COL_NAME},
+        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_JSON,
@@ -421,7 +421,7 @@ pub async fn logs_json_handler(
                         &StreamType::Logs,
                     );
                     local_val.insert(
-                        RECORD_ID_COL_NAME.to_string(),
+                        ID_COL_NAME.to_string(),
                         json::Value::Number(record_id.into()),
                     );
                 }
