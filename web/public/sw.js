@@ -149,14 +149,29 @@ self.addEventListener("fetch", function (event) {
               });
               return response;
             }
-            if (event.request.method === "POST") {
-              // Do not cache POST requests
-              event.respondWith(
-                fetch(event.request).catch(function (error) {
-                  throw error;
-                }),
-              );
-              return;
+            // if (event.request.method === "POST") {
+            //   // Do not cache POST requests
+            //   event.respondWith(
+            //     fetch(event.request).catch(function (error) {
+            //       throw error;
+            //     }),
+            //   );
+            //   return;
+            // }
+            if (event.request.url.endsWith(".js")) {
+              var responseToCache = response.clone();
+              caches
+                .open(cacheVersion)
+                .then(function (cache) {
+                  cache
+                    .put(event.request, responseToCache)
+                    .catch(function (error) {
+                      console.error("Cache put failed:", error);
+                    });
+                })
+                .catch(function (error) {
+                  console.error("Cache open failed:", error);
+                });
             }
             var responseToCache = response.clone();
             caches
