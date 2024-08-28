@@ -173,6 +173,20 @@ pub async fn search(
         )));
     }
 
+    if tables.is_empty() {
+        return Ok(cluster_rpc::SearchResponse {
+            job: req.job.clone(),
+            took: start.elapsed().as_millis() as i32,
+            idx_took: 0,
+            from: sql.meta.offset as i32,
+            size: sql.meta.limit as i32,
+            total: 0,
+            hits: vec![],
+            scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
+            is_partial: false,
+        });
+    }
+
     let ret = tokio::select! {
         ret = exec::sql(&session, &sql, tables) => {
             match ret {

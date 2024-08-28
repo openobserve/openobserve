@@ -22,7 +22,7 @@ use datafusion::{
     common::Result,
     datasource::TableProvider,
     logical_expr::{Expr, TableProviderFilterPushDown, TableType},
-    physical_plan::{union::UnionExec, ExecutionPlan},
+    physical_plan::{empty::EmptyExec, union::UnionExec, ExecutionPlan},
 };
 
 pub(crate) struct NewUnionTable {
@@ -58,6 +58,12 @@ impl TableProvider for NewUnionTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        if self.tables.is_empty() {
+            return Ok(Arc::new(EmptyExec::new(self.schema())));
+        }
+        if self.tables.len() == 1 {
+            return self.tables[0].scan(state, projection, filters, limit).await;
+        }
         let mut table_plans = Vec::new();
         for table in self.tables.iter() {
             let plan = table.scan(state, projection, filters, limit).await?;
