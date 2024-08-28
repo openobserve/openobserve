@@ -188,7 +188,6 @@ impl Sql {
             meta.time_range = Some(req_time_range); // update meta
         };
 
-        let mut rewrite_time_range_sql = origin_sql.clone();
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -209,6 +208,7 @@ impl Sql {
                 && meta_time_range_is_empty
                 && req_query.size > QUERY_WITH_NO_LIMIT
             {
+                let mut rewrite_time_range_sql = origin_sql.clone();
                 match pickup_where(&rewrite_time_range_sql, Some(meta.clone()))? {
                     Some(where_str) => {
                         let pos_start = rewrite_time_range_sql.find(where_str.as_str()).unwrap();
@@ -226,11 +226,11 @@ impl Sql {
                             .replace(" FROM tbl", &format!(" FROM tbl WHERE {time_range_sql}"));
                     }
                 };
+                origin_sql = rewrite_time_range_sql;
             }
         }
 
         // Hack offset limit and sort by for sql
-        origin_sql = rewrite_time_range_sql;
         if meta.limit == 0 && req_query.size > QUERY_WITH_NO_LIMIT {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
@@ -294,7 +294,7 @@ impl Sql {
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(ID_COL_NAME) {
                 origin_sql =
-                    origin_sql.replacen(cap_str, &format!("{}, {}", ID_COL_NAME, cap_str), 1);
+                    origin_sql.replacen(cap_str, &format!("{}, {}", cap_str, ID_COL_NAME), 1);
             }
         }
 
