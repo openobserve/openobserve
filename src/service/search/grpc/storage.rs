@@ -33,11 +33,7 @@ use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{
-        datafusion::exec,
-        generate_search_schema, generate_select_start_search_schema,
-        sql::{Sql, RE_SELECT_WILDCARD},
-    },
+    search::{datafusion::exec, generate_search_schema_diff, sql::Sql},
 };
 
 type CachedFiles = (usize, usize);
@@ -53,9 +49,7 @@ pub async fn search(
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
-    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    let schema = sql.schema.clone();
     // fetch all schema versions, group files by version
     let schema_versions = match infra::schema::get_versions(
         &sql.org_id,
@@ -86,10 +80,9 @@ pub async fn search(
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let files = match file_list.is_empty() {
@@ -210,11 +203,15 @@ pub async fn search(
     };
 
     // construct latest schema map
+    let schema_latest = Arc::new(
+        schema
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     let mut tables = Vec::new();
     for (ver, files) in files_group {
@@ -236,21 +233,15 @@ pub async fn search(
             target_partitions,
         };
 
-        // cacluate the diff between latest schema and group schema
-        let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(
-                &sql,
-                schema.as_ref(),
-                &schema_latest_map,
-                &defined_schema_fields,
-            )?
-        } else {
-            generate_search_schema(&sql, schema.as_ref(), &schema_latest_map)?
-        };
-
-        let table =
-            exec::create_parquet_table(&session, schema, &files, diff_fields, &sql.meta.order_by)
-                .await?;
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let table = exec::create_parquet_table(
+            &session,
+            schema_latest.clone(),
+            &files,
+            diff_fields,
+            &sql.meta.order_by,
+        )
+        .await?;
         tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 

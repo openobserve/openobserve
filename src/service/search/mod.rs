@@ -896,6 +896,25 @@ fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {
     used_fields.into_iter().collect()
 }
 
+// generate parquet file search schema
+fn generate_search_schema_diff(
+    schema: &Schema,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+) -> Result<HashMap<String, DataType>, Error> {
+    // cacluate the diff between latest schema and group schema
+    let mut diff_fields = HashMap::new();
+
+    for field in schema.fields().iter() {
+        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+            if field.data_type() != latest_field.data_type() {
+                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
+            }
+        }
+    }
+
+    Ok(diff_fields)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

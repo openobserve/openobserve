@@ -42,8 +42,8 @@ use crate::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_search_schema, generate_select_start_search_schema,
-            sql::{Sql, RE_SELECT_WILDCARD},
+            generate_search_schema_diff,
+            sql::Sql,
         },
     },
 };
@@ -56,20 +56,10 @@ pub async fn search_parquet(
     stream_type: StreamType,
     work_group: &str,
 ) -> super::SearchTable {
-    let schema_latest = match infra::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
-            log::error!("[trace_id {trace_id}] get schema error: {}", err);
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                sql.stream_name.clone(),
-            )));
-        }
-    };
-
-    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let schema = sql.schema.clone();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let files = get_file_list(
@@ -231,12 +221,15 @@ pub async fn search_parquet(
     }
 
     // construct latest schema map
+    let schema_latest = Arc::new(
+        schema
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-
     let mut tables = Vec::new();
     for (ver, files) in files_group {
         if files.is_empty() {
@@ -258,22 +251,15 @@ pub async fn search_parquet(
             work_group: Some(work_group.to_string()),
             target_partitions: 0,
         };
-
-        // cacluate the diff between latest schema and group schema
-        let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(
-                &sql,
-                schema.as_ref(),
-                &schema_latest_map,
-                &defined_schema_fields,
-            )?
-        } else {
-            generate_search_schema(&sql, schema.as_ref(), &schema_latest_map)?
-        };
-
-        let table =
-            exec::create_parquet_table(&session, schema, &files, diff_fields, &sql.meta.order_by)
-                .await?;
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let table = exec::create_parquet_table(
+            &session,
+            schema_latest.clone(),
+            &files,
+            diff_fields,
+            &sql.meta.order_by,
+        )
+        .await?;
         tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
@@ -290,12 +276,7 @@ pub async fn search_memtable(
     sql: Arc<Sql>,
     stream_type: StreamType,
 ) -> super::SearchTable {
-    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-        .await
-        .unwrap_or(Schema::empty());
-    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
-    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
-
+    let schema = sql.schema.clone();
     let mut scan_stats = ScanStats::new();
 
     let mut batches = ingester::read_from_memtable(
@@ -345,19 +326,16 @@ pub async fn search_memtable(
         super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
     }
 
-    // fetch all schema versions, get latest schema
+    // construct latest schema map
     let schema_latest = Arc::new(
-        schema_latest
-            .to_owned()
+        schema
+            .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-
-    // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     // only sort by timestamp desc
     let sort_by_timestamp_desc = sql.meta.order_by.len() == 1
@@ -369,26 +347,14 @@ pub async fn search_memtable(
         if record_batches.is_empty() {
             continue;
         }
-        let sql = sql.clone();
-
-        // cacluate the diff between latest schema and group schema
-        let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(
-                &sql,
-                schema.as_ref(),
-                &schema_latest_map,
-                &defined_schema_fields,
-            )?
-        } else {
-            generate_search_schema(&sql, schema.as_ref(), &schema_latest_map)?
-        };
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
 
         for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(&schema, batch);
+            *batch = adapt_batch(&schema_latest, batch);
         }
 
         let table = Arc::new(NewMemTable::try_new(
-            schema,
+            schema_latest.clone(),
             vec![record_batches],
             diff_fields,
             sort_by_timestamp_desc,
