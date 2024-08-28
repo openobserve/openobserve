@@ -230,7 +230,13 @@ export default defineComponent({
       ">",
       "<",
       "IN",
+      "str_match",
+      "str_match_ignore_case",
       "match_all",
+      "match_all_raw",
+      "match_all_raw_ignore_case",
+      "re_match",
+      "re_not_match",
       "Contains",
       "Not Contains",
       "Is Null",
@@ -242,6 +248,46 @@ export default defineComponent({
     const computedLabel = (condition: any) => {
       if (condition.operator === "match_all") {
         return condition.operator + "(" + condition.value + ")";
+      } else if (condition.operator === "match_all_raw") {
+        return condition.operator + "(" + condition.value + ")";
+      } else if (condition.operator === "match_all_raw_ignore_case") {
+        return condition.operator + "(" + condition.value + ")";
+      } else if (condition.operator === "str_match") {
+        return (
+          condition.operator +
+          "(" +
+          condition.column +
+          ", " +
+          condition.value +
+          ")"
+        );
+      } else if (condition.operator === "str_match_ignore_case") {
+        return (
+          condition.operator +
+          "(" +
+          condition.column +
+          ", " +
+          condition.value +
+          ")"
+        );
+      } else if (condition.operator === "re_match") {
+        return (
+          condition.operator +
+          "(" +
+          condition.column +
+          ", " +
+          condition.value +
+          ")"
+        );
+      } else if (condition.operator === "re_not_match") {
+        return (
+          condition.operator +
+          "(" +
+          condition.column +
+          ", " +
+          condition.value +
+          ")"
+        );
       } else {
         return props.condition.column;
       }

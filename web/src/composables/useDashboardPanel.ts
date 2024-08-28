@@ -1763,6 +1763,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           selectFilter += `${condition.column} IN (${formatINValue(condition.value)})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value)})`;
+        } else if (condition.operator === "match_all_raw") {
+          selectFilter += `match_all_raw(${formatValue(condition.value)})`;
+        } else if (condition.operator === "match_all_raw_ignore_case") {
+          selectFilter += `match_all_raw_ignore_case(${formatValue(condition.value)})`;
+        } else if (condition.operator === "str_match") {
+          selectFilter += `str_match(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.operator === "str_match_ignore_case") {
+          selectFilter += `str_match_ignore_case(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.operator === "re_match") {
+          selectFilter += `re_match(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.operator === "re_not_match") {
+          selectFilter += `re_not_match(${condition.column}, ${formatValue(condition.value)})`;
         } else if (condition.value != null && condition.value !== "") {
           selectFilter += `${condition.column} `;
           switch (condition.operator) {
@@ -2642,7 +2654,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           }
         });
       }
-
 
       if (
         dashboardPanelData.data.queries[
