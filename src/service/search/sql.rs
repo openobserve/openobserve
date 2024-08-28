@@ -40,7 +40,10 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
-use crate::{common::meta::stream::StreamParams, service::search::match_source};
+use crate::{
+    common::meta::{ingestion::ID_COL_NAME, stream::StreamParams},
+    service::search::match_source,
+};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -282,6 +285,19 @@ impl Sql {
         };
         let schema_fields = schema.fields().to_vec();
         let stream_settings = infra::schema::unwrap_stream_settings(&schema);
+
+        // modification if _original unflattened data is required by stream_setting and is log
+        // search
+        if stream_settings.as_ref().map_or(false, |settings| {
+            settings.store_original_data && stream_type == StreamType::Logs
+        }) {
+            let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+            let cap_str = caps.get(1).unwrap().as_str();
+            if !cap_str.contains(ID_COL_NAME) {
+                origin_sql =
+                    origin_sql.replacen(cap_str, &format!("{}, {}", ID_COL_NAME, cap_str), 1);
+            }
+        }
 
         // fetch inverted index fields
         let mut fts_terms = HashSet::new();

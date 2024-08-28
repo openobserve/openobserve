@@ -37,7 +37,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{IngestionStatus, StreamStatus, ORIGINAL_DATA_COL_NAME, RECORD_ID_COL_NAME},
+        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_PROTO,
@@ -304,7 +304,7 @@ pub async fn handle_grpc_request(
                         &StreamType::Logs,
                     );
                     local_val.insert(
-                        RECORD_ID_COL_NAME.to_string(),
+                        ID_COL_NAME.to_string(),
                         json::Value::Number(record_id.into()),
                     );
                 }

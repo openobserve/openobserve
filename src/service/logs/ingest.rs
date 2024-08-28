@@ -39,7 +39,7 @@ use crate::{
         ingestion::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
             IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
-            StreamStatus, ORIGINAL_DATA_COL_NAME, RECORD_ID_COL_NAME,
+            StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
         },
         stream::StreamParams,
     },
@@ -294,7 +294,7 @@ pub async fn ingest(
                 &StreamType::Logs,
             );
             local_val.insert(
-                RECORD_ID_COL_NAME.to_string(),
+                ID_COL_NAME.to_string(),
                 json::Value::Number(record_id.into()),
             );
         }
@@ -660,7 +660,7 @@ fn deserialize_aws_record_from_str(data: &str, request_id: &str) -> Result<Vec<j
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_and_decompress, deserialize_aws_record_from_str, json};
+    use super::{decode_and_decompress, deserialize_aws_record_from_str};
 
     #[test]
     fn test_decode_and_decompress_success() {
