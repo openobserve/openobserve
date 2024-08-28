@@ -134,9 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="searchTableRef"
         :columns="searchObj.data.resultGrid.columns"
         :rows="searchObj.data.queryResults.hits"
-        :wrap="
-          searchObj.meta.toggleSourceWrap && searchObj.meta.flagWrapContent
-        "
+        :wrap="searchObj.meta.toggleSourceWrap"
         :width="getTableWidth"
         :err-msg="searchObj.data.missingStreamMessage"
         :loading="searchObj.loading"

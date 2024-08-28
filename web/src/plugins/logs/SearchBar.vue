@@ -288,7 +288,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
-          v-if="searchObj.meta.flagWrapContent"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
           :title="t('search.messageWrapContent')"
@@ -2002,13 +2001,14 @@ export default defineComponent({
               extractedObj.data.resultGrid.colSizes.hasOwnProperty(
                 searchObj.data.stream.selectedStream,
               )
-            ){
-              searchObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream] =
-              extractedObj.data.resultGrid.colSizes[
+            ) {
+              searchObj.data.resultGrid.colSizes[
                 searchObj.data.stream.selectedStream
-              ];
+              ] =
+                extractedObj.data.resultGrid.colSizes[
+                  searchObj.data.stream.selectedStream
+                ];
             }
-            
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
