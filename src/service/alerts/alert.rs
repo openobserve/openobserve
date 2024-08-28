@@ -127,7 +127,8 @@ pub async fn save(
                 if !vrl.is_empty() && !vrl.ends_with('.') {
                     let vrl = base64::encode_url(&format!("{vrl} \n ."));
                     alert.query_condition.vrl_function = Some(vrl);
-                } else if vrl.is_empty() {
+                } else if vrl.is_empty() || vrl.eq(".") {
+                    // In case the vrl contains only ".", no need to save it
                     alert.query_condition.vrl_function = None;
                 }
             }
