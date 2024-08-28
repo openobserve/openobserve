@@ -254,6 +254,8 @@ export const usePanelDataLoader = (
 
       log("loadData: now waiting for the panel to become visible");
 
+      state.lastTriggeredAt = new Date().getTime();
+
       // Wait for isVisible to become true
       await waitForThePanelToBecomeVisible(abortController.signal);
 
@@ -282,7 +284,6 @@ export const usePanelDataLoader = (
       }
 
       state.loading = true;
-      state.lastTriggeredAt = new Date().getTime();
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {

@@ -178,12 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
         :folderId="route.query.folder"
-        :currentTimeObj="currentTimeObj"
+        :currentTimeObj="currentTimeObjPerPanel"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
+        @refreshPanelRequest="refreshPanelRequest"
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
@@ -467,6 +468,13 @@ export default defineComponent({
           end_time: new Date(date.endTime),
         };
 
+        currentTimeObjPerPanel.value = {
+          __global: {
+            start_time: new Date(date.startTime),
+            end_time: new Date(date.endTime),
+          }
+        }
+
         setTimeString();
       }
     });
@@ -709,6 +717,26 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
+    const currentTimeObjPerPanel = ref({})
+
+    const refreshPanelRequest = (panelId) => {
+      // when the date changes from the picker, update the current time object for the dashboard
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+
+        currentTimeObjPerPanel.value = {
+          ...currentTimeObjPerPanel.value,
+          [panelId]: {
+            start_time: new Date(date.startTime),
+            end_time: new Date(date.endTime),
+          },
+        }
+
+        setTimeString();
+      }
+
+    }
+
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -724,6 +752,7 @@ export default defineComponent({
       dateTimePicker,
       selectedDate,
       currentTimeObj,
+      currentTimeObjPerPanel,
       refreshInterval,
       // ----------------
       refreshData,
@@ -733,6 +762,7 @@ export default defineComponent({
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,
+      refreshPanelRequest,
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,

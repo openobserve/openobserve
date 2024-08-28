@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }} 
-          <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-            <span class="lastRefreshedAtIcon">🕑</span><RelativeTime :timestamp="lastTriggeredAt" fullTimePrefix="Last Refreshed At: "/></span>
         </div>
         <q-space />
+        <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+            <span class="lastRefreshedAtIcon">🕑</span><RelativeTime :timestamp="lastTriggeredAt" fullTimePrefix="Last Refreshed At: "/>
+        </span>
         <q-icon
           v-if="
             !viewOnly && isCurrentlyHoveredPanel && props.data.description != ''
@@ -111,6 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
+        <q-btn
+          icon="refresh"
+          flat
+          size="sm"
+          padding="1px"
+          @click="onRefreshPanel"
+          title="Refresh Panel"
+          data-test="dashboard-panel-refresh-panel-btn"
+        />
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           dense
@@ -254,6 +264,7 @@ export default defineComponent({
     "onViewPanel",
     "updated:data-zoom",
     "onMovePanel",
+    "refreshPanelRequest",
     "refresh",
     "update:initial-variable-values",
   ],
@@ -416,6 +427,10 @@ export default defineComponent({
       emit("onMovePanel", props.data.id, selectedTabId);
     };
 
+    const onRefreshPanel = () => {
+      emit("refreshPanelRequest", props.data.id);
+    }
+
     return {
       props,
       onEditPanel,
@@ -437,6 +452,7 @@ export default defineComponent({
       PanleSchemaRendererRef,
       confirmMovePanelDialog,
       movePanelDialog,
+      onRefreshPanel
     };
   },
   methods: {
@@ -478,15 +494,16 @@ export default defineComponent({
   margin-left: 5px;
 
   &::after {
-    content: ")";
+    content: "";
   }
 
   &::before {
-    content: "(";
+    content: "";
   }
 
   & .lastRefreshedAtIcon {
     font-size: smaller;
+    margin-right: 2px;
   }
 }
 </style>

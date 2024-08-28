@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="currentTimeObj"
+      :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="item"
               :dashboardId="dashboardData.dashboardId"
               :folderId="folderId"
-              :selectedTimeDate="currentTimeObj"
+              :selectedTimeDate="currentTimeObj[item.id] || currentTimeObj['__global']"
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchType="searchType"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
+              @refreshPanelRequest="refreshPanelRequest"
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
             >
@@ -160,6 +161,7 @@ export default defineComponent({
     "onViewPanel",
     "variablesData",
     "updated:data-zoom",
+    "refreshPanelRequest",
     "refresh",
     "onMovePanel",
   ],
@@ -453,6 +455,10 @@ export default defineComponent({
       );
     };
 
+    const refreshPanelRequest = (panelId) => {
+      emit("refreshPanelRequest", panelId);
+    };
+
     return {
       store,
       addPanelData,
@@ -473,6 +479,7 @@ export default defineComponent({
       panels,
       refreshDashboard,
       onMovePanel,
+      refreshPanelRequest,
       variablesValueSelectorRef,
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
