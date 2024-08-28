@@ -247,21 +247,34 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
-      //@ts-ignore
-      this.searchObj.data.resultGrid[
+      this.searchObj.data.resultGrid.colSizes[
         this.searchObj.data.stream.selectedStream
       ] = [newColSizes];
     },
     handleColumnOrderUpdate(newColOrder: any) {
-      if (this.searchObj.data.stream?.selectedStream.length === 1) {
+
+
+      if (this.searchObj.data.stream?.selectedStream.length === 1 && newColOrder[0] === "@timestamp") {
         const colOrderToStore = newColOrder.slice(1);
-        this.searchObj.data.resultGrid.colOrder[
+        if(!(colOrderToStore[0] === "source")){
+          this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
         ] = [colOrderToStore];
+        }
+        
       } else {
-        this.searchObj.data.resultGrid.colOrder[
+        if(newColOrder[0] === "@timestamp"){
+          const colOrderToStore = newColOrder.slice(1);
+          this.searchObj.data.resultGrid.colOrder[
+          this.searchObj.data.stream.selectedStream
+        ] = [colOrderToStore];
+        }
+        else{
+          this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
         ] = [newColOrder];
+        }
+       
       }
     },
 
