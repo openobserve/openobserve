@@ -1168,12 +1168,20 @@ export default defineComponent({
       data.forEach((item) => {
         if (item.expr && item.expr.column) {
           columnNames.push(item.expr.column);
-        } else if (item.expr && item.expr.args && item.expr.args.expr) {
+        } 
+        else if (item.expr && item.expr.args && item.expr.args.expr) {
           if (item.expr.args.expr.column) {
             columnNames.push(item.expr.args.expr.column);
           } else if (item.expr.args.expr.value) {
             columnNames.push(item.expr.args.expr.value);
           }
+        }
+        else if(item.expr && item.expr.name && item.expr.type ==="function"){
+          item.expr.args.value.map((val) => {
+            if (val.type === "column_ref") {
+              columnNames.push(val.column);
+            }
+          })
         }
       });
       return columnNames;
@@ -1239,6 +1247,7 @@ export default defineComponent({
                 }
               }
               useLocalInterestingFields(localFields);
+
             }
           }
 
@@ -1986,10 +1995,18 @@ export default defineComponent({
                 extractedObj.data.stream.selectedFields;
             }
 
-            searchObj.data.resultGrid[searchObj.data.stream.selectedStream] =
-              extractedObj.data.resultGrid[
+            if (
+              extractedObj.data.resultGrid.colSizes &&
+              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ){
+              searchObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream] =
+              extractedObj.data.resultGrid.colSizes[
                 searchObj.data.stream.selectedStream
               ];
+            }
+            
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
@@ -2303,9 +2320,7 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-          ",",
-        )}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream}"`;
         if (
           searchObj.data.stream.interestingFieldList.length > 0 &&
           searchObj.meta.quickMode
