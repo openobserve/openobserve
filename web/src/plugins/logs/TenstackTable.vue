@@ -473,6 +473,7 @@ const table = useVueTable({
     },
   },
   onSortingChange: setSorting,
+  enableSorting: false,
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   defaultColumn: {
