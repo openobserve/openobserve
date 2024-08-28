@@ -375,7 +375,6 @@ export default defineComponent({
       updatedLocalLogFilterField,
       searchAroundData,
       extractFTSFields,
-      evaluateWrapContentFlag,
       refreshPartitionPagination,
       filterHitsColumns,
     } = useLogs();
@@ -468,7 +467,6 @@ export default defineComponent({
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
-      evaluateWrapContentFlag();
       filterHitsColumns();
     }
 
@@ -549,7 +547,6 @@ export default defineComponent({
       getWidth,
       copyLogToClipboard,
       extractFTSFields,
-      evaluateWrapContentFlag,
       useLocalWrapContent,
       noOfRecordsTitle,
       scrollPosition,
@@ -582,7 +579,6 @@ export default defineComponent({
     },
     findFTSFields() {
       this.extractFTSFields();
-      this.evaluateWrapContentFlag();
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
