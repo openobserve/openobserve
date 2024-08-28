@@ -292,7 +292,7 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
-      // we need that toolbox datazoom button initally selected
+      // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
         key: "dataZoomSelect",
@@ -374,7 +374,7 @@ export default defineComponent({
       window.removeEventListener("resize", windowResizeEventCallback);
       window.addEventListener("resize", windowResizeEventCallback);
 
-      // we need that toolbox datazoom button initally selected
+      // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
         key: "dataZoomSelect",
@@ -545,7 +545,7 @@ export default defineComponent({
     onActivated(() => {
       windowResizeEventCallback();
 
-      // we need that toolbox datazoom button initally selected
+      // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
         key: "dataZoomSelect",
@@ -563,7 +563,7 @@ export default defineComponent({
             chart?.setOption(props?.data?.options || {}, true);
           } catch (error) {}
 
-          // we need that toolbox datazoom button initally selected
+          // we need that toolbox datazoom button initially selected
           // for that we required to dispatch an event
           // while dispatching an event we need to pass a datazoomselectactive as true
           // this action is available in the echarts docs in list of brush actions
