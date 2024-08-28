@@ -1739,6 +1739,11 @@ export default defineComponent({
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
 
+            // Add colOrder to searchObj if saved view don't have colOrder property in resultGrid
+            if (!extractedObj.data.resultGrid.hasOwnProperty("colOrder")) {
+              searchObj.data.resultGrid.colOrder = [];
+            }
+
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
@@ -1976,20 +1981,17 @@ export default defineComponent({
                 console.log(e);
               }
             }, 1000);
+
             if (
               extractedObj.data.resultGrid.colOrder &&
               extractedObj.data.resultGrid.colOrder.hasOwnProperty(
                 searchObj.data.stream.selectedStream,
               )
             ) {
-              const colOrderObject =
+              searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
                 ];
-
-              const colOrderArray = Object.values(colOrderObject);
-
-              searchObj.data.stream.selectedFields = colOrderArray[0];
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
@@ -2137,6 +2139,7 @@ export default defineComponent({
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
+
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {

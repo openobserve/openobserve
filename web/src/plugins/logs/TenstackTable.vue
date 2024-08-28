@@ -142,10 +142,9 @@
             :colspan="columnOrder.length"
             class="text-bold"
             :style="{
-                          background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
-                          opacity: 0.7
-            } "
-
+              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+              opacity: 0.7,
+            }"
           >
             <div
               class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
@@ -447,6 +446,13 @@ watch(
   },
 );
 
+watch(
+  () => columnOrder.value,
+  () => {
+    emits("update:columnOrder", columnOrder.value, props.columns);
+  },
+);
+
 const table = useVueTable({
   get data() {
     return tableRows.value || [];
@@ -459,7 +465,6 @@ const table = useVueTable({
       return sorting.value;
     },
     get columnOrder() {
-      emits("update:columnOrder", columnOrder.value);
       return columnOrder.value;
     },
   },
@@ -561,7 +566,9 @@ const closeColumn = (data: any) => {
 };
 
 const handleDragStart = (event: any) => {
-  if (columnOrder.value[event.oldIndex] === "@timestamp") {
+  if (
+    columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column
+  ) {
     isResizingHeader.value = true;
   } else {
     isResizingHeader.value = false;
@@ -570,8 +577,8 @@ const handleDragStart = (event: any) => {
 
 const handleDragEnd = async (event: any) => {
   if (
-    columnOrder.value.includes("@timestamp") &&
-    columnOrder.value[0] !== "@timestamp"
+    columnOrder.value.includes(store.state.zoConfig.timestamp_column) &&
+    columnOrder.value[0] !== store.state.zoConfig.timestamp_column
   ) {
     await nextTick();
     const newItem = columnOrder.value[event.newIndex];
