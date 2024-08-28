@@ -552,6 +552,8 @@ pub struct Common {
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
     pub ui_sql_base64_enabled: bool,
+    #[env_config(name = "ZO_UI_UNFLATTEN_DATA_ENABLED", default = false)]
+    pub ui_unflatten_data_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]

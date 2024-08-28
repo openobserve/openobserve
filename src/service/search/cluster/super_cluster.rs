@@ -241,6 +241,7 @@ pub async fn search(
             as f64
             / scan_stats.querier_files as f64) as usize,
     );
+    result.set_original_cond(id_timestamps);
 
     if query_type == "table" {
         result.response_type = "table".to_string();
