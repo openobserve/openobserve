@@ -27,7 +27,10 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
 };
-use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
+use datafusion::{
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
+    catalog::TableProvider,
+};
 use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
@@ -55,7 +58,7 @@ pub async fn search_parquet(
     sql: Arc<Sql>,
     stream_type: StreamType,
     work_group: &str,
-) -> super::SearchTable {
+) -> Result<(Vec<Arc<dyn TableProvider>>, ScanStats, Vec<String>), Error> {
     let schema = sql.schema.clone();
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
@@ -71,7 +74,7 @@ pub async fn search_parquet(
     )
     .await?;
     if files.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), vec![]));
     }
 
     let mut scan_stats = ScanStats::new();
@@ -132,7 +135,7 @@ pub async fn search_parquet(
     if scan_stats.files == 0 {
         // release all files
         wal::release_files(&lock_files).await;
-        return Ok((vec![], scan_stats));
+        return Ok((vec![], scan_stats, vec![]));
     }
 
     // fetch all schema versions, group files by version
@@ -153,7 +156,7 @@ pub async fn search_parquet(
         }
     };
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), vec![]));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -252,21 +255,29 @@ pub async fn search_parquet(
             target_partitions: 0,
         };
         let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
-        let table = exec::create_parquet_table(
+        let table = match exec::create_parquet_table(
             &session,
             schema_latest.clone(),
             &files,
             diff_fields,
             &sql.meta.order_by,
         )
-        .await?;
+        .await
+        {
+            Ok(table) => table,
+            Err(err) => {
+                // release all files
+                wal::release_files(&lock_files).await;
+                log::error!("[trace_id {trace_id}] create parquet table error: {}", err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    "create parquet table error".to_string(),
+                )));
+            }
+        };
         tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
-    // TODO: release all files
-    wal::release_files(&lock_files).await;
-
-    Ok((tables, scan_stats))
+    Ok((tables, scan_stats, lock_files))
 }
 
 /// search in local WAL, which haven't been sync to object storage

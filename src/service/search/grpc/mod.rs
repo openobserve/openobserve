@@ -118,9 +118,11 @@ pub async fn search(
 
     // search in WAL parquet
     let skip_wal = req.query.as_ref().unwrap().skip_wal;
+    let wal_lock_files;
     if LOCAL_NODE.is_ingester() && !skip_wal {
-        let (tbls, stats) =
+        let (tbls, stats, lock_files) =
             wal::search_parquet(&trace_id, sql.clone(), stream_type, &work_group).await?;
+        wal_lock_files = lock_files;
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
