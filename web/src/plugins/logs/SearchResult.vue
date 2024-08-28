@@ -251,31 +251,32 @@ export default defineComponent({
         this.searchObj.data.stream.selectedStream
       ] = [newColSizes];
     },
-    handleColumnOrderUpdate(newColOrder: any) {
+    handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
+      // Here we are checking if the columns are default columns
+      // As there can be case where user can have column with source like default source column
+      // So checking enableResizing as well as its off for default column
+      // If default columns not saving in colOrder
+      if (
+        newColOrder.length === 2 &&
+        newColOrder[0] === this.store.state.zoConfig.timestamp_column &&
+        newColOrder[1] === "source"
+      ) {
+        const sourceColIndex = columns.findIndex(
+          (col: any) => col.name === "source",
+        );
 
+        if (columns[sourceColIndex].enableResizing === false) {
+          this.searchObj.data.resultGrid.colOrder[
+            this.searchObj.data.stream.selectedStream
+          ] = [];
 
-      if (this.searchObj.data.stream?.selectedStream.length === 1 && newColOrder[0] === "@timestamp") {
-        const colOrderToStore = newColOrder.slice(1);
-        if(!(colOrderToStore[0] === "source")){
-          this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
-        ] = [colOrderToStore];
+          return;
         }
-        
-      } else {
-        if(newColOrder[0] === "@timestamp"){
-          const colOrderToStore = newColOrder.slice(1);
-          this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
-        ] = [colOrderToStore];
-        }
-        else{
-          this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
-        ] = [newColOrder];
-        }
-       
       }
+
+      this.searchObj.data.resultGrid.colOrder[
+        this.searchObj.data.stream.selectedStream
+      ] = [...newColOrder];
     },
 
     getPageData(actionType: string) {
@@ -374,7 +375,6 @@ export default defineComponent({
       updatedLocalLogFilterField,
       searchAroundData,
       extractFTSFields,
-      evaluateWrapContentFlag,
       refreshPartitionPagination,
       filterHitsColumns,
     } = useLogs();
@@ -467,7 +467,6 @@ export default defineComponent({
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
-      evaluateWrapContentFlag();
       filterHitsColumns();
     }
 
@@ -548,7 +547,6 @@ export default defineComponent({
       getWidth,
       copyLogToClipboard,
       extractFTSFields,
-      evaluateWrapContentFlag,
       useLocalWrapContent,
       noOfRecordsTitle,
       scrollPosition,
@@ -581,7 +579,6 @@ export default defineComponent({
     },
     findFTSFields() {
       this.extractFTSFields();
-      this.evaluateWrapContentFlag();
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
