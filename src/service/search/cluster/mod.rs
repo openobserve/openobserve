@@ -715,7 +715,14 @@ async fn merge_grpc_result(
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
             let batch = reader
                 .into_iter()
-                .map(std::result::Result::unwrap)
+                .map(|v| match v {
+                    Ok(v) => v,
+                    Err(e) => {
+                        panic!(
+                            "[trace_id {trace_id}] search->merge_grpc_result: read ipc error: {e}"
+                        );
+                    }
+                })
                 .collect::<Vec<_>>();
             batches.push(batch);
         }
