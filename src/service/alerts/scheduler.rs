@@ -127,7 +127,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
-        is_realtime: false,
+        is_realtime: alert.is_real_time,
         is_silenced: false,
         status: db::scheduler::TriggerStatus::Waiting,
         retries: 0,
