@@ -227,8 +227,19 @@ pub async fn search(
     };
 
     // format recordbatch with same schema
-    if !results.is_empty() {
-        let mut schema = results[0].schema();
+    let merge_schema = results
+        .iter()
+        .filter_map(|v| {
+            if v.num_rows() > 0 {
+                Some(v.schema())
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap_or_else(|| Arc::new(Schema::empty()));
+    if !merge_schema.fields().is_empty() {
+        let mut schema = merge_schema.clone();
         let schema_fields = schema
             .fields()
             .iter()
