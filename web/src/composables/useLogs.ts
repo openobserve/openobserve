@@ -3085,8 +3085,8 @@ const useLogs = () => {
                 showWrap: true,
                 wrapContent: false,
               },
-
               size: foundValue || 250,
+              maxSize: window.innerWidth,
             });
           }
         }
