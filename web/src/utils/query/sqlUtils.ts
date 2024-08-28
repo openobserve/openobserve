@@ -283,12 +283,44 @@ function parseCondition(condition: any) {
         const right: any = parseCondition(condition.right);
 
         // set current logical operator to the right side
-        right.logicalOperator = condition.operator ?? "AND";
-        return {
-          filterType: "group",
-          logicalOperator: "AND",
-          conditions: [left, right],
-        };
+        if (Array.isArray(right)) {
+          right[0].logicalOperator = condition.operator ?? "AND";
+        } else {
+          right.logicalOperator = condition.operator ?? "AND";
+        }
+
+        // conditions array
+        const conditions = [];
+
+        // if left is array
+        if (Array.isArray(left)) {
+          // distructure left array and push
+          conditions.push(...left);
+        } else {
+          // if left is not array, push left object
+          conditions.push(left);
+        }
+
+        // if right is array
+        if (Array.isArray(right)) {
+          // distructure right array and push
+          conditions.push(...right);
+        } else {
+          // if right is not array, push right object
+          conditions.push(right);
+        }
+
+        // if parentheses are true, create new group
+        // else return conditions array
+        if (condition.parentheses == true) {
+          return {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: conditions,
+          };
+        } else {
+          return conditions;
+        }
       } else if (
         condition.operator == "=" ||
         condition.operator == "<" ||
@@ -487,7 +519,18 @@ function convertWhereToFilter(where: any) {
         conditions: [],
       };
     }
-    return parseCondition(where);
+    const parsedCondition = parseCondition(where);
+
+    // if parsed condition is an array, it means it's a group
+    if (Array.isArray(parsedCondition)) {
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: parsedCondition,
+      };
+    }
+    // if parsed condition is an object, it means it's a condition
+    return parsedCondition;
   } catch (error) {
     return {
       filterType: "group",
