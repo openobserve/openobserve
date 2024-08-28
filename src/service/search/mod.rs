@@ -773,7 +773,7 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 // generate parquet file search schema
 fn generate_search_schema(
     sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
+    schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
     // cacluate the diff between latest schema and group schema
@@ -821,7 +821,7 @@ fn generate_search_schema(
 // generate parquet file search schema
 fn generate_select_start_search_schema(
     sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
+    schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
     defined_schema_fields: &[String],
 ) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
@@ -872,12 +872,9 @@ fn generate_select_start_search_schema(
         Arc::new(Schema::new(new_fields))
     } else if !new_fields.is_empty() {
         let new_schema = Schema::new(new_fields);
-        Arc::new(Schema::try_merge(vec![
-            schema.as_ref().to_owned(),
-            new_schema,
-        ])?)
+        Arc::new(Schema::try_merge(vec![schema.to_owned(), new_schema])?)
     } else {
-        schema.clone()
+        Arc::new(schema.clone())
     };
     Ok((schema, diff_fields))
 }

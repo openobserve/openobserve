@@ -28,22 +28,20 @@ use config::{
     },
 };
 use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
-use futures::{future::try_join_all, StreamExt};
+use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use ingester::WAL_PARQUET_METADATA;
-use tokio::time::Duration;
-use tracing::{info_span, Instrument};
 
 use crate::{
     common::infra::wal,
     service::{
         db, file_list,
         search::{
-            datafusion::{exec, file_type::FileType},
+            datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_search_schema, generate_select_start_search_schema,
             sql::{Sql, RE_SELECT_WILDCARD},
         },
@@ -57,8 +55,7 @@ pub async fn search_parquet(
     sql: Arc<Sql>,
     stream_type: StreamType,
     work_group: &str,
-    timeout: u64,
-) -> super::SearchResult {
+) -> super::SearchTable {
     let schema_latest = match infra::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
@@ -240,8 +237,11 @@ pub async fn search_parquet(
     }
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
-    let mut tasks = Vec::new();
+    let mut tables = Vec::new();
     for (ver, files) in files_group {
+        if files.is_empty() {
+            continue;
+        }
         let schema = schema_versions[ver]
             .clone()
             .with_metadata(std::collections::HashMap::new());
@@ -263,114 +263,24 @@ pub async fn search_parquet(
         let (schema, diff_fields) = if select_wildcard {
             generate_select_start_search_schema(
                 &sql,
-                schema.clone(),
+                schema.as_ref(),
                 &schema_latest_map,
                 &defined_schema_fields,
             )?
         } else {
-            generate_search_schema(&sql, schema.clone(), &schema_latest_map)?
+            generate_search_schema(&sql, schema.as_ref(), &schema_latest_map)?
         };
 
-        let datafusion_span = info_span!(
-            "service:search:grpc:wal:parquet:datafusion",
-            org_id = sql.org_id,
-            stream_name = sql.stream_name,
-            stream_type = stream_type.to_string(),
-        );
-
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        if crate::service::search::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender)
-            .await
-            .is_err()
-        {
-            log::info!(
-                "[trace_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
-                session.id
-            );
-            return Err(Error::Message(format!(
-                "[trace_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
-                session.id
-            )));
-        }
-
-        let task = tokio::task::spawn(
-            async move {
-                tokio::select! {
-                    ret = exec::sql(
-                        &session,
-                        schema,
-                        diff_fields,
-                        &sql,
-                        &files,
-                        None,
-                        FileType::PARQUET,
-                    ) => ret,
-                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[trace_id {}] wal->parquet->search: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
-                            "[trace_id {}] wal->parquet->search: task timeout", session.id
-                        )))
-                    },
-                    _ = async {
-                        #[cfg(feature = "enterprise")]
-                        let _ = abort_receiver.await;
-                        #[cfg(not(feature = "enterprise"))]
-                        futures::future::pending::<()>().await;
-                    } => {
-                        log::info!("[trace_id {}] wal->parquet->search: search canceled", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[trace_id {}] wal->parquet->search: task is cancel", session.id
-                        )))
-                    }
-                }
-            }
-            .instrument(datafusion_span),
-        );
-
-        tasks.push(task);
+        let table =
+            exec::create_parquet_table(&session, schema, &files, diff_fields, &sql.meta.order_by)
+                .await?;
+        tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
-    let task_results = match try_join_all(tasks).await {
-        Ok(v) => v,
-        Err(e) => {
-            // release all files
-            wal::release_files(&lock_files).await;
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                e.to_string(),
-            )));
-        }
-    };
-
-    let mut results = vec![];
-    for ret in task_results {
-        match ret {
-            Ok(v) => {
-                results.extend(v);
-            }
-            Err(err) => {
-                // release all files
-                wal::release_files(&lock_files).await;
-                log::error!(
-                    "[trace_id {trace_id}] wal->parquet->search: datafusion execute error: {}",
-                    err
-                );
-                match err {
-                    datafusion::error::DataFusionError::ResourcesExhausted(e) => {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
-                    }
-                    _ => return Err(err.into()),
-                }
-            }
-        };
-    }
-
-    // release all files
+    // TODO: release all files
     wal::release_files(&lock_files).await;
 
-    Ok((results, scan_stats))
+    Ok((tables, scan_stats))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -379,9 +289,7 @@ pub async fn search_memtable(
     trace_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
-    work_group: &str,
-    timeout: u64,
-) -> super::SearchResult {
+) -> super::SearchTable {
     let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
@@ -451,123 +359,44 @@ pub async fn search_memtable(
     }
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
-    let mut tasks = Vec::new();
-    for (ver, (schema, mut record_batches)) in batch_groups.into_iter().enumerate() {
+    // only sort by timestamp desc
+    let sort_by_timestamp_desc = sql.meta.order_by.len() == 1
+        && sql.meta.order_by[0].0 == cfg.common.column_timestamp
+        && sql.meta.order_by[0].1;
+
+    let mut tables = Vec::new();
+    for (schema, mut record_batches) in batch_groups {
+        if record_batches.is_empty() {
+            continue;
+        }
         let sql = sql.clone();
-        let session = config::meta::search::Session {
-            id: format!("{trace_id}-mem-{ver}"),
-            storage_type: StorageType::Tmpfs,
-            search_type: if !sql.meta.group_by.is_empty() {
-                SearchType::Aggregation
-            } else {
-                SearchType::Normal
-            },
-            work_group: Some(work_group.to_string()),
-            target_partitions: 0,
-        };
 
         // cacluate the diff between latest schema and group schema
         let (schema, diff_fields) = if select_wildcard {
             generate_select_start_search_schema(
                 &sql,
-                schema.clone(),
+                schema.as_ref(),
                 &schema_latest_map,
                 &defined_schema_fields,
             )?
         } else {
-            generate_search_schema(&sql, schema.clone(), &schema_latest_map)?
+            generate_search_schema(&sql, schema.as_ref(), &schema_latest_map)?
         };
 
         for batch in record_batches.iter_mut() {
             *batch = adapt_batch(&schema, batch);
         }
 
-        let datafusion_span = info_span!(
-            "service:search:grpc:wal:mem:datafusion",
-            org_id = sql.org_id,
-            stream_name = sql.stream_name,
-            stream_type = stream_type.to_string(),
-        );
-
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        if crate::service::search::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender)
-            .await
-            .is_err()
-        {
-            log::info!(
-                "[trace_id {}] wal->mem->search: search canceled before call wal->mem->search",
-                session.id
-            );
-            return Err(Error::Message(format!(
-                "[trace_id {}] wal->mem->search: search canceled before call wal->mem->search",
-                session.id
-            )));
-        }
-
-        let task = tokio::task::spawn(
-            async move {
-                let files = vec![];
-                tokio::select! {
-                    ret = exec::sql(
-                        &session,
-                        schema,
-                        diff_fields,
-                        &sql,
-                        &files,
-                        Some(record_batches),
-                        FileType::ARROW,
-                    ) => ret,
-                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[trace_id {}] wal->mem->search: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
-                            "[trace_id {}] wal->mem->search: task timeout", session.id
-                        )))
-                    },
-                    _ = async {
-                        #[cfg(feature = "enterprise")]
-                        let _ = abort_receiver.await;
-                        #[cfg(not(feature = "enterprise"))]
-                        futures::future::pending::<()>().await;
-                    } => {
-                        log::info!("[trace_id {}] wal->mem->search: search canceled", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[trace_id {}] wal->mem->search: task is cancel", session.id
-                        )))
-                    }
-                }
-            }
-            .instrument(datafusion_span),
-        );
-
-        tasks.push(task);
+        let table = Arc::new(NewMemTable::try_new(
+            schema,
+            vec![record_batches],
+            diff_fields,
+            sort_by_timestamp_desc,
+        )?);
+        tables.push(table as _);
     }
 
-    let mut results = vec![];
-    let task_results = try_join_all(tasks)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-    for ret in task_results {
-        match ret {
-            Ok(v) => results.extend(v),
-            Err(err) => {
-                log::error!(
-                    "[trace_id {trace_id}] wal->mem->search: datafusion execute error: {}",
-                    err
-                );
-                match err {
-                    datafusion::error::DataFusionError::ResourcesExhausted(e) => {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
-                    }
-                    _ => return Err(err.into()),
-                }
-            }
-        };
-    }
-
-    Ok((results, scan_stats))
+    Ok((tables, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
