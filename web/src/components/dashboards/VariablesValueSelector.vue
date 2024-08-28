@@ -30,11 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         item.isVariableLoadingPending +
         index
       "
-      class="q-mr-lg q-mt-xs"
       :data-test="`dashboard-variable-${item}-selector`"
     >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
+          class="q-mr-lg q-mt-xs"
+          v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -42,6 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'constant'">
         <q-input
+          v-show="!item.hideOnDashboard"
+          class="q-mr-lg q-mt-xs"
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
@@ -54,6 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'textbox'">
         <q-input
+          v-show="!item.hideOnDashboard"
+          class="q-mr-lg q-mt-xs"
           style="max-width: 150px !important"
           debounce="1000"
           v-model="item.value"
@@ -66,13 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector
+          v-show="!item.hideOnDashboard"
+          class="q-mr-lg q-mt-xs"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
-        <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
+        <VariableAdHocValueSelector
+          class="q-mr-lg q-mt-xs"
+          v-model="item.value"
+          :variableItem="item"
+        />
       </div>
     </div>
   </div>

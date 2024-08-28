@@ -383,9 +383,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <div class="button-group multi-select-default-value-toggle">
+              <div>By Default Select:</div>
               <div class="row">
                 <div style="align-self: center; padding-right: 4px">
-                  Default Value:
                 </div>
                 <div>
                   <button
