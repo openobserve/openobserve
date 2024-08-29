@@ -366,7 +366,7 @@ export const usePanelDataLoader = (
             const partitionArr = res?.data?.partitions ?? [];
 
             // max_query_range for current query stream
-            const max_query_range = res?.data?.max_query_range ?? 1;
+            const max_query_range = res?.data?.max_query_range ?? 0;
 
             // histogram_interval from partition api response
             const histogramInterval = res?.data?.histogram_interval
