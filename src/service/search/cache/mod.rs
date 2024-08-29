@@ -413,6 +413,13 @@ fn merge_response(
             fn_error = res.function_error.clone();
         }
 
+        if let Some(original_cond) = res.original_cond {
+            cache_response
+                .original_cond
+                .get_or_insert_with(Vec::new)
+                .extend(original_cond);
+        }
+
         cache_response.hits.extend(res.hits.clone());
     }
     sort_response(is_descending, &mut cache_response, ts_column);
