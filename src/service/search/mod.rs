@@ -285,6 +285,7 @@ pub async fn search_partition(
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
         histogram_interval: meta.histogram_interval,
+        max_query_range: stream_settings.max_query_range,
         partitions: vec![],
     };
 
