@@ -157,23 +157,12 @@ impl ExecutionPlan for RemoteScanExec {
         partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        // 10 node 8 querier and 2 ingester
-        // 1 1 1 1 0 1 0 1 1 1
-        let ingester_num = (0..partition)
-            .filter(|i| !self.nodes[*i].is_querier())
-            .count();
-        let node = self.nodes[partition].clone();
-        let file_list = if node.is_querier() {
-            self.file_list[partition - ingester_num].clone()
-        } else {
-            vec![]
-        };
         let req = self.req.clone();
         let fut = get_remote_batch(
             self.input.clone(),
             partition,
-            node,
-            file_list,
+            self.nodes[partition].clone(),
+            self.file_list[partition].clone(),
             self.partition_keys.clone(),
             self.match_all_keys.clone(),
             self.is_leader,

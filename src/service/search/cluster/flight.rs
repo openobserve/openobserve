@@ -687,7 +687,17 @@ pub async fn partition_file_lists(
     let mut file_partitions = HashMap::with_capacity(file_lists.len());
     for (stream_name, file_list) in file_lists {
         let partitions = partition_filt_list(file_list, nodes, group).await?;
-        file_partitions.insert(stream_name, partitions);
+        let mut partition_file_list = Vec::with_capacity(nodes.len());
+        let mut partitions = partitions.into_iter();
+        // partition file list, push file list to querier node
+        for node in nodes {
+            if node.is_querier() {
+                partition_file_list.push(partitions.next().unwrap());
+            } else {
+                partition_file_list.push(vec![]);
+            }
+        }
+        file_partitions.insert(stream_name, partition_file_list);
     }
     Ok(file_partitions)
 }
