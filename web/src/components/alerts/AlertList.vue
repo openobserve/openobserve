@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-btn
                 data-test="add-alert-submit-btn"
-                :label="isSubmitting ? t('alerts.processing') : t('alerts.save')"
+                :label="t('alerts.save')"
                 class="q-mb-md text-bold no-border q-ml-md"
                 color="secondary"
                 padding="sm xl"
@@ -650,6 +650,12 @@ export default defineComponent({
     const submitForm = async () =>{
       const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value) as Alert;
 
+      const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+
       if (!alertToBeCloned) {
         $q.notify({
           type: "negative",
@@ -687,6 +693,7 @@ export default defineComponent({
             alertToBeCloned.stream_type,
             alertToBeCloned,
           ).then((res) => {
+            dismiss();
             if (res.data.code == 200) {
               $q.notify({
                 type: "positive",
@@ -696,7 +703,6 @@ export default defineComponent({
               showForm.value = false;
               getAlerts();
             } else {
-              console.log(res,"res")
               $q.notify({
                 type: "negative",
                 message: res.data.message,
@@ -705,6 +711,7 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            dismiss();
             $q.notify({
               type: "negative",
               message: e.response.data.message,
