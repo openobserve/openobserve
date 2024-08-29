@@ -706,6 +706,8 @@ export default defineComponent({
       }
       if (Number(maxQueryRange.value) > 0) {
         settings["max_query_range"] = Number(maxQueryRange.value);
+      } else {
+        settings["max_query_range"] = 0;
       }
 
       if (showDataRetention.value) {
