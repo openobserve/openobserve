@@ -487,7 +487,7 @@ const table = useVueTable({
   enableColumnResizing: true,
   onStateChange: async (state) => {
     await nextTick();
-    tableRowSize.value = tableBodyRef.value.children[0]?.scrollWidth;
+    tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
   },
 });
 
