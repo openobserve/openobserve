@@ -1167,20 +1167,22 @@ export default defineComponent({
       data.forEach((item) => {
         if (item.expr && item.expr.column) {
           columnNames.push(item.expr.column);
-        } 
-        else if (item.expr && item.expr.args && item.expr.args.expr) {
+        } else if (item.expr && item.expr.args && item.expr.args.expr) {
           if (item.expr.args.expr.column) {
             columnNames.push(item.expr.args.expr.column);
           } else if (item.expr.args.expr.value) {
             columnNames.push(item.expr.args.expr.value);
           }
-        }
-        else if(item.expr && item.expr.name && item.expr.type ==="function"){
+        } else if (
+          item.expr &&
+          item.expr.name &&
+          item.expr.type === "function"
+        ) {
           item.expr.args.value.map((val) => {
             if (val.type === "column_ref") {
               columnNames.push(val.column);
             }
-          })
+          });
         }
       });
       return columnNames;
@@ -1246,7 +1248,6 @@ export default defineComponent({
                 }
               }
               useLocalInterestingFields(localFields);
-
             }
           }
 
@@ -1740,7 +1741,10 @@ export default defineComponent({
 
             // Add colOrder to searchObj if saved view don't have colOrder property in resultGrid
             if (!extractedObj.data.resultGrid.hasOwnProperty("colOrder")) {
-              searchObj.data.resultGrid.colOrder = [];
+              extractedObj.data.resultGrid.colOrder = {};
+              extractedObj.data.resultGrid.colOrder[
+                extractedObj.data.stream.selectedStream
+              ] = [];
             }
 
             if (extractedObj.data?.timezone) {
