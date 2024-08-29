@@ -17,7 +17,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use config::{
     get_config,
-    meta::search::Response,
+    meta::{search::Response, stream::StreamType},
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -55,7 +55,10 @@ pub async fn check_cache(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let sql = match NewSql::new(rpc_req).await {
+    let query = rpc_req.clone().query.unwrap();
+    let org_id = rpc_req.org_id.clone();
+    let stream_type = StreamType::from(rpc_req.stream_type.as_str());
+    let sql = match NewSql::new(&query, &org_id, stream_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);

@@ -43,7 +43,7 @@ use infra::{
         SchemaCache,
     },
 };
-use proto::cluster_rpc::{self, SearchRequest};
+use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
 
 use crate::{
@@ -57,6 +57,7 @@ use crate::{
         },
         generate_filter_from_equal_items, match_file,
         new_sql::NewSql,
+        request::Request,
     },
 };
 
@@ -69,7 +70,8 @@ use crate::{
 pub async fn search(
     trace_id: &str,
     sql: Arc<NewSql>,
-    mut req: cluster_rpc::SearchRequest,
+    mut req: Request,
+    query: SearchQuery,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -90,7 +92,7 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
 
-    let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+    let trace_id = req.trace_id.clone();
     #[cfg(feature = "enterprise")]
     let user_id = req.user_id.clone();
     #[cfg(feature = "enterprise")]
@@ -149,6 +151,7 @@ pub async fn search(
         let index_terms = generate_filter_from_equal_items(&index_terms);
         (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
             req.clone(),
+            query.clone(),
             stream_name,
             &file_list_vec,
             &match_terms,
@@ -278,7 +281,7 @@ pub async fn search(
     );
 
     // reset work_group
-    req.work_group = work_group_str;
+    req.work_group = Some(work_group_str);
 
     // 3. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
@@ -792,18 +795,13 @@ pub(crate) async fn partition_file_by_hash(
 }
 
 pub async fn generate_context(
-    req: &SearchRequest,
+    req: &Request,
     sql: &Arc<NewSql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
-    let work_group = if !req.work_group.is_empty() {
-        Some(req.work_group.clone())
-    } else {
-        None
-    };
-    let optimizer_rules = generate_optimizer_rules(sql, req);
+    let optimizer_rules = generate_optimizer_rules(sql);
     let ctx = prepare_datafusion_context(
-        work_group,
+        req.work_group.clone(),
         optimizer_rules,
         sql.sorted_by_time,
         target_partitions,
@@ -847,7 +845,8 @@ pub fn filter_index_fields(
 }
 
 async fn get_file_list_by_inverted_index(
-    mut req: cluster_rpc::SearchRequest,
+    mut req: Request,
+    mut query: SearchQuery,
     stream_name: &str,
     file_list: &[&FileKey],
     match_terms: &[String],
@@ -857,7 +856,7 @@ async fn get_file_list_by_inverted_index(
     let cfg = get_config();
 
     let org_id = req.org_id.clone();
-    let stream_type = StreamType::from(req.stream_type.as_str());
+    let stream_type = req.stream_type;
     let file_list = file_list
         .iter()
         .map(|f| (&f.key, &f.meta))
@@ -923,20 +922,20 @@ async fn get_file_list_by_inverted_index(
         } else {
             format!("{}_{}", stream_name, stream_type)
         };
-    let query = format!(
+    let sql = format!(
         "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
         index_stream_name, search_condition,
     );
 
-    req.stream_type = StreamType::Index.to_string();
-    req.query.as_mut().unwrap().sql = query;
-    req.query.as_mut().unwrap().from = 0;
-    req.query.as_mut().unwrap().size = QUERY_WITH_NO_LIMIT;
-    req.query.as_mut().unwrap().track_total_hits = false;
-    req.query.as_mut().unwrap().uses_zo_fn = false;
-    req.query.as_mut().unwrap().query_fn = "".to_string();
+    req.stream_type = StreamType::Index;
+    query.sql = sql;
+    query.from = 0;
+    query.size = QUERY_WITH_NO_LIMIT;
+    query.track_total_hits = false;
+    query.uses_zo_fn = false;
+    query.query_fn = "".to_string();
 
-    let resp = super::http::search(req).await?;
+    let resp = super::http::search(req, query).await?;
     // get deleted file
     let deleted_files = resp
         .hits

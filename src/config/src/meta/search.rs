@@ -465,6 +465,25 @@ impl From<Request> for cluster_rpc::SearchRequest {
     }
 }
 
+impl From<Query> for cluster_rpc::SearchQuery {
+    fn from(query: Query) -> Self {
+        cluster_rpc::SearchQuery {
+            sql: query.sql.clone(),
+            quick_mode: query.quick_mode,
+            query_type: query.query_type.clone(),
+            from: query.from as i32,
+            size: query.size as i32,
+            start_time: query.start_time,
+            end_time: query.end_time,
+            sort_by: query.sort_by.unwrap_or_default(),
+            track_total_hits: query.track_total_hits,
+            uses_zo_fn: query.uses_zo_fn,
+            query_fn: query.query_fn.unwrap_or_default(),
+            skip_wal: query.skip_wal,
+        }
+    }
+}
+
 impl From<&ScanStats> for cluster_rpc::ScanStats {
     fn from(req: &ScanStats) -> Self {
         cluster_rpc::ScanStats {

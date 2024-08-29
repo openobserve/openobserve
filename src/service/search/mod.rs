@@ -37,7 +37,7 @@ use infra::{
 use new_sql::NewSql;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
@@ -62,6 +62,7 @@ pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod new_sql;
+pub(crate) mod request;
 pub(crate) mod sql;
 
 // Checks for #ResultArray#
@@ -129,14 +130,18 @@ pub async fn search(
         && !req_clusters.is_empty()
         && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
-    let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
-    req.job.as_mut().unwrap().trace_id = trace_id.clone();
-    req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::Cluster as _;
-    req.stream_type = stream_type.to_string();
-    req.user_id = user_id.clone();
-
-    let req_query = req.clone().query.unwrap();
+    let query: SearchQuery = in_req.query.clone().into();
+    let req_query = query.clone();
+    let request = crate::service::search::request::Request::new(
+        trace_id.clone(),
+        org_id.to_string(),
+        stream_type,
+        cluster_rpc::SearchType::Cluster,
+        in_req.timeout,
+        user_id.clone(),
+        Some((query.start_time, query.end_time)),
+        in_req.search_type.map(|v| v.to_string()),
+    );
 
     let handle = tokio::task::spawn(async move {
         #[cfg(feature = "enterprise")]
@@ -147,7 +152,7 @@ pub async fn search(
         }
         #[cfg(not(feature = "enterprise"))]
         {
-            cluster::http::search(req).await
+            cluster::http::search(request, query).await
         }
     });
     let res = match handle.await {
@@ -242,13 +247,7 @@ pub async fn search_partition(
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let search_req = cluster_rpc::SearchRequest {
-        org_id: org_id.to_string(),
-        stream_type: stream_type.to_string(),
-        query: Some(query),
-        ..Default::default()
-    };
-    let sql = NewSql::new(&search_req).await?;
+    let sql = NewSql::new(&query, org_id, stream_type).await?;
 
     let mut files = Vec::new();
     for (stream, schema) in sql.schemas.iter() {

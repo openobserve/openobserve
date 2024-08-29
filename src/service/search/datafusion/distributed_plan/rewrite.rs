@@ -24,13 +24,14 @@ use datafusion::{
     physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
 };
 use hashbrown::HashMap;
-use proto::cluster_rpc::{PartitionKeys, SearchRequest};
+use proto::cluster_rpc::PartitionKeys;
 
 use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
+use crate::service::search::request::Request;
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
-    pub req: SearchRequest,
+    pub req: Request,
     pub nodes: Vec<Node>,
     pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
     pub partition_keys: HashMap<String, Vec<PartitionKeys>>,
@@ -42,7 +43,7 @@ pub struct RemoteScanRewriter {
 impl RemoteScanRewriter {
     #[allow(dead_code)]
     pub fn new(
-        req: SearchRequest,
+        req: Request,
         nodes: Vec<Node>,
         file_lists: HashMap<String, Vec<Vec<FileKey>>>,
         partition_keys: HashMap<String, Vec<PartitionKeys>>,

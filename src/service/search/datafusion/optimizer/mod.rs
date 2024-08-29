@@ -34,7 +34,6 @@ use datafusion::optimizer::{
     unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
 };
 use infra::schema::get_stream_setting_fts_fields;
-use proto::cluster_rpc;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
@@ -45,32 +44,27 @@ pub mod add_timestamp;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
 
-pub fn generate_optimizer_rules(
-    meta: &NewSql,
-    req: &cluster_rpc::SearchRequest,
-) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
-    let query = req.query.as_ref().unwrap();
-    let limit = if query.size > config::QUERY_WITH_NO_LIMIT {
-        if query.size > 0 {
-            Some(query.size as usize)
+pub fn generate_optimizer_rules(sql: &NewSql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
+    let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
+        if sql.limit > 0 {
+            Some(sql.limit as usize)
         } else {
             Some(config::get_config().limit.query_default_limit as usize)
         }
     } else {
         None
     };
-    let offest = query.from as usize;
-    let start_time = query.start_time;
-    let end_time = query.end_time;
+    let offest = sql.offset as usize;
+    let (start_time, end_time) = sql.time_range.unwrap();
 
     // get full text search fields
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
-    if meta.match_items.is_some() && meta.stream_names.len() == 1 {
+    if sql.match_items.is_some() && sql.stream_names.len() == 1 {
         let mut fields = Vec::new();
-        let stream_name = &meta.stream_names[0];
-        let schema = meta.schemas.get(stream_name).unwrap();
+        let stream_name = &sql.stream_names[0];
+        let schema = sql.schemas.get(stream_name).unwrap();
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
         for fts_field in fts_fields {

@@ -30,7 +30,7 @@ use infra::{
         SchemaCache,
     },
 };
-use proto::cluster_rpc;
+use proto::cluster_rpc::SearchQuery;
 use serde::Serialize;
 use sqlparser::{
     ast::{
@@ -42,6 +42,7 @@ use sqlparser::{
     parser::Parser,
 };
 
+use super::request::Request;
 use crate::service::search::sql::{
     convert_histogram_interval_to_seconds, generate_histogram_interval,
 };
@@ -68,19 +69,24 @@ pub struct NewSql {
 }
 
 impl NewSql {
-    pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<NewSql, Error> {
-        let query = req.query.as_ref().unwrap();
+    pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<NewSql, Error> {
+        Self::new(query, &req.org_id, req.stream_type).await
+    }
+
+    pub async fn new(
+        query: &SearchQuery,
+        org_id: &str,
+        stream_type: StreamType,
+    ) -> Result<NewSql, Error> {
         let sql = query.sql.clone();
         let limit = query.size as i64;
         let offset = query.from as i64;
-        let org_id = req.org_id.clone();
-        let stream_type = StreamType::from(req.stream_type.as_str());
 
         // 1. get table name
         let stream_names = resolve_stream_names(&sql).unwrap();
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream_name in stream_names.iter() {
-            let schema = infra::schema::get(&org_id, stream_name, stream_type)
+            let schema = infra::schema::get(org_id, stream_name, stream_type)
                 .await
                 .unwrap_or_else(|_| Schema::empty());
             total_schemas.insert(stream_name.clone(), Arc::new(SchemaCache::new(schema)));
@@ -160,7 +166,7 @@ impl NewSql {
 
         Ok(NewSql {
             sql: statement.to_string(),
-            org_id,
+            org_id: org_id.to_string(),
             stream_type,
             stream_names,
             match_items: match_visitor.match_items,

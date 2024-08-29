@@ -25,39 +25,34 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes, Result};
-use proto::cluster_rpc;
+use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::functions::VRLResultResolver,
-    service::search::{cluster::flight, new_sql::NewSql},
+    service::search::{cluster::flight, new_sql::NewSql, request::Request},
 };
 
-#[tracing::instrument(
-    name = "service:search:cluster",
-    skip(req),
-    fields(org_id = req.org_id)
-)]
-pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Response> {
+#[tracing::instrument(name = "service:search:cluster", skip(req))]
+pub async fn search(req: Request, query: SearchQuery) -> Result<search::Response> {
     let start = std::time::Instant::now();
-    let trace_id = req.job.as_ref().unwrap().trace_id.clone();
-    let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
-    let track_total_hits = req.query.as_ref().unwrap().track_total_hits;
+    let trace_id = req.trace_id.clone();
+    let query_type = query.query_type.to_lowercase();
+    let track_total_hits = query.track_total_hits;
 
     // handle request time range
-    let meta = NewSql::new(&req).await?;
+    let meta = NewSql::new_from_req(&req, &query).await?;
     let sql = Arc::new(meta);
 
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
-    let use_query_fn = req.query.as_ref().unwrap().uses_zo_fn;
-    let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
-    req.query.as_mut().unwrap().query_fn = "".to_string();
+    let use_query_fn = query.uses_zo_fn;
+    let mut query_fn = query.query_fn.clone();
 
     // handle query function
     let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
-        flight::search(&trace_id, sql.clone(), req).await?;
+        flight::search(&trace_id, sql.clone(), req, query).await?;
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);

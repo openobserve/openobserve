@@ -39,7 +39,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use futures::{Stream, StreamExt, TryStreamExt};
 use prost::Message;
-use proto::cluster_rpc::{self, FlightSearchRequest, PartitionKeys, SearchRequest};
+use proto::cluster_rpc::{self, FlightSearchRequest, PartitionKeys};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -48,7 +48,7 @@ use tonic::{
 };
 
 use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
-use crate::service::search::infra_cluster;
+use crate::service::search::{infra_cluster, request::Request};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -58,7 +58,7 @@ pub struct RemoteScanExec {
     partition_keys: Vec<PartitionKeys>,
     match_all_keys: Vec<String>,
     is_leader: bool,
-    req: SearchRequest,
+    req: Request,
     nodes: Vec<Node>,
     partitions: usize,
     cache: PlanProperties,
@@ -72,7 +72,7 @@ impl RemoteScanExec {
         partition_keys: Vec<PartitionKeys>,
         match_all_keys: Vec<String>,
         is_leader: bool,
-        req: SearchRequest,
+        req: Request,
         nodes: Vec<Node>,
     ) -> Self {
         let output_partitions = nodes.len();
@@ -200,7 +200,7 @@ async fn get_remote_batch(
     partition_keys: Vec<PartitionKeys>,
     match_all_keys: Vec<String>,
     is_leader: bool,
-    req: SearchRequest,
+    req: Request,
 ) -> Result<SendableRecordBatchStream> {
     let proto = ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
@@ -211,26 +211,24 @@ async fn get_remote_batch(
     } else {
         cluster_rpc::SearchType::User
     };
+    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let request = FlightSearchRequest {
-        trace_id: req.job.as_ref().unwrap().trace_id.clone(),
+        trace_id: req.trace_id.clone(),
         partition: partition as u32,
         org_id: req.org_id.clone(),
-        stream_type: req.stream_type,
+        stream_type: req.stream_type.to_string(),
         search_type: search_type.into(),
         plan: physical_plan_bytes.to_vec(),
         file_list: file_list.iter().map(cluster_rpc::FileKey::from).collect(),
         partition_keys,
         match_all_keys,
         is_leader,
-        start_time: req.query.as_ref().unwrap().start_time,
-        end_time: req.query.as_ref().unwrap().end_time,
+        start_time,
+        end_time,
         timeout: req.timeout,
-        work_group: if !req.work_group.is_empty() {
-            Some(req.work_group.clone())
-        } else {
-            None
-        },
-        user_id: None,
+        work_group: req.work_group.clone(),
+        user_id: req.user_id.clone(),
+        search_event_type: req.search_event_type,
     };
 
     let mut buf: Vec<u8> = Vec::new();
@@ -264,7 +262,7 @@ async fn get_remote_batch(
         .map_err(|err| {
             log::error!(
                 "[trace_id {}] search->grpc: node: {}, connect err: {:?}",
-                req.job.as_ref().unwrap().trace_id.clone(),
+                req.trace_id.clone(),
                 &node.grpc_addr,
                 err
             );

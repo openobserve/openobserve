@@ -36,6 +36,7 @@ message FlightSearchRequest {
     bool                       is_leader = 13;
     optional string           work_group = 14;
     optional string              user_id = 15;
+    optional string    search_event_type = 16;
 }
 
 message PartitionKeys {

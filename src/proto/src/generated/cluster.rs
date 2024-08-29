@@ -3197,6 +3197,8 @@ pub struct FlightSearchRequest {
     pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "15")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "16")]
+    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
