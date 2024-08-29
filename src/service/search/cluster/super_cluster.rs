@@ -28,9 +28,7 @@ use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
 use vector_enrichment::TableRegistry;
 
-use crate::{
-    common::meta::functions::VRLResultResolver, service::search::cluster::extract_id_and_timestamp,
-};
+use crate::common::meta::functions::VRLResultResolver;
 
 pub async fn search(
     mut req: cluster_rpc::SearchRequest,
@@ -90,12 +88,8 @@ pub async fn search(
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
 
-    // _id and _timestamp columns for additional query for _original unflattened fata
-    let mut id_timestamps: Option<Vec<(json::Value, Option<json::Value>)>> = None;
-
     // hits
     if !merge_batches.is_empty() {
-        let timestamp_col_name = &config::get_config().common.column_timestamp;
         let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let json_rows = record_batches_to_json_rows(&batches_query_ref)
@@ -104,9 +98,7 @@ pub async fn search(
             json_rows
                 .into_iter()
                 .filter(|v| !v.is_empty())
-                .map(|record| {
-                    extract_id_and_timestamp(record, &mut id_timestamps, timestamp_col_name)
-                })
+                .map(json::Value::Object)
                 .collect()
         } else {
             // compile vrl function & apply the same before returning the response
@@ -141,13 +133,7 @@ pub async fn search(
                                 json_rows
                                     .into_iter()
                                     .filter(|v| !v.is_empty())
-                                    .map(|record| {
-                                        extract_id_and_timestamp(
-                                            record,
-                                            &mut id_timestamps,
-                                            timestamp_col_name,
-                                        )
-                                    })
+                                    .map(json::Value::Object)
                                     .collect(),
                             ),
                             &sql.org_id,
@@ -166,11 +152,6 @@ pub async fn search(
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
-                                let hit = extract_id_and_timestamp(
-                                    hit,
-                                    &mut id_timestamps,
-                                    timestamp_col_name,
-                                );
                                 let ret_val = crate::service::ingestion::apply_vrl_fn(
                                     &mut runtime,
                                     &VRLResultResolver {
@@ -189,9 +170,7 @@ pub async fn search(
                 None => json_rows
                     .into_iter()
                     .filter(|v| !v.is_empty())
-                    .map(|record| {
-                        extract_id_and_timestamp(record, &mut id_timestamps, timestamp_col_name)
-                    })
+                    .map(json::Value::Object)
                     .collect(),
             }
         };
@@ -241,7 +220,6 @@ pub async fn search(
             as f64
             / scan_stats.querier_files as f64) as usize,
     );
-    result.set_original_cond(id_timestamps);
 
     if query_type == "table" {
         result.response_type = "table".to_string();
