@@ -382,8 +382,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ['custom', 'query_values'].includes(variableData.type)
             "
           >
-            <div class="button-group multi-select-default-value-toggle">
-              <div>By Default Select:</div>
+            <div class="button-group multi-select-default-value-toggle" style="margin-bottom: 12px;">
+              <div class="multi-select-default-value">By Default Select:</div>
               <div class="row">
                 <div>
                   <button
@@ -395,6 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="button button-left"
                     type="button"
+                    style="padding: 8px"
                     @click="variableData.selectAllValueForMultiSelect = false"
                   >
                     First value
@@ -410,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     type="button"
                     class="button button-right"
+                    style="padding: 8px"
                     @click="variableData.selectAllValueForMultiSelect = true"
                   >
                     All values
@@ -992,5 +994,12 @@ export default defineComponent({
     background-color: var(--q-primary) !important;
     color: white;
   }
+}
+.multi-select-default-value {
+  margin-top: 5px;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666666;
 }
 </style>
