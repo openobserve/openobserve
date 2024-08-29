@@ -35,6 +35,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
+        ingestion::{ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
         prom,
         stream::{Stream, StreamProperty},
     },
@@ -49,9 +50,24 @@ pub async fn get_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let schema = infra::schema::get(org_id, stream_name, stream_type)
+    let mut schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
+
+    if schema.field_with_name(ORIGINAL_DATA_COL_NAME).is_ok()
+        || schema.field_with_name(ID_COL_NAME).is_ok()
+    {
+        schema = Schema::new(
+            schema
+                .fields()
+                .iter()
+                .filter(|field| {
+                    field.name() != ORIGINAL_DATA_COL_NAME && field.name() != ID_COL_NAME
+                })
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
+    }
 
     let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
     transform_stats(&mut stats);
