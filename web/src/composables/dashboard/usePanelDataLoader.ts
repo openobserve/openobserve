@@ -400,7 +400,9 @@ export const usePanelDataLoader = (
             let remainingQueryRange = max_query_range;
 
             // loop on all partitions and call search api for each partition
-            for (const partition of partitionArr) {
+            for (let i = 0; i < partitionArr.length; i++) {
+              const partition = partitionArr[i];
+
               if (abortControllerRef?.signal?.aborted) {
                 break;
               }
@@ -484,7 +486,20 @@ export const usePanelDataLoader = (
                 // if the remaining query range is less than 0, break the loop
                 // we exceeded the max query range
                 if (remainingQueryRange < 0) {
-                  break;
+                  // set that is_partial to true if it is not last partition
+                  if (i < partitionArr.length - 1) {
+                    // set that is_partial to true
+                    state.resultMetaData[currentQueryIndex].is_partial = true;
+                    // set function error
+                    state.resultMetaData[currentQueryIndex].function_error =
+                      `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                    // set the new start time and end time
+                    state.resultMetaData[currentQueryIndex].new_end_time =
+                      partition[1];
+                    state.resultMetaData[currentQueryIndex].new_start_time =
+                      partition[0];
+                    break;
+                  }
                 }
               }
             }
