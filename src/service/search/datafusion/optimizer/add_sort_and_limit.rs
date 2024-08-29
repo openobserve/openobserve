@@ -85,10 +85,18 @@ impl OptimizerRule for AddSortAndLimitRule {
                     }
                 }
             },
-            LogicalPlan::Sort(_) => (
-                Transformed::yes(generate_limit_plan(Arc::new(plan), self.limit, self.offest)),
-                None,
-            ),
+            LogicalPlan::Sort(sort) => {
+                if sort.fetch.is_some() {
+                    (Transformed::no(LogicalPlan::Sort(sort)), None)
+                } else {
+                    let plan = generate_limit_plan(
+                        Arc::new(LogicalPlan::Sort(sort)),
+                        self.limit,
+                        self.offest,
+                    );
+                    (Transformed::yes(plan), None)
+                }
+            }
             _ => {
                 if is_complex {
                     (
