@@ -51,7 +51,10 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
+    common::{
+        infra::cluster as infra_cluster,
+        meta::{ingestion::ORIGINAL_DATA_COL_NAME, stream::StreamParams},
+    },
     handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
@@ -855,7 +858,7 @@ fn generate_select_start_search_schema(
         }
     }
     let cfg = get_config();
-    let schema = if !defined_schema_fields.is_empty() {
+    let mut new_schema_fields = if !defined_schema_fields.is_empty() {
         let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
         if !fields.contains(&cfg.common.column_timestamp) {
             fields.insert(cfg.common.column_timestamp.to_string());
@@ -870,14 +873,20 @@ fn generate_select_start_search_schema(
                 None => schema_latest_map.get(f).map(|f| (*f).clone()),
             })
             .collect::<Vec<_>>();
-        Arc::new(Schema::new(new_fields))
+        new_fields
     } else if !new_fields.is_empty() {
-        let new_schema = Schema::new(new_fields);
-        Arc::new(Schema::try_merge(vec![schema.to_owned(), new_schema])?)
+        let mut merged_fields = schema.fields().to_vec();
+        // can extend directly b/c none of the `new_fields` is present in schema, checked above
+        merged_fields.extend(new_fields);
+        merged_fields
     } else {
-        Arc::new(schema.clone())
+        schema.fields().to_vec()
     };
-    Ok((schema, diff_fields))
+
+    // skip selecting "_original" column if `SELECT * ...`
+    new_schema_fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+
+    Ok((Arc::new(Schema::new(new_schema_fields)), diff_fields))
 }
 
 fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {

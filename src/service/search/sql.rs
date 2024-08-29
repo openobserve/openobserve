@@ -288,13 +288,16 @@ impl Sql {
         // modification if _original unflattened data is required by stream_setting and is log
         // search
         if stream_settings.as_ref().map_or(false, |settings| {
-            settings.store_original_data && stream_type == StreamType::Logs
+            settings.store_original_data
+                && stream_type == StreamType::Logs
+                && !origin_sql.contains('*')
         }) {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(ID_COL_NAME) {
                 origin_sql =
                     origin_sql.replacen(cap_str, &format!("{}, {}", cap_str, ID_COL_NAME), 1);
+                meta.fields.push(ID_COL_NAME.to_string());
             }
         }
 

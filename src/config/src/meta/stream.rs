@@ -500,7 +500,7 @@ pub struct UpdateStreamSettings {
     pub max_query_range: Option<i64>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
@@ -530,6 +530,24 @@ pub struct StreamSettings {
 // TODO(taiming): TO BE REMOVED - default true for development and testing purposes.
 const fn default_true() -> bool {
     true
+}
+
+// TODO(taiming): TO BE REMOVED - default true for development and testing purposes.
+impl Default for StreamSettings {
+    fn default() -> Self {
+        Self {
+            partition_time_level: Some(PartitionTimeLevel::default()),
+            partition_keys: vec![],
+            full_text_search_keys: vec![],
+            index_fields: vec![],
+            bloom_filter_fields: vec![],
+            data_retention: 0,
+            flatten_level: None,
+            defined_schema_fields: None,
+            max_query_range: 0,
+            store_original_data: true,
+        }
+    }
 }
 
 impl Serialize for StreamSettings {
