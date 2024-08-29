@@ -517,6 +517,8 @@ const useStreams = () => {
         const result: any = compareArrays(previousArray, currentArray);
         add = result.add;
         remove = result.remove;
+
+        remove = remove.filter((item: any) => item.disabled !== true);
       } else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));
