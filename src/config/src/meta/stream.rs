@@ -496,7 +496,7 @@ pub struct UpdateStreamSettings {
     pub store_original_data: Option<bool>,
 }
 
-#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
