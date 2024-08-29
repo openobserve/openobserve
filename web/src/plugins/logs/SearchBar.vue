@@ -1743,8 +1743,6 @@ export default defineComponent({
             // As we reassign columns from selectedFields and search results
             extractedObj.data.resultGrid.columns = [];
 
-            // Add colOrder to searchObj if saved view don't have colOrder property in resultGrid
-
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
