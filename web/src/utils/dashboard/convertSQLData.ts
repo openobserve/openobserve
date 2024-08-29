@@ -964,6 +964,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -1145,6 +1146,7 @@ export const convertSQLData = async (
                 yAxisKeys[0]
               ] ?? null,
           ),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -1354,6 +1356,7 @@ export const convertSQLData = async (
                 yAxisKeys[0]
               ] ?? null,
           ),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
