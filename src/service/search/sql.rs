@@ -136,7 +136,15 @@ impl Sql {
         }
         origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
 
-        // Hack select for _timestamp, add _timestamp to select clause
+        // fetch schema
+        let schema = match infra::schema::get(&org_id, &meta.source, stream_type).await {
+            Ok(schema) => schema,
+            Err(_) => Schema::empty(),
+        };
+        let schema_fields = schema.fields().to_vec();
+        let stream_settings = infra::schema::unwrap_stream_settings(&schema);
+
+        // Hack select for _timestamp & _o2_id, add both to select clause if needed
         let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
         if !is_aggregate
             && meta.group_by.is_empty()
@@ -145,12 +153,31 @@ impl Sql {
         {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
-            if !cap_str.contains(&cfg.common.column_timestamp) {
-                origin_sql = origin_sql.replacen(
-                    cap_str,
-                    &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                    1,
-                );
+
+            let (need_o2_id_col, need_timestamp_col) =
+                if stream_settings.as_ref().map_or(false, |settings| {
+                    settings.store_original_data
+                        && stream_type == StreamType::Logs
+                        && !cap_str.contains(ID_COL_NAME)
+                }) {
+                    meta.fields.push(ID_COL_NAME.to_string());
+                    (true, !cap_str.contains(&cfg.common.column_timestamp))
+                } else {
+                    (false, !cap_str.contains(&cfg.common.column_timestamp))
+                };
+
+            let replacement = match (need_o2_id_col, need_timestamp_col) {
+                (true, true) => format!(
+                    "{}, {}, {}",
+                    &cfg.common.column_timestamp, ID_COL_NAME, cap_str
+                ),
+                (true, false) => format!("{}, {}", ID_COL_NAME, cap_str),
+                (false, true) => format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                (false, false) => String::new(),
+            };
+
+            if !replacement.is_empty() {
+                origin_sql = origin_sql.replacen(cap_str, &replacement, 1);
             }
         }
 
@@ -276,30 +303,6 @@ impl Sql {
             } else {
                 format!("{} LIMIT {}", origin_sql, meta.offset + meta.limit)
             };
-        }
-
-        // fetch schema
-        let schema = match infra::schema::get(&org_id, &meta.source, stream_type).await {
-            Ok(schema) => schema,
-            Err(_) => Schema::empty(),
-        };
-        let schema_fields = schema.fields().to_vec();
-        let stream_settings = infra::schema::unwrap_stream_settings(&schema);
-
-        // modification if _original unflattened data is required by stream_setting and is log
-        // search
-        if stream_settings.as_ref().map_or(false, |settings| {
-            settings.store_original_data
-                && stream_type == StreamType::Logs
-                && !origin_sql.contains('*')
-        }) {
-            let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-            let cap_str = caps.get(1).unwrap().as_str();
-            if !cap_str.contains(ID_COL_NAME) {
-                origin_sql =
-                    origin_sql.replacen(cap_str, &format!("{}, {}", cap_str, ID_COL_NAME), 1);
-                meta.fields.push(ID_COL_NAME.to_string());
-            }
         }
 
         // fetch inverted index fields
