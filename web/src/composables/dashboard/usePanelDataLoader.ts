@@ -460,10 +460,14 @@ export const usePanelDataLoader = (
               state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
               // if the query is aborted or the response is partial, break the loop
-              if (
-                abortControllerRef?.signal?.aborted ||
-                searchRes.data.is_partial == true
-              ) {
+              if (abortControllerRef?.signal?.aborted) {
+                break;
+              }
+
+              if (searchRes.data.is_partial == true) {
+                // set the new start time as the start time of query
+                state.resultMetaData[currentQueryIndex].new_start_time =
+                  startISOTimestamp;
                 break;
               }
 
@@ -472,14 +476,15 @@ export const usePanelDataLoader = (
                 // convert timerange from milliseconds to hours
                 const timeRange = (partition[1] - partition[0]) / 3600000000;
 
-                // get cache ratio(it will be from 0 to 100)
-                const cacheRatio = searchRes.data.cached_ratio ?? 0;
+                // get result cache ratio(it will be from 0 to 100)
+                const resultCacheRatio = searchRes.data.result_cache_ratio ?? 0;
 
                 // calculate the remaining query range
                 // remaining query range = remaining query range - queried time range for the current partition
-                // queried time range = time range * ((100 - cache ratio) / 100)
+                // queried time range = time range * ((100 - result cache ratio) / 100)
 
-                const queriedTimeRange = timeRange * ((100 - cacheRatio) / 100);
+                const queriedTimeRange =
+                  timeRange * ((100 - resultCacheRatio) / 100);
 
                 remainingQueryRange = remainingQueryRange - queriedTimeRange;
 
@@ -496,8 +501,10 @@ export const usePanelDataLoader = (
                     // set the new start time and end time
                     state.resultMetaData[currentQueryIndex].new_end_time =
                       partition[1];
+
+                    // set the new start time as the start time of query
                     state.resultMetaData[currentQueryIndex].new_start_time =
-                      partition[0];
+                      startISOTimestamp;
                     break;
                   }
                 }
