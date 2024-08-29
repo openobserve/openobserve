@@ -35,7 +35,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        ingestion::{ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
+        ingestion::ORIGINAL_DATA_COL_NAME,
         prom,
         stream::{Stream, StreamProperty},
     },
@@ -54,16 +54,12 @@ pub async fn get_stream(
         .await
         .unwrap();
 
-    if schema.field_with_name(ORIGINAL_DATA_COL_NAME).is_ok()
-        || schema.field_with_name(ID_COL_NAME).is_ok()
-    {
+    if schema.field_with_name(ORIGINAL_DATA_COL_NAME).is_ok() {
         schema = Schema::new(
             schema
                 .fields()
                 .iter()
-                .filter(|field| {
-                    field.name() != ORIGINAL_DATA_COL_NAME && field.name() != ID_COL_NAME
-                })
+                .filter(|field| field.name() != ORIGINAL_DATA_COL_NAME)
                 .cloned()
                 .collect::<Vec<_>>(),
         );
