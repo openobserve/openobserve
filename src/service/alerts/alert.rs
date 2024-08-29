@@ -209,10 +209,12 @@ pub async fn save(
         }
     }
 
-    // test the alert
-    if let Err(e) = &alert.evaluate(None).await {
-        return Err(anyhow::anyhow!("Alert test failed: {}", e));
-    }
+    // Commented intentionally - in case the alert period is big and there
+    // is huge amount of data within the time period, the below can timeout and return error.
+    // // test the alert
+    // if let Err(e) = &alert.evaluate(None).await {
+    //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
+    // }
 
     // save the alert
     match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
