@@ -252,31 +252,30 @@ export default defineComponent({
       ] = [newColSizes];
     },
     handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
-      // Here we are checking if the columns are default columns
+      // Here we are checking if the columns are default columns ( _timestamp and source)
       // As there can be case where user can have column with source like default source column
       // So checking enableResizing as well as its off for default column
       // If default columns not saving in colOrder
-      if (
-        newColOrder.length === 2 &&
-        newColOrder[0] === this.store.state.zoConfig.timestamp_column &&
-        newColOrder[1] === "source"
-      ) {
+      const updatedColOrder = [...newColOrder];
+
+      if (updatedColOrder[0] === this.store.state.zoConfig.timestamp_column)
+        updatedColOrder.splice(0, 1);
+
+      const sourceOrderIndex = updatedColOrder.indexOf("source");
+
+      if (sourceOrderIndex > -1) {
         const sourceColIndex = columns.findIndex(
           (col: any) => col.name === "source",
         );
 
         if (columns[sourceColIndex].enableResizing === false) {
-          this.searchObj.data.resultGrid.colOrder[
-            this.searchObj.data.stream.selectedStream
-          ] = [];
-
-          return;
+          updatedColOrder.splice(sourceOrderIndex, 1);
         }
       }
 
       this.searchObj.data.resultGrid.colOrder[
         this.searchObj.data.stream.selectedStream
-      ] = [...newColOrder];
+      ] = [...updatedColOrder];
     },
 
     getPageData(actionType: string) {

@@ -1702,7 +1702,9 @@ const useLogs = () => {
               if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
                 partitions.reverse();
               }
+
               await generateHistogramSkeleton();
+
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
@@ -2329,16 +2331,15 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
-      if (
-        searchObj.data.isOperationCancelled &&
-        searchObj.data.histogram?.xData?.length == 0
-      ) {
+      if (searchObj.data.isOperationCancelled) {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
-        notificationMsg.value = "Search query was cancelled";
-        searchObj.data.histogram.errorMsg = "Search query was cancelled";
-        searchObj.data.histogram.errorDetail = "Search query was cancelled";
+        if (!searchObj.data.histogram?.xData?.length) {
+          notificationMsg.value = "Search query was cancelled";
+          searchObj.data.histogram.errorMsg = "Search query was cancelled";
+          searchObj.data.histogram.errorDetail = "Search query was cancelled";
+        }
         return;
       }
 
@@ -2430,13 +2431,6 @@ const useLogs = () => {
                 notificationMsg.value += " TraceID:" + trace_id;
                 trace_id = "";
               }
-            }
-
-            if (err?.request?.status >= 429) {
-              notificationMsg.value = err?.response?.data?.message;
-              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
-              searchObj.data.histogram.errorDetail =
-                err?.response?.data?.error_detail;
             }
 
             reject(false);
@@ -3007,13 +3001,8 @@ const useLogs = () => {
           });
         }
       } else {
-        // searchObj.data.stream.selectedFields.forEach((field: any) => {
-        if (
-          searchObj.data.stream.selectedFields.includes(
-            store.state.zoConfig.timestamp_column,
-          )
-        ) {
-          searchObj.data.resultGrid.columns.push({
+        if (searchObj.data.hasSearchDataTimestampField == true) {
+          searchObj.data.resultGrid.columns.unshift({
             name: store.state.zoConfig.timestamp_column,
             id: store.state.zoConfig.timestamp_column,
             accessorFn: (row: any) =>
@@ -3034,7 +3023,7 @@ const useLogs = () => {
             sortable: true,
             enableResizing: false,
             meta: {
-              closable: true,
+              closable: false,
               showWrap: false,
               wrapContent: false,
             },
