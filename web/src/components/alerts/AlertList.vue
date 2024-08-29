@@ -457,6 +457,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "last_satisfied_at",
+        field: "last_satisfied_at",
+        label: t("alerts.lastSatisfied"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("alerts.actions"),
@@ -518,6 +525,7 @@ export default defineComponent({
               uuid: data.uuid,
               owner: data.owner,
               last_triggered_at:convertUnixToQuasarFormat(data.last_triggered_at),
+              last_satisfied_at:convertUnixToQuasarFormat(data.last_satisfied_at),
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
