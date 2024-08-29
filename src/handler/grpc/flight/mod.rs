@@ -36,7 +36,7 @@ use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::service::search::grpc::flight as grpcFlight;
+use crate::service::search::{cluster::flight_leader, grpc::flight as grpcFlight};
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -58,11 +58,6 @@ impl FlightService for FlightServiceImpl {
         let _start = std::time::Instant::now();
         let cfg = config::get_config();
 
-        // follow node
-        // follow cluster leader:
-        // TODO
-        // if follow cluster leader -> call: flight_leader.rs
-
         // 1. decnode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
@@ -72,14 +67,14 @@ impl FlightService for FlightServiceImpl {
 
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
-        if req.is_leader {
-            // follow leader
-            // TODO
-            return Err(Status::unimplemented("Implement follow leader"));
-        }
+        let result = if req.is_leader {
+            flight_leader::cluster_search(&req).await
+        } else {
+            grpcFlight::search(&req).await
+        };
 
         // 2. prepare dataufion context
-        let (ctx, physical_plan) = match grpcFlight::search(&req).await {
+        let (ctx, physical_plan) = match result {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
