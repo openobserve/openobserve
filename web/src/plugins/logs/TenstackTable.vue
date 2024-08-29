@@ -473,6 +473,7 @@ const table = useVueTable({
     },
   },
   onSortingChange: setSorting,
+  enableSorting: false,
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   defaultColumn: {
@@ -684,18 +685,8 @@ defineExpose({
 }
 
 .resizer.isResizing {
-  background: blue;
+  background: $primary;
   opacity: 1;
-}
-
-@media (hover: hover) {
-  .resizer {
-    opacity: 0;
-  }
-
-  *:hover > .resizer {
-    opacity: 1;
-  }
 }
 
 .container {
