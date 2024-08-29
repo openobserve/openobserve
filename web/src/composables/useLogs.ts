@@ -3001,7 +3001,12 @@ const useLogs = () => {
           });
         }
       } else {
-        if (searchObj.data.hasSearchDataTimestampField == true) {
+        if (
+          searchObj.data.hasSearchDataTimestampField ||
+          searchObj.data.stream.selectedFields.includes(
+            store.state.zoConfig.timestamp_column,
+          )
+        ) {
           searchObj.data.resultGrid.columns.unshift({
             name: store.state.zoConfig.timestamp_column,
             id: store.state.zoConfig.timestamp_column,
