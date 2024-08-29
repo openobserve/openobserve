@@ -202,9 +202,6 @@ pub struct Response {
     pub new_end_time: Option<i64>,
     #[serde(default)]
     pub result_cache_ratio: usize,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub original_cond: Option<Vec<(json::Value, Option<json::Value>)>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -249,7 +246,6 @@ impl Response {
             new_start_time: None,
             new_end_time: None,
             result_cache_ratio: 0,
-            original_cond: None,
         }
     }
 
@@ -319,13 +315,6 @@ impl Response {
 
     pub fn set_histogram_interval(&mut self, val: Option<i64>) {
         self.histogram_interval = val;
-    }
-
-    pub fn set_original_cond(
-        &mut self,
-        conditions: Option<Vec<(json::Value, Option<json::Value>)>>,
-    ) {
-        self.original_cond = conditions;
     }
 }
 
