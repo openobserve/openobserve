@@ -400,7 +400,7 @@ export const usePanelDataLoader = (
             let remainingQueryRange = max_query_range;
 
             // loop on all partitions and call search api for each partition
-            for (let i = 0; i < partitionArr.length; i++) {
+            for (let i = partitionArr.length - 1; i >= 0; i--) {
               const partition = partitionArr[i];
 
               if (abortControllerRef?.signal?.aborted) {
@@ -460,10 +460,14 @@ export const usePanelDataLoader = (
               state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
               // if the query is aborted or the response is partial, break the loop
-              if (
-                abortControllerRef?.signal?.aborted ||
-                searchRes.data.is_partial == true
-              ) {
+              if (abortControllerRef?.signal?.aborted) {
+                break;
+              }
+
+              if (searchRes.data.is_partial == true) {
+                // set the new start time as the start time of query
+                state.resultMetaData[currentQueryIndex].new_end_time =
+                  endISOTimestamp;
                 break;
               }
 
@@ -472,22 +476,23 @@ export const usePanelDataLoader = (
                 // convert timerange from milliseconds to hours
                 const timeRange = (partition[1] - partition[0]) / 3600000000;
 
-                // get cache ratio(it will be from 0 to 100)
-                const cacheRatio = searchRes.data.cached_ratio ?? 0;
+                // get result cache ratio(it will be from 0 to 100)
+                const resultCacheRatio = searchRes.data.result_cache_ratio ?? 0;
 
                 // calculate the remaining query range
                 // remaining query range = remaining query range - queried time range for the current partition
-                // queried time range = time range * ((100 - cache ratio) / 100)
+                // queried time range = time range * ((100 - result cache ratio) / 100)
 
-                const queriedTimeRange = timeRange * ((100 - cacheRatio) / 100);
+                const queriedTimeRange =
+                  timeRange * ((100 - resultCacheRatio) / 100);
 
                 remainingQueryRange = remainingQueryRange - queriedTimeRange;
 
                 // if the remaining query range is less than 0, break the loop
                 // we exceeded the max query range
                 if (remainingQueryRange < 0) {
-                  // set that is_partial to true if it is not last partition
-                  if (i < partitionArr.length - 1) {
+                  // set that is_partial to true if it is not last partition which we need to call
+                  if (i != 0) {
                     // set that is_partial to true
                     state.resultMetaData[currentQueryIndex].is_partial = true;
                     // set function error
@@ -495,7 +500,9 @@ export const usePanelDataLoader = (
                       `Query duration is modified due to query range restriction of ${max_query_range} hours`;
                     // set the new start time and end time
                     state.resultMetaData[currentQueryIndex].new_end_time =
-                      partition[1];
+                      endISOTimestamp;
+
+                    // set the new start time as the start time of query
                     state.resultMetaData[currentQueryIndex].new_start_time =
                       partition[0];
                     break;
