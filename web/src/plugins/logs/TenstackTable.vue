@@ -1,3 +1,19 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
     <table
@@ -58,6 +74,9 @@
               "
               :class="[
                 'resizer',
+                store.state.theme === 'dark'
+                  ? 'tw-bg-zinc-800'
+                  : 'tw-bg-zinc-300',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
               :style="{}"
@@ -94,31 +113,6 @@
                   (header.column.columnDef.meta as any).showWrap
                 "
               >
-                <!-- <span
-                        v-if="(header.column.columnDef.meta as any).showWrap"
-                        style="font-weight: normal"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-white'
-                            : 'text-grey-9'
-                        "
-                        >{{ t("common.wrap") }}</span
-                      >
-                      <q-toggle
-                        v-if="(header.column.columnDef.meta as any).showWrap"
-                        class="text-normal q-ml-xs q-mr-sm"
-                        :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                        v-model="(header.column.columnDef.meta as any).wrapContent"
-                        color="primary"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-white'
-                            : 'text-grey-7'
-                        "
-                        size="xs"
-                        dense
-                      /> -->
-
                 <q-icon
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
@@ -234,6 +228,13 @@
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
                 : 'tw-flex',
+              (tableRows[virtualRow.index] as any)[
+                store.state.zoConfig.timestamp_column
+              ] === highlightTimestamp
+                ? store.state.theme === 'dark'
+                  ? 'tw-bg-zinc-700'
+                  : 'tw-bg-zinc-300'
+                : '',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -281,7 +282,7 @@
                     cell.column.columnDef.id !== 'source'
                       ? cell.column.getSize() + 'px'
                       : wrap
-                        ? width - 225 - 12 + 'px'
+                        ? width - 260 - 12 + 'px'
                         : 'auto',
                   height: wrap ? '100%' : '26px',
                 }"
@@ -383,6 +384,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  highlightTimestamp: {
+    type: Number,
+    default: -1,
+  },
 });
 
 const { t } = useI18n();
@@ -441,9 +446,7 @@ watch(
     await nextTick();
 
     expandedRowIndices.value = [];
-    props.expandedRows.forEach((index) => {
-      expandRow(index as number);
-    });
+    setExpandedRows();
   },
   {
     deep: true,
@@ -480,9 +483,9 @@ const table = useVueTable({
     minSize: 60,
     maxSize: 800,
   },
-  debugTable: true,
-  debugHeaders: true,
-  debugColumns: true,
+  // debugTable: true,
+  // debugHeaders: true,
+  // debugColumns: true,
   columnResizeMode,
   enableColumnResizing: true,
   onStateChange: async (state) => {
@@ -507,9 +510,7 @@ watch(columnSizeVars, (newColSizes) => {
 });
 
 onMounted(() => {
-  props.expandedRows.forEach((index) => {
-    expandRow(index as number);
-  });
+  setExpandedRows();
 });
 
 const formattedRows = computed(() => {
@@ -555,6 +556,14 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+const setExpandedRows = () => {
+  props.expandedRows.forEach((index: any) => {
+    if (index < props.rows.length) {
+      expandRow(index as number);
+    }
+  });
+};
 
 const copyLogToClipboard = (value: any) => {
   emits("copy", value);
@@ -670,7 +679,6 @@ defineExpose({
   top: 0;
   height: 100%;
   width: 5px;
-  background: rgba(0, 0, 0, 0.5);
   cursor: col-resize;
   user-select: none;
   touch-action: none;
