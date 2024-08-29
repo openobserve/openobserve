@@ -787,6 +787,7 @@
     "prom_am": "Alert manager",
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
+    "cloneTitle": "Clone Alert",
     "start": "start",
     "pause": "Pause",
     "groupBy": "Group by",
