@@ -3053,7 +3053,7 @@ const useLogs = () => {
           if (field != store.state.zoConfig.timestamp_column) {
             let foundKey, foundValue;
 
-            if (sizes.length > 0) {
+            if (sizes?.length > 0) {
               Object.keys(sizes[0]).forEach((key) => {
                 const trimmedKey = key
                   .replace(/^--(header|col)-/, "")
