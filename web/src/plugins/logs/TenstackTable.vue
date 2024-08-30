@@ -350,6 +350,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import { debounce } from "quasar";
 
 const props = defineProps({
   rows: {
@@ -483,9 +484,6 @@ const table = useVueTable({
     minSize: 60,
     maxSize: 800,
   },
-  // debugTable: true,
-  // debugHeaders: true,
-  // debugColumns: true,
   columnResizeMode,
   enableColumnResizing: true,
   onStateChange: async (state) => {
@@ -506,12 +504,16 @@ const columnSizeVars = computed(() => {
 });
 
 watch(columnSizeVars, (newColSizes) => {
-  emits("update:columnSizes", newColSizes);
+  debouncedUpdate(newColSizes);
 });
 
 onMounted(() => {
   setExpandedRows();
 });
+
+const debouncedUpdate = debounce((newColSizes) => {
+  emits("update:columnSizes", newColSizes);
+}, 500);
 
 const formattedRows = computed(() => {
   return table.getRowModel().rows;
@@ -541,7 +543,7 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 26,
+    estimateSize: () => 20,
     overscan: 5,
     measureElement:
       typeof window !== "undefined" &&
