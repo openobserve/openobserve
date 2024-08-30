@@ -107,7 +107,6 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
-      console.log(dashboardPanelData.data.config);
       if (!dashboardPanelData.data.config.chip_column) {
         dashboardPanelData.data.config.chip_column = [];
       }
@@ -149,5 +148,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

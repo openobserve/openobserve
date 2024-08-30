@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @row-click="(...args: any) => $emit('row-click', ...args)"
   >
     <template
-      v-for="config in dashboardPanelData.data.config.chip_column"
+      v-for="config in chipColumns"
       v-slot:[`body-cell-${config.column_name}`]="props"
       :key="config.column_name"
     >
@@ -48,10 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
 import { exportFile } from "quasar";
-import { defineComponent, inject, ref } from "vue";
+import { defineComponent, PropType, ref } from "vue";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -65,6 +64,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
       default: false,
+    },
+    chipColumns: {
+      required: false,
+      type: Array as PropType<any[]>,
+      default: () => [],
     },
   },
   emits: ["row-click"],
@@ -87,21 +91,6 @@ export default defineComponent({
 
       return `"${formatted}"`;
     }
-
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
-    // const {
-    //   dashboardPanelData: {
-    //     data: {
-    //       config: { chip_column },
-    //     },
-    //   },
-    // } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const downloadTableAsCSV = (title?: any) => {
       // naive encoding to csv format
@@ -158,29 +147,6 @@ export default defineComponent({
       }).color;
     };
 
-    // const chipConfig = [
-    //   {
-    //     column_name: "Level",
-    //     operator: "equals",
-    //     values: [
-    //       {
-    //         property_value: "info",
-    //         color: "orange",
-    //       },
-    //     ],
-    //   },
-    //   {
-    //     column_name: "Log",
-    //     operator: "contains",
-    //     values: [
-    //       {
-    //         property_value: "POST",
-    //         color: "red",
-    //       },
-    //     ],
-    //   },
-    // ];
-
     return {
       pagination: ref({
         rowsPerPage: 0,
@@ -189,7 +155,6 @@ export default defineComponent({
       tableRef,
       getChipColor,
       isPropChipped,
-      dashboardPanelData,
     };
   },
 });

@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
+          :chip-columns="panelSchema.config?.chip_column"
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -253,7 +254,6 @@ export default defineComponent({
         forceLoad,
         searchType,
       );
-
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
 
