@@ -441,7 +441,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-
+          <!-- if selectAllValueForMultiSelect is custom then show this input -->
+          <div
+            v-if="
+              variableData.selectAllValueForMultiSelect === 'custom' &&
+              variableData.type == 'query_values'
+            "
+          >
+            <div
+              v-for="(value, index) in variableData.customMultiSelectValue"
+              :key="index"
+              class="q-mb-sm"
+            >
+              <q-input
+                dense
+                filled
+                outlined
+                stack-label
+                class="col textbox showLabelOnTop q-mr-sm"
+                v-model="variableData.customMultiSelectValue[index]"
+                label="Custom Value"
+                name="value"
+              />
+              <q-btn
+                size="sm"
+                padding="12px 5px"
+                flat
+                dense
+                @click="removeCustomValue(index)"
+                icon="close"
+                :data-test="`dashboard-variable-custom-close-${index}`"
+              />
+            </div>
+            <q-btn
+              no-caps
+              icon="add"
+              no-outline
+              class="q-mt-md"
+              @click="addCustomValue"
+              data-test="dashboard-add-custom-value-btn"
+            >
+              Add Custom Value
+            </q-btn>
+          </div>
           <!-- hide on dashboard toggle -->
           <div>
             <q-toggle
@@ -568,6 +610,7 @@ export default defineComponent({
       multiSelect: false,
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
+      customMultiSelectValue: [],
     });
 
     const filterCycleError: any = ref("");
@@ -741,6 +784,7 @@ export default defineComponent({
       ) {
         variableData.multiSelect = false;
         variableData.selectAllValueForMultiSelect = "";
+        variableData.customMultiSelectValue = [];
       }
 
       if (editMode.value) {
@@ -937,6 +981,17 @@ export default defineComponent({
         }))
         .filter((it: any) => it.label !== variableData.name),
     );
+
+    // Add new custom value to the array
+    const addCustomValue = () => {
+      variableData.customMultiSelectValue.push("");
+    };
+
+    // Remove a custom value from the array by index
+    const removeCustomValue = (index: number) => {
+      variableData.customMultiSelectValue.splice(index, 1);
+    };
+
     return {
       variableData,
       store,
@@ -963,6 +1018,8 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
+      addCustomValue,
+      removeCustomValue,
     };
   },
 });
