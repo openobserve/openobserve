@@ -380,8 +380,6 @@ export const usePanelDataLoader = (
               ? `${res?.data?.histogram_interval} seconds`
               : null;
 
-            const partitionResult: any = [];
-
             // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
             state.data.push([]);
             state.metadata.queries.push({});
@@ -451,7 +449,7 @@ export const usePanelDataLoader = (
 
               state.data[currentQueryIndex] = [
                 ...searchRes.data.hits,
-                ...state.data[currentQueryIndex],
+                ...(state.data[currentQueryIndex] ?? []),
               ];
 
               // update result metadata
