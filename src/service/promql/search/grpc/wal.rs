@@ -19,6 +19,7 @@ use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
 use config::{
     get_config,
     meta::{
+        cluster::get_internal_grpc_token,
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::StreamType,
     },
@@ -43,7 +44,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+    common::infra::cluster::get_cached_online_ingester_nodes,
     service::search::{
         datafusion::exec::{prepare_datafusion_context, register_table},
         MetadataMap,

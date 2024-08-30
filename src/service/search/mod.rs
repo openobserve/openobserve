@@ -146,9 +146,9 @@ pub async fn search(
     let handle = tokio::task::spawn(async move {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req, req_regions, req_clusters).await
+            cluster::super_cluster::search(request, query, req_regions, req_clusters).await
         } else {
-            cluster::http::search(req).await
+            cluster::http::search(request, query).await
         }
         #[cfg(not(feature = "enterprise"))]
         {
@@ -361,6 +361,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
+
+    use config::meta::cluster::get_internal_grpc_token;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -394,7 +396,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     )
                 });
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
@@ -522,6 +524,8 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
+
+    use config::meta::cluster::get_internal_grpc_token;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -556,7 +560,7 @@ pub async fn cancel_query(
                     )
                 });
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)

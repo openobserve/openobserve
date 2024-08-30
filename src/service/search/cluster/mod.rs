@@ -27,9 +27,10 @@ use config::{
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
+    super::request::Request,
     config::metrics,
     infra::dist_lock,
-    infra::errors::{Error, ErrorCodes},
+    infra::errors::{Error, ErrorCodes, Result},
 };
 
 use super::{match_file, new_sql::NewSql};
@@ -48,7 +49,7 @@ pub mod super_cluster;
 pub async fn work_group_checking(
     trace_id: &str,
     start: std::time::Instant,
-    req: &cluster_rpc::SearchRequest,
+    req: &Request,
     work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
     locker: &Option<dist_lock::Locker>,
     user_id: Option<&str>,
@@ -101,7 +102,7 @@ pub async fn work_group_checking(
 pub async fn work_group_need_wait(
     trace_id: &str,
     start: std::time::Instant,
-    req: &cluster_rpc::SearchRequest,
+    req: &Request,
     work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
     user_id: Option<&str>,
 ) -> Result<()> {

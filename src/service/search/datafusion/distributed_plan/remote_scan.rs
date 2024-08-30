@@ -26,7 +26,7 @@ use arrow_flight::{
     Ticket,
 };
 use arrow_schema::{Schema, SchemaRef};
-use config::meta::{cluster::Node, stream::FileKey};
+use config::meta::{cluster::NodeInfo, stream::FileKey};
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -48,7 +48,7 @@ use tonic::{
 };
 
 use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
-use crate::service::search::{infra_cluster, request::Request};
+use crate::service::search::request::Request;
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -59,7 +59,7 @@ pub struct RemoteScanExec {
     match_all_keys: Vec<String>,
     is_leader: bool,
     req: Request,
-    nodes: Vec<Node>,
+    nodes: Vec<Arc<dyn NodeInfo>>,
     partitions: usize,
     cache: PlanProperties,
 }
@@ -73,7 +73,7 @@ impl RemoteScanExec {
         match_all_keys: Vec<String>,
         is_leader: bool,
         req: Request,
-        nodes: Vec<Node>,
+        nodes: Vec<Arc<dyn NodeInfo>>,
     ) -> Self {
         let output_partitions = nodes.len();
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
@@ -184,7 +184,7 @@ impl ExecutionPlan for RemoteScanExec {
 async fn get_remote_batch(
     input: Arc<dyn ExecutionPlan>,
     partition: usize,
-    node: Node,
+    node: Arc<dyn NodeInfo>,
     file_list: Vec<FileKey>,
     partition_keys: Vec<PartitionKeys>,
     match_all_keys: Vec<String>,
@@ -240,10 +240,11 @@ async fn get_remote_batch(
         .org_header_key
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid org_header_key".to_string()))?;
-    let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+    let token: MetadataValue<_> = node
+        .get_auth_token()
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid token".to_string()))?;
-    let channel = Channel::from_shared(node.grpc_addr.clone())
+    let channel = Channel::from_shared(node.get_grpc_addr().clone())
         .unwrap()
         .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
         .connect()
@@ -252,7 +253,7 @@ async fn get_remote_batch(
             log::error!(
                 "[trace_id {}] search->grpc: node: {}, connect err: {:?}",
                 req.trace_id.clone(),
-                &node.grpc_addr,
+                &node.get_grpc_addr(),
                 err
             );
             DataFusionError::Internal("connect search node error".to_string())

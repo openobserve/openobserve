@@ -17,7 +17,7 @@ use std::{cmp::min, ops::Bound, sync::Arc, time::Duration};
 
 use config::{
     cluster::*,
-    get_config, get_instance_id,
+    get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
@@ -115,16 +115,6 @@ pub async fn get_node_from_consistent_hash(
         return Some(uuid.clone());
     }
     None
-}
-
-#[inline]
-pub fn get_internal_grpc_token() -> String {
-    let cfg = get_config();
-    if cfg.grpc.internal_grpc_token.is_empty() {
-        get_instance_id()
-    } else {
-        cfg.grpc.internal_grpc_token.clone()
-    }
 }
 
 /// Register and keepalive the node to cluster

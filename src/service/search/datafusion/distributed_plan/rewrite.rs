@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::Node, stream::FileKey};
+use config::meta::{cluster::NodeInfo, stream::FileKey};
 use datafusion::{
     common::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
@@ -32,7 +32,7 @@ use crate::service::search::request::Request;
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
     pub req: Request,
-    pub nodes: Vec<Node>,
+    pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
     pub partition_keys: HashMap<String, Vec<PartitionKeys>>,
     pub match_all_keys: Vec<String>,
@@ -44,7 +44,7 @@ impl RemoteScanRewriter {
     #[allow(dead_code)]
     pub fn new(
         req: Request,
-        nodes: Vec<Node>,
+        nodes: Vec<Arc<dyn NodeInfo>>,
         file_lists: HashMap<String, Vec<Vec<FileKey>>>,
         partition_keys: HashMap<String, Vec<PartitionKeys>>,
         match_all_keys: Vec<String>,

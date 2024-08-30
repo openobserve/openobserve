@@ -15,7 +15,10 @@
 
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use config::meta::{cluster::RoleGroup, search::SearchEventType};
+use config::meta::{
+    cluster::{IntoArcVec, RoleGroup},
+    search::SearchEventType,
+};
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::ExecutionPlan, prelude::SessionContext,
 };
@@ -142,7 +145,7 @@ pub async fn cluster_search(
             flight_request.match_all_keys.clone(),
             false,
             req.clone(),
-            nodes,
+            nodes.into_arc_vec(),
         ));
         physical_plan = top_merge_node.with_new_children(vec![remote_scan_exec])?;
     } else {
@@ -153,7 +156,7 @@ pub async fn cluster_search(
             flight_request.match_all_keys.clone(),
             false,
             req.clone(),
-            nodes,
+            nodes.into_arc_vec(),
         ));
     }
 

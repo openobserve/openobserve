@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::cluster::get_internal_grpc_token;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_client::TraceServiceClient, trace_service_server::TraceService,
     ExportTraceServiceRequest, ExportTraceServiceResponse,
@@ -20,7 +21,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster, service::search::MetadataMap};
+use crate::service::search::MetadataMap;
 
 #[derive(Default)]
 pub struct TraceServer;
@@ -52,7 +53,7 @@ impl TraceService for TraceServer {
             )
         });
 
-        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
         let channel = super::get_ingester_channel().await?;

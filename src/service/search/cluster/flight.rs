@@ -21,7 +21,7 @@ use config::{
     get_config,
     meta::{
         bitvec::BitVec,
-        cluster::{Node, Role, RoleGroup},
+        cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         stream::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
@@ -433,7 +433,7 @@ pub async fn search(
         .collect::<HashMap<_, _>>();
     let mut rewrite = RemoteScanRewriter::new(
         req,
-        nodes,
+        nodes.into_arc_vec(),
         partition_file_lists,
         partition_keys,
         match_all_keys,

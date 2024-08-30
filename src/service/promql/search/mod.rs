@@ -21,7 +21,7 @@ use std::{
 use config::{
     ider,
     meta::{
-        cluster::RoleGroup,
+        cluster::{get_internal_grpc_token, RoleGroup},
         search::ScanStats,
         stream::StreamType,
         usage::{RequestStats, UsageType},
@@ -175,7 +175,7 @@ async fn search_in_cluster(
                 });
 
                 let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
-                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)

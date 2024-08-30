@@ -25,31 +25,34 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes, Result};
-use proto::cluster_rpc;
+use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::{common::meta::functions::VRLResultResolver, service::search::new_sql::NewSql};
+use crate::{
+    common::meta::functions::VRLResultResolver,
+    service::search::{new_sql::NewSql, request::Request},
+};
 
 pub async fn search(
-    mut req: cluster_rpc::SearchRequest,
+    req: Request,
+    query: SearchQuery,
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
-    let trace_id = req.job.as_ref().unwrap().trace_id.clone();
-    let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
-    let track_total_hits = req.query.as_ref().unwrap().track_total_hits;
+    let trace_id = req.trace_id.clone();
+    let query_type = query.query_type.to_lowercase();
+    let track_total_hits = query.track_total_hits;
 
     // handle request time range
-    let sql = NewSql::new(&req).await?;
+    let sql = NewSql::new_from_req(&req, &query).await?;
     let sql = Arc::new(sql);
 
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
-    let uses_zo_fn = req.query.as_ref().unwrap().uses_zo_fn;
-    let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
-    req.query.as_mut().unwrap().query_fn = "".to_string();
+    let uses_zo_fn = query.uses_zo_fn;
+    let mut query_fn = query.query_fn.clone();
 
     // handle query function
     // let (_took, grpc_results) =

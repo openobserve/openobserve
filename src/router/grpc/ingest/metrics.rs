@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::cluster::get_internal_grpc_token;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
@@ -20,7 +21,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster, service::search::MetadataMap};
+use crate::service::search::MetadataMap;
 
 #[derive(Default)]
 pub struct MetricsServer;
@@ -51,7 +52,7 @@ impl MetricsService for MetricsServer {
                 &mut MetadataMap(request.metadata_mut()),
             )
         });
-        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
         let channel = super::get_ingester_channel().await?;
