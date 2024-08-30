@@ -552,9 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b
-                  >This is only applicable when breakdown field is available</b
-                >
+                <b>This is only applicable when breakdown field is available</b>
                 <br />
                 <br />
                 Specify the number of top N values to show when breakdown field
@@ -674,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-input
         v-if="
-          ['area', 'line', 'area-stacked'].includes(
+          ['area', 'line', 'area-stacked', 'bar'].includes(
             dashboardPanelData.data.type,
           )
         "
