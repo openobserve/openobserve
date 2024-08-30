@@ -1542,6 +1542,7 @@ const useLogs = () => {
           router.currentRoute.value.name == "logs"
         ) {
           queryReq.query.from = 0;
+          searchObj.meta.refreshHistogram = true;
         }
 
         // get function definition
@@ -2942,7 +2943,10 @@ const useLogs = () => {
       // If user adds timestamp manually then only we get it in response.
       // If we don’t add timestamp and add timestamp to table it should show invalid date.
 
-      if (searchObj.data.stream.selectedFields.length == 0) {
+      if (
+        searchObj.data.stream.selectedFields.length == 0 ||
+        !searchObj.data.queryResults?.hits?.length
+      ) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
         if (
           (searchObj.meta.sqlMode == true &&
@@ -3049,6 +3053,9 @@ const useLogs = () => {
             ];
         }
 
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             let foundKey, foundValue;
@@ -3079,7 +3086,7 @@ const useLogs = () => {
                 showWrap: true,
                 wrapContent: false,
               },
-              size: foundValue || 250,
+              size: foundValue ? foundValue : getColumnWidth(context, field),
               maxSize: window.innerWidth,
             });
           }
@@ -3092,6 +3099,37 @@ const useLogs = () => {
       console.log("Error while updating grid columns");
       notificationMsg.value = "Error while updating table columns.";
     }
+  };
+
+  /**
+   * Helper function to calculate width of the column based on its content(from first 5 rows)
+   * @param context - Canvas Context to calculate width of column using its content
+   * @param field - Field name for which width needs to be calculated
+   * @returns - Width of the column
+   */
+  const getColumnWidth = (context: any, field: string) => {
+    // Font of table header
+    context.font = "bold 14px sans-serif";
+    let max = context.measureText(field).width;
+
+    // Font of the table content
+    context.font = "12px monospace";
+    let width = 0;
+    try {
+      for (let i = 0; i < 4; i++) {
+        if (searchObj.data.queryResults.hits?.[i]?.[field]) {
+          width = context.measureText(
+            searchObj.data.queryResults.hits[i][field],
+          ).width;
+
+          if (width > max) max = width;
+        }
+      }
+    } catch (err) {
+      console.log("Error while calculation column width");
+    }
+
+    return max > 800 ? 800 : max < 150 ? 150 : max + 20;
   };
 
   function getHistogramTitle() {
