@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use config::{{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token}, get_config};
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};

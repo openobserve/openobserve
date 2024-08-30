@@ -293,7 +293,9 @@ pub async fn search_partition(
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
         histogram_interval: sql.histogram_interval,
-        max_query_range: stream_settings.max_query_range,
+        // TODO: search_partition with multiple streams
+        // max_query_range: stream_settings.max_query_range,
+        max_query_range: 100,
         partitions: vec![],
     };
 
@@ -829,25 +831,6 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
             }
         }
     }
-}
-
-// generate parquet file search schema
-fn generate_search_schema_diff(
-    schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, Error> {
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-
-    for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
-            if field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
-        }
-    }
-
-    Ok(diff_fields)
 }
 
 // generate parquet file search schema

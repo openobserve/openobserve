@@ -35,7 +35,6 @@ pub struct NewEmptyTable {
     schema: SchemaRef,
     partitions: usize,
     sorted_by_time: bool,
-    sorted_by_time: bool,
 }
 
 impl NewEmptyTable {
@@ -92,7 +91,6 @@ impl TableProvider for NewEmptyTable {
                 None,
                 filters,
                 limit,
-                self.sorted_by_time,
                 self.sorted_by_time,
             )
             .with_partitions(self.partitions),

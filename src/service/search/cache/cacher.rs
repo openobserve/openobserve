@@ -169,7 +169,7 @@ pub async fn check_cache(
             .map(|v| v.cached_response.total)
             .sum::<usize>();
 
-        let deltas = if total_hits == (meta.meta.limit as usize) {
+        let deltas = if total_hits == (sql.limit as usize) {
             *should_exec_query = false;
             vec![]
         } else {

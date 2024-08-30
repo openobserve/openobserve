@@ -207,7 +207,6 @@ pub async fn search(
     }
 
     let mut tables = Vec::new();
-    let mut tables = Vec::new();
     for (ver, files) in files_group {
         if files.is_empty() {
             continue;

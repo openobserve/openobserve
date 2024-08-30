@@ -40,7 +40,6 @@ pub struct NewEmptyExec {
     filters: Vec<Expr>,
     limit: Option<usize>,
     sorted_by_time: bool,
-    sorted_by_time: bool,
 }
 
 impl NewEmptyExec {
@@ -52,9 +51,7 @@ impl NewEmptyExec {
         filters: &[Expr],
         limit: Option<usize>,
         sorted_by_time: bool,
-        sorted_by_time: bool,
     ) -> Self {
-        let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
         let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
         NewEmptyExec {
             name: name.to_string(),
@@ -64,7 +61,6 @@ impl NewEmptyExec {
             projection: projection.cloned(),
             filters: filters.to_owned(),
             limit,
-            sorted_by_time,
             sorted_by_time,
         }
     }
@@ -91,7 +87,6 @@ impl NewEmptyExec {
     fn compute_properties(
         schema: SchemaRef,
         n_partitions: usize,
-        sorted_by_time: bool,
         sorted_by_time: bool,
     ) -> PlanProperties {
         let index = schema.index_of(&get_config().common.column_timestamp);

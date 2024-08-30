@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use ::datafusion::datasource::TableProvider;
 use config::{
@@ -65,29 +65,4 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
-}
-
-struct ReleaseFileGuard {
-    trace_id: String,
-}
-
-impl ReleaseFileGuard {
-    fn new(trace_id: &str) -> Self {
-        Self {
-            trace_id: trace_id.to_string(),
-        }
-    }
-}
-
-impl Drop for ReleaseFileGuard {
-    fn drop(&mut self) {
-        log::info!(
-            "[trace_id {}] grpc->search: drop ReleaseFileGuard",
-            self.trace_id
-        );
-        // clear session data
-        crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
-        // release wal lock files
-        crate::common::infra::wal::release_request(&self.trace_id);
-    }
 }
