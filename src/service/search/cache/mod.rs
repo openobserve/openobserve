@@ -346,6 +346,7 @@ fn merge_response(
                 continue;
             }
             resp.hits.extend(res.hits.clone());
+            resp.histogram_interval = res.histogram_interval;
         }
         resp.took = cache_took;
         resp

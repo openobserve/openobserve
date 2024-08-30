@@ -1817,7 +1817,7 @@ const useLogs = () => {
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
       ); // Convert microseconds to milliseconds
       if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
-        startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 10, 0); // Round to the nearest whole minute
+        startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {
         startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
         // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
@@ -3110,13 +3110,13 @@ const useLogs = () => {
   const getColumnWidth = (context: any, field: string) => {
     // Font of table header
     context.font = "bold 14px sans-serif";
-    let max = context.measureText(field).width;
+    let max = context.measureText(field).width + 16;
 
     // Font of the table content
     context.font = "12px monospace";
     let width = 0;
     try {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 5; i++) {
         if (searchObj.data.queryResults.hits?.[i]?.[field]) {
           width = context.measureText(
             searchObj.data.queryResults.hits[i][field],
@@ -3129,7 +3129,13 @@ const useLogs = () => {
       console.log("Error while calculation column width");
     }
 
-    return max > 800 ? 800 : max < 150 ? 150 : max + 20;
+    max += 24; // 24px padding
+
+    if (max > 800) return 800;
+
+    if (max < 150) return 150;
+
+    return max;
   };
 
   function getHistogramTitle() {
