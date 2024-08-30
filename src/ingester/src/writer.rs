@@ -110,8 +110,19 @@ pub async fn check_ttl() -> Result<()> {
         let w = w.read().await;
         for r in w.values() {
             // check writer
-            r.write(Arc::new(Schema::empty()), Entry::default(), true)
-                .await?;
+            let wal = r.wal_lock();
+            let wal = &mut *wal.lock().await;
+            let mem = &mut r.memtable_lock();
+            let mem = &mut *mem.write().await;
+            r.write(
+                Arc::new(Schema::empty()),
+                Entry::default(),
+                true,
+                "",
+                wal,
+                mem,
+            )
+            .await?;
         }
     }
     Ok(())
@@ -173,6 +184,9 @@ impl Writer {
         schema: Arc<Schema>,
         mut entry: Entry,
         check_ttl: bool,
+        in_trace_id: &str,
+        wal: &mut WalWriter,
+        mem: &mut MemTable,
     ) -> Result<()> {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
@@ -184,17 +198,17 @@ impl Writer {
         } else {
             (Vec::new(), None)
         };
-        let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
-        let wal_lock_time = start.elapsed().as_millis() as f64;
-        metrics::INGEST_WAL_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(wal_lock_time);
-        let mut mem = self.memtable.write().await;
-        let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
-        metrics::INGEST_MEMTABLE_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(mem_lock_time);
+        // let start = std::time::Instant::now();
+        // let mut wal = self.wal.lock().await;
+        // let wal_lock_time = start.elapsed().as_millis() as f64;
+        // metrics::INGEST_WAL_LOCK_TIME
+        //     .with_label_values(&[&self.key.org_id])
+        //     .observe(wal_lock_time);
+        // let mut mem = self.memtable.write().await;
+        // let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
+        // metrics::INGEST_MEMTABLE_LOCK_TIME
+        //     .with_label_values(&[&self.key.org_id])
+        //     .observe(mem_lock_time);
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(mem.size(), entry.data_size)
         {
@@ -207,7 +221,7 @@ impl Writer {
                 .join("logs")
                 .join(self.idx.to_string());
             log::info!(
-                "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
+                "[INGESTER:MEM] [{in_trace_id}] create file: {}/{}/{}/{}.wal",
                 wal_dir.display().to_string(),
                 &self.key.org_id,
                 &self.key.stream_type,
@@ -221,6 +235,7 @@ impl Writer {
                 cfg.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
+
             let old_wal = std::mem::replace(&mut *wal, new_wal);
 
             // rotation memtable
@@ -233,19 +248,28 @@ impl Writer {
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
             let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-            log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
+            log::info!(
+                "[INGESTER:MEM] [{in_trace_id}] start add to IMMUTABLES, file: {}",
+                path_str,
+            );
             IMMUTABLES.write().await.insert(path, table);
-            log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
+            log::info!(
+                "[INGESTER:MEM] [{in_trace_id}] dones add to IMMUTABLES, file: {}",
+                path_str
+            );
         }
 
         if !check_ttl {
             // write into wal
+            log::info!("[check_ttl] [{in_trace_id}] start wal write");
             wal.write(&entry_bytes, false).context(WalSnafu)?;
+            log::info!("[check_ttl] [{in_trace_id}] end wal write");
             // write into memtable
             let Some(entry_batch) = entry_batch else {
                 return Ok(());
             };
             mem.write(schema, entry, entry_batch)?;
+            log::info!("[check_ttl] [{in_trace_id}] end mem write");
         }
 
         Ok(())
@@ -304,6 +328,18 @@ impl Writer {
         json_size > 0
             && (json_size + data_size > cfg.limit.max_file_size_in_memory
                 || arrow_size + data_size > cfg.limit.max_file_size_in_memory)
+    }
+
+    pub fn key_org_id(&self) -> Arc<str> {
+        self.key.org_id.clone()
+    }
+
+    pub fn wal_lock(&self) -> Arc<Mutex<WalWriter>> {
+        self.wal.clone()
+    }
+
+    pub fn memtable_lock(&self) -> Arc<RwLock<MemTable>> {
+        self.memtable.clone()
     }
 }
 

@@ -32,7 +32,7 @@ use crate::{
     ReadRecordBatchEntry,
 };
 
-pub(crate) struct MemTable {
+pub struct MemTable {
     streams: HashMap<Arc<str>, Stream>, // key: schema name, val: stream
     json_bytes_written: AtomicU64,
     arrow_bytes_written: AtomicU64,
