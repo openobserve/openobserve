@@ -1127,12 +1127,12 @@ export const convertSQLData = async (
       const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(processedData.map((obj: any) => obj[key1])),
+        ...new Set(missingValueData.map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = processedData.filter((it: any) => it[key1] == key);
+        const data = missingValueData.filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
