@@ -687,17 +687,7 @@ pub async fn partition_file_lists(
     let mut file_partitions = HashMap::with_capacity(file_lists.len());
     for (stream_name, file_list) in file_lists {
         let partitions = partition_filt_list(file_list, nodes, group).await?;
-        let mut partition_file_list = Vec::with_capacity(nodes.len());
-        let mut partitions = partitions.into_iter();
-        // partition file list, push file list to querier node
-        for node in nodes {
-            if node.is_querier() {
-                partition_file_list.push(partitions.next().unwrap());
-            } else {
-                partition_file_list.push(vec![]);
-            }
-        }
-        file_partitions.insert(stream_name, partition_file_list);
+        file_partitions.insert(stream_name, partitions);
     }
     Ok(file_partitions)
 }
@@ -714,13 +704,22 @@ pub async fn partition_filt_list(
     if cfg.memory_cache.cache_latest_files {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
-    match partition_strategy {
-        QueryPartitionStrategy::FileNum => Ok(partition_file_by_nums(file_list, querier_num)),
-        QueryPartitionStrategy::FileSize => Ok(partition_file_by_bytes(file_list, querier_num)),
-        QueryPartitionStrategy::FileHash => {
-            Ok(partition_file_by_hash(file_list, nodes, group).await)
+    let partitions = match partition_strategy {
+        QueryPartitionStrategy::FileNum => partition_file_by_nums(file_list, querier_num),
+        QueryPartitionStrategy::FileSize => partition_file_by_bytes(file_list, querier_num),
+        QueryPartitionStrategy::FileHash => partition_file_by_hash(file_list, nodes, group).await,
+    };
+    let mut partition_file_list = Vec::with_capacity(nodes.len());
+    let mut partitions = partitions.into_iter();
+    // partition file list, push file list to querier node
+    for node in nodes {
+        if node.is_querier() {
+            partition_file_list.push(partitions.next().unwrap());
+        } else {
+            partition_file_list.push(vec![]);
         }
     }
+    Ok(partition_file_list)
 }
 
 pub(crate) fn partition_file_by_nums(
