@@ -138,7 +138,6 @@ pub async fn search(
         trace_id.clone(),
         org_id.to_string(),
         stream_type,
-        cluster_rpc::SearchType::Cluster,
         in_req.timeout,
         user_id.clone(),
         Some((query.start_time, query.end_time)),

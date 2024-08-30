@@ -41,7 +41,6 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
         cluster_rpc::MetricsQueryRequest {
             job: Some(job),
             org_id: "".to_string(),
-            stype: cluster_rpc::SearchType::User.into(),
             need_wal: false,
             query: Some(req_query),
             timeout: 0,

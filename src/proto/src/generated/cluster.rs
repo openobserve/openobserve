@@ -136,43 +136,6 @@ impl StreamType {
         }
     }
 }
-/// Search request type
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum SearchType {
-    /// user input search request
-    User = 0,
-    /// cluster dispatch search request
-    Cluster = 1,
-    /// ingester node just search local wal
-    WalOnly = 2,
-    /// super cluster
-    SuperCluster = 3,
-}
-impl SearchType {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            SearchType::User => "USER",
-            SearchType::Cluster => "CLUSTER",
-            SearchType::WalOnly => "WAL_ONLY",
-            SearchType::SuperCluster => "SUPER_CLUSTER",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "USER" => Some(Self::User),
-            "CLUSTER" => Some(Self::Cluster),
-            "WAL_ONLY" => Some(Self::WalOnly),
-            "SUPER_CLUSTER" => Some(Self::SuperCluster),
-            _ => None,
-        }
-    }
-}
 /// Generated client implementations.
 pub mod event_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -839,8 +802,6 @@ pub struct MetricsQueryRequest {
     pub job: ::core::option::Option<Job>,
     #[prost(string, tag = "2")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(enumeration = "SearchType", tag = "3")]
-    pub stype: i32,
     #[prost(bool, tag = "4")]
     pub need_wal: bool,
     #[prost(message, optional, tag = "5")]
@@ -1356,8 +1317,6 @@ pub struct SearchRequest {
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
     pub stream_type: ::prost::alloc::string::String,
-    #[prost(enumeration = "SearchType", tag = "4")]
-    pub stype: i32,
     #[prost(message, optional, tag = "5")]
     pub query: ::core::option::Option<SearchQuery>,
     #[prost(enumeration = "AggregateMode", tag = "6")]
@@ -3175,8 +3134,6 @@ pub struct FlightSearchRequest {
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
     pub stream_type: ::prost::alloc::string::String,
-    #[prost(enumeration = "SearchType", tag = "5")]
-    pub search_type: i32,
     #[prost(bytes = "vec", tag = "6")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(message, repeated, tag = "7")]

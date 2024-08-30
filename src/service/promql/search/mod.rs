@@ -60,7 +60,6 @@ pub async fn search(
 ) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::User as _;
     req.timeout = timeout;
     search_in_cluster(req, user_email).await
 }
@@ -133,11 +132,7 @@ async fn search_in_cluster(
             partition: node.id as _,
             ..job.clone()
         });
-        let mut req = cluster_rpc::MetricsQueryRequest {
-            job,
-            stype: cluster_rpc::SearchType::Cluster as _,
-            ..req.clone()
-        };
+        let mut req = cluster_rpc::MetricsQueryRequest { job, ..req.clone() };
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);

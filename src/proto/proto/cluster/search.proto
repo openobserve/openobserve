@@ -35,7 +35,6 @@ message SearchRequest {
     Job                            job = 1;
     string                      org_id = 2;
     string                 stream_type = 3;
-    SearchType                   stype = 4;
     SearchQuery                  query = 5;
     AggregateMode             agg_mode = 6;
     repeated FileKey         file_list = 7;

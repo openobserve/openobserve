@@ -25,7 +25,6 @@ message FlightSearchRequest {
     uint32                      partition = 2;
     string                         org_id = 3;
     string                    stream_type = 4;
-    SearchType                search_type = 5;
     bytes                            plan = 6;
     repeated FileKey            file_list = 7;
     repeated PartitionKeys partition_keys = 8;

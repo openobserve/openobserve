@@ -141,7 +141,7 @@ pub async fn search(
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
     // search in object storage
-    if req.search_type != cluster_rpc::SearchType::WalOnly as i32 {
+    if !req.file_list.is_empty() {
         let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),

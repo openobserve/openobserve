@@ -195,18 +195,12 @@ async fn get_remote_batch(
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
     };
     let physical_plan_bytes = physical_plan_to_bytes_with_extension_codec(input, &proto)?;
-    let search_type = if file_list.is_empty() {
-        cluster_rpc::SearchType::WalOnly
-    } else {
-        cluster_rpc::SearchType::User
-    };
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let request = FlightSearchRequest {
         trace_id: req.trace_id.clone(),
         partition: partition as u32,
         org_id: req.org_id.clone(),
         stream_type: req.stream_type.to_string(),
-        search_type: search_type.into(),
         plan: physical_plan_bytes.to_vec(),
         file_list: file_list.iter().map(cluster_rpc::FileKey::from).collect(),
         partition_keys,
