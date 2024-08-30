@@ -221,7 +221,7 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData.value.map(
+    const interval = resultMetaData?.value?.map(
       (it: any) => it.histogram_interval,
     )[0];
 
@@ -939,6 +939,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -963,6 +964,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -1144,6 +1146,7 @@ export const convertSQLData = async (
                 yAxisKeys[0]
               ] ?? null,
           ),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -1353,6 +1356,7 @@ export const convertSQLData = async (
                 yAxisKeys[0]
               ] ?? null,
           ),
+          barMinHeight: 1,
         };
         return seriesObj;
       });

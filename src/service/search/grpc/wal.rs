@@ -123,6 +123,7 @@ pub async fn search_parquet(
                     file.meta.max_ts
                 );
                 wal::release_files(&[file.key.clone()]);
+                wal::release_files(&[file.key.clone()]);
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
@@ -229,6 +230,7 @@ pub async fn search_parquet(
         if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
             // release all files
             wal::release_files(&lock_files);
+            wal::release_files(&lock_files);
             return Err(e);
         }
     }
@@ -247,6 +249,9 @@ pub async fn search_parquet(
 
     let mut tables = Vec::new();
     for (ver, files) in files_group {
+        if files.is_empty() {
+            continue;
+        }
         if files.is_empty() {
             continue;
         }
@@ -346,6 +351,7 @@ pub async fn search_memtable(
         super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
     }
 
+    // construct latest schema map
     // construct latest schema map
     let schema_latest = Arc::new(
         schema
@@ -452,6 +458,7 @@ async fn get_file_list_inner(
                     file_max_ts
                 );
                 wal::release_files(&[file.clone()]);
+                wal::release_files(&[file.clone()]);
                 continue;
             }
         }
@@ -467,6 +474,7 @@ async fn get_file_list_inner(
         {
             result.push(file_key);
         } else {
+            wal::release_files(&[file.clone()]);
             wal::release_files(&[file.clone()]);
         }
     }

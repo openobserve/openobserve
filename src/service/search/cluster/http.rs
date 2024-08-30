@@ -52,7 +52,13 @@ pub async fn search(req: Request, query: SearchQuery) -> Result<search::Response
 
     // handle query function
     let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
-        flight::search(&trace_id, sql.clone(), req, query).await?;
+        match flight::search(&trace_id, sql.clone(), req, query).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+                return Err(e);
+            }
+        };
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);

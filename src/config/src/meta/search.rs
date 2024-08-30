@@ -355,6 +355,7 @@ pub struct SearchPartitionResponse {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub histogram_interval: Option<i64>, // seconds, for histogram
+    pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
 }
 

@@ -760,6 +760,12 @@ pub struct Common {
     )]
     pub use_multi_result_cache: bool,
     #[env_config(
+        name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
+        default = "both",
+        help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
+    )]
+    pub result_cache_selection_strategy: String,
+    #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
         default = "60",
         help = "Discard data of last n seconds from cached results"
@@ -893,6 +899,8 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
+    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = false)]
+    pub quick_mode_force_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
