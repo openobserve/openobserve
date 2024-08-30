@@ -228,7 +228,7 @@ export const convertSQLData = async (
     if (
       !interval ||
       !metadata.queries ||
-      !["area-stacked", "line", "area"].includes(panelSchema.type)
+      !["area-stacked", "line", "area", "bar"].includes(panelSchema.type)
     ) {
       return JSON.parse(JSON.stringify(processedData));
     }
