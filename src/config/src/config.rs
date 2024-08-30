@@ -1181,6 +1181,8 @@ pub struct S3 {
     pub allow_invalid_certificates: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
     pub sync_to_cache_interval: u64,
+    #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
+    pub max_retries: usize,
 }
 
 #[derive(Debug, EnvConfig)]
