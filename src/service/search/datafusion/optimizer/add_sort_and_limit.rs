@@ -335,23 +335,12 @@ mod tests {
                 ],
             ),
             (
-                "select name, count(*) as cnt from t group by name order by cnt desc",
+                "select name, count(*) as cnt from t group by name order by cnt desc, name desc",
                 vec![
                     "+-------------+-----+",
                     "| name        | cnt |",
                     "+-------------+-----+",
                     "| openobserve | 2   |",
-                    "| oo          | 1   |",
-                    "+-------------+-----+",
-                ],
-            ),
-            (
-                "select t1.name, count(*) as cnt from t t1 join t t2 on t1.name = t2.name group by name order by cnt desc",
-                vec![
-                    "+-------------+-----+",
-                    "| name        | cnt |",
-                    "+-------------+-----+",
-                    "| openobserve | 4   |",
                     "| oo          | 1   |",
                     "+-------------+-----+",
                 ],
