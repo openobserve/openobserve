@@ -31,7 +31,6 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
     : pos > -1
       ? window.location.origin + window.location.pathname.slice(0, pos)
       : window.location.origin;
-console.log("tamere : ", import.meta.env.VITE_OPENOBSERVE_ENDPOINT);
 
 const organizationObj = {
   organizationPasscode: "",

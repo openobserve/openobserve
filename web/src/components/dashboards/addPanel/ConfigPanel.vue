@@ -888,7 +888,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
       <ChipColumn></ChipColumn>
-      <!-- <TestTest></TestTest> -->
 
       <div class="space"></div>
       <MarkLineConfig
@@ -914,13 +913,12 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
-import TestTest from "@/components/dashboards/addPanel/TestTest.vue";
 import ChipColumn from "@/components/dashboards/addPanel/ChipColumn.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete, MarkLineConfig, TestTest, ChipColumn },
+  components: { Drilldown, CommonAutoComplete, MarkLineConfig, ChipColumn },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(

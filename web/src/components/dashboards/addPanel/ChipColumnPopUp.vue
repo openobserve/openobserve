@@ -192,7 +192,6 @@ export default defineComponent({
           )
         : getDefaultChipColumnData(),
     );
-    // const chipColumnData = ref(getDefaultChipColumnData());
 
     const operatorOptions = [
       {
