@@ -1542,6 +1542,7 @@ const useLogs = () => {
           router.currentRoute.value.name == "logs"
         ) {
           queryReq.query.from = 0;
+          searchObj.meta.refreshHistogram = true;
         }
 
         // get function definition
