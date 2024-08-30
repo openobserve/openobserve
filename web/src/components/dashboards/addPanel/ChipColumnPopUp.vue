@@ -129,8 +129,6 @@
         :label="isEditMode ? 'Update' : 'Add'"
       />
     </q-card-actions>
-    {{ chipColumnData }}
-    {{ isFormValid }}
   </div>
 </template>
 
@@ -152,12 +150,6 @@ export default defineComponent({
       type: Number,
       default: -1,
     },
-    chipColumnData: {
-      type: Object,
-      default: () => {
-        return {};
-      },
-    },
   },
   emits: ["close"],
   setup(props, { emit }) {
@@ -170,6 +162,7 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
     const getDefaultChipColumnData = () => ({
       column_name: "",
       operator: "",
@@ -250,6 +243,9 @@ export default defineComponent({
     const isFormValid = computed(() => {
       let isValid = true;
       if (!chipColumnData.value.column_name.trim()) {
+        isValid = false;
+      }
+      if (!chipColumnData.value.operator) {
         isValid = false;
       }
       if (

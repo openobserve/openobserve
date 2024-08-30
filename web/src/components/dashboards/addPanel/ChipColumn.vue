@@ -73,7 +73,6 @@
       <ChipColumnPopUp
         :chip-column-data-index="selectedChipColumnIndexToEdit"
         :is-edit-mode="isChipColumnEditMode"
-        :chip-column-data="chipColumnData"
         @close="saveChipColumnData"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
