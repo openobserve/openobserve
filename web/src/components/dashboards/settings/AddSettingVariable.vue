@@ -382,21 +382,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ['custom', 'query_values'].includes(variableData.type)
             "
           >
-            <div class="button-group multi-select-default-value-toggle" style="margin-bottom: 12px;">
+            <div
+              class="button-group multi-select-default-value-toggle"
+              style="margin-bottom: 12px"
+            >
               <div class="multi-select-default-value">By Default Select:</div>
               <div class="row">
                 <div>
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-first-value"
                     :class="
-                      variableData?.selectAllValueForMultiSelect === true
-                        ? ''
-                        : 'selected'
+                      variableData.selectAllValueForMultiSelect === 'first'
+                        ? 'selected'
+                        : ''
                     "
                     class="button button-left"
                     type="button"
                     style="padding: 8px"
-                    @click="variableData.selectAllValueForMultiSelect = false"
+                    @click="variableData.selectAllValueForMultiSelect = 'first'"
                   >
                     First value
                   </button>
@@ -405,21 +408,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-all-values"
                     :class="
-                      variableData?.selectAllValueForMultiSelect === true
+                      variableData.selectAllValueForMultiSelect === 'all'
+                        ? 'selected'
+                        : ''
+                    "
+                    type="button"
+                    class="button button-middle"
+                    style="padding: 8px"
+                    @click="variableData.selectAllValueForMultiSelect = 'all'"
+                  >
+                    All values
+                  </button>
+                </div>
+                <div>
+                  <button
+                    data-test="dashboard-multi-select-default-value-toggle-custom"
+                    :class="
+                      variableData.selectAllValueForMultiSelect === 'custom'
                         ? 'selected'
                         : ''
                     "
                     type="button"
                     class="button button-right"
                     style="padding: 8px"
-                    @click="variableData.selectAllValueForMultiSelect = true"
+                    @click="
+                      variableData.selectAllValueForMultiSelect = 'custom'
+                    "
                   >
-                    All values
+                    Custom
                   </button>
                 </div>
               </div>
             </div>
           </div>
+
           <!-- hide on dashboard toggle -->
           <div>
             <q-toggle
@@ -545,7 +567,7 @@ export default defineComponent({
       options: [],
       multiSelect: false,
       hideOnDashboard: false,
-      selectAllValueForMultiSelect: false,
+      selectAllValueForMultiSelect: "first",
     });
 
     const filterCycleError: any = ref("");
@@ -570,9 +592,9 @@ export default defineComponent({
       variableData.hideOnDashboard = false;
     }
 
-    // by default, use selectAllValueForMultiSelect as false
+    // by default, use selectAllValueForMultiSelect as 'first'
     if (!variableData.selectAllValueForMultiSelect) {
-      variableData.selectAllValueForMultiSelect = false;
+      variableData.selectAllValueForMultiSelect = "first";
     }
 
     const filterUpdated = (index: number, filter: any) => {
@@ -718,7 +740,7 @@ export default defineComponent({
         variableData.type !== "custom"
       ) {
         variableData.multiSelect = false;
-        variableData.selectAllValueForMultiSelect = false;
+        variableData.selectAllValueForMultiSelect = "";
       }
 
       if (editMode.value) {
