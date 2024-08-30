@@ -12,7 +12,7 @@
       />
 
       <div
-        v-if="showViewTraceBtn"
+        v-if="showViewTraceBtn && filteredTracesStreamOptions.length"
         class="o2-input flex items-center logs-trace-selector"
       >
         <q-select
@@ -275,7 +275,7 @@ export default {
           multiStreamFields.value.push(item.name);
         }
       });
-      getTracesStreams();
+      if (showViewTraceBtn.value) getTracesStreams();
       previewId.value = getUUID();
     });
 
@@ -286,8 +286,6 @@ export default {
           filteredTracesStreamOptions.value = JSON.parse(
             JSON.stringify(tracesStreams.value),
           );
-
-          console.log("tracesStreams", tracesStreams.value);
 
           if (!searchObj.meta.selectedTraceStream.length)
             searchObj.meta.selectedTraceStream = tracesStreams.value[0];
@@ -311,7 +309,6 @@ export default {
     const showViewTraceBtn = computed(() => {
       return (
         !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        filteredTracesStreamOptions.value.length && // Check if traces streams are available
         props.value[
           store.state.organizationData?.organizationSettings
             ?.trace_id_field_name
