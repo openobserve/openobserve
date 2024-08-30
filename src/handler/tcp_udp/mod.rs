@@ -49,7 +49,6 @@ pub async fn udp_server(socket: UdpSocket) {
         if let Ok(val) = udp_receiver_rx.try_recv() {
             if !val {
                 log::warn!("UDP server - received the stop signal, exiting.");
-                drop(socket);
                 break;
             }
         };
@@ -98,7 +97,12 @@ pub async fn tcp_server(listener: TcpListener) {
                     }
                 };
                 if input_str != STOP_SRV {
-                    let _ = syslog::ingest(&input_str, peer_addr).await;
+                    if let Err(e) = syslog::ingest(&input_str, peer_addr).await {
+                        log::error!("Error while ingesting TCP message: {}", e);
+                    }
+                } else {
+                    log::info!("received stop signal, closing for peer {}", peer_addr);
+                    break;
                 }
             }
         });

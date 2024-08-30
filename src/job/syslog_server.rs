@@ -58,7 +58,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
         let sender = BROADCASTER.read().await;
         let _ = sender.send(start_srv);
 
-        let socket = UdpSocket::bind("0.0.0.0:34254").await?;
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.send_to(STOP_SRV.as_bytes(), udp_addr).await?;
         let mut stream = TcpStream::connect(tcp_addr)?;
         stream.write_all(STOP_SRV.as_bytes())?;
