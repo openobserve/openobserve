@@ -46,9 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :style="{
             width:
-              (defaultColumns && wrap) || !defaultColumns
+              defaultColumns && wrap
                 ? width - 12 + 'px'
-                : tableRowSize + 'px',
+                : defaultColumns
+                  ? tableRowSize + 'px'
+                  : table.getTotalSize() + 'px',
             minWidth: '100%',
             background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
           }"
@@ -439,7 +441,8 @@ watch(
     columnOrder.value = newVal.map((column: any) => column.id);
 
     await nextTick();
-    tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
+
+    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -458,7 +461,7 @@ watch(
     setExpandedRows();
 
     await nextTick();
-    tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
+    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -497,10 +500,6 @@ const table = useVueTable({
   },
   columnResizeMode,
   enableColumnResizing: true,
-  onStateChange: async (state) => {
-    await nextTick();
-    tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
-  },
 });
 
 const columnSizeVars = computed(() => {
@@ -521,6 +520,20 @@ watch(columnSizeVars, (newColSizes) => {
 onMounted(() => {
   setExpandedRows();
 });
+
+const updateTableWidth = async () => {
+  tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
+
+  setTimeout(() => {
+    let max = 0;
+    let width = max;
+    for (let i = 0; i < tableRows.value.length; i++) {
+      width = tableBodyRef?.value?.children[i]?.scrollWidth;
+      if (width > max) max = width;
+    }
+    tableRowSize.value = max;
+  }, 0);
+};
 
 const debouncedUpdate = debounce((newColSizes) => {
   emits("update:columnSizes", newColSizes);
