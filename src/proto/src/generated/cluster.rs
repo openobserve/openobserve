@@ -3149,7 +3149,7 @@ pub struct FlightSearchRequest {
     #[prost(int64, tag = "12")]
     pub timeout: i64,
     #[prost(bool, tag = "13")]
-    pub is_leader: bool,
+    pub is_super_cluster: bool,
     #[prost(string, optional, tag = "14")]
     pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "15")]

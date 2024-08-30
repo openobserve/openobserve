@@ -34,7 +34,12 @@ use crate::{
 };
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
-pub async fn search(req: Request, query: SearchQuery) -> Result<search::Response> {
+pub async fn search(
+    req: Request,
+    query: SearchQuery,
+    _req_regions: Vec<String>,
+    _req_clusters: Vec<String>,
+) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();
     let query_type = query.query_type.to_lowercase();
@@ -50,15 +55,39 @@ pub async fn search(req: Request, query: SearchQuery) -> Result<search::Response
     let use_query_fn = query.uses_zo_fn;
     let mut query_fn = query.query_fn.clone();
 
+    #[cfg(feature = "enterprise")]
+    let local_cluster_search = _req_regions == vec!["local"]
+        && !_req_clusters.is_empty()
+        && (_req_clusters == vec!["local"] || _req_clusters == vec![config::get_cluster_name()]);
+
     // handle query function
-    let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
-        match flight::search(&trace_id, sql.clone(), req, query).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
-                return Err(e);
-            }
-        };
+    #[cfg(feature = "enterprise")]
+    let ret = if o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+        .super_cluster
+        .enabled
+        && !local_cluster_search
+    {
+        super::super::super_cluster::leader::search(
+            &trace_id,
+            sql.clone(),
+            req,
+            _req_regions,
+            _req_clusters,
+        )
+        .await
+    } else {
+        flight::search(&trace_id, sql.clone(), req, query).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let ret = flight::search(&trace_id, sql.clone(), req, query).await;
+
+    let (merge_batches, scan_stats, took_wait, is_partial, idx_took) = match ret {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+            return Err(e);
+        }
+    };
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);

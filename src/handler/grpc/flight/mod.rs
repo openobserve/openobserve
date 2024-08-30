@@ -37,8 +37,6 @@ use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::service::search::grpc::flight as grpcFlight;
-#[cfg(feature = "enterprise")]
-use crate::service::search::super_cluster::follower;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -60,7 +58,7 @@ impl FlightService for FlightServiceImpl {
         let _start = std::time::Instant::now();
         let cfg = config::get_config();
 
-        // 1. decnode ticket to RemoteExecNode
+        // 1. decode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
         let req = proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
@@ -70,8 +68,8 @@ impl FlightService for FlightServiceImpl {
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
         #[cfg(feature = "enterprise")]
-        let result = if req.is_leader {
-            follower::search(&req).await
+        let result = if req.is_super_cluster {
+            crate::service::search::super_cluster::follower::search(&req).await
         } else {
             grpcFlight::search(&req).await
         };

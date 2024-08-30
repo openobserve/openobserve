@@ -44,7 +44,7 @@ use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
+    o2_enterprise::enterprise::search::TaskStatus,
     std::collections::HashSet,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
     tracing::{info_span, Instrument},
@@ -123,14 +123,14 @@ pub async fn search(
             .await;
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    let req_regions = vec![];
+    #[cfg(not(feature = "enterprise"))]
+    let req_clusters = vec![];
     #[cfg(feature = "enterprise")]
     let req_regions = in_req.regions.clone();
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
-    #[cfg(feature = "enterprise")]
-    let local_cluster_search = req_regions == vec!["local"]
-        && !req_clusters.is_empty()
-        && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
     let query: SearchQuery = in_req.query.clone().into();
     let req_query = query.clone();
@@ -145,16 +145,7 @@ pub async fn search(
     );
 
     let handle = tokio::task::spawn(async move {
-        #[cfg(feature = "enterprise")]
-        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            super_cluster::search(request, query, req_regions, req_clusters).await
-        } else {
-            cluster::http::search(request, query).await
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            cluster::http::search(request, query).await
-        }
+        cluster::http::search(request, query, req_regions, req_clusters).await
     });
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),

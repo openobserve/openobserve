@@ -32,7 +32,7 @@ message FlightSearchRequest {
     int64                     start_time = 10;
     int64                       end_time = 11;
     int64                        timeout = 12;
-    bool                       is_leader = 13;
+    bool                is_super_cluster = 13;
     optional string           work_group = 14;
     optional string              user_id = 15;
     optional string    search_event_type = 16;

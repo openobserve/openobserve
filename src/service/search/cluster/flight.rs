@@ -944,7 +944,7 @@ async fn get_file_list_by_inverted_index(
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
 
-    let resp = super::http::search(req, query).await?;
+    let resp = super::http::search(req, query, vec![], vec![]).await?;
     // get deleted file
     let deleted_files = resp
         .hits
