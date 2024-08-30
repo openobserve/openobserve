@@ -887,7 +887,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
-      <ChipColumn></ChipColumn>
+      <ChipColumn v-if="dashboardPanelData.data.type == 'table'"></ChipColumn>
 
       <div class="space"></div>
       <MarkLineConfig
