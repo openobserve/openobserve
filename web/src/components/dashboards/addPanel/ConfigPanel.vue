@@ -672,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-input
         v-if="
-          ['area', 'line', 'area-stacked', 'bar'].includes(
+          ['area', 'line', 'area-stacked', 'bar', "stacked"].includes(
             dashboardPanelData.data.type,
           )
         "
