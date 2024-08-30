@@ -248,9 +248,18 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
+      const prevColSizes =
+        this.searchObj.data.resultGrid?.colSizes[
+          this.searchObj.data.stream.selectedStream
+        ]?.[0] || {};
       this.searchObj.data.resultGrid.colSizes[
         this.searchObj.data.stream.selectedStream
-      ] = [newColSizes];
+      ] = [
+        {
+          ...prevColSizes,
+          ...newColSizes,
+        },
+      ];
     },
     handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
       // Here we are checking if the columns are default columns ( _timestamp and source)
