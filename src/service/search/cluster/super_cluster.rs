@@ -18,7 +18,11 @@ use std::sync::Arc;
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::{cluster::Node, search},
-    utils::{arrow::record_batches_to_json_rows, flatten, json},
+    utils::{
+        arrow::record_batches_to_json_rows,
+        flatten,
+        json::{self, get_int_value},
+    },
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
@@ -34,6 +38,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
+    let track_total_hits = req.query.as_ref().unwrap().track_total_hits;
 
     // handle request time range
     let meta = super::super::sql::Sql::new(&req).await?;
@@ -45,12 +50,23 @@ pub async fn search(
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
-    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
+    let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (_took, grpc_results) =
-        o2_enterprise::enterprise::super_cluster::search(req, req_regions, req_clusters).await?;
+    let (_took, grpc_results) = match o2_enterprise::enterprise::super_cluster::search(
+        req,
+        req_regions,
+        req_clusters,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[trace_id {trace_id}] super_cluster->search: err: {:?}", e);
+            return Err(e);
+        }
+    };
 
     // handle query function
     let grpc_results = grpc_results
@@ -58,21 +74,24 @@ pub async fn search(
         .map(|v| (Node::default(), v))
         .collect();
     let (merge_batches, scan_stats, is_partial) =
-        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
+        match super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {trace_id}] super_cluster->merge_grpc_result: err: {:?}",
+                    e
+                );
+                return Err(e);
+            }
+        };
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
 
     // hits
-    let empty_vec = vec![];
-    let batches_query = match merge_batches.get("query") {
-        Some(batches) => batches,
-        None => &empty_vec,
-    };
-
-    if !batches_query.is_empty() {
-        let schema = batches_query[0].schema();
-        let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
+    if !merge_batches.is_empty() {
+        let schema = merge_batches[0].schema();
+        let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {
@@ -83,6 +102,10 @@ pub async fn search(
                 .collect()
         } else {
             // compile vrl function & apply the same before returning the response
+            let apply_over_hits = query_fn.trim().starts_with("#ResultArray#");
+            if apply_over_hits {
+                query_fn = query_fn.trim().replace("#ResultArray#", "");
+            }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
                 match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
@@ -98,23 +121,52 @@ pub async fn search(
                     }
                 };
             match program {
-                Some(program) => json_rows
-                    .into_iter()
-                    .filter(|v| !v.is_empty())
-                    .filter_map(|hit| {
+                Some(program) => {
+                    if apply_over_hits {
                         let ret_val = crate::service::ingestion::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
                                 fields: program.fields.clone(),
                             },
-                            &json::Value::Object(hit.clone()),
+                            &json::Value::Array(
+                                json_rows
+                                    .into_iter()
+                                    .filter(|v| !v.is_empty())
+                                    .map(json::Value::Object)
+                                    .collect(),
+                            ),
                             &sql.org_id,
                             &sql.stream_name,
                         );
-                        (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
-                    })
-                    .collect(),
+                        ret_val
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .filter_map(|v| {
+                                (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
+                            })
+                            .collect()
+                    } else {
+                        json_rows
+                            .into_iter()
+                            .filter(|v| !v.is_empty())
+                            .filter_map(|hit| {
+                                let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                    &mut runtime,
+                                    &VRLResultResolver {
+                                        program: program.program.clone(),
+                                        fields: program.fields.clone(),
+                                    },
+                                    &json::Value::Object(hit.clone()),
+                                    &sql.org_id,
+                                    &sql.stream_name,
+                                );
+                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
+                            })
+                            .collect()
+                    }
+                }
                 None => json_rows
                     .into_iter()
                     .filter(|v| !v.is_empty())
@@ -141,27 +193,19 @@ pub async fn search(
         }
     }
 
-    // aggs
-    for (name, batch) in merge_batches {
-        if name == "query" || batch.is_empty() {
-            continue;
-        }
-        let name = name.strip_prefix("agg_").unwrap().to_string();
-        let batch_ref: Vec<&RecordBatch> = batch.iter().collect();
-        let json_rows = record_batches_to_json_rows(&batch_ref)
-            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-        let sources: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
-        for source in sources {
-            result.add_agg(&name, &source);
-        }
-    }
-
-    // total
-    let total = match result.aggs.get("_count") {
-        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => result.hits.len(),
+    let total = if !track_total_hits {
+        result.hits.len()
+    } else {
+        result
+            .hits
+            .first()
+            .map(|v| {
+                v.get("zo_sql_num")
+                    .map(|v| get_int_value(v) as usize)
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
     };
-    result.aggs.remove("_count");
 
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);

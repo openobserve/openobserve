@@ -22,7 +22,7 @@ use crate::{
             alerts::destinations::{Destination, DestinationType, DestinationWithTemplate},
             authz::Authz,
         },
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::db,
 };
@@ -63,6 +63,15 @@ pub async fn save(
         destination.name = name.to_string();
     }
     destination.name = destination.name.trim().to_string();
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&destination.name) {
+        return Err((
+            http::StatusCode::BAD_REQUEST,
+            anyhow::anyhow!(
+                "Alert destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
+            ),
+        ));
+    }
     if destination.name.is_empty() {
         return Err((
             http::StatusCode::BAD_REQUEST,
@@ -164,7 +173,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
         for alert in alerts.iter() {
             if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
                 return Err((
-                    http::StatusCode::FORBIDDEN,
+                    http::StatusCode::CONFLICT,
                     anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
                 ));
             }

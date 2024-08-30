@@ -336,6 +336,13 @@ export default defineComponent({
         field: "queryRange",
       },
       {
+        name: "work_group",
+        label: t("queries.queryType"),
+        align: "left",
+        sortable: true,
+        field: "work_group",
+      },
+      {
         name: "status",
         field: "status",
         label: t("queries.status"),
@@ -377,7 +384,8 @@ export default defineComponent({
               query.org_id.toLowerCase().includes(newVal.toLowerCase()) ||
               query.stream_type.toLowerCase().includes(newVal.toLowerCase()) ||
               query.status.toLowerCase().includes(newVal.toLowerCase()) ||
-              query.trace_id.toLowerCase().includes(newVal.toLowerCase())
+              query.trace_id.toLowerCase().includes(newVal.toLowerCase()) ||
+              query.work_group.toLowerCase().includes(newVal.toLowerCase())
           );
         }
       } else {
@@ -534,6 +542,7 @@ export default defineComponent({
           duration: getDuration(row?.created_at),
           queryRange: queryRange(row?.query?.start_time, row?.query?.end_time),
           status: row?.status,
+          work_group: row?.work_group,
           stream_type: row?.stream_type,
           actions: "true",
           trace_id: row?.trace_id,

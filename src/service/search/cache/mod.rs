@@ -17,12 +17,12 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search,
+        search::{self, ResponseTook},
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -33,19 +33,17 @@ use tracing::Instrument;
 
 use crate::{
     common::{
-        meta::search::{CachedQueryResponse, QueryDelta},
+        meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::functions,
     },
     service::{
-        search::{
-            self as SearchService,
-            cache::{cacher::check_cache, result_utils::is_aggregate_query},
-        },
+        search::{self as SearchService, cache::cacher::check_cache},
         usage::{http_report_metrics, report_request_usage_stats},
     },
 };
 
 pub mod cacher;
+pub mod multi;
 pub mod result_utils;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
@@ -63,6 +61,7 @@ pub async fn search(
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
+    origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
     let parsed_sql = match config::meta::sql::Sql::new(&origin_sql) {
         Ok(v) => v,
@@ -70,15 +69,33 @@ pub async fn search(
             return Err(Error::Message(e.to_string()));
         }
     };
+
     let stream_name = &parsed_sql.source;
 
+    let mut req = in_req.clone();
+    let mut query_fn = req
+        .query
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
     let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&origin_sql);
+    let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let mut req = in_req.clone();
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
@@ -87,20 +104,19 @@ pub async fn search(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
     );
-    let mut c_resp: CachedQueryResponse = if use_cache {
+    let mut c_resp: MultiCachedQueryResponse = if use_cache {
         check_cache(
             trace_id,
             &rpc_req,
             &mut req,
             &mut origin_sql,
-            &parsed_sql,
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
         )
         .await
     } else {
-        CachedQueryResponse::default()
+        MultiCachedQueryResponse::default()
     };
 
     // No cache data present, add delta for full query
@@ -109,7 +125,7 @@ pub async fn search(
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
             delta_removed_hits: false,
-        })
+        });
     } else if use_cache {
         log::info!(
             "[trace_id {trace_id}] Query deltas are: {:?}",
@@ -125,9 +141,16 @@ pub async fn search(
     // Result caching check ends, start search
     let mut results = Vec::new();
     let mut res = if !should_exec_query {
-        c_resp.cached_response
+        merge_response(
+            trace_id,
+            &mut c_resp.cached_response,
+            &mut vec![],
+            &c_resp.ts_column,
+            c_resp.limit,
+            c_resp.is_descending,
+            c_resp.took,
+        )
     } else {
-        let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
         if let Some(vrl_function) = &query_fn {
             if !vrl_function.trim().ends_with('.') {
                 query_fn = Some(format!("{} \n .", vrl_function));
@@ -214,14 +237,16 @@ pub async fn search(
             merge_response(
                 trace_id,
                 &mut c_resp.cached_response,
-                &results,
+                &mut results,
                 &c_resp.ts_column,
                 c_resp.limit,
                 c_resp.is_descending,
-            );
-            c_resp.cached_response
+                c_resp.took,
+            )
         } else {
-            results[0].clone()
+            let mut reps = results[0].clone();
+            sort_response(c_resp.is_descending, &mut reps, &c_resp.ts_column);
+            reps
         }
     };
 
@@ -268,7 +293,8 @@ pub async fn search(
     if cfg.common.result_cache_enabled
         && should_exec_query
         && c_resp.cache_query_response
-        && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
+        && (results.first().is_some_and(|res| !res.hits.is_empty())
+            || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
         write_results(
             trace_id,
@@ -291,15 +317,40 @@ pub async fn search(
 // or end to cache response
 fn merge_response(
     trace_id: &str,
-    cache_response: &mut config::meta::search::Response,
-    search_response: &Vec<config::meta::search::Response>,
+    cache_responses: &mut Vec<config::meta::search::Response>,
+    search_response: &mut Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
     is_descending: bool,
-) {
-    if cache_response.hits.is_empty() && search_response.is_empty() {
-        return;
+    cache_took: usize,
+) -> config::meta::search::Response {
+    cache_responses.retain(|res| !res.hits.is_empty());
+
+    search_response.retain(|res| !res.hits.is_empty());
+
+    if cache_responses.is_empty() && search_response.is_empty() {
+        return config::meta::search::Response::default();
     }
+
+    let mut cache_response = if cache_responses.is_empty() {
+        config::meta::search::Response::default()
+    } else {
+        let mut resp = config::meta::search::Response::default();
+        for res in cache_responses {
+            resp.total += res.total;
+            resp.scan_size += res.scan_size;
+
+            resp.scan_records += res.scan_records;
+
+            if res.hits.is_empty() {
+                continue;
+            }
+            resp.hits.extend(res.hits.clone());
+            resp.histogram_interval = res.histogram_interval;
+        }
+        resp.took = cache_took;
+        resp
+    };
 
     if cache_response.hits.is_empty()
         && search_response.is_empty()
@@ -311,7 +362,7 @@ fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
         }
-        return;
+        return cache_response;
     }
     let cache_hits_len = cache_response.hits.len();
 
@@ -320,19 +371,57 @@ fn merge_response(
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
 
-    for res in search_response {
+    let mut res_took = ResponseTook::default();
+
+    for res in search_response.clone() {
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
+        cache_response.histogram_interval = res.histogram_interval;
 
         result_cache_len += res.total;
 
         if res.hits.is_empty() {
             continue;
         }
+        if let Some(mut took_details) = res.took_detail {
+            res_took.cluster_total += took_details.cluster_total;
+            res_took.cluster_wait_queue += took_details.cluster_wait_queue;
+            res_took.idx_took += took_details.idx_took;
+            res_took.wait_queue += took_details.wait_queue;
+            res_took.total += took_details.total;
+            res_took.nodes.append(&mut took_details.nodes);
+        }
+
         cache_response.hits.extend(res.hits.clone());
     }
+    sort_response(is_descending, &mut cache_response, ts_column);
+
+    if cache_response.hits.len() > (limit as usize) {
+        cache_response.hits.truncate(limit as usize);
+    }
+    if limit > 0 {
+        cache_response.total = cache_response.hits.len();
+    }
+
+    if !search_response.is_empty() {
+        cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    }
+    cache_response.size = cache_response.hits.len() as i64;
+    log::info!(
+        "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
+        cache_hits_len,
+        result_cache_len
+    );
+    cache_response.took_detail = Some(res_took);
+    cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
+        / ((result_cache_len + cache_hits_len) as f64))
+        as usize;
+    cache_response
+}
+
+fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_column: &str) {
     if is_descending {
         cache_response
             .hits
@@ -342,18 +431,6 @@ fn merge_response(
             .hits
             .sort_by_key(|a| get_ts_value(ts_column, a));
     }
-
-    if cache_response.hits.len() > limit as usize {
-        cache_response.hits.truncate(limit as usize);
-    }
-    cache_response.cached_ratio = files_cache_ratio / search_response.len();
-    log::info!(
-        "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
-        cache_hits_len,
-        result_cache_len,
-    );
-    cache_response.result_cache_ratio =
-        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -370,8 +447,11 @@ async fn write_results(
     let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
     let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
 
-    if (last_rec_ts - first_rec_ts).abs()
-        < get_config().common.result_cache_discard_duration * 1000 * 1000
+    let smallest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
+    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+
+    if (last_rec_ts - first_rec_ts).abs() < discard_duration
+        && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
@@ -379,7 +459,7 @@ async fn write_results(
     let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
 
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
-        last_rec_ts
+        largest_ts
     } else {
         req_query_end_time
     };

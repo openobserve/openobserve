@@ -32,9 +32,10 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow_schema::{Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
+use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use datafusion::{
+    catalog::Session,
     common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
     datasource::{
         get_statistics_with_limit,
@@ -47,15 +48,24 @@ use datafusion::{
         cache::{cache_manager::FileStatisticsCache, cache_unit::DefaultFileStatisticsCache},
         context::SessionState,
     },
+    logical_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType},
     physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
-    physical_plan::{empty::EmptyExec, ExecutionPlan},
+    physical_plan::{
+        empty::EmptyExec,
+        expressions::{CastExpr, Column},
+        projection::ProjectionExec,
+        ExecutionPlan, PhysicalExpr,
+    },
 };
-use datafusion_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType};
 use futures::{future, stream, StreamExt};
+use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
 
+pub mod empty_table;
 mod helpers;
+pub mod memtable;
+pub mod uniontable;
 
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,
@@ -63,6 +73,7 @@ pub(crate) struct NewListingTable {
     file_schema: SchemaRef,
     /// File fields + partition columns
     table_schema: SchemaRef,
+    diff_rules: HashMap<String, DataType>,
     options: ListingOptions,
     collected_statistics: FileStatisticsCache,
 }
@@ -77,7 +88,7 @@ impl NewListingTable {
     /// If the schema is provided then it must be resolved before creating the table
     /// and should contain the fields of the file without the table
     /// partitioning columns.
-    pub fn try_new(config: ListingTableConfig) -> Result<Self> {
+    pub fn try_new(config: ListingTableConfig, rules: HashMap<String, DataType>) -> Result<Self> {
         let file_schema = config
             .file_schema
             .ok_or_else(|| DataFusionError::Internal("No schema provided.".into()))?;
@@ -96,6 +107,7 @@ impl NewListingTable {
             table_paths: config.table_paths,
             file_schema,
             table_schema: Arc::new(builder.finish()),
+            diff_rules: rules,
             options,
             collected_statistics: Arc::new(DefaultFileStatisticsCache::default()),
         };
@@ -152,10 +164,13 @@ impl NewListingTable {
                     if let Some(access_plan) = access_plan {
                         part_file.extensions = Some(access_plan as _);
                     }
-                    Ok((part_file, statistics)) as Result<(PartitionedFile, Statistics)>
+                    Ok((part_file, Arc::new(statistics)))
+                        as Result<(PartitionedFile, Arc<Statistics>)>
                 } else {
-                    Ok((part_file, Statistics::new_unknown(&self.file_schema)))
-                        as Result<(PartitionedFile, Statistics)>
+                    Ok((
+                        part_file,
+                        Arc::new(Statistics::new_unknown(&self.file_schema)),
+                    )) as Result<(PartitionedFile, Arc<Statistics>)>
                 }
             })
             .boxed()
@@ -220,13 +235,15 @@ impl TableProvider for NewListingTable {
 
     async fn scan(
         &self,
-        state: &SessionState,
+        state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        // TODO (https://github.com/apache/datafusion/issues/11600) remove downcast_ref from here?
+        let session_state = state.as_any().downcast_ref::<SessionState>().unwrap();
         let (mut partitioned_file_lists, statistics) =
-            self.list_files_for_scan(state, limit).await?;
+            self.list_files_for_scan(session_state, limit).await?;
 
         let projected_schema = project_schema(&self.schema(), projection)?;
 
@@ -306,10 +323,11 @@ impl TableProvider for NewListingTable {
         };
 
         // create the execution plan
-        self.options
+        let parquet_exec = self
+            .options
             .format
             .create_physical_plan(
-                state,
+                session_state,
                 FileScanConfig::new(object_store_url, Arc::clone(&self.file_schema))
                     .with_file_groups(partitioned_file_lists)
                     .with_statistics(statistics)
@@ -319,7 +337,25 @@ impl TableProvider for NewListingTable {
                     .with_table_partition_cols(table_partition_cols),
                 filters.as_ref(),
             )
-            .await
+            .await?;
+
+        // add the diff rules to the execution plan
+        if self.diff_rules.is_empty() {
+            return Ok(parquet_exec);
+        }
+        let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
+            Vec::with_capacity(projected_schema.fields().len());
+        for (idx, field) in projected_schema.fields().iter().enumerate() {
+            let name = field.name().to_string();
+            let col = Arc::new(Column::new(&name, idx));
+            if let Some(data_type) = self.diff_rules.get(&name) {
+                exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
+            } else {
+                exprs.push((col, name));
+            }
+        }
+        let projection_exec = ProjectionExec::try_new(exprs, parquet_exec)?;
+        Ok(Arc::new(projection_exec))
     }
 
     fn supports_filters_pushdown(

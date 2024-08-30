@@ -45,10 +45,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     service::search::{
-        datafusion::{
-            exec::{prepare_datafusion_context, register_table},
-            file_type::FileType,
-        },
+        datafusion::exec::{prepare_datafusion_context, register_table},
         MetadataMap,
     },
 };
@@ -135,8 +132,8 @@ pub(crate) async fn create_context(
         })?;
     for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
         if !record_batches.is_empty() {
-            let ctx =
-                prepare_datafusion_context(None, &SearchType::Normal, false, false, None).await?;
+            let ctx = prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None)
+                .await?;
             // calculate schema diff
             let mut diff_fields = HashMap::new();
             let group_fields = arrow_schema.fields();
@@ -181,6 +178,7 @@ pub(crate) async fn create_context(
         storage_type: StorageType::Tmpfs,
         search_type: SearchType::Normal,
         work_group: None,
+        target_partitions: 0,
     };
 
     let ctx = register_table(
@@ -188,7 +186,7 @@ pub(crate) async fn create_context(
         schema.clone(),
         stream_name,
         &[],
-        FileType::PARQUET,
+        hashbrown::HashMap::default(),
         false,
         &[],
         None,

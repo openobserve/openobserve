@@ -18,7 +18,10 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
-    common::meta::{dashboards::reports::Report, http::HttpResponse as MetaHttpResponse},
+    common::{
+        meta::{dashboards::reports::Report, http::HttpResponse as MetaHttpResponse},
+        utils::auth::UserEmail,
+    },
     service::dashboards::reports,
 };
 
@@ -50,9 +53,13 @@ use crate::{
 pub async fn create_report(
     path: web::Path<String>,
     report: web::Json<Report>,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    match reports::save(&org_id, "", report.into_inner(), true).await {
+
+    let mut report = report.into_inner();
+    report.owner = user_email.user_id;
+    match reports::save(&org_id, "", report, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -84,9 +91,12 @@ pub async fn create_report(
 async fn update_report(
     path: web::Path<(String, String)>,
     report: web::Json<Report>,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    match reports::save(&org_id, &name, report.into_inner(), false).await {
+    let mut report = report.into_inner();
+    report.last_edited_by = user_email.user_id;
+    match reports::save(&org_id, &name, report, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -192,7 +202,7 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
     match reports::delete(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report deleted")),
         Err(e) => match e {
-            (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),
+            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
             (_, e) => Ok(MetaHttpResponse::internal_error(e)),
         },

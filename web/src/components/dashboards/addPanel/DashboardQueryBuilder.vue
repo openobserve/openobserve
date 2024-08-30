@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.type == "table"
                 ? t("panel.firstColumn")
                 : dashboardPanelData.data.type == "h-bar" ||
-                  dashboardPanelData.data.type == "h-stacked"
-                ? t("panel.yAxis")
-                : t("panel.xAxis")
+                    dashboardPanelData.data.type == "h-stacked"
+                  ? t("panel.yAxis")
+                  : t("panel.xAxis")
             }}
             <q-icon name="info_outline" class="q-ml-xs">
               <q-tooltip>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'x',
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.x?.length || 0
+                ].fields?.x?.length || 0,
               )
             "
             @dragenter="onDragEnter($event, 'x', null)"
@@ -120,7 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="
                               !dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
+                              ].customQuery &&
+                              !dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.x[index].isDerived
                             "
                             class="q-mr-xs q-mb-sm"
                           >
@@ -162,7 +165,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields?.x[index]?.aggregationFunction ===
-                              'histogram'
+                              'histogram' &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].isDerived
                           "
                           class="q-mb-sm"
                         >
@@ -173,12 +179,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               getHistoramIntervalField(
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.x[index]
+                                ].fields?.x[index],
                               )
                             "
-                            @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-                  ].fields.x[index].args[0].value = newValue.value}"
+                            @update:modelValue="
+                              (newValue: any) => {
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].args[0].value =
+                                  newValue.value;
+                              }
+                            "
                           />
                         </div>
                         <q-input
@@ -191,14 +202,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].label
                           "
-                          :rules="[(val) => val.length > 0 || 'Required']"
+                          :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
                           v-if="
                             !dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
                             ].customQuery &&
-                            dashboardPanelData.data.queryType == 'sql'
+                            dashboardPanelData.data.queryType == 'sql' &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].isDerived
                           "
                         >
                           <SortByBtnGrp
@@ -297,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'breakdown',
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.breakdown?.length || 0
+                ].fields?.breakdown?.length || 0,
               )
             "
             @dragenter="onDragEnter($event, 'breakdown', null)"
@@ -358,7 +372,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="
                               !dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
+                              ].customQuery &&
+                              !dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.breakdown[index].isDerived
                             "
                             class="q-mr-xs q-mb-sm"
                           >
@@ -402,7 +419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields?.breakdown[index]?.aggregationFunction ===
-                              'histogram'
+                              'histogram' &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.breakdown[index].isDerived
                           "
                           class="q-mb-sm"
                         >
@@ -413,12 +433,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               getHistoramIntervalField(
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.breakdown[index]
+                                ].fields?.breakdown[index],
                               )
                             "
-                            @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                    ].fields.breakdown[index].args[0].value = newValue.value}"
+                            @update:modelValue="
+                              (newValue: any) => {
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.breakdown[index].args[0].value =
+                                  newValue.value;
+                              }
+                            "
                           />
                         </div>
                         <q-input
@@ -431,14 +456,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].label
                           "
-                          :rules="[(val) => val.length > 0 || 'Required']"
+                          :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
                           v-if="
                             !dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
                             ].customQuery &&
-                            dashboardPanelData.data.queryType == 'sql'
+                            dashboardPanelData.data.queryType == 'sql' &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.breakdown[index].isDerived
                           "
                         >
                           <SortByBtnGrp
@@ -491,9 +519,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == "table"
             ? t("panel.otherColumn")
             : dashboardPanelData.data.type == "h-bar" ||
-              dashboardPanelData.data.type == "h-stacked"
-            ? t("panel.xAxis")
-            : t("panel.yAxis")
+                dashboardPanelData.data.type == "h-stacked"
+              ? t("panel.xAxis")
+              : t("panel.yAxis")
         }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
@@ -517,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'y',
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields?.y?.length || 0
+            ].fields?.y?.length || 0,
           )
         "
         @dragenter="onDragEnter($event, 'y', null)"
@@ -576,7 +604,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="
                           !dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
+                          ].customQuery &&
+                          !dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.y[index].isDerived
                         "
                         class="q-mr-xs"
                         style="width: 160px"
@@ -621,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="color-input-wrapper"
                         v-if="
                           !['table', 'pie'].includes(
-                            dashboardPanelData.data.type
+                            dashboardPanelData.data.type,
                           )
                         "
                       >
@@ -644,7 +675,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].customQuery &&
                         dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
-                        ].fields?.y[index]?.aggregationFunction === 'histogram'
+                        ].fields?.y[index]?.aggregationFunction ===
+                          'histogram' &&
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].isDerived
                       "
                       class="q-mb-sm"
                     >
@@ -655,12 +690,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           getHistoramIntervalField(
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index]
+                            ].fields.y[index],
                           )
                         "
-                        @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                    ].fields.y[index].args[0].value = newValue.value}"
+                        @update:modelValue="
+                          (newValue: any) => {
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].args[0].value = newValue.value;
+                          }
+                        "
                       />
                     </div>
                     <q-input
@@ -673,14 +712,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].label
                       "
-                      :rules="[(val) => val.length > 0 || 'Required']"
+                      :rules="[(val: any) => val.length > 0 || 'Required']"
                     />
                     <div
                       v-if="
                         !dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery &&
-                        dashboardPanelData.data.queryType == 'sql'
+                        dashboardPanelData.data.queryType == 'sql' &&
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].isDerived
                       "
                     >
                       <SortByBtnGrp
@@ -754,7 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'z',
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.z?.length || 0
+              ].fields?.z?.length || 0,
             )
           "
           @dragenter="onDragEnter($event, 'z', null)"
@@ -813,7 +855,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="
                             !dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery
+                            ].customQuery &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.z[index].isDerived
                           "
                           class="q-mr-xs"
                           style="width: 160px"
@@ -837,7 +882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="color-input-wrapper"
                           v-if="
                             !['table', 'pie'].includes(
-                              dashboardPanelData.data.type
+                              dashboardPanelData.data.type,
                             )
                           "
                         >
@@ -862,14 +907,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].label
                         "
-                        :rules="[(val) => val.length > 0 || 'Required']"
+                        :rules="[(val: any) => val.length > 0 || 'Required']"
                       />
                       <div
                         v-if="
                           !dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
                           ].customQuery &&
-                          dashboardPanelData.data.queryType == 'sql'
+                          dashboardPanelData.data.queryType == 'sql' &&
+                          !dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.z[index].isDerived
                         "
                       >
                         <SortByBtnGrp
@@ -953,7 +1001,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-menu
               class="q-pa-md"
-              @show="(e) => loadFilterItem(filteredItem.column)"
+              @show="(e: any) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
               <div style="height: 100%">
@@ -1012,14 +1060,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :label="t('common.operator')"
                             data-test="dashboard-filter-condition-dropdown"
                             style="width: 100%"
-                            :rules="[(val) => !!val || 'Required']"
+                            :rules="[(val: any) => !!val || 'Required']"
                           />
                           <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.filter[index]?.operator
+                                ].fields?.filter[index]?.operator,
                               )
                             "
                             :label="t('common.value')"
@@ -1030,7 +1078,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :items="dashboardVariablesFilterItems(index)"
                             searchRegex="(?:^|[^$])\$?(\w+)"
-                            :rules="[(val: any) => val?.length > 0 || 'Required']"
+                            :rules="[
+                              (val: any) => val?.length > 0 || 'Required',
+                            ]"
                           ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
@@ -1049,13 +1099,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ].fields.filter[index].values
                           "
                           data-test="dashboard-filter-list-dropdown"
-                          :options="dashboardPanelData.meta.filterValue.find((it: any)=>it.column == filteredItem.column)?.value"
+                          :options="
+                            dashboardPanelData.meta.filterValue.find(
+                              (it: any) => it.column == filteredItem.column,
+                            )?.value
+                          "
                           :label="t('common.selectFilter')"
                           multiple
                           emit-value
                           map-options
                           :rules="[
-                            (val) =>
+                            (val: any) =>
                               val.length > 0 || 'At least 1 item required',
                           ]"
                         >
@@ -1068,7 +1122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     dashboardPanelData.layout.currentQueryIndex
                                   ].fields.filter[index].values[0]?.substring(
                                     0,
-                                    15
+                                    15,
                                   ) + "..."
                                 : dashboardPanelData.data.queries[
                                     dashboardPanelData.layout.currentQueryIndex
@@ -1178,8 +1232,7 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
-    const {  showErrorNotification } =
-      useNotifications();
+    const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
       x: true,
       y: true,
@@ -1190,7 +1243,7 @@ export default defineComponent({
     });
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const {
       dashboardPanelData,
@@ -1212,6 +1265,7 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -1274,7 +1328,7 @@ export default defineComponent({
           expansionItems.config = false;
           expansionItems.filter = true;
         }
-      }
+      },
     );
 
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
@@ -1289,7 +1343,7 @@ export default defineComponent({
         const draggedItem = dashboardPanelData.meta.dragAndDrop.dragElement;
         fieldList?.splice(
           dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
-          1
+          1,
         );
         fieldList?.splice(droppedAtIndex, 0, draggedItem);
       } else {
@@ -1322,25 +1376,24 @@ export default defineComponent({
           reorderItems(
             targetAxis,
             dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
-            droppedAtIndex
+            droppedAtIndex,
           );
         } else {
           // move the item from field list to axis
           const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-          const dragName =
-            dashboardPanelData.meta.stream.selectedStreamFields.find(
-              (item: any) => item?.name === dragElement?.column
-            );
+          const dragName = selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
+            (item: any) => item?.name === dragElement?.column,
+          );
           const customDragName =
             dashboardPanelData.meta.stream.customQueryFields.find(
-              (item: any) => item?.name === dragElement?.column
+              (item: any) => item?.name === dragElement?.column,
             );
 
           if (dragName || customDragName) {
             const axisArray = getAxisArray(targetAxis);
             const duplicateName = axisArray.some(
-              (item: any) => item.column === (dragName || customDragName).name
+              (item: any) => item.column === (dragName || customDragName).name,
             );
 
             if (duplicateName) {
@@ -1423,7 +1476,7 @@ export default defineComponent({
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields[targetAxis]?.length - 1 || 0,
-              droppedAtIndex
+              droppedAtIndex,
             );
           }
           updateArrayAlias();
@@ -1435,7 +1488,7 @@ export default defineComponent({
     const reorderItems = (
       targetAxis: string,
       sourceIndex: number,
-      targetIndex: number
+      targetIndex: number,
     ) => {
       const fieldList =
         dashboardPanelData.data.queries[
@@ -1504,7 +1557,7 @@ export default defineComponent({
       e: any,
       item: any,
       axis: string,
-      index: number
+      index: number,
     ) => {
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
@@ -1650,7 +1703,7 @@ export default defineComponent({
             label: it.name,
             value: value,
           };
-        })
+        }),
     );
 
     return {

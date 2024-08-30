@@ -1,8 +1,27 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div style="height: 200px" data-test="alert-preview-chart">
+      <p class="sql-preview" v-if="selectedTab === 'sql'">
+        Preview is not available in SQL mode
+      </p>
       <PanelSchemaRenderer
-        v-if="chartData"
+        v-else-if="chartData"
         :height="6"
         :width="6"
         :panelSchema="chartData"
@@ -146,7 +165,12 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
-  const startTime = endTime - relativeTime * 60 * 1000000;
+  let new_relative_time = 2;
+  if (relativeTime < 2) {
+    new_relative_time = relativeTime;
+  }
+
+  const startTime = endTime - new_relative_time * 60 * 1000000;
 
   dashboardPanelData.meta.dateTime = {
     start_time: new Date(startTime),
@@ -216,4 +240,11 @@ const refreshData = () => {
 defineExpose({ refreshData });
 </script>
 
-<style scoped></style>
+<style scoped>
+.sql-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 5vh;
+}
+</style>

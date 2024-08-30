@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
-          label="Reset Filters"
+          :title="t('search.resetFilters')"
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-xs"
+          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         />
         <syntax-guide
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="
                               handleFavoriteSavedView(
                                 props.row,
-                                favoriteViews.includes(props.row.view_id)
+                                favoriteViews.includes(props.row.view_id),
                               )
                             "
                           >
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="
                               handleFavoriteSavedView(
                                 props.row,
-                                favoriteViews.includes(props.row.view_id)
+                                favoriteViews.includes(props.row.view_id),
                               )
                             "
                           >
@@ -288,7 +288,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
-          v-if="searchObj.meta.flagWrapContent"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
           :title="t('search.messageWrapContent')"
@@ -473,6 +472,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn-group>
 
             <q-btn
+              v-if="
+                config.isEnterprise == 'true' &&
+                !!searchObj.data.searchRequestTraceIds.length &&
+                (searchObj.loading == true ||
+                  searchObj.loadingHistogram == true)
+              "
+              data-test="logs-search-bar-refresh-btn"
+              data-cy="search-bar-refresh-button"
+              dense
+              flat
+              :title="t('search.cancel')"
+              class="q-pa-none search-button cancel-search-button"
+              @click="cancelQuery"
+              >{{ t("search.cancel") }}</q-btn
+            >
+            <q-btn
+              v-else
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               dense
@@ -507,6 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
+              @keydown.ctrl.enter="handleRunQueryFn"
               @update:query="updateQueryValue"
               @run-query="handleRunQueryFn"
               :class="
@@ -522,10 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="logs-vrl-function-editor"
-              v-show="
-                searchObj.meta.toggleFunction &&
-                searchObj.meta.logsVisualizeToggle != 'visualize'
-              "
+              v-show="searchObj.meta.toggleFunction"
               style="width: 100%; height: 100%"
             >
               <query-editor
@@ -540,7 +554,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'empty-function'
                     : ''
                 "
-                language="ruby"
+                @keydown.ctrl.enter="handleRunQueryFn"
+                language="vrl"
                 @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
               />
@@ -920,7 +935,7 @@ export default defineComponent({
   components: {
     DateTime,
     QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+      () => import("@/components/QueryEditor.vue"),
     ),
     SyntaxGuide,
     AutoRefreshInterval,
@@ -943,7 +958,7 @@ export default defineComponent({
     },
     changeFunctionName(value) {
       // alert(value)
-      console.log(value);
+      // console.log(value);
     },
     createNewValue(inputValue, doneFn) {
       // Call the doneFn with the new value
@@ -981,7 +996,6 @@ export default defineComponent({
         return;
       }
       // const queryReq = this.buildSearch();
-      // console.log(this.searchObj.data.customDownloadQueryObj)
       this.searchObj.data.customDownloadQueryObj.query.from = initNumber;
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
@@ -992,7 +1006,7 @@ export default defineComponent({
             query: this.searchObj.data.customDownloadQueryObj,
             page_type: this.searchObj.data.stream.streamType,
           },
-          "UI"
+          "UI",
         )
         .then((res) => {
           this.customDownloadDialog = false;
@@ -1117,7 +1131,7 @@ export default defineComponent({
       (fields) => {
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
 
     watch(
@@ -1125,7 +1139,7 @@ export default defineComponent({
       (funs) => {
         if (funs.length) updateFunctionKeywords(funs);
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
 
     onBeforeMount(async () => {
@@ -1159,6 +1173,16 @@ export default defineComponent({
           } else if (item.expr.args.expr.value) {
             columnNames.push(item.expr.args.expr.value);
           }
+        } else if (
+          item.expr &&
+          item.expr.name &&
+          item.expr.type === "function"
+        ) {
+          item.expr.args.value.map((val) => {
+            if (val.type === "column_ref") {
+              columnNames.push(val.column);
+            }
+          });
         }
       });
       return columnNames;
@@ -1175,7 +1199,6 @@ export default defineComponent({
           parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
         ) {
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
-          searchObj.data.stream.selectedStreamFields = [];
           onStreamChange(value);
         }
         // if (
@@ -1249,11 +1272,13 @@ export default defineComponent({
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
               !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table
+                searchObj.data.parsedQuery.from[0].table,
               ) &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
               let streamFound = false;
+              searchObj.data.stream.selectedStream = [];
+
               streamName = searchObj.data.parsedQuery.from[0].table;
               searchObj.data.streamResults.list.forEach((stream) => {
                 if (stream.name == searchObj.data.parsedQuery.from[0].table) {
@@ -1262,13 +1287,22 @@ export default defineComponent({
                     label: stream.name,
                     value: stream.name,
                   };
+
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  stream.schema.forEach((field) => {
-                    searchObj.data.stream.selectedStreamFields.push({
-                      name: field.name,
-                    });
-                  });
+                  onStreamChange(searchObj.data.editorValue);
+                  // searchObj.data.stream.selectedStreamFields = [];
+
+                  // if (searchObj.data.stream.selectedStreamFields.length == 0)
+                  //  {
+                  //     const data = await getStream (
+                  //       searchObj.data.stream.selectedStream[0],
+                  //       searchObj.data.stream.streamType || "logs",
+                  //       true
+                  //  )
+                  //  searchObj.data.stream.selectedStreamFields = data.schema
+
+                  // }
                 }
               });
               if (streamFound == false) {
@@ -1286,7 +1320,7 @@ export default defineComponent({
           }
         }
       } catch (e) {
-        console.log("Logs: Error while updating query value");
+        console.log(e, "Logs: Error while updating query value");
       }
     };
 
@@ -1314,12 +1348,12 @@ export default defineComponent({
           value.selectedDate.from = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "yyyy/MM/DD"
+            "yyyy/MM/DD",
           );
           value.selectedTime.startTime = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "HH:mm"
+            "HH:mm",
           );
 
           dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
@@ -1505,7 +1539,7 @@ export default defineComponent({
       if (isSavedFunctionAction.value == "create") {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
-          formData.value
+          formData.value,
         );
 
         callTransform
@@ -1547,7 +1581,7 @@ export default defineComponent({
           saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
-            formData.value
+            formData.value,
           );
 
           callTransform
@@ -1558,7 +1592,7 @@ export default defineComponent({
               });
 
               const transformIndex = searchObj.data.transforms.findIndex(
-                (obj) => obj.name === formData.value.name
+                (obj) => obj.name === formData.value.name,
               );
               if (transformIndex !== -1) {
                 searchObj.data.transforms[transformIndex].name =
@@ -1600,7 +1634,6 @@ export default defineComponent({
     const resetEditorLayout = () => {
       setTimeout(() => {
         queryEditorRef?.value?.resetEditorLayout();
-        console.log("resetEditorLayout", fnEditorRef.value);
         fnEditorRef?.value?.resetEditorLayout();
       }, 100);
     };
@@ -1667,7 +1700,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           functionOptions.value = searchObj.data.transforms.filter(
-            (v) => v.name?.toLowerCase().indexOf(needle) > -1
+            (v) => v.name?.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
@@ -1699,12 +1732,16 @@ export default defineComponent({
       savedviewsService
         .getViewDetail(
           store.state.selectedOrganization.identifier,
-          item.view_id
+          item.view_id,
         )
         .then(async (res) => {
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
+
+            // Resetting columns as its not required in searchObj
+            // As we reassign columns from selectedFields and search results
+            extractedObj.data.resultGrid.columns = [];
 
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
@@ -1730,32 +1767,32 @@ export default defineComponent({
               // ----- Here we are explicitly handling stream change for multistream -----
               let selectedStreams = [];
               const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value
+                (item) => item.value,
               );
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value"
+                    "value",
                   )
                 ) {
                   selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value
+                    extractedObj.data.stream.selectedStream.value,
                   );
                 } else {
                   selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream
+                    ...extractedObj.data.stream.selectedStream,
                   );
                 }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
               }
               const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str)
+                (stream_str) => !streamValues.includes(stream_str),
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
                   "[STREAM_NAME]",
-                  streamNotExist
+                  streamNotExist,
                 );
                 throw new Error(errMsg);
                 return;
@@ -1794,7 +1831,7 @@ export default defineComponent({
                     name: "",
                     function: searchObj.data.tempFunctionContent,
                   },
-                  false
+                  false,
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -1805,7 +1842,7 @@ export default defineComponent({
                     name: "",
                     function: "",
                   },
-                  false
+                  false,
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -1840,15 +1877,15 @@ export default defineComponent({
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value"
+                    "value",
                   )
                 ) {
                   selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value
+                    extractedObj.data.stream.selectedStream.value,
                   );
                 } else {
                   selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream
+                    ...extractedObj.data.stream.selectedStream,
                   );
                 }
               } else {
@@ -1871,7 +1908,7 @@ export default defineComponent({
 
               const streamData = await getStreams(
                 searchObj.data.stream.streamType,
-                true
+                true,
               );
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
@@ -1879,15 +1916,15 @@ export default defineComponent({
               // searchObj.value = mergeDeep(searchObj, extractedObj);
 
               const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value
+                (item) => item.value,
               );
               const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str)
+                (stream_str) => !streamValues.includes(stream_str),
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
                   "[STREAM_NAME]",
-                  streamNotExist
+                  streamNotExist,
                 );
                 throw new Error(errMsg);
                 return;
@@ -1899,7 +1936,7 @@ export default defineComponent({
                     name: "",
                     function: searchObj.data.tempFunctionContent,
                   },
-                  false
+                  false,
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -1910,7 +1947,7 @@ export default defineComponent({
                     name: "",
                     function: "",
                   },
-                  false
+                  false,
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -1932,6 +1969,7 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loading = true;
+                searchObj.meta.refreshHistogram = true;
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
@@ -1942,6 +1980,35 @@ export default defineComponent({
                 console.log(e);
               }
             }, 1000);
+
+            if (
+              extractedObj.data.resultGrid.colOrder &&
+              extractedObj.data.resultGrid.colOrder.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ) {
+              searchObj.data.stream.selectedFields =
+                extractedObj.data.resultGrid.colOrder[
+                  searchObj.data.stream.selectedStream
+                ];
+            } else {
+              searchObj.data.stream.selectedFields =
+                extractedObj.data.stream.selectedFields;
+            }
+
+            if (
+              extractedObj.data.resultGrid.colSizes &&
+              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ) {
+              searchObj.data.resultGrid.colSizes[
+                searchObj.data.stream.selectedStream
+              ] =
+                extractedObj.data.resultGrid.colSizes[
+                  searchObj.data.stream.selectedStream
+                ];
+            }
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
@@ -2001,7 +2068,7 @@ export default defineComponent({
             saveViewLoader.value = true;
             updateSavedViews(
               savedViewSelectedName.value.view_id,
-              savedViewSelectedName.value.view_name
+              savedViewSelectedName.value.view_name,
             );
           });
         } else {
@@ -2020,7 +2087,7 @@ export default defineComponent({
         savedviewsService
           .delete(
             store.state.selectedOrganization.identifier,
-            deleteViewID.value
+            deleteViewID.value,
           )
           .then((res) => {
             if (res.status == 200) {
@@ -2175,7 +2242,7 @@ export default defineComponent({
                     searchObj.data.savedViews[index].payload = viewObj.data;
                     searchObj.data.savedViews[index].view_name = viewName;
                   }
-                }
+                },
               );
 
               $q.notify({
@@ -2227,7 +2294,7 @@ export default defineComponent({
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
         )
         .join("&");
 
@@ -2256,21 +2323,19 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-          ","
-        )}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream}"`;
         if (
           searchObj.data.stream.interestingFieldList.length > 0 &&
           searchObj.meta.quickMode
         ) {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(",")
+            searchObj.data.stream.interestingFieldList.join(","),
           );
         } else {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            "*"
+            "*",
           );
         }
       } else {
@@ -2315,7 +2380,7 @@ export default defineComponent({
             let favoriteViewsList = localSavedViews.value;
             if (favoriteViewsList.length > 0) {
               favoriteViewsList = favoriteViewsList.filter(
-                (item) => item.view_id != row.view_id
+                (item) => item.view_id != row.view_id,
               );
               // for (const [key, item] of favoriteViewsList.entries()) {
               //   console.log(item, key);
@@ -2410,7 +2475,11 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
-      if (value == "logs") {
+      // confirm with user on toggle from visualize to logs
+      if (
+        value == "logs" &&
+        searchObj.meta.logsVisualizeToggle == "visualize"
+      ) {
         confirmLogsVisualizeModeChangeDialog.value = true;
       } else {
         searchObj.meta.logsVisualizeToggle = value;
@@ -2419,18 +2488,24 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs"
+      "logs",
     );
-    const { resetDashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
-    );
+    const { dashboardPanelData, resetDashboardPanelData } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const changeLogsVisualizeToggle = () => {
       // change logs visualize toggle
       searchObj.meta.logsVisualizeToggle = "logs";
       confirmLogsVisualizeModeChangeDialog.value = false;
+
+      // store dashboardPanelData meta object
+      const dashboardPanelDataMetaObj = dashboardPanelData.meta;
+
       // reset old dashboardPanelData
       resetDashboardPanelData();
+
+      // assign, old dashboardPanelData meta object
+      dashboardPanelData.meta = dashboardPanelDataMetaObj;
     };
 
     return {
@@ -2582,7 +2657,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by"
+                  "order by",
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2593,7 +2668,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit"
+                  "limit",
                 );
                 query =
                   beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
@@ -2604,7 +2679,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by"
+                  "order by",
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2615,7 +2690,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit"
+                  "limit",
                 );
                 query =
                   beforeLimit.trim() +
@@ -2667,6 +2742,15 @@ export default defineComponent({
   padding-bottom: 1px;
   height: 100%;
   overflow: visible;
+
+  .reset-filters {
+    width: 32px;
+    height: 32px;
+
+    .q-icon {
+      margin-right: 0;
+    }
+  }
 
   #logsQueryEditor,
   #fnEditor {
@@ -3012,11 +3096,6 @@ export default defineComponent({
 }
 
 .logs-visualize-toggle {
-  .selected {
-    background-color: var(--q-primary) !important;
-    color: white;
-  }
-
   .button-group {
     border: 1px solid gray !important;
     border-radius: 9px;
@@ -3034,11 +3113,17 @@ export default defineComponent({
   .button-left {
     border-top-left-radius: 4px;
     border-bottom-left-radius: 4px;
+    color: black;
   }
 
   .button-right {
     border-top-right-radius: 4px;
     border-bottom-right-radius: 4px;
+    color: black;
+  }
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
   }
 }
 </style>

@@ -1,6 +1,22 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div class="scheduled-alerts">
-    <div class="scheduled-alert-tabs q-mb-lg">
+    <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-mb-lg">
       <q-tabs
         data-test="scheduled-alert-tabs"
         v-model="tab"
@@ -40,29 +56,146 @@
       />
     </template>
     <template v-else>
-      <div class="text-bold q-mr-sm q-my-sm">
-        {{ tab === "promql" ? "Promql" : "SQL" }}
+      <div class="tw-flex tw-justify-start tw-items-center">
+        <div class="text-bold q-mr-sm q-my-sm">
+          {{ tab === "promql" ? "Promql" : "SQL" }}
+        </div>
+        <q-toggle
+          v-if="!disableVrlFunction"
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="isVrlFunctionEnabled"
+          :icon="'img:' + getImageURL('images/common/function.svg')"
+          title="Toggle Function Editor"
+          class="q-pl-xs"
+          size="30px"
+          @update:model-value="updateFunctionVisibility"
+          :disable="tab === 'promql'"
+        />
       </div>
-      <template v-if="tab === 'sql'">
-        <query-editor
-          data-test="scheduled-alert-sql-editor"
-          ref="queryEditorRef"
-          editor-id="alerts-query-editor"
-          class="monaco-editor q-mb-md"
-          v-model:query="query"
-          @update:query="updateQueryValue"
-        />
-      </template>
-      <template v-if="tab === 'promql'">
-        <query-editor
-          data-test="scheduled-alert-promql-editor"
-          ref="queryEditorRef"
-          editor-id="alerts-query-editor"
-          class="monaco-editor q-mb-md"
-          v-model:query="promqlQuery"
-          @update:query="updateQueryValue"
-        />
-      </template>
+
+      <div class="flex">
+        <template v-if="tab === 'sql'">
+          <div>
+            <query-editor
+              data-test="scheduled-alert-sql-editor"
+              ref="queryEditorRef"
+              editor-id="alerts-query-editor"
+              class="monaco-editor"
+              :debounceTime="300"
+              v-model:query="query"
+              :class="
+                query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+              "
+              @update:query="updateQueryValue"
+              @focus="queryEditorPlaceholderFlag = false"
+              @blur="onBlurQueryEditor"
+            />
+            <div class="text-negative q-mb-xs invalid-sql-error">
+              <span v-show="!!sqlQueryErrorMsg">
+                Error: {{ sqlQueryErrorMsg }}</span
+              >
+            </div>
+          </div>
+        </template>
+        <template v-if="tab === 'promql'">
+          <query-editor
+            data-test="scheduled-alert-promql-editor"
+            ref="queryEditorRef"
+            editor-id="alerts-query-editor"
+            class="monaco-editor q-mb-md"
+            :debounceTime="300"
+            v-model:query="promqlQuery"
+            @update:query="updateQueryValue"
+          />
+        </template>
+
+        <div
+          data-test="logs-vrl-function-editor"
+          v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
+        >
+          <div style="height: 40px; width: 100%">
+            <div style="display: flex; height: 40px">
+              <q-select
+                v-model="selectedFunction"
+                label="Use Saved function"
+                :options="functionOptions"
+                data-test="dashboard-use-saved-vrl-function"
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                filled
+                borderless
+                dense
+                hide-selected
+                menu-anchor="top left"
+                fill-input
+                option-label="name"
+                option-value="name"
+                @filter="filterFunctionOptions"
+                @update:modelValue="onFunctionSelect"
+                style="width: 100%"
+              >
+                <template #no-option>
+                  <q-item>
+                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+          </div>
+          <query-editor
+            data-test="logs-vrl-function-editor"
+            ref="fnEditorRef"
+            editor-id="fnEditor"
+            class="monaco-editor"
+            :debounceTime="300"
+            v-model:query="vrlFunctionContent"
+            :class="
+              vrlFunctionContent == '' && functionEditorPlaceholderFlag
+                ? 'empty-function'
+                : ''
+            "
+            language="ruby"
+            @focus="functionEditorPlaceholderFlag = false"
+            @blur="onBlurFunctionEditor"
+          />
+
+          <div
+            class="text-subtitle2 q-pb-sm"
+            style="min-height: 21px; width: 500px"
+          >
+            <div v-if="vrlFunctionError">
+              <div class="text-negative q-mb-xs flex items-center">
+                <q-btn
+                  :icon="
+                    isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
+                  "
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  data-test="table-row-expand-menu"
+                  @click.stop="toggleExpandFunctionError"
+                />
+                <div>
+                  <span v-show="vrlFunctionError">Invalid VRL function</span>
+                </div>
+              </div>
+              <div
+                v-if="isFunctionErrorExpanded"
+                class="q-px-sm q-pb-sm"
+                :class="
+                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                "
+              >
+                <pre class="q-my-none" style="white-space: pre-wrap">{{
+                  vrlFunctionError
+                }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
 
     <div class="q-mt-sm">
@@ -205,7 +338,10 @@
           />
         </div>
       </div>
-      <div class="flex justify-start items-center q-mb-xs no-wrap q-pb-md">
+      <div
+        v-if="!disableThreshold"
+        class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+      >
         <div
           data-test="scheduled-alert-threshold-title"
           class="text-bold flex items-center"
@@ -496,7 +632,7 @@
               max-width="300px"
             >
               <span style="font-size: 14px"
-                >Configure the option to enable a cron job for this alert.</span
+                >Configure the option to enable a cron job.</span
               >
             </q-tooltip>
           </q-icon>
@@ -545,9 +681,9 @@
               <span
                 style="font-size: 14px"
                 v-if="triggerData.frequency_type == 'minutes'"
-                >How often the alert should be evaluated.<br />
-                e.g. 2 minutes means that the query will be run every 2 minutes
-                and evaluated based on the other parameters provided.</span
+                >How often the task should be executed.<br />
+                e.g., 2 minutes means that the task will run every 2 minutes and
+                will be processed based on the other parameters provided.</span
               >
               <span style="font-size: 14px" v-else>
                 Pattern: * * * * * * means every second.
@@ -634,17 +770,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, type Ref, defineAsyncComponent } from "vue";
-import FieldsInput from "./FieldsInput.vue";
+import { ref, watch, computed, defineAsyncComponent } from "vue";
+import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import {
   outlinedDelete,
   outlinedInfo,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import { getImageURL } from "@/utils/zincutils";
+import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/QueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -658,6 +796,13 @@ const props = defineProps([
   "alertData",
   "promql",
   "promql_condition",
+  "vrl_function",
+  "showVrlFunction",
+  "sqlQueryErrorMsg",
+  "disableThreshold",
+  "disableVrlFunction",
+  "disableQueryTypeSelection",
+  "vrlFunctionError",
 ]);
 
 const emits = defineEmits([
@@ -671,6 +816,9 @@ const emits = defineEmits([
   "input:update",
   "update:promql",
   "update:promql_condition",
+  "update:vrl_function",
+  "update:showVrlFunction",
+  "validate-sql",
 ]);
 
 const { t } = useI18n();
@@ -683,7 +831,15 @@ const promqlQuery = ref(props.promql);
 
 const tab = ref(props.query_type || "custom");
 
+const q = useQuasar();
+
 const store = useStore();
+
+const functionEditorPlaceholderFlag = ref(true);
+
+const queryEditorPlaceholderFlag = ref(true);
+
+const isFunctionErrorExpanded = ref(false);
 
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
@@ -691,11 +847,11 @@ const regularFunctions = ["avg", "max", "min", "sum", "count"];
 const aggFunctions = computed(() =>
   props.alertData.stream_type === "metrics"
     ? [...regularFunctions, ...metricFunctions]
-    : [...regularFunctions]
+    : [...regularFunctions],
 );
 
 const _isAggregationEnabled = ref(
-  tab.value === "custom" && props.isAggregationEnabled
+  tab.value === "custom" && props.isAggregationEnabled,
 );
 
 const promqlCondition = ref(props.promql_condition);
@@ -703,6 +859,8 @@ const promqlCondition = ref(props.promql_condition);
 const aggregationData = ref(props.aggregation);
 
 const filteredFields = ref(props.columns);
+
+const fnEditorRef = ref<any>(null);
 
 const getNumericColumns = computed(() => {
   if (
@@ -724,6 +882,8 @@ const addField = () => {
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
+
+const selectedFunction = ref("");
 
 const removeField = (field: any) => {
   emits("field:remove", field);
@@ -756,6 +916,48 @@ const getDefaultPromqlCondition = () => {
     operator: ">=",
     value: 0,
   };
+};
+
+const onFunctionSelect = (_function: any) => {
+  selectedFunction.value = _function.name;
+  vrlFunctionContent.value = _function.function;
+};
+
+const functionsList = computed(() => store.state.organizationData.functions);
+
+const functionOptions = ref<any[]>([]);
+
+watch(
+  () => functionsList.value,
+  (functions: any[]) => {
+    functionOptions.value = [...functions];
+  },
+);
+
+const vrlFunctionContent = computed({
+  get() {
+    return props.vrl_function || "";
+  },
+  set(value) {
+    emits("update:vrl_function", value);
+  },
+});
+
+const isVrlFunctionEnabled = computed({
+  get() {
+    return props.showVrlFunction;
+  },
+  set(value) {
+    emits("update:showVrlFunction", value);
+    updateFunctionVisibility(value);
+  },
+});
+
+const updateFunctionVisibility = (isEnabled: boolean) => {
+  if (!isEnabled) {
+    vrlFunctionContent.value = null;
+    selectedFunction.value = "";
+  }
 };
 
 const updateQuery = () => {
@@ -816,7 +1018,7 @@ const filterColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredFields.value = props.columns.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };
@@ -830,7 +1032,7 @@ const filterNumericColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredNumericColumns.value = getNumericColumns.value.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };
@@ -839,8 +1041,84 @@ const updateAggregationToggle = () => {
   _isAggregationEnabled.value =
     tab.value === "custom" && props.isAggregationEnabled;
 };
+
+const filterFunctionOptions = (val: string, update: any) => {
+  update(() => {
+    functionOptions.value = functionsList.value.filter((fn: any) => {
+      return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+    });
+  });
+};
+
+const onBlurQueryEditor = async () => {
+  queryEditorPlaceholderFlag.value = true;
+  emits("validate-sql");
+};
+
+const validateInputs = (notify: boolean = true) => {
+  if (
+    Number(triggerData.value.period) < 1 ||
+    isNaN(Number(triggerData.value.period))
+  ) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Period should be greater than 0",
+        timeout: 1500,
+      });
+    return false;
+  }
+
+  if (aggregationData.value) {
+    if (
+      !props.disableThreshold &&
+      (isNaN(triggerData.value.threshold) ||
+        !aggregationData.value.having.value.toString().trim().length ||
+        !aggregationData.value.having.column ||
+        !aggregationData.value.having.operator)
+    ) {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Threshold should not be empty",
+          timeout: 1500,
+        });
+      return false;
+    }
+
+    return true;
+  }
+
+  if (
+    !props.disableThreshold &&
+    (isNaN(triggerData.value.threshold) ||
+      triggerData.value.threshold < 1 ||
+      !triggerData.value.operator)
+  ) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Threshold should not be empty",
+        timeout: 1500,
+      });
+    return false;
+  }
+
+  return true;
+};
+
+const onBlurFunctionEditor = async () => {
+  functionEditorPlaceholderFlag.value = true;
+  emits("validate-sql");
+};
+
+const toggleExpandFunctionError = () => {
+  isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
+};
+
 defineExpose({
   tab,
+  validateInputs,
 });
 </script>
 
@@ -880,5 +1158,21 @@ defineExpose({
       filter: none !important;
     }
   }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
+}
+
+.invalid-sql-error {
+  min-height: 21px;
 }
 </style>

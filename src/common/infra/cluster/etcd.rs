@@ -82,7 +82,8 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 async fn register() -> Result<()> {
     let cfg = get_config();
     // 1. create a cluster lock for node register
-    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
+    let locker =
+        dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64, None).await?;
 
     // 2. watch node list
     tokio::task::spawn(async move { super::watch_node_list().await });

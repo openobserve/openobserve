@@ -227,10 +227,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : { width: '100%' }
                   "
                 >
-                  <PermissionsJSON
+                  <query-editor
+                    data-test="logs-vrl-function-editor"
+                    editor-id="add-function-editor"
+                    class="monaco-editor q-mt-sm"
+                    language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
-                    class="q-mt-sm"
                     style="height: calc(100vh - 328px)"
                   />
                 </div>
@@ -337,8 +340,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 
-const PermissionsJSON = defineAsyncComponent(
-  () => import("@/components/iam/roles/PermissionsJSON.vue")
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue")
 );
 
 onBeforeMount(() => {

@@ -70,17 +70,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-bind:readonly="isEditingReport"
               v-bind:disable="isEditingReport"
               :rules="[
-                (val, rules) =>
+                (val: any) =>
                   !!val
-                    ? isValidName ||
-                      `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                    ? isValidResourceName(val) ||
+                      `Characters like :, ?, /, #, and spaces are not allowed.`
                     : t('common.nameRequired'),
               ]"
               tabindex="0"
               style="width: 400px"
             >
               <template v-slot:hint>
-                Use alphanumeric and '+=,.@-_' characters only, without spaces.
+                Characters like :, ?, /, #, and spaces are not allowed.
               </template>
             </q-input>
           </div>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       input-style="text-transform: none;"
                       @update:model-value="onFolderSelection(dashboard.folder)"
                       @filter="
-                        (...args) =>
+                        (...args: any) =>
                           onFilterOptions('folders', args[0], args[1])
                       "
                       behavior="menu"
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         onDashboardSelection(dashboard.dashboard)
                       "
                       @filter="
-                        (...args) =>
+                        (...args: any) =>
                           onFilterOptions('dashboards', args[0], args[1])
                       "
                       behavior="menu"
@@ -225,9 +225,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       fill-input
                       input-style="text-transform: none;"
                       :input-debounce="400"
-                      :rules="[(val: any) => !!val.length || 'Field is required!']"
+                      :rules="[
+                        (val: any) => !!val.length || 'Field is required!',
+                      ]"
                       @filter="
-                        (...args) => onFilterOptions('tabs', args[0], args[1])
+                        (...args: any) =>
+                          onFilterOptions('tabs', args[0], args[1])
                       "
                       style="
                         min-width: 250px !important;
@@ -383,7 +386,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         bg-color="input-bg"
                         type="text"
                         outlined
-                        :rules="[(val: any) => !!val.length ? cronError.length ? cronError : true : 'Field is required!']"
+                        :rules="[
+                          (val: any) =>
+                            !!val.length
+                              ? cronError.length
+                                ? cronError
+                                : true
+                              : 'Field is required!',
+                        ]"
                         dense
                         style="width: 100%"
                       />
@@ -438,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         outlined
                         dense
-                        :rules="[(val) => !!val || 'Field is required!']"
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 100%"
                       />
                     </div>
@@ -484,9 +494,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         bg-color="input-bg"
                         class="showLabelOnTop"
                         :rules="[
-                          (val) =>
+                          (val: any) =>
                             /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
-                              val
+                              val,
                             ) || 'Date format is incorrect!',
                         ]"
                         stack-label
@@ -634,7 +644,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outlined
                     filled
                     dense
-                    :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                    :rules="[
+                      (val: any) => !!val.trim() || 'Field is required!',
+                    ]"
                     tabindex="0"
                     style="width: 400px"
                   />
@@ -654,7 +666,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outlined
                     filled
                     dense
-                    :rules="[(val: any) => /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(val) || 'Add valid emails!']"
+                    :rules="[
+                      (val: any) =>
+                        /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
+                          val,
+                        ) || 'Add valid emails!',
+                    ]"
                     tabindex="0"
                     style="width: 100%"
                     borderless
@@ -737,7 +754,11 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
-import { getUUID, useLocalTimezone } from "@/utils/zincutils";
+import {
+  getUUID,
+  useLocalTimezone,
+  isValidResourceName,
+} from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
@@ -968,7 +989,7 @@ const setDashboardOptions = (id: string) => {
         false,
         "",
         store.state.selectedOrganization.identifier,
-        id
+        id,
       )
       .then((response: any) => {
         response.data.dashboards
@@ -991,7 +1012,7 @@ const setDashboardOptions = (id: string) => {
               });
               options.value["dashboards"] = [...dashboardOptions.value];
               resolve(true);
-            }
+            },
           );
       })
       .catch((err) => resolve(false))
@@ -1011,7 +1032,7 @@ const setDashboardTabOptions = (dashboardId: any) => {
 
   dashboardTabOptions.value =
     dashboardOptions.value.filter(
-      (dashboard) => dashboard.value === dashboardId
+      (dashboard) => dashboard.value === dashboardId,
     )[0].tabs || defaultTabs;
 
   options.value["tabs"] = [...dashboardTabOptions.value];
@@ -1066,7 +1087,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
@@ -1095,7 +1116,7 @@ const addDashboardVariable = () => {
 const removeDashboardVariable = (variable: any) => {
   formData.value.dashboards[0].variables =
     formData.value.dashboards[0].variables.filter(
-      (_variable: any) => _variable.id !== variable.id
+      (_variable: any) => _variable.id !== variable.id,
     );
 };
 
@@ -1125,7 +1146,7 @@ const getDashboaordFolders = () => {
 const convertDateToTimestamp = (
   date: string,
   time: string,
-  timezone: string
+  timezone: string,
 ) => {
   const [day, month, year] = date.split("-");
   const [hour, minute] = time.split(":");
@@ -1178,7 +1199,7 @@ const saveReport = async () => {
   const convertedDateTime = convertDateToTimestamp(
     scheduling.value.date,
     scheduling.value.time,
-    scheduling.value.timezone
+    scheduling.value.timezone,
   );
 
   formData.value.start = convertedDateTime.timestamp;
@@ -1335,7 +1356,7 @@ const validateReportData = async () => {
   if (
     !formData.value.title ||
     !/^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-      emails.value
+      emails.value,
     )
   ) {
     step.value = 3;

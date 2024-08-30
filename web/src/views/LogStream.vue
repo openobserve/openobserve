@@ -24,7 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:selected="selected"
       :rows="logStream"
       :columns="columns"
-      row-key="id"
+      row-key="name"
+      :selected-rows-label="getSelectedString"
+      selection="multiple"
       :pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
@@ -34,17 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!loadingState" class="text-center full-width full-height">
           <NoData />
         </div>
-        <div v-else class="text-center full-width full-height q-mt-lg">
+        <div
+          v-else
+          class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+        >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -166,14 +169,25 @@ size="sm" color="secondary" />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination
-          data-test="log-stream-table-pagination"
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <div class="bottom-bar">
+          <q-btn
+            v-if="selected.length > 0"
+            class="delete-btn"
+            color="red"
+            icon="delete"
+            :label="isDeleting ? 'Deleting...' : 'Delete'"
+            :disable="isDeleting"
+            @click="confirmBatchDeleteAction"
+          />
+          <QTablePagination
+            data-test="log-stream-table-pagination"
+            :scope="scope"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            position="bottom"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </div>
       </template>
     </q-table>
     <q-dialog
@@ -205,8 +219,7 @@ size="sm" color="secondary" />
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -216,6 +229,30 @@ no-caps class="q-mr-sm">
             class="no-border"
             color="primary"
             @click="deleteStream"
+          >
+            {{ t("logStream.ok") }}
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <q-dialog v-model="confirmBatchDelete">
+      <q-card style="width: 240px">
+        <q-card-section class="confirmBody">
+          <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
+          <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+            {{ t("logStream.cancel") }}
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="deleteBatchStream"
           >
             {{ t("logStream.ok") }}
           </q-btn>
@@ -266,7 +303,9 @@ export default defineComponent({
     const router = useRouter();
     const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
+    const isDeleting = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const resultTotal = ref<number>(0);
     const selected = ref<any>([]);
@@ -361,7 +400,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
         columns.value = columns.value.filter(
-          (column) => column.name !== "doc_num"
+          (column) => column.name !== "doc_num",
         );
       }
 
@@ -384,7 +423,7 @@ export default defineComponent({
         if (!value) {
           onChangeStreamFilter(selectedStreamType.value);
         }
-      }
+      },
     );
 
     const getLogStream = (refresh: boolean = false) => {
@@ -428,7 +467,7 @@ export default defineComponent({
                   schema: data.schema ? data.schema : [],
                   stream_type: data.stream_type,
                 };
-              })
+              }),
             );
             duplicateStreamList.value = [...logStream.value];
 
@@ -504,13 +543,17 @@ export default defineComponent({
       deleteStreamName = props.row.name;
       deleteStreamType = props.row.stream_type;
     };
+    const confirmBatchDeleteAction = () => {
+      confirmBatchDelete.value = true;
+      console.log(selected, "selected items");
+    };
 
     const deleteStream = () => {
       streamService
         .delete(
           store.state.selectedOrganization.identifier,
           deleteStreamName,
-          deleteStreamType
+          deleteStreamType,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -519,6 +562,7 @@ export default defineComponent({
               message: "Stream deleted successfully.",
             });
             removeStream(deleteStreamName, deleteStreamType);
+            selected.value = [];
             getLogStream();
           }
         })
@@ -527,6 +571,68 @@ export default defineComponent({
             color: "negative",
             message: "Error while deleting stream.",
           });
+        });
+    };
+    const deleteBatchStream = () => {
+      isDeleting.value = true;
+      const selectedItems = selected.value;
+      const promises: Promise<any>[] = [];
+
+      selectedItems.forEach((stream: any) => {
+        promises.push(
+          streamService.delete(
+            store.state.selectedOrganization.identifier,
+            stream.name,
+            stream.stream_type,
+          ),
+        );
+      });
+
+      Promise.all(promises)
+        .then((responses) => {
+          const successfulDeletions = responses.filter(
+            (res) => res.data.code === 200,
+          );
+          const failedDeletions = responses.filter(
+            (res) => res.data.code !== 200,
+          );
+
+          if (successfulDeletions.length > 0) {
+            $q.notify({
+              color: "positive",
+              message: `Deleted ${successfulDeletions.length} streams successfully.`,
+            });
+          }
+
+          if (failedDeletions.length > 0) {
+            $q.notify({
+              color: "negative",
+              message: `Failed to delete ${failedDeletions.length} streams.`,
+            });
+          }
+
+          // Remove deleted streams from the list
+          console.log(selectedItems, "after deleting streams");
+          selectedItems.forEach((stream: any) => {
+            removeStream(stream.name, stream.stream_type);
+            selected.value = selected.value.filter(
+              (item: any) =>
+                item.name !== stream.name &&
+                item.stream_type !== stream.stream_type,
+            );
+          });
+
+          getLogStream();
+        })
+        .catch((error) => {
+          console.error(error);
+          $q.notify({
+            color: "negative",
+            message: "Error while deleting streams.",
+          });
+        })
+        .finally(() => {
+          isDeleting.value = false;
         });
     };
 
@@ -546,6 +652,11 @@ export default defineComponent({
         getLogStream();
       }
     });
+    const getSelectedString = () => {
+      return selected.value.length === 0
+        ? ""
+        : `${selected.value.length} record${selected.value.length > 1 ? "s" : ""} selected`;
+    };
 
     const exploreStream = (props: any) => {
       router.push({
@@ -586,11 +697,14 @@ export default defineComponent({
       selectedStreamType.value = value;
       logStream.value = filterData(
         duplicateStreamList.value,
-        filterQuery.value.toLowerCase()
+        filterQuery.value.toLowerCase(),
       );
       resultTotal.value = logStream.value.length;
     };
 
+    const getSelectedItems = () => {
+      console.log(selected.value[0], "selected");
+    };
     const addStream = () => {
       addStreamDialog.value.show = true;
       // router.push({
@@ -615,8 +729,11 @@ export default defineComponent({
       resultTotal,
       listSchema,
       deleteStream,
+      deleteBatchStream,
       confirmDeleteAction,
+      confirmBatchDeleteAction,
       confirmDelete,
+      confirmBatchDelete,
       schemaData,
       perPageOptions,
       selectedPerPage,
@@ -636,6 +753,9 @@ export default defineComponent({
       addStreamDialog,
       addStream,
       loadingState,
+      getSelectedString,
+      getSelectedItems,
+      isDeleting,
     };
   },
 });
@@ -647,6 +767,15 @@ export default defineComponent({
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
   }
+}
+.bottom-bar {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+.delete-btn {
+  width: 10vw;
 }
 
 .confirmBody {

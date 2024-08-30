@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.10.8"
+version = "0.10.9"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -58,6 +58,9 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
   "base64",
 ] }
 actix-ws = "0.2.5"
+actix = "0.13.5"
+tokio-tungstenite = "0.23.1"
+actix-web-actors = "4.3.0"
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -81,7 +84,7 @@ cron = "0.12.1"
 csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
-datafusion-expr.workspace = true
+datafusion-proto.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
@@ -103,7 +106,11 @@ memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry = "0.22"
-opentelemetry_sdk = { version = "0.22", features = ["rt-tokio", "trace", "metrics"] }
+opentelemetry_sdk = { version = "0.22", features = [
+  "rt-tokio",
+  "trace",
+  "metrics",
+] }
 opentelemetry-otlp = { version = "0.15", features = [
   "http-proto",
   "serialize",
@@ -157,8 +164,8 @@ url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
-vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "66667dd291482a440c5eb2032ef3cbfb7377b53b" }
-vrl = { version = "0.8.1", features = ["value", "compiler", "test"] }
+vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "70e61fc344b9db2f191cfba9ad58ee08e79d30b4" }
+vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }
 zstd.workspace = true
 config.workspace = true
 infra.workspace = true
@@ -208,7 +215,6 @@ argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"
 async-walkdir = "1.0.0"
-aws-config = "0.56.1"
 base64 = "0.21"
 bitvec = "1.0"
 bytes = "1.4"
@@ -219,14 +225,14 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 ], default-features = false, rev = "348967500868c2b5dfcb3930fe483b2ff17b35ff" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
-dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "40"
-datafusion-expr = "40"
-arrow = { version = "52.1.0", features = ["ipc_compression", "prettyprint"] }
-arrow-json = "52.1.0"
-arrow-schema = { version = "52.1.0", features = ["serde"] }
-parquet = { version = "52.1.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.10.1", features = ["aws", "azure", "gcp"] }
+dashmap = { version = "6.0", features = ["serde"] }
+datafusion = "41"
+datafusion-proto = "41"
+arrow = { version = "52.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-json = "52.2.0"
+arrow-schema = { version = "52.2.0", features = ["serde"] }
+parquet = { version = "52.2.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.10.2", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -279,7 +285,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.47", features = ["serde", "visitor"] }
+sqlparser = { version = "0.49", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"

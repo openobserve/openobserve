@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,7 @@ pub struct Session {
     pub storage_type: StorageType,
     pub search_type: SearchType,
     pub work_group: Option<String>,
+    pub target_partitions: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,8 +51,6 @@ pub enum SearchType {
 pub struct Request {
     #[schema(value_type = SearchQuery)]
     pub query: Query,
-    #[serde(default)]
-    pub aggs: HashMap<String, String>,
     #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
@@ -106,15 +105,11 @@ pub struct Query {
     #[serde(default)]
     pub sort_by: Option<String>,
     #[serde(default)]
-    pub sql_mode: String,
-    #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
     pub query_type: String,
     #[serde(default)]
     pub track_total_hits: bool,
-    #[serde(default)]
-    pub query_context: Option<String>,
     #[serde(default)]
     pub uses_zo_fn: bool,
     #[serde(default)]
@@ -136,11 +131,9 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             sort_by: None,
-            sql_mode: "".to_string(),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            query_context: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
@@ -159,14 +152,6 @@ impl Request {
                         return Err(e);
                     }
                 };
-                for (_, v) in self.aggs.iter_mut() {
-                    *v = match base64::decode_url(v) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    };
-                }
             }
             RequestEncoding::Empty => {}
         }
@@ -187,10 +172,6 @@ pub struct Response {
     pub columns: Vec<String>,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    #[schema(value_type = Object)]
-    pub aggs: HashMap<String, Vec<json::Value>>,
     pub total: usize,
     pub from: i64,
     pub size: i64,
@@ -199,6 +180,7 @@ pub struct Response {
     pub file_count: usize,
     pub cached_ratio: usize,
     pub scan_size: usize,
+    pub idx_scan_size: usize,
     pub scan_records: usize,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -225,6 +207,7 @@ pub struct Response {
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseTook {
     pub total: usize,
+    pub idx_took: usize,
     pub wait_queue: usize,
     pub cluster_total: usize,
     pub cluster_wait_queue: usize,
@@ -251,10 +234,10 @@ impl Response {
             file_count: 0,
             cached_ratio: 0,
             scan_size: 0,
+            idx_scan_size: 0,
             scan_records: 0,
             columns: Vec::new(),
             hits: Vec::new(),
-            aggs: HashMap::new(),
             response_type: "".to_string(),
             trace_id: "".to_string(),
             function_error: "".to_string(),
@@ -271,15 +254,11 @@ impl Response {
         self.total += 1;
     }
 
-    pub fn add_agg(&mut self, name: &str, hit: &json::Value) {
-        let val = self.aggs.entry(name.to_string()).or_default();
-        val.push(hit.to_owned());
-    }
-
     pub fn set_cluster_took(&mut self, val: usize, wait: usize) {
         self.took = val - wait;
         self.took_detail = Some(ResponseTook {
             total: 0,
+            idx_took: 0,
             wait_queue: 0,
             cluster_total: val,
             cluster_wait_queue: wait,
@@ -293,6 +272,12 @@ impl Response {
             if wait > 0 {
                 self.took_detail.as_mut().unwrap().wait_queue = wait;
             }
+        }
+    }
+
+    pub fn set_idx_took(&mut self, val: usize) {
+        if self.took_detail.is_some() {
+            self.took_detail.as_mut().unwrap().idx_took = val;
         }
     }
 
@@ -310,6 +295,10 @@ impl Response {
 
     pub fn set_scan_size(&mut self, val: usize) {
         self.scan_size = val;
+    }
+
+    pub fn set_idx_scan_size(&mut self, val: usize) {
+        self.idx_scan_size = val;
     }
 
     pub fn set_scan_records(&mut self, val: usize) {
@@ -332,8 +321,6 @@ impl Response {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionRequest {
     pub sql: String,
-    #[serde(default)]
-    pub sql_mode: String,
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
@@ -342,6 +329,8 @@ pub struct SearchPartitionRequest {
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -370,6 +359,10 @@ pub struct SearchPartitionResponse {
     pub records: usize,
     pub original_size: usize,
     pub compressed_size: usize,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub histogram_interval: Option<i64>, // seconds, for histogram
+    pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
 }
 
@@ -414,6 +407,7 @@ pub struct ScanStats {
     pub querier_files: i64,
     pub querier_memory_cached_files: i64,
     pub querier_disk_cached_files: i64,
+    pub idx_scan_size: i64,
 }
 
 impl ScanStats {
@@ -429,11 +423,13 @@ impl ScanStats {
         self.querier_files += other.querier_files;
         self.querier_memory_cached_files += other.querier_memory_cached_files;
         self.querier_disk_cached_files += other.querier_disk_cached_files;
+        self.idx_scan_size += other.idx_scan_size;
     }
 
     pub fn format_to_mb(&mut self) {
         self.original_size = self.original_size / 1024 / 1024;
         self.compressed_size = self.compressed_size / 1024 / 1024;
+        self.idx_scan_size = self.idx_scan_size / 1024 / 1024;
     }
 }
 
@@ -441,7 +437,6 @@ impl From<Request> for cluster_rpc::SearchRequest {
     fn from(req: Request) -> Self {
         let req_query = cluster_rpc::SearchQuery {
             sql: req.query.sql.clone(),
-            sql_mode: req.query.sql_mode.clone(),
             quick_mode: req.query.quick_mode,
             query_type: req.query.query_type.clone(),
             from: req.query.from as i32,
@@ -450,7 +445,6 @@ impl From<Request> for cluster_rpc::SearchRequest {
             end_time: req.query.end_time,
             sort_by: req.query.sort_by.unwrap_or_default(),
             track_total_hits: req.query.track_total_hits,
-            query_context: req.query.query_context.unwrap_or_default(),
             uses_zo_fn: req.query.uses_zo_fn,
             query_fn: req.query.query_fn.unwrap_or_default(),
             skip_wal: req.query.skip_wal,
@@ -463,17 +457,12 @@ impl From<Request> for cluster_rpc::SearchRequest {
             partition: 0,
         };
 
-        let mut aggs = Vec::new();
-        for (name, sql) in req.aggs {
-            aggs.push(cluster_rpc::SearchAggRequest { name, sql });
-        }
-
         cluster_rpc::SearchRequest {
             job: Some(job),
             org_id: "".to_string(),
             stype: cluster_rpc::SearchType::User.into(),
+            agg_mode: cluster_rpc::AggregateMode::Final.into(),
             query: Some(req_query),
-            aggs,
             file_list: vec![],
             stream_type: "".to_string(),
             timeout: req.timeout,
@@ -494,6 +483,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             querier_files: req.querier_files,
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
+            idx_scan_size: req.idx_scan_size,
         }
     }
 }
@@ -508,6 +498,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             querier_files: req.querier_files,
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
+            idx_scan_size: req.idx_scan_size,
         }
     }
 }
@@ -521,18 +512,20 @@ pub enum SearchEventType {
     Values,
     Other,
     RUM,
+    DerivedStream,
 }
 
 impl std::fmt::Display for SearchEventType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            SearchEventType::UI => write!(f, "UI"),
-            SearchEventType::Dashboards => write!(f, "Dashboards"),
-            SearchEventType::Reports => write!(f, "Reports"),
-            SearchEventType::Alerts => write!(f, "Alerts"),
-            SearchEventType::Other => write!(f, "Other"),
+            SearchEventType::UI => write!(f, "ui"),
+            SearchEventType::Dashboards => write!(f, "dashboards"),
+            SearchEventType::Reports => write!(f, "reports"),
+            SearchEventType::Alerts => write!(f, "alerts"),
             SearchEventType::Values => write!(f, "_values"),
-            SearchEventType::RUM => write!(f, "RUM"),
+            SearchEventType::Other => write!(f, "other"),
+            SearchEventType::RUM => write!(f, "rum"),
+            SearchEventType::DerivedStream => write!(f, "derived_stream"),
         }
     }
 }
@@ -546,9 +539,10 @@ impl FromStr for SearchEventType {
             "dashboards" => Ok(SearchEventType::Dashboards),
             "reports" => Ok(SearchEventType::Reports),
             "alerts" => Ok(SearchEventType::Alerts),
-            "values" => Ok(SearchEventType::Values),
+            "values" | "_values" => Ok(SearchEventType::Values),
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
+            "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
             _ => Err(format!("Invalid search event type: {s}")),
         }
     }
@@ -560,13 +554,13 @@ pub struct MultiSearchPartitionRequest {
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
-    pub sql_mode: String,
-    #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -580,8 +574,6 @@ pub struct MultiSearchPartitionResponse {
 pub struct MultiStreamRequest {
     pub sql: Vec<String>,
     #[serde(default)]
-    pub aggs: HashMap<String, String>,
-    #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
     pub timeout: i64,
@@ -594,15 +586,11 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     pub sort_by: Option<String>,
     #[serde(default)]
-    pub sql_mode: String,
-    #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
     pub query_type: String,
     #[serde(default)]
     pub track_total_hits: bool,
-    #[serde(default)]
-    pub query_context: Option<String>,
     #[serde(default)]
     pub uses_zo_fn: bool,
     #[serde(default)]
@@ -628,16 +616,13 @@ impl MultiStreamRequest {
                     start_time: self.start_time,
                     end_time: self.end_time,
                     sort_by: self.sort_by.clone(),
-                    sql_mode: self.sql_mode.clone(),
                     quick_mode: self.quick_mode,
                     query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
-                    query_context: self.query_context.clone(),
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn: self.query_fn.clone(),
                     skip_wal: self.skip_wal,
                 },
-                aggs: self.aggs.clone(),
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
                 encoding: self.encoding,
@@ -661,7 +646,6 @@ mod tests {
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
-        res.add_agg("count", &json::Value::Object(val_map));
         res.add_hit(&hit); // total+1
         assert_eq!(res.total, 11);
     }
@@ -676,11 +660,7 @@ mod tests {
                     "size": 10,
                     "start_time": 0,
                     "end_time": 0,
-                    "sql_mode": "context",
                     "track_total_hits": false
-                },
-                "aggs": {
-                    "sql": "c2VsZWN0ICogZnJvbSBvbHltcGljcw=="
                 },
                 "encoding": "base64"
             }
@@ -688,7 +668,6 @@ mod tests {
         let mut req: Request = json::from_value(req).unwrap();
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
-        assert_eq!(req.aggs.get("sql").unwrap(), "select * from olympics");
     }
 
     #[test]
@@ -701,11 +680,7 @@ mod tests {
                     "size": 10,
                     "start_time": 0,
                     "end_time": 0,
-                    "sql_mode": "context",
                     "track_total_hits": false
-                },
-                "aggs": {
-                    "sql": "select * from olympics"
                 },
                 "encoding": ""
             }
@@ -713,15 +688,13 @@ mod tests {
         let mut req: Request = json::from_value(req).unwrap();
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
-        assert_eq!(req.aggs.get("sql").unwrap(), "select * from olympics");
     }
 
     #[tokio::test]
     async fn test_search_convert() {
-        let mut req = Request {
+        let req = Request {
             query: Query {
                 sql: "SELECT * FROM test".to_string(),
-                sql_mode: "default".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 from: 0,
@@ -730,20 +703,16 @@ mod tests {
                 end_time: 0,
                 sort_by: None,
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: "base64".into(),
             regions: vec![],
             clusters: vec![],
             timeout: 0,
             search_type: None,
         };
-        req.aggs
-            .insert("test".to_string(), "SELECT * FROM test".to_string());
 
         let rpc_req = cluster_rpc::SearchRequest::from(req.clone());
 

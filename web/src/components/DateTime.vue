@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-cy="date-time-button"
       outline
       no-caps
-      :label="displayValue"
+      :label="getDisplayValue"
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
@@ -136,20 +136,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       filled
                       min="1"
+                      :max="
+                        relativePeriodsMaxValue[relativePeriod] > 0
+                          ? relativePeriodsMaxValue[relativePeriod]
+                          : ''
+                      "
                       @update:model-value="onCustomPeriodSelect"
-                      :disable="queryRangeRestrictionInHour > 0"
                     />
                   </div>
                   <div class="col">
                     <q-select
                       v-model="relativePeriod"
-                      :options="relativePeriods"
+                      :options="relativePeriodsSelect"
                       dense
                       filled
                       emit-value
                       @update:modelValue="onCustomPeriodSelect"
                       popup-content-style="z-index: 10002"
-                      :disable="queryRangeRestrictionInHour > 0"
+                      style="width: 100px"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel }}</div>
@@ -315,6 +319,7 @@ import {
   onMounted,
   watch,
   nextTick,
+  onActivated,
 } from "vue";
 import {
   getImageURL,
@@ -326,7 +331,8 @@ import { date, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { utcToZonedTime } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
+import { max } from "moment";
 
 export default defineComponent({
   props: {
@@ -411,7 +417,7 @@ export default defineComponent({
       // ignore case
       timezone.value =
         timezoneOptions.find(
-          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
+          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase(),
         ) || currentTimezone;
 
       // call onTimezoneChange to set the timezone in the store
@@ -420,13 +426,22 @@ export default defineComponent({
 
     const filteredTimezone: any = ref([]);
 
-    const relativePeriods = [
+    let relativePeriods = [
       { label: "Minutes", value: "m" },
       { label: "Hours", value: "h" },
       { label: "Days", value: "d" },
       { label: "Weeks", value: "w" },
       { label: "Months", value: "M" },
     ];
+
+    let relativePeriodsSelect = ref([
+      { label: "Minutes", value: "m" },
+      { label: "Hours", value: "h" },
+      { label: "Days", value: "d" },
+      { label: "Weeks", value: "w" },
+      { label: "Months", value: "M" },
+    ]);
+
     const relativeDates = {
       m: [1, 5, 10, 15, 30, 45],
       h: [1, 2, 3, 6, 8, 12],
@@ -442,6 +457,14 @@ export default defineComponent({
       w: [168, 336, 504, 672, 840, 1008],
       M: [744, 1488, 2232, 2976, 3720, 4464],
     };
+
+    let relativePeriodsMaxValue: object = ref({
+      m: 0,
+      h: 0,
+      d: 0,
+      w: 0,
+      M: 0,
+    });
 
     const datetimeBtn = ref(null);
 
@@ -477,8 +500,11 @@ export default defineComponent({
 
         selectedType.value = props.defaultType;
         setAbsoluteTime(startTime, endTime);
+
         setRelativeTime(props.defaultRelativeTime);
-        displayValue.value = getDisplayValue();
+
+        if (props.queryRangeRestrictionInHour) computeRelativePeriod();
+        // displayValue.value = getDisplayValue();
 
         if (props.autoApply) saveDate(props.defaultType);
       } catch (e) {
@@ -502,7 +528,7 @@ export default defineComponent({
           saveDate("absolute");
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(
@@ -510,16 +536,35 @@ export default defineComponent({
         router.currentRoute.value.query?.from;
       },
       () => {
-        if(router.currentRoute.value.query.hasOwnProperty("from") && router.currentRoute.value.query.hasOwnProperty("to")) {
+        if (
+          router.currentRoute.value.query.hasOwnProperty("from") &&
+          router.currentRoute.value.query.hasOwnProperty("to")
+        ) {
           selectedType.value = "absolute";
-          selectedTime.value.startTime = timestampToTimezoneDate(router.currentRoute.value.query?.from/1000, store.state.timezone, "HH:mm");
-          selectedTime.value.endTime = timestampToTimezoneDate(router.currentRoute.value.query?.to/1000, store.state.timezone, "HH:mm");
-          selectedDate.value.from = timestampToTimezoneDate(router.currentRoute.value.query?.from/1000, store.state.timezone, "yyyy/MM/dd");
-          selectedDate.value.to = timestampToTimezoneDate(router.currentRoute.value.query?.to/1000, store.state.timezone, "yyyy/MM/dd");
+          selectedTime.value.startTime = timestampToTimezoneDate(
+            router.currentRoute.value.query?.from / 1000,
+            store.state.timezone,
+            "HH:mm",
+          );
+          selectedTime.value.endTime = timestampToTimezoneDate(
+            router.currentRoute.value.query?.to / 1000,
+            store.state.timezone,
+            "HH:mm",
+          );
+          selectedDate.value.from = timestampToTimezoneDate(
+            router.currentRoute.value.query?.from / 1000,
+            store.state.timezone,
+            "yyyy/MM/dd",
+          );
+          selectedDate.value.to = timestampToTimezoneDate(
+            router.currentRoute.value.query?.to / 1000,
+            store.state.timezone,
+            "yyyy/MM/dd",
+          );
           saveDate("absolute");
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // watch(
@@ -549,6 +594,17 @@ export default defineComponent({
     };
 
     const onCustomPeriodSelect = () => {
+      if (
+        selectedType.value == "relative" &&
+        props.queryRangeRestrictionInHour > 0 &&
+        relativeValue.value >
+          relativePeriodsMaxValue.value[relativePeriod.value]
+      ) {
+        relativeValue.value =
+          relativePeriodsMaxValue.value[relativePeriod.value] > -1
+            ? relativePeriodsMaxValue.value[relativePeriod.value]
+            : 15;
+      }
       if (props.autoApply) saveDate("relative-custom");
     };
 
@@ -568,6 +624,8 @@ export default defineComponent({
         if (periodValue) {
           relativeValue.value = parseInt(periodValue);
         }
+
+        selectedType.value = "relative";
       }
     };
 
@@ -604,7 +662,7 @@ export default defineComponent({
 
     function convertUnixTime(unixTimeMicros) {
       // Convert microseconds to milliseconds and create a new Date object
-      var date = utcToZonedTime(unixTimeMicros / 1000, store.state.timezone);
+      var date = toZonedTime(unixTimeMicros / 1000, store.state.timezone);
 
       // Extract hour, minute, day, month, and year
       const hours = ("0" + date.getHours()).slice(-2); // pad with leading zero if needed
@@ -623,7 +681,7 @@ export default defineComponent({
     };
 
     const saveDate = (dateType) => {
-      displayValue.value = getDisplayValue();
+      // displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
       if (isNaN(date.endTime) || isNaN(date.startTime)) {
         return false;
@@ -696,7 +754,7 @@ export default defineComponent({
 
         const startTimeStamp = date.subtractFromDate(
           endTimeStamp,
-          JSON.parse(subtractObject)
+          JSON.parse(subtractObject),
         );
 
         return {
@@ -717,7 +775,7 @@ export default defineComponent({
           start = new Date();
         } else {
           start = new Date(
-            selectedDate.value.from + " " + selectedTime.value.startTime
+            selectedDate.value.from + " " + selectedTime.value.startTime,
           );
         }
 
@@ -725,7 +783,7 @@ export default defineComponent({
           end = new Date();
         } else {
           end = new Date(
-            selectedDate.value.to + " " + selectedTime.value.endTime
+            selectedDate.value.to + " " + selectedTime.value.endTime,
           );
         }
 
@@ -784,10 +842,10 @@ export default defineComponent({
         }
       }
 
-      displayValue.value = getDisplayValue();
+      // displayValue.value = getDisplayValue();
     };
 
-    const getDisplayValue = () => {
+    const getDisplayValue = computed(() => {
       if (selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
@@ -805,7 +863,7 @@ export default defineComponent({
           return `${todayDate} ${selectedTime.value.startTime} - ${todayDate} ${selectedTime.value.endTime}`;
         }
       }
-    };
+    });
 
     const timezoneFilterFn = (val, update) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
@@ -822,7 +880,7 @@ export default defineComponent({
       update(() => {
         const value = val.toLowerCase();
         filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
         );
       });
       return filteredOptions;
@@ -832,17 +890,103 @@ export default defineComponent({
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
-        "yyyy/MM/dd"
+        "yyyy/MM/dd",
       );
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
     const setDateType = (type) => {
       selectedType.value = type;
-      displayValue.value = getDisplayValue();
+      // displayValue.value = getDisplayValue();
 
       if (props.autoApply)
         saveDate(type === "absolute" ? "absolute" : "relative-custom");
+    };
+
+    const computeRelativePeriod = () => {
+      if (selectedType.value === "relative") {
+        if (props.queryRangeRestrictionInHour > 0) {
+          for (let period of relativePeriods) {
+            if (period.value == "m") {
+              relativePeriodsMaxValue.value[period.value] = 60;
+            }
+
+            if (period.value == "h" && props.queryRangeRestrictionInHour > 0) {
+              relativePeriodsMaxValue.value[period.value] =
+                props.queryRangeRestrictionInHour;
+            } else if (period.value == "h") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+
+            if (period.value == "d" && props.queryRangeRestrictionInHour > 24) {
+              relativePeriodsMaxValue.value[period.value] =
+                Math.round(props.queryRangeRestrictionInHour / 24) || 31;
+            } else if (period.value == "d") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+
+            if (
+              period.value == "w" &&
+              props.queryRangeRestrictionInHour > 24 * 7
+            ) {
+              relativePeriodsMaxValue.value[period.value] =
+                Math.round(props.queryRangeRestrictionInHour / (24 * 7)) || 100;
+            } else if (period.value == "w") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+
+            if (
+              period.value == "M" &&
+              props.queryRangeRestrictionInHour > 24 * 30
+            ) {
+              relativePeriodsMaxValue.value[period.value] =
+                Math.round(props.queryRangeRestrictionInHour / (24 * 30)) ||
+                100;
+            } else if (period.value == "M") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+          }
+        } else {
+          relativePeriodsMaxValue.value = {
+            m: 0,
+            h: 0,
+            d: 0,
+            w: 0,
+            M: 0,
+          };
+        }
+
+        relativePeriodsSelect.value = relativePeriods.filter((period) => {
+          if (relativePeriodsMaxValue.value[period.value] > -1) {
+            return period;
+          }
+        });
+
+        if (props.queryRangeRestrictionInHour > 0) {
+          const maxRelativeValue =
+            relativePeriodsMaxValue.value[relativePeriod.value];
+
+          try {
+            if (
+              maxRelativeValue !== -1 &&
+              relativeValue.value > maxRelativeValue
+            ) {
+              setRelativeDate(relativePeriod.value, maxRelativeValue);
+            } else if (maxRelativeValue === -1) {
+              const periods = ["m", "h", "d", "w", "M"];
+              const periodIndex = periods.indexOf(relativePeriod.value);
+              for (let i = periodIndex; i >= 0; i--) {
+                if (relativePeriodsMaxValue.value[periods[i]] > -1) {
+                  setRelativeDate(periods[i], relativeDates[periods[i]][0]);
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.log("Error while setting relative date", e);
+          }
+        }
+      }
     };
 
     return {
@@ -876,7 +1020,22 @@ export default defineComponent({
       getConsumableDateTime,
       relativeDatesInHour,
       setAbsoluteTime,
+      setRelativeTime,
+      getDisplayValue,
+      relativePeriodsMaxValue,
+      relativePeriodsSelect,
+      computeRelativePeriod,
     };
+  },
+  computed: {
+    relativePeriodWatch() {
+      return this.queryRangeRestrictionInHour;
+    },
+  },
+  watch: {
+    relativePeriodWatch() {
+      this.computeRelativePeriod();
+    },
   },
 });
 </script>

@@ -422,6 +422,7 @@ export default defineComponent({
                   : 10,
                 type: currentVariable.query_data.stream_type,
                 query_context: queryContext,
+                no_count: true,
               });
 
               if (res.data.hits.length) {

@@ -103,6 +103,7 @@ import {
   PolarComponent,
   VisualMapComponent,
   DataZoomComponent,
+  MarkLineComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
@@ -128,6 +129,7 @@ import type {
   PolarComponentOption,
   VisualMapComponentOption,
   DataZoomComponentOption,
+  MarkLineComponentOption,
 } from "echarts/components";
 
 type ECOption = ComposeOption<
@@ -149,6 +151,7 @@ type ECOption = ComposeOption<
   | PolarComponentOption
   | VisualMapComponentOption
   | DataZoomComponentOption
+  | MarkLineComponentOption
 >;
 
 echarts.use([
@@ -161,6 +164,7 @@ echarts.use([
   PolarComponent,
   VisualMapComponent,
   DataZoomComponent,
+  MarkLineComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -229,7 +233,7 @@ export default defineComponent({
       }
 
       // set current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName);
+      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName ?? "");
 
       // Below logic is to scroll legend upto current series index
       // which creates wrong legend highlight issue in tooltip
@@ -312,9 +316,9 @@ export default defineComponent({
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
-      chart?.on("downplay", (params: any) => {
+      chart?.on("highlight", (params: any) => {
         // reset hovered series name on downplay
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
+        // hoveredSeriesState?.value?.setHoveredSeriesName("");
 
         // downplay event will only called by currently hovered panel else it will go into infinite loop
         // and chart must be timeseries chart
@@ -331,7 +335,7 @@ export default defineComponent({
               dataIndex,
               seriesIndex,
               props?.data?.extras?.panelId || -1,
-              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
+              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0],
             );
           }
         }
@@ -367,6 +371,7 @@ export default defineComponent({
         emit("mouseover", params);
       });
 
+      window.removeEventListener("resize", windowResizeEventCallback);
       window.addEventListener("resize", windowResizeEventCallback);
 
       // we need that toolbox datazoom button initally selected
@@ -415,7 +420,7 @@ export default defineComponent({
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime
+              hoveredSeriesState?.value?.hoveredTime,
             );
           }
 
@@ -435,7 +440,7 @@ export default defineComponent({
         ) {
           restoreChart();
         }
-      }
+      },
     );
 
     watch(
@@ -445,7 +450,7 @@ export default defineComponent({
           type: "highlight",
           seriesName: hoveredSeriesState?.value?.hoveredSeriesName,
         });
-      }
+      },
     );
 
     watch(
@@ -475,7 +480,7 @@ export default defineComponent({
         }
 
         chartInitialSetUp();
-      }
+      },
     );
 
     onMounted(async () => {
@@ -572,7 +577,7 @@ export default defineComponent({
           emit("error", e);
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef, hoveredSeriesState };
   },

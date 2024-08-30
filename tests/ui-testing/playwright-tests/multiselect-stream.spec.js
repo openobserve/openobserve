@@ -132,7 +132,7 @@ async function multistreamselect(page) {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
   }
   
 
@@ -166,14 +166,16 @@ await page.waitForTimeout(1000);
         force: true,
       });
     await page
-      .locator(".q-pl-sm > .q-btn > .q-btn__content")
+      .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
       .click({ force: true });
     await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
       force: true,
     });
+    await page.waitForTimeout(1000);
     await expect(page.locator(".q-notification__message")).toContainText(
       "Live mode is enabled"
     );
+    await page.waitForTimeout(5000);
     await page
       .locator(".q-pl-sm > .q-btn > .q-btn__content")
       .click({ force: true });
@@ -213,12 +215,11 @@ await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').first().click();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
       .last()
       .click({

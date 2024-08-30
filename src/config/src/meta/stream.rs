@@ -80,6 +80,20 @@ impl From<&str> for StreamType {
     }
 }
 
+impl From<StreamType> for cluster_rpc::StreamType {
+    fn from(value: StreamType) -> Self {
+        match value {
+            StreamType::Logs => cluster_rpc::StreamType::Logs,
+            StreamType::Metrics => cluster_rpc::StreamType::Metrics,
+            StreamType::Traces => cluster_rpc::StreamType::Traces,
+            StreamType::EnrichmentTables => cluster_rpc::StreamType::EnrichmentTables,
+            StreamType::Filelist => cluster_rpc::StreamType::Filelist,
+            StreamType::Metadata => cluster_rpc::StreamType::Metadata,
+            StreamType::Index => cluster_rpc::StreamType::Index,
+        }
+    }
+}
+
 impl std::fmt::Display for StreamType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -447,6 +461,43 @@ impl std::fmt::Display for PartitionTimeLevel {
             PartitionTimeLevel::Daily => write!(f, "daily"),
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateStreamPartition {
+    pub add: Vec<StreamPartition>,
+    pub remove: Vec<StreamPartition>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateStringSettingsArray {
+    pub add: Vec<String>,
+    pub remove: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateStreamSettings {
+    #[serde(skip_serializing_if = "Option::None")]
+    pub partition_time_level: Option<PartitionTimeLevel>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub partition_keys: UpdateStreamPartition,
+    #[serde(default)]
+    pub full_text_search_keys: UpdateStringSettingsArray,
+    #[serde(default)]
+    pub index_fields: UpdateStringSettingsArray,
+    #[serde(default)]
+    pub bloom_filter_fields: UpdateStringSettingsArray,
+    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
+    pub data_retention: Option<i64>,
+    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
+    pub flatten_level: Option<i64>,
+    #[serde(default)]
+    pub defined_schema_fields: UpdateStringSettingsArray,
+    #[serde(default)]
+    pub max_query_range: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]

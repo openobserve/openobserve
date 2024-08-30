@@ -47,8 +47,17 @@ use tonic::{
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster as infra_cluster, service::file_list};
+use crate::{
+    common::infra::cluster as infra_cluster,
+    service::{
+        file_list,
+        search::{
+            generate_search_schema, generate_select_start_search_schema, sql::RE_SELECT_WILDCARD,
+        },
+    },
+};
 
+pub mod cache_multi;
 pub mod cacher;
 pub mod grpc;
 pub mod http;
@@ -65,12 +74,13 @@ pub async fn search(
     trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut req: cluster_rpc::SearchRequest,
-) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, usize, bool)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let start = std::time::Instant::now();
 
     let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
+    log::info!("[trace_id {trace_id}] is_final_phase: {}", is_final_phase);
     let stream_type = StreamType::from(req.stream_type.as_str());
     if req.timeout == 0 {
         req.timeout = cfg.limit.query_timeout as i64;
@@ -88,9 +98,13 @@ pub async fn search(
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let mut nodes = infra_cluster::get_cached_online_query_nodes(req_node_group)
-        .await
-        .unwrap();
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(req_node_group).await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!("[trace_id {trace_id}] service:search:cluster:run: no querier node online");
+            return Err(Error::Message("no querier node online".to_string()));
+        }
+    };
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
@@ -118,8 +132,7 @@ pub async fn search(
         && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] search: is_agg_query {} is_inverted_index {}",
-        !req.aggs.is_empty(),
+        "[trace_id {trace_id}] search: is_inverted_index {}",
         is_inverted_index
     );
 
@@ -137,13 +150,6 @@ pub async fn search(
         &stream_settings.partition_keys,
     )
     .await;
-
-    // If the query is of type inverted index and this is not an aggregations request,
-    // then filter the file list based on the inverted index.
-    if is_inverted_index && req.aggs.is_empty() {
-        file_list = get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
-    }
-
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {} ms",
@@ -151,6 +157,22 @@ pub async fn search(
         file_list.len(),
         file_list_took,
     );
+
+    // If the query is of type inverted index and this is not an aggregations request,
+    // then filter the file list based on the inverted index.
+    let mut idx_scan_size = 0;
+    let mut idx_took = 0;
+    if is_inverted_index {
+        (file_list, idx_scan_size, idx_took) =
+            get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
+        log::info!(
+            "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+            meta.meta.time_range,
+            file_list.len(),
+            idx_scan_size,
+            idx_took,
+        );
+    }
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -179,7 +201,11 @@ pub async fn search(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, req.timeout as u64)
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.uuid.to_string())
+            .collect::<HashSet<_>>();
+        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
@@ -281,6 +307,7 @@ pub async fn search(
             original_size += file_meta.original_size;
             compressed_size += file_meta.compressed_size;
         }
+        original_size += idx_scan_size as i64;
         super::SEARCH_SERVER
             .add_file_stats(
                 trace_id,
@@ -532,25 +559,35 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, scan_stats, is_partial) =
-        match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
-            Ok(v) => v,
-            Err(e) => {
-                // search done, release lock
-                #[cfg(not(feature = "enterprise"))]
-                dist_lock::unlock(&locker).await?;
-                #[cfg(feature = "enterprise")]
-                {
-                    work_group
-                        .as_ref()
-                        .unwrap()
-                        .done(trace_id, user_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                }
-                return Err(e);
+    let trace_id_span = trace_id.to_string();
+    let meta_span = meta.clone();
+    let handle = match tokio::task::spawn(async move {
+        merge_grpc_result(&trace_id_span, meta_span, results, is_final_phase).await
+    })
+    .await
+    {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(Error::Message(e.to_string())),
+    };
+    let (merge_batches, mut scan_stats, is_partial) = match handle {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
             }
-        };
+            return Err(e);
+        }
+    };
     log::info!("[trace_id {trace_id}] final merge task finish");
 
     // search done, release lock
@@ -566,7 +603,9 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    Ok((merge_batches, scan_stats, took_wait, is_partial))
+    scan_stats.idx_scan_size = idx_scan_size as i64;
+    scan_stats.original_size += idx_scan_size as i64;
+    Ok((merge_batches, scan_stats, took_wait, is_partial, idx_took))
 }
 
 #[cfg(feature = "enterprise")]
@@ -659,10 +698,10 @@ async fn merge_grpc_result(
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
     is_final_phase: bool,
-) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, bool)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, bool)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
-    let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let mut batches: Vec<Vec<RecordBatch>> = Vec::new();
     let mut is_partial = false;
     for (_, resp) in results {
         if resp.is_partial {
@@ -670,85 +709,107 @@ async fn merge_grpc_result(
             continue;
         }
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
-        // handle hits
-        let value = batches.entry("query".to_string()).or_default();
+        // handle partition data
         if !resp.hits.is_empty() {
             let buf = Cursor::new(resp.hits);
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
             let batch = reader
                 .into_iter()
-                .map(std::result::Result::unwrap)
+                .map(|v| match v {
+                    Ok(v) => v,
+                    Err(e) => {
+                        panic!(
+                            "[trace_id {trace_id}] search->merge_grpc_result: read ipc error: {e}"
+                        );
+                    }
+                })
                 .collect::<Vec<_>>();
-            value.extend(batch);
-        }
-        // handle aggs
-        for agg in resp.aggs {
-            if !agg.hits.is_empty() {
-                let buf = Cursor::new(agg.hits);
-                let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                let batch = reader
-                    .into_iter()
-                    .map(std::result::Result::unwrap)
-                    .collect::<Vec<_>>();
-                let value = batches.entry(format!("agg_{}", agg.name)).or_default();
-                value.extend(batch);
-            }
+            batches.push(batch);
         }
     }
 
-    // convert select field to schema::Field
-    let select_fields = sql
-        .meta
-        .fields
-        .iter()
-        .filter_map(|f| {
-            sql.schema
-                .field_with_name(f)
-                .ok()
-                .map(|f| Arc::new(f.clone()))
-        })
-        .collect::<Vec<_>>();
+    // get the using schema
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
+    let schema_latest = Arc::new(sql.schema.clone());
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
+    for field in schema_latest.fields() {
+        schema_latest_map.insert(field.name(), field);
+    }
+    let (schema_latest, _) = if select_wildcard {
+        generate_select_start_search_schema(
+            &sql,
+            schema_latest.as_ref(),
+            &schema_latest_map,
+            &defined_schema_fields,
+        )?
+    } else {
+        generate_search_schema(&sql, schema_latest.as_ref(), &schema_latest_map)?
+    };
 
-    // merge all batches
-    let mut merge_batches = HashMap::new();
-    for (name, batch) in batches {
-        let (merge_sql, select_fields) = if name == "query" {
-            (sql.origin_sql.clone(), select_fields.clone())
-        } else {
-            let agg_name = name.strip_prefix("agg_").unwrap();
-            (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
-        };
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        let err = format!(
+            "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
+        );
+        log::error!("{}", err);
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
+    }
 
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        if super::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender)
-            .await
-            .is_err()
-        {
-            let err = format!(
-                "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
-            );
-            log::error!("{}", err);
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
-        }
-
+    if !is_final_phase {
         let merge_batch;
         tokio::select! {
-            res = super::datafusion::exec::merge(
+            res = super::datafusion::exec::merge_partitions_cluster(
                 &sql.org_id,
                 sql.meta.offset,
                 sql.meta.limit,
-                &merge_sql,
-                &batch,
-                &select_fields,
-                is_final_phase,
-                sql.meta.subquery.is_some()
+                &sql.origin_sql,
+                schema_latest,
+                batches,
             ) => {
                 match res {
                     Ok(res) => merge_batch = res,
                     Err(err) => {
+                        log::error!("[trace_id {trace_id}] search->cluster: merge super cluster partitions error: {err}");
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            err.to_string(),
+                        )));
+                    }
+                }
+            }
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
+                log::info!("[trace_id {trace_id}] search->cluster: super cluster merge task is cancel");
+                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: super cluster follow cluster merge task is cancel"))));
+            }
+        }
+        Ok((merge_batch, scan_stats, is_partial))
+    } else {
+        let merge_batch;
+        tokio::select! {
+            res = super::datafusion::exec::merge_partitions(
+                &sql.org_id,
+                sql.meta.offset,
+                sql.meta.limit,
+                &sql.origin_sql,
+                schema_latest,
+                batches,
+            ) => {
+                match res {
+                    Ok(res) => merge_batch = res,
+                    Err(err) => {
+                        log::error!("[trace_id {trace_id}] search->cluster: merge partitions error: {err}");
                         return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                             err.to_string(),
                         )));
@@ -765,10 +826,8 @@ async fn merge_grpc_result(
                 return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: final merge task is cancel"))));
             }
         }
-
-        merge_batches.insert(name, merge_batch);
+        Ok((merge_batch, scan_stats, is_partial))
     }
-    Ok((merge_batches, scan_stats, is_partial))
 }
 
 #[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
@@ -931,19 +990,15 @@ async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
     file_list: &[FileKey],
-) -> Result<Vec<FileKey>> {
+) -> Result<(Vec<FileKey>, usize, usize)> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
     let file_list = file_list
         .iter()
         .map(|f| (&f.key, &f.meta))
         .collect::<HashMap<_, _>>();
-
-    // fast_mode is for 1st page optimization
-    //  1. single WHERE clause of `match_all()`
-    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
-    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
-        && idx_req.query.as_ref().unwrap().size > 0);
 
     // Get all the unique terms which the user has searched.
     let terms = meta
@@ -960,7 +1015,7 @@ async fn get_file_list_by_inverted_index(
 
     let fts_condition = terms
         .iter()
-        .map(|x| format!("term LIKE '%{x}%'"))
+        .map(|x| format!("term LIKE '{x}%'"))
         .collect::<Vec<_>>()
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {
@@ -1008,20 +1063,17 @@ async fn get_file_list_by_inverted_index(
             format!("{}_{}", meta.stream_name, stream_type)
         };
     let query = format!(
-        "SELECT term, file_name, _count, deleted, segment_ids FROM \"{}\" WHERE {} ORDER BY {} DESC",
-        index_stream_name, search_condition, cfg.common.column_timestamp
+        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
+        index_stream_name, search_condition,
     );
 
     idx_req.stream_type = StreamType::Index.to_string();
     idx_req.query.as_mut().unwrap().sql = query;
-    idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
     idx_req.query.as_mut().unwrap().from = 0;
     idx_req.query.as_mut().unwrap().size = QUERY_WITH_NO_LIMIT;
     idx_req.query.as_mut().unwrap().uses_zo_fn = false;
     idx_req.query.as_mut().unwrap().track_total_hits = false;
-    idx_req.query.as_mut().unwrap().query_context = "".to_string();
     idx_req.query.as_mut().unwrap().query_fn = "".to_string();
-    idx_req.aggs.clear();
 
     let idx_resp: search::Response = http::search(idx_req).await?;
     // get deleted file
@@ -1036,72 +1088,17 @@ async fn get_file_list_by_inverted_index(
             }
         })
         .collect::<HashSet<_>>();
-    let unique_files = if fast_mode {
-        let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
-        let sorted_data = idx_resp.hits.iter().filter_map(|hit| {
-            let term = hit.get("term").unwrap().as_str().unwrap().to_string();
-            let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-            let count = hit.get("_count").unwrap().as_u64().unwrap();
-            let segment_ids = match hit.get("segment_ids") {
-                None => "".to_string(),
-                Some(v) => v.as_str().unwrap().to_string(),
-            };
-            if deleted_files.contains(&file_name) {
-                None
-            } else {
-                Some((term, file_name, count, segment_ids))
-            }
-        });
-        let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
-        let mut term_counts: HashMap<String, u64> = HashMap::new();
-        for (term, filename, count, segment_ids) in sorted_data {
-            let prefixed_filename = format!(
-                "files/{}/{}/{}/{}",
-                meta.org_id, stream_type, meta.stream_name, filename
-            );
-            if !file_list.contains_key(&prefixed_filename) {
-                continue;
-            };
-            let term = term.as_str();
-            for search_term in terms.iter() {
-                if term.contains(search_term) {
-                    let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
-                    if *current_count < limit_count {
-                        *current_count += count;
-                        term_map
-                            .entry(search_term.to_string())
-                            .or_insert_with(Vec::new)
-                            .push((filename.to_string(), segment_ids.to_string()));
-                    }
-                }
-            }
-        }
-        term_map
-            .into_iter()
-            .flat_map(|(_, filenames)| filenames)
-            .collect::<Vec<_>>()
-    } else {
-        idx_resp
-            .hits
-            .iter()
-            .filter_map(|hit| {
-                hit.get("file_name")
-                    .and_then(|value| value.as_str())
-                    .filter(|&name| !deleted_files.contains(name))
-                    .map(|v| {
-                        let segment_ids = match hit.get("segment_ids") {
-                            None => "".to_string(),
-                            Some(v) => v.as_str().unwrap().to_string(),
-                        };
-                        (v.to_string(), segment_ids)
-                    })
-            })
-            .collect::<Vec<_>>()
-    };
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
-    for (filename, segment_ids) in unique_files {
+    for item in idx_resp.hits.iter() {
+        let filename = match item.get("file_name") {
+            None => continue,
+            Some(v) => v.as_str().unwrap(),
+        };
+        if deleted_files.contains(filename) {
+            continue;
+        }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
@@ -1109,10 +1106,9 @@ async fn get_file_list_by_inverted_index(
         let Some(file_meta) = file_list.get(&prefixed_filename) else {
             continue;
         };
-        let segment_ids = if segment_ids.is_empty() {
-            None
-        } else {
-            hex::decode(segment_ids).ok()
+        let segment_ids = match item.get("segment_ids") {
+            None => None,
+            Some(v) => hex::decode(v.as_str().unwrap()).ok(),
         };
         let entry = idx_file_list
             .entry(prefixed_filename.clone())
@@ -1140,7 +1136,11 @@ async fn get_file_list_by_inverted_index(
         .collect::<Vec<_>>();
     // sorted by _timestamp
     idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-    Ok(idx_file_list)
+    Ok((
+        idx_file_list,
+        idx_resp.scan_size,
+        start.elapsed().as_millis() as usize,
+    ))
 }
 
 #[cfg(test)]

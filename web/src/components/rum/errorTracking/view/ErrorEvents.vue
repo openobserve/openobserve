@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="q-mt-lg">
     <div class="tags-title text-bold q-mb-sm q-ml-xs">Events</div>
     <AppTable :columns="columns || []" :rows="error.events || []">
-      <template v-slot:error-type="slotProps">
+      <template v-slot:error-type="slotProps: any">
         <ErrorTypeIcons :column="slotProps.column.row" />
       </template>
-      <template v-slot:description="slotProps">
+      <template v-slot:description="slotProps: any">
         <ErrorEventDescription :column="slotProps.column.row" />
       </template>
     </AppTable>

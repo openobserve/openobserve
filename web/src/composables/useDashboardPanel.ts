@@ -47,6 +47,8 @@ const getDefaultDashboardPanelData: any = () => ({
       unit: null,
       unit_custom: null,
       decimals: 2,
+      top_results: null,
+      top_results_others: false,
       axis_width: null,
       axis_border_show: false,
       legend_width: {
@@ -70,6 +72,7 @@ const getDefaultDashboardPanelData: any = () => ({
         size_fixed: 2,
       },
       drilldown: [],
+      mark_line: [],
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
@@ -80,6 +83,7 @@ const getDefaultDashboardPanelData: any = () => ({
     queries: [
       {
         query: "",
+        vrlFunctionQuery: "",
         customQuery: false,
         fields: {
           stream: "",
@@ -114,6 +118,7 @@ const getDefaultDashboardPanelData: any = () => ({
     showQueryBar: false,
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
+    vrlFunctionToggle: false,
   },
   meta: {
     parsedQuery: "",
@@ -135,6 +140,7 @@ const getDefaultDashboardPanelData: any = () => ({
       hasUserDefinedSchemas: false,
       interestingFieldList: [],
       userDefinedSchema: [],
+      vrlFunctionFieldList: [],
       selectedStreamFields: [],
       useUserDefinedSchemas: "user_defined_schema",
       customQueryFields: [],
@@ -180,6 +186,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queryType === "sql" ? "sql" : "promql";
     const newQuery: any = {
       query: "",
+      vrlFunctionQuery: "",
       customQuery: queryType === "promql",
       fields: {
         stream:
@@ -238,8 +245,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const promqlMode = computed(
-    () => dashboardPanelData.data.queryType == "promql"
+    () => dashboardPanelData.data.queryType == "promql",
   );
+
+  const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
+    if (
+      store.state.zoConfig.user_defined_schemas_enabled &&
+      dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+      dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+        "user_defined_schema"
+    ) {
+      return dashboardPanelData.meta.stream.userDefinedSchema ?? [];
+    }
+
+    return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
+  });
 
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
@@ -338,6 +358,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   });
 
+  const checkIsDerivedField = (fieldName: string) => {
+    // if given fieldName is from vrlFunctionFields, then it is a derived field
+    return !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+      (vrlField: any) => vrlField.name == fieldName,
+    );
+  };
+
   const addXAxisItem = (row: { name: string }) => {
     if (
       !dashboardPanelData.data.queries[
@@ -353,6 +380,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return;
     }
 
+    const isDerived = checkIsDerivedField(row.name) ?? false;
+
     // check for existing field
     if (
       !dashboardPanelData.data.queries[
@@ -367,19 +396,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].customQuery
           ? generateLabelFromName(row.name)
           : row.name,
-        alias: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "x_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.x.length +
-              1)
-          : row.name,
+        alias:
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !isDerived
+            ? "x_axis_" +
+              (dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length +
+                1)
+            : row.name,
         column: row.name,
         color: null,
         aggregationFunction:
-          row.name == store.state.zoConfig.timestamp_column
+          row.name == store.state.zoConfig.timestamp_column && !isDerived
             ? "histogram"
             : null,
         sortBy:
@@ -388,6 +418,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               ? "DESC"
               : "ASC"
             : null,
+        isDerived,
       });
     }
 
@@ -409,6 +440,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return;
     }
 
+    const isDerived = checkIsDerivedField(row.name) ?? false;
+
     // check for existing field
     if (
       !dashboardPanelData.data.queries[
@@ -423,19 +456,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].customQuery
           ? generateLabelFromName(row.name)
           : row.name,
-        alias: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "breakdown_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.breakdown.length +
-              1)
-          : row.name,
+        alias:
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !isDerived
+            ? "breakdown_" +
+              (dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.breakdown.length +
+                1)
+            : row.name,
         column: row.name,
         color: null,
         aggregationFunction:
-          row.name == store.state.zoConfig.timestamp_column
+          row.name == store.state.zoConfig.timestamp_column && !isDerived
             ? "histogram"
             : null,
         sortBy:
@@ -444,6 +478,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               ? "DESC"
               : "ASC"
             : null,
+        isDerived,
       });
     }
 
@@ -465,6 +500,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return;
     }
 
+    const isDerived = checkIsDerivedField(row.name) ?? false;
+
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -478,19 +515,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].customQuery
           ? generateLabelFromName(row.name)
           : row.name,
-        alias: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "y_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.y.length +
-              1)
-          : row.name,
+        alias:
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !isDerived
+            ? "y_axis_" +
+              (dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y.length +
+                1)
+            : row.name,
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction:
-          dashboardPanelData.data.type == "heatmap" ? null : "count",
+          dashboardPanelData.data.type == "heatmap" || isDerived
+            ? null
+            : "count",
+        isDerived,
       });
     }
     updateArrayAlias();
@@ -511,6 +552,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return;
     }
 
+    const isDerived = checkIsDerivedField(row.name) ?? false;
+
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -524,24 +567,27 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].customQuery
           ? generateLabelFromName(row.name)
           : row.name,
-        alias: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "z_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.z.length +
-              1)
-          : row.name,
+        alias:
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !isDerived
+            ? "z_axis_" +
+              (dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.z.length +
+                1)
+            : row.name,
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: "count",
+        aggregationFunction: isDerived ? null : "count",
+        isDerived,
       });
     }
     updateArrayAlias();
   };
 
   const addLatitude = (row: any) => {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -551,15 +597,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.latitude = {
         label: generateLabelFromName(row.name),
-        alias: "latitude",
+        alias: isDerived ? row.name : "latitude",
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
+        isDerived,
       };
     }
   };
 
   const addLongitude = (row: any) => {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -569,15 +617,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.longitude = {
         label: generateLabelFromName(row.name),
-        alias: "longitude",
+        alias: isDerived ? row.name : "longitude",
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
+        isDerived,
       };
     }
   };
 
   const addWeight = (row: any) => {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -587,15 +637,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.weight = {
         label: generateLabelFromName(row.name),
-        alias: "weight",
+        alias: isDerived ? row.name : "weight",
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: "count", // You can set the appropriate aggregation function here
+        aggregationFunction: isDerived ? null : "count", // You can set the appropriate aggregation function here
+        isDerived,
       };
     }
   };
 
   const addSource = (row: any) => {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -605,15 +657,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.source = {
         label: generateLabelFromName(row.name),
-        alias: "source",
+        alias: isDerived ? row.name : "source",
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
+        isDerived,
       };
     }
   };
 
   const addTarget = (row: any) => {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -623,15 +677,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.target = {
         label: generateLabelFromName(row.name),
-        alias: "target",
+        alias: isDerived ? row.name : "target",
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
+        isDerived,
       };
     }
   };
 
   const addValue = (row: any) => {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -641,10 +697,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.value = {
         label: generateLabelFromName(row.name),
-        alias: "value",
+        alias: isDerived ? row.name : "value",
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: "sum", // You can set the appropriate aggregation function here
+        aggregationFunction: isDerived ? null : "sum", // You can set the appropriate aggregation function here
+        isDerived,
       };
     }
   };
@@ -700,7 +757,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
-          if (itemY.aggregationFunction === null) {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
             itemY.aggregationFunction = "count";
           }
         });
@@ -733,7 +790,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
-          if (itemY.aggregationFunction === null) {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
             itemY.aggregationFunction = "count";
           }
         });
@@ -834,41 +891,45 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.x?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "x_axis_" + (index + 1)
-          : it?.column)
+        (it.alias =
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !it.isDerived
+            ? "x_axis_" + (index + 1)
+            : it?.column),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.y?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "y_axis_" + (index + 1)
-          : it?.column)
+        (it.alias =
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !it.isDerived
+            ? "y_axis_" + (index + 1)
+            : it?.column),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.z?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "z_axis_" + (index + 1)
-          : it?.column)
+        (it.alias =
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !it.isDerived
+            ? "z_axis_" + (index + 1)
+            : it?.column),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.breakdown?.forEach(
       (it: any, index: any) =>
-        (it.alias = !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? "breakdown_" + (index + 1)
-          : it?.column)
+        (it.alias =
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && !it.isDerived
+            ? "breakdown_" + (index + 1)
+            : it?.column),
     );
   };
 
@@ -993,14 +1054,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         org_identifier: store.state.selectedOrganization.identifier,
         stream_name: currentQuery.fields.stream,
         start_time: new Date(
-          dashboardPanelData.meta.dateTime["start_time"].toISOString()
+          dashboardPanelData.meta.dateTime["start_time"].toISOString(),
         ).getTime(),
         end_time: new Date(
-          dashboardPanelData.meta.dateTime["end_time"].toISOString()
+          dashboardPanelData.meta.dateTime["end_time"].toISOString(),
         ).getTime(),
         fields: [name],
         size: 100,
         type: currentQuery.fields.stream_type,
+        no_count: true,
       });
 
       dashboardPanelData.meta.filterValue.push({
@@ -1031,20 +1093,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
       start_time: new Date(
-        dashboardPanelData.meta.dateTime["start_time"].toISOString()
+        dashboardPanelData.meta.dateTime["start_time"].toISOString(),
       ).getTime(),
       end_time: new Date(
-        dashboardPanelData.meta.dateTime["end_time"].toISOString()
+        dashboardPanelData.meta.dateTime["end_time"].toISOString(),
       ).getTime(),
       fields: [name],
       size: 100,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
+      no_count: true,
     })
       .then((res: any) => {
         const find = dashboardPanelData.meta.filterValue.findIndex(
-          (it: any) => it.column == name
+          (it: any) => it.column == name,
         );
         if (find >= 0) {
           dashboardPanelData.meta.filterValue.splice(find, 1);
@@ -1084,7 +1147,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.x.length
+        ].fields.x.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1092,7 +1155,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.length
+        ].fields.y.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1100,15 +1163,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.z.length
+        ].fields.z.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown.splice(
+      ].fields?.breakdown?.splice(
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown.length
+        ].fields?.breakdown?.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1116,7 +1179,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.length
+        ].fields.filter.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1148,6 +1211,118 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery == true
     ) {
+      // first, remove all derived fields from x,y,z,latitude,longitude,weight,source,target,value
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x.filter((it: any) => !it.isDerived);
+
+      // remove from y axis
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y.filter((it: any) => !it.isDerived);
+
+      // remove from z axis
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z.filter((it: any) => !it.isDerived);
+
+      // remove from breakdown
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.filter((it: any) => !it.isDerived);
+
+      // remove from latitude
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude = null;
+      }
+
+      // remove from longitude
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude = null;
+      }
+
+      // remove from weight
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight = null;
+      }
+
+      // remove from source
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source = null;
+      }
+
+      // remove from target
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target = null;
+      }
+
+      // remove from value
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value = null;
+      }
+
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach(
         (it: any, index: number) => {
@@ -1267,7 +1442,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
                 ];
             }
             // If the current field is a y or z field, set the aggregation function to "count"
-            if (currentFieldType === "y" || currentFieldType === "z") {
+            if (
+              (currentFieldType === "y" || currentFieldType === "z") &&
+              !field.isDerived
+            ) {
               field.aggregationFunction = "count";
             }
           }
@@ -1276,7 +1454,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           field.alias = name; // Set the alias to the name of the custom query field
           field.column = name; // Set the column to the name of the custom query field
           field.color = null; // Reset the color to null
-        }
+        },
       );
     }
   };
@@ -1287,7 +1465,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const oldArray = oldCustomQueryFields;
     // Create a deep copy of the new custom query fields array
     const newArray = JSON.parse(
-      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
+      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
     );
 
     // Check if the length of the old and new arrays are the same
@@ -1513,7 +1691,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ].fields.z,
           ]
         : []),
-    ].flat();
+    ]
+      .flat()
+      .filter((fieldObj: any) => !fieldObj.isDerived);
+
     const filter = [
       ...dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1617,15 +1798,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // add group by statement
     const xAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.x.map((it: any) => it?.alias);
+    ].fields.x
+      .filter((it: any) => !it?.isDerived)
+      .map((it: any) => it?.alias);
 
     const yAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.y.map((it: any) => it?.alias);
+    ].fields.y
+      .filter((it: any) => !it?.isDerived)
+      .map((it: any) => it?.alias);
 
     const bAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields?.breakdown?.map((it: any) => it?.alias);
+    ].fields?.breakdown
+      ?.filter((it: any) => !it?.isDerived)
+      ?.map((it: any) => it?.alias);
 
     if (dashboardPanelData.data.type == "heatmap") {
       query +=
@@ -1673,16 +1860,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields;
 
-    if (latitude && longitude) {
+    if (latitude && !latitude.isDerived && longitude && !longitude.isDerived) {
       query += `SELECT ${latitude.column} as ${latitude.alias}, ${longitude.column} as ${longitude.alias}`;
-    } else if (latitude) {
+    } else if (latitude && !latitude.isDerived) {
       query += `SELECT ${latitude.column} as ${latitude.alias}`;
-    } else if (longitude) {
+    } else if (longitude && !longitude.isDerived) {
       query += `SELECT ${longitude.column} as ${longitude.alias}`;
     }
 
     if (query) {
-      if (weight) {
+      if (weight && !weight.isDerived) {
         switch (weight?.aggregationFunction) {
           case "p50":
             query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
@@ -1766,22 +1953,30 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     // Group By clause
-    if (latitude || longitude) {
-      const aliases = [latitude?.alias, longitude?.alias]
-        .filter(Boolean)
-        .join(", ");
+    let aliases: any = [];
+
+    if (latitude && !latitude.isDerived) {
+      aliases.push(latitude?.alias);
+    }
+    if (longitude && !longitude.isDerived) {
+      aliases.push(longitude?.alias);
+    }
+    if (aliases.length) {
+      aliases = aliases.filter(Boolean).join(", ");
       query += `GROUP BY ${aliases}`;
     }
 
     // array of sorting fields with followed by asc or desc
     const orderByArr: string[] = [];
 
-    [latitude, longitude, weight].forEach((it: any) => {
-      // ignore if None is selected or sortBy is not there
-      if (it?.sortBy) {
-        orderByArr.push(`${it.alias} ${it.sortBy}`);
-      }
-    });
+    [latitude, longitude, weight]
+      .filter((it: any) => !it?.isDerived)
+      .forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
 
     // append with query by joining array with comma
     query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
@@ -1812,39 +2007,39 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     let query = "SELECT ";
     const selectFields = [];
 
-    if (source) {
+    if (source && !source.isDerived) {
       selectFields.push(`${source.column} as ${source.alias}`);
     }
 
-    if (target) {
+    if (target && !target.isDerived) {
       selectFields.push(`${target.column} as ${target.alias}`);
     }
 
-    if (value) {
+    if (value && !value.isDerived) {
       switch (value?.aggregationFunction) {
         case "p50":
           selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`
+            `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`,
           );
           break;
         case "p90":
           selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`
+            `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`,
           );
           break;
         case "p95":
           selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`
+            `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`,
           );
           break;
         case "p99":
           selectFields.push(
-            `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`
+            `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`,
           );
           break;
         default:
           selectFields.push(
-            `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+            `${value.aggregationFunction}(${value.column}) as ${value.alias}`,
           );
           break;
       }
@@ -1898,18 +2093,29 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       query += " WHERE " + filterConditions.join(" AND ");
     }
 
-    // Adding group by statement
-    if (source && target) {
-      query += ` GROUP BY ${source.alias}, ${target.alias}`;
+    // Group By clause
+    let aliases: any = [];
+
+    if (source && !source.isDerived) {
+      aliases.push(source?.alias);
+    }
+    if (target && !target.isDerived) {
+      aliases.push(target?.alias);
+    }
+    if (aliases.length) {
+      aliases = aliases.filter(Boolean).join(", ");
+      query += `GROUP BY ${aliases}`;
     }
 
     // Adding sorting
     const orderByArr: string[] = [];
-    [source, target, value].forEach((field) => {
-      if (field && field.sortBy) {
-        orderByArr.push(`${field.alias} ${field.sortBy}`);
-      }
-    });
+    [source, target, value]
+      .filter((it: any) => !it?.isDerived)
+      .forEach((field) => {
+        if (field && field.sortBy) {
+          orderByArr.push(`${field.alias} ${field.sortBy}`);
+        }
+      });
 
     if (orderByArr.length > 0) {
       query += ` ORDER BY ${orderByArr.join(", ")}`;
@@ -2002,7 +2208,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         makeAutoSQLQuery();
       }
     },
-    { deep: true }
+    { deep: true },
   );
 
   // so, it is not above common state
@@ -2054,7 +2260,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ];
       if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
         errors.push(
-          "Selected chart type is not supported for PromQL. Only line chart is supported."
+          "Selected chart type is not supported for PromQL. Only line chart is supported.",
         );
       }
 
@@ -2065,7 +2271,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.x.length > 0
       ) {
         errors.push(
-          "X-Axis is not supported for PromQL. Remove anything added to the X-Axis."
+          "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
         );
       }
 
@@ -2075,7 +2281,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.y.length > 0
       ) {
         errors.push(
-          "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis."
+          "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
         );
       }
 
@@ -2085,7 +2291,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.filter.length > 0
       ) {
         errors.push(
-          "Filters are not supported for PromQL. Remove anything added to the Filters."
+          "Filters are not supported for PromQL. Remove anything added to the Filters.",
         );
       }
 
@@ -2138,7 +2344,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ].fields.x.length
           ) {
             errors.push(
-              `${currentXLabel.value} field is not allowed for Metric chart`
+              `${currentXLabel.value} field is not allowed for Metric chart`,
             );
           }
 
@@ -2245,7 +2451,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ].fields.y.length == 0
           ) {
             errors.push(
-              "Add exactly one field on Y-Axis for stacked and h-stacked charts"
+              "Add exactly one field on Y-Axis for stacked and h-stacked charts",
             );
           }
           if (
@@ -2257,7 +2463,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ].fields.breakdown.length != 1
           ) {
             errors.push(
-              `Add exactly one fields on the X-Axis and breakdown for stacked, area-stacked and h-stacked charts`
+              `Add exactly one fields on the X-Axis and breakdown for stacked, area-stacked and h-stacked charts`,
             );
           }
 
@@ -2315,7 +2521,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.filter(
           (it: any) =>
-            it.aggregationFunction == null || it.aggregationFunction == ""
+            !it.isDerived &&
+            (it.aggregationFunction == null || it.aggregationFunction == ""),
         );
         if (
           dashboardPanelData.data.queries[
@@ -2326,8 +2533,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           errors.push(
             ...aggregationFunctionError.map(
               (it: any) =>
-                `${currentYLabel.value}: ${it.column}: Aggregation function required`
-            )
+                `${currentYLabel.value}: ${it.column}: Aggregation function required`,
+            ),
           );
         }
       }
@@ -2344,8 +2551,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         errors.push(
           ...labelError.map(
-            (it: any) => `${currentYLabel.value}: ${it.column}: Label required`
-          )
+            (it: any) => `${currentYLabel.value}: ${it.column}: Label required`,
+          ),
         );
       }
 
@@ -2359,14 +2566,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const listFilterError = dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter.filter(
-          (it: any) => it.type == "list" && !it.values?.length
+          (it: any) => it.type == "list" && !it.values?.length,
         );
         if (listFilterError.length) {
           errors.push(
             ...listFilterError.map(
               (it: any) =>
-                `Filter: ${it.column}: Select at least 1 item from the list`
-            )
+                `Filter: ${it.column}: Select at least 1 item from the list`,
+            ),
           );
         }
 
@@ -2374,13 +2581,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const conditionFilterError = dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter.filter(
-          (it: any) => it.type == "condition" && it.operator == null
+          (it: any) => it.type == "condition" && it.operator == null,
         );
         if (conditionFilterError.length) {
           errors.push(
             ...conditionFilterError.map(
-              (it: any) => `Filter: ${it.column}: Operator selection required`
-            )
+              (it: any) => `Filter: ${it.column}: Operator selection required`,
+            ),
           );
         }
 
@@ -2391,13 +2598,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           (it: any) =>
             it.type == "condition" &&
             !["Is Null", "Is Not Null"].includes(it.operator) &&
-            (it.value == null || it.value == "")
+            (it.value == null || it.value == ""),
         );
         if (conditionValueFilterError.length) {
           errors.push(
             ...conditionValueFilterError.map(
-              (it: any) => `Filter: ${it.column}: Condition value required`
-            )
+              (it: any) => `Filter: ${it.column}: Condition value required`,
+            ),
           );
         }
       }
@@ -2422,16 +2629,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.x.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.customQueryFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...dashboardPanelData.meta.stream.customQueryFields,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column),
         );
         if (customQueryXFieldError.length) {
           errors.push(
             ...customQueryXFieldError.map(
               (it: any) =>
-                `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`
-            )
+                `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
+            ),
           );
         }
 
@@ -2439,16 +2647,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.customQueryFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...dashboardPanelData.meta.stream.customQueryFields,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column),
         );
         if (customQueryYFieldError.length) {
           errors.push(
             ...customQueryYFieldError.map(
               (it: any) =>
-                `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`
-            )
+                `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
+            ),
           );
         }
       } else {
@@ -2457,16 +2666,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.x.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.selectedStreamFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column),
         );
         if (customQueryXFieldError.length) {
           errors.push(
             ...customQueryXFieldError.map(
               (it: any) =>
-                `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`
-            )
+                `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
+            ),
           );
         }
 
@@ -2474,16 +2684,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.selectedStreamFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column),
         );
         if (customQueryYFieldError.length) {
           errors.push(
             ...customQueryYFieldError.map(
               (it: any) =>
-                `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`
-            )
+                `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
+            ),
           );
         }
       }
@@ -2500,7 +2711,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery &&
-      dashboardPanelData.data.queryType != "promql"
+      dashboardPanelData.data.queryType != "promql" &&
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query
     ) {
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
@@ -2516,25 +2730,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         if (/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)) {
           currentQuery = currentQuery.replaceAll(
             /\${[a-zA-Z0-9_-]+:csv}/g,
-            "1,2"
+            "1,2",
           );
         }
         if (/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)) {
           currentQuery = currentQuery.replaceAll(
             /\${[a-zA-Z0-9_-]+:singlequote}/g,
-            "'1','2'"
+            "'1','2'",
           );
         }
         if (/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)) {
           currentQuery = currentQuery.replaceAll(
             /\${[a-zA-Z0-9_-]+:doublequote}/g,
-            '"1","2"'
+            '"1","2"',
           );
         }
         if (/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)) {
           currentQuery = currentQuery.replaceAll(
             /\${[a-zA-Z0-9_-]+:pipe}/g,
-            "1|2"
+            "1|2",
           );
         }
         if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
@@ -2558,7 +2772,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.meta.parsedQuery?.columns?.length > 0
       ) {
         const oldCustomQueryFields = JSON.parse(
-          JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
+          JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
         );
         dashboardPanelData.meta.stream.customQueryFields = [];
         dashboardPanelData.meta.parsedQuery.columns.forEach((item: any) => {
@@ -2572,7 +2786,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           }
           if (
             !dashboardPanelData.meta.stream.customQueryFields.find(
-              (it: any) => it.name == val
+              (it: any) => it.name == val,
             )
           ) {
             dashboardPanelData.meta.stream.customQueryFields.push({
@@ -2592,7 +2806,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
         const streamFound = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
-            it.name == dashboardPanelData.meta.parsedQuery.from[0].table
+            it.name == dashboardPanelData.meta.parsedQuery.from[0].table,
         );
         if (streamFound) {
           if (
@@ -2621,7 +2835,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery,
-      dashboardPanelData.meta.stream.selectedStreamFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
       // Only continue if the current mode is "show custom query"
@@ -2642,23 +2856,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       //     updatePromQLQuery()
       // }
     },
-    { deep: true }
+    { deep: true },
   );
 
   const currentXLabel = computed(() => {
     return dashboardPanelData.data.type == "table"
       ? "First Column"
       : dashboardPanelData.data.type == "h-bar"
-      ? "Y-Axis"
-      : "X-Axis";
+        ? "Y-Axis"
+        : "X-Axis";
   });
 
   const currentYLabel = computed(() => {
     return dashboardPanelData.data.type == "table"
       ? "Other Columns"
       : dashboardPanelData.data.type == "h-bar"
-      ? "X-Axis"
-      : "Y-Axis";
+        ? "X-Axis"
+        : "Y-Axis";
   });
 
   return {
@@ -2706,6 +2920,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentXLabel,
     currentYLabel,
     generateLabelFromName,
+    selectedStreamFieldsBasedOnUserDefinedSchema,
   };
 };
 export default useDashboardPanelData;

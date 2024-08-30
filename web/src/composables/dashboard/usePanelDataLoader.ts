@@ -25,13 +25,22 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
+import {
+  addLabelsToSQlQuery,
+  changeHistogramInterval,
+} from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+
+/**
+ * debounce time in milliseconds for panel data loader
+ */
+const PANEL_DATA_LOADER_DEBOUCE_TIME = 50;
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -39,7 +48,7 @@ export const usePanelDataLoader = (
   variablesData: any,
   chartPanelRef: any,
   forceLoad: any,
-  searchType: any
+  searchType: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -51,7 +60,9 @@ export const usePanelDataLoader = (
     data: [] as any,
     loading: false,
     errorDetail: "",
-    metadata: {},
+    metadata: {
+      queries: [] as any,
+    },
     resultMetaData: [] as any,
   });
 
@@ -69,14 +80,14 @@ export const usePanelDataLoader = (
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
             ?.filter((it: any) => {
               const regexForVariable = new RegExp(
-                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
               );
 
               return panelSchema.value.queries
                 ?.map((q: any) => regexForVariable.test(q?.query))
                 ?.includes(true);
-            })
-        )
+            }),
+        ),
       )
     : [];
 
@@ -97,8 +108,8 @@ export const usePanelDataLoader = (
             ?.filter((it: any) => it.type === "dynamic_filters")
             ?.map((it: any) => it?.value)
             ?.flat()
-            ?.filter((it: any) => it?.operator && it?.name && it?.value)
-        )
+            ?.filter((it: any) => it?.operator && it?.name && it?.value),
+        ),
       )
     : [];
   // let currentAdHocVariablesData: any = null;
@@ -109,6 +120,23 @@ export const usePanelDataLoader = (
   let abortController = new AbortController();
 
   // [START] --------- New Functions ------------------------------------------
+
+  // This function acts as a debounce and helps to reduce to continue execution
+  // with old values when too many frequent updates are made to schema
+  const waitForTimeout = (signal: AbortSignal) => {
+    return new Promise<void>((resolve, reject) => {
+      // wait for timeout
+      // and abort if abort signal received
+      const timeoutId = setTimeout(resolve, PANEL_DATA_LOADER_DEBOUCE_TIME);
+
+      // Listen to the abort signal
+      signal.addEventListener("abort", () => {
+        clearTimeout(timeoutId);
+        reject(new Error("Aborted waiting for loading"));
+      });
+    });
+  };
+
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
@@ -142,8 +170,10 @@ export const usePanelDataLoader = (
   // an async function that waits for the variables to load
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
+      log("waitForTheVariablesToLoad: entering...");
       // Immediately resolve if variables are already loaded
       if (ifPanelVariablesCompletedLoading()) {
+        log("waitForTheVariablesToLoad: variables are already loaded");
         resolve();
         return;
       }
@@ -153,10 +183,13 @@ export const usePanelDataLoader = (
         () => variablesData.value?.values,
         () => {
           if (ifPanelVariablesCompletedLoading()) {
+            log(
+              "waitForTheVariablesToLoad: variables are loaded (inside watch)",
+            );
             resolve();
             stopWatching(); // Stop watching once isVisible is true
           }
-        }
+        },
       );
 
       // Listen to the abort signal
@@ -172,7 +205,7 @@ export const usePanelDataLoader = (
       log("loadData: entering...");
 
       if (abortController) {
-        log("logData: aborting previous function call (if any)");
+        log("loadData: aborting previous function call (if any)");
         abortController.abort();
       }
 
@@ -184,9 +217,16 @@ export const usePanelDataLoader = (
         log("loadData: there are no queries to execute");
         state.loading = false;
         state.data = [];
-        state.metadata = {};
+        state.metadata = {
+          queries: [],
+        };
+        state.resultMetaData = [];
         return;
       }
+
+      log("loadData: now waiting for the timeout to avoid frequent updates");
+
+      await waitForTimeout(abortController.signal);
 
       log("loadData: now waiting for the panel to become visible");
 
@@ -210,7 +250,7 @@ export const usePanelDataLoader = (
         timestamps.end_time != "Invalid Date"
       ) {
         startISOTimestamp = new Date(
-          timestamps.start_time.toISOString()
+          timestamps.start_time.toISOString(),
         ).getTime();
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
@@ -228,7 +268,7 @@ export const usePanelDataLoader = (
               it.query,
               startISOTimestamp,
               endISOTimestamp,
-              panelSchema.value.queryType
+              panelSchema.value.queryType,
             );
             // console.log("Calling queryPromises", query1);
 
@@ -262,95 +302,226 @@ export const usePanelDataLoader = (
                 processApiError(error, "promql");
                 return { result: null, metadata: metadata };
               });
-          }
+          },
         );
 
         // Wait for all query promises to resolve
-        const queryResults = await Promise.all(queryPromises);
+        const queryResults: any = await Promise.all(queryPromises);
         state.loading = false;
         state.data = queryResults.map((it: any) => it?.result);
         state.metadata = {
-          queries: queryResults.map((it) => it?.metadata),
+          queries: queryResults.map((it: any) => it?.metadata),
         };
       } else {
+        // reset old state data
+        state.data = [];
+        state.metadata = {
+          queries: [],
+        };
+        state.resultMetaData = [];
+
         // Call search API
 
         // Get the page type from the first query in the panel schema
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
-        const sqlqueryPromise = panelSchema.value.queries?.map(
-          async (it: any) => {
-            const { query: query1, metadata: metadata1 } = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType
-            );
+        // Handle each query sequentially
+        for (const it of panelSchema.value.queries) {
+          const { query: query1, metadata: metadata1 } = replaceQueryValue(
+            it.query,
+            startISOTimestamp,
+            endISOTimestamp,
+            panelSchema.value.queryType,
+          );
 
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } =
+            await applyDynamicVariables(query1, panelSchema.value.queryType);
 
-            const query = query2;
+          const query = query2;
 
-            const metadata = {
-              originalQuery: it.query,
-              query: query,
-              startTime: startISOTimestamp,
-              endTime: endISOTimestamp,
-              queryType: panelSchema.value.queryType,
-              variables: [...(metadata1 || []), ...(metadata2 || [])],
-            };
+          const metadata: any = {
+            originalQuery: it.query,
+            query: query,
+            startTime: startISOTimestamp,
+            endTime: endISOTimestamp,
+            queryType: panelSchema.value.queryType,
+            variables: [...(metadata1 || []), ...(metadata2 || [])],
+          };
 
-            // console.log("Calling search API", query, metadata);
-            return await queryService
-              .search(
+          try {
+            // trace context
+            const { traceparent } = generateTraceContext();
+
+            // partition api call
+            const res = await queryService.partition({
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                sql: query,
+                query_fn: it.vrlFunctionQuery
+                  ? b64EncodeUnicode(it.vrlFunctionQuery)
+                  : null,
+                sql_mode: "full",
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                size: -1,
+              },
+              page_type: pageType,
+              traceparent,
+            });
+
+            // partition array from api response
+            const partitionArr = res?.data?.partitions ?? [];
+
+            // max_query_range for current query stream
+            const max_query_range = res?.data?.max_query_range ?? 0;
+
+            // histogram_interval from partition api response
+            const histogramInterval = res?.data?.histogram_interval
+              ? `${res?.data?.histogram_interval} seconds`
+              : null;
+
+            // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
+            state.data.push([]);
+            state.metadata.queries.push({});
+            state.resultMetaData.push({});
+
+            const currentQueryIndex = state.data.length - 1;
+
+            // copy of current abortController
+            // which is used to check whether the current query has been aborted
+            const abortControllerRef = abortController;
+
+            // Update the metadata for the current query
+            Object.assign(state.metadata.queries[currentQueryIndex], metadata);
+
+            // remaining query range
+            let remainingQueryRange = max_query_range;
+
+            // loop on all partitions and call search api for each partition
+            for (let i = partitionArr.length - 1; i >= 0; i--) {
+              const partition = partitionArr[i];
+
+              if (abortControllerRef?.signal?.aborted) {
+                break;
+              }
+              const searchRes = await queryService.search(
                 {
                   org_identifier: store.state.selectedOrganization.identifier,
                   query: {
                     query: {
-                      sql: query,
+                      sql: await changeHistogramInterval(
+                        query,
+                        histogramInterval,
+                      ),
+                      query_fn: it.vrlFunctionQuery
+                        ? b64EncodeUnicode(it.vrlFunctionQuery)
+                        : null,
                       sql_mode: "full",
-                      start_time: startISOTimestamp,
-                      end_time: endISOTimestamp,
+                      start_time: partition[0],
+                      end_time: partition[1],
                       size: -1,
                     },
                   },
                   page_type: pageType,
                 },
-                searchType.value ?? "Dashboards"
-              )
-              .then((res) => {
-                // Set searchQueryData.data to the API response hits
-                // state.data = res.data.hits;
-                state.errorDetail = "";
-                // console.log("API response received");
+                searchType.value ?? "Dashboards",
+              );
 
-                return {
-                  result: res.data.hits,
-                  metadata: metadata,
-                  resultMetaData: { ...res.data },
-                };
-              })
-              .catch((error) => {
-                // console.log("API error received", error);
+              // remove past error detail
+              state.errorDetail = "";
 
-                // Process API error for "sql"
-                processApiError(error, "sql");
-                return { result: null, metadata: metadata };
-              });
+              // if there is an function error and which not related to stream range, throw error
+              if (
+                searchRes.data.function_error &&
+                searchRes.data.is_partial != true
+              ) {
+                // abort on unmount
+                if (abortController) {
+                  // this will stop partition api call
+                  abortController.abort();
+                }
+
+                // throw error
+                throw new Error(
+                  `Function error: ${searchRes.data.function_error}`,
+                );
+              }
+
+              state.data[currentQueryIndex] = [
+                ...searchRes.data.hits,
+                ...(state.data[currentQueryIndex] ?? []),
+              ];
+
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+
+              // if the query is aborted or the response is partial, break the loop
+              if (abortControllerRef?.signal?.aborted) {
+                break;
+              }
+
+              if (searchRes.data.is_partial == true) {
+                // set the new start time as the start time of query
+                state.resultMetaData[currentQueryIndex].new_end_time =
+                  endISOTimestamp;
+                break;
+              }
+
+              if (max_query_range != 0) {
+                // calculate the current partition time range
+                // convert timerange from milliseconds to hours
+                const timeRange = (partition[1] - partition[0]) / 3600000000;
+
+                // get result cache ratio(it will be from 0 to 100)
+                const resultCacheRatio = searchRes.data.result_cache_ratio ?? 0;
+
+                // calculate the remaining query range
+                // remaining query range = remaining query range - queried time range for the current partition
+                // queried time range = time range * ((100 - result cache ratio) / 100)
+
+                const queriedTimeRange =
+                  timeRange * ((100 - resultCacheRatio) / 100);
+
+                remainingQueryRange = remainingQueryRange - queriedTimeRange;
+
+                // if the remaining query range is less than 0, break the loop
+                // we exceeded the max query range
+                if (remainingQueryRange < 0) {
+                  // set that is_partial to true if it is not last partition which we need to call
+                  if (i != 0) {
+                    // set that is_partial to true
+                    state.resultMetaData[currentQueryIndex].is_partial = true;
+                    // set function error
+                    state.resultMetaData[currentQueryIndex].function_error =
+                      `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                    // set the new start time and end time
+                    state.resultMetaData[currentQueryIndex].new_end_time =
+                      endISOTimestamp;
+
+                    // set the new start time as the start time of query
+                    state.resultMetaData[currentQueryIndex].new_start_time =
+                      partition[0];
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            // Process API error for "sql"
+            processApiError(error, "sql");
+            return { result: null, metadata: metadata };
+          } finally {
+            // set loading to false
+            state.loading = false;
+
+            // abort on done
+            if (abortController) {
+              abortController.abort();
+            }
           }
-        );
-        // Wait for all query promises to resolve
-        const sqlqueryResults = await Promise.all(sqlqueryPromise);
-        state.loading = false;
-        state.data = sqlqueryResults.map((it) => it?.result);
-        state.metadata = {
-          queries: sqlqueryResults.map((it) => it?.metadata),
-        };
+        }
 
-        state.resultMetaData = sqlqueryResults.map(
-          (it) => it?.resultMetaData
-        );
+        state.loading = false;
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
@@ -373,7 +544,7 @@ export const usePanelDataLoader = (
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
-    }
+    },
   );
 
   /**
@@ -386,7 +557,7 @@ export const usePanelDataLoader = (
     query: any,
     startISOTimestamp: any,
     endISOTimestamp: any,
-    queryType: any
+    queryType: any,
   ) => {
     const metadata: any[] = [];
 
@@ -413,16 +584,16 @@ export const usePanelDataLoader = (
     const __rate_interval: any = Math.max(
       getTimeInSecondsBasedOnUnit(
         formattedInterval.value,
-        formattedInterval.unit
+        formattedInterval.unit,
       ) + scrapeInterval,
-      4 * scrapeInterval
+      4 * scrapeInterval,
     );
 
     //get interval in ms
     const __interval_ms =
       getTimeInSecondsBasedOnUnit(
         formattedInterval.value,
-        formattedInterval.unit
+        formattedInterval.unit,
       ) * 1000;
 
     const fixedVariables = [
@@ -500,7 +671,7 @@ export const usePanelDataLoader = (
             }
             query = query.replaceAll(
               placeHolderObj.placeHolder,
-              placeHolderObj.value
+              placeHolderObj.value,
             );
           });
         } else {
@@ -555,7 +726,7 @@ export const usePanelDataLoader = (
           query,
           variable.name,
           variable.value,
-          variable.operator
+          variable.operator,
         );
       });
     }
@@ -655,7 +826,7 @@ export const usePanelDataLoader = (
         loadData();
       }
     },
-    { deep: true }
+    { deep: true },
   );
 
   // [START] Variables functions
@@ -663,14 +834,14 @@ export const usePanelDataLoader = (
     variablesData.value?.values?.some(
       (it: any) =>
         it.type === "dynamic_filters" &&
-        (it.isLoading || it.isVariableLoadingPending)
+        (it.isLoading || it.isVariableLoadingPending),
     );
 
   const areDependentVariablesStillLoadingWith = (
-    newDependentVariablesData: any
+    newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => it.isLoading || it.isVariableLoadingPending
+      (it: any) => it.isLoading || it.isVariableLoadingPending,
     );
 
   const getDependentVariablesData = () =>
@@ -678,7 +849,7 @@ export const usePanelDataLoader = (
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) => {
         const regexForVariable = new RegExp(
-          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
         );
 
         return panelSchema.value.queries
@@ -706,16 +877,16 @@ export const usePanelDataLoader = (
   };
 
   const updateCurrentDependentVariablesData = (
-    newDependentVariablesData: any
+    newDependentVariablesData: any,
   ) => {
     currentDependentVariablesData = JSON.parse(
-      JSON.stringify(newDependentVariablesData)
+      JSON.stringify(newDependentVariablesData),
     );
   };
 
   const updateCurrentDynamicVariablesData = (newDynamicVariablesData: any) => {
     currentDynamicVariablesData = JSON.parse(
-      JSON.stringify(newDynamicVariablesData)
+      JSON.stringify(newDynamicVariablesData),
     );
   };
 
@@ -741,11 +912,11 @@ export const usePanelDataLoader = (
   };
 
   const isAllRegularVariablesValuesSameWith = (
-    newDependentVariablesData: any
+    newDependentVariablesData: any,
   ) =>
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find(
-        (it2: any) => it2.name == it.name
+        (it2: any) => it2.name == it.name,
       );
       // return it.value == oldValue?.value && oldValue?.value != "";
       return it.multiSelect
@@ -756,7 +927,7 @@ export const usePanelDataLoader = (
   const isAllDynamicVariablesValuesSameWith = (newDynamicVariablesData: any) =>
     newDynamicVariablesData.every((it: any) => {
       const oldValue = currentDynamicVariablesData?.find(
-        (it2: any) => it2.name == it.name
+        (it2: any) => it2.name == it.name,
       );
       return (
         oldValue?.value != "" &&
@@ -817,30 +988,30 @@ export const usePanelDataLoader = (
 
     log(
       "Step3: newDependentVariablesData,",
-      JSON.stringify(newDependentVariablesData, null, 2)
+      JSON.stringify(newDependentVariablesData, null, 2),
     );
     log(
       "Step3: newDynamicVariablesData...",
-      JSON.stringify(newDynamicVariablesData, null, 2)
+      JSON.stringify(newDynamicVariablesData, null, 2),
     );
 
     // if the length of the any of the regular and old dynamic data has changed,
     // we need to fire the query
     log(
       "Step3: newDependentVariablesData?.length",
-      newDependentVariablesData?.length
+      newDependentVariablesData?.length,
     );
     log(
       "Step3: newDynamicVariablesData?.length",
-      newDynamicVariablesData?.length
+      newDynamicVariablesData?.length,
     );
     log(
       "Step3: currentDependentVariablesData?.length",
-      currentDependentVariablesData?.length
+      currentDependentVariablesData?.length,
     );
     log(
       "Step3: currentAdHocVariablesData?.length",
-      currentDynamicVariablesData?.length
+      currentDynamicVariablesData?.length,
     );
 
     if (
@@ -852,7 +1023,7 @@ export const usePanelDataLoader = (
       updateCurrentDynamicVariablesData(newDynamicVariablesData);
 
       log(
-        "Step3: length of the any of the regular and old dynamic data has changed, we need to fire the query"
+        "Step3: length of the any of the regular and old dynamic data has changed, we need to fire the query",
       );
       return true;
     }
@@ -872,11 +1043,11 @@ export const usePanelDataLoader = (
 
     log(
       "Step4: newDependentVariablesData.length",
-      newDependentVariablesData?.length
+      newDependentVariablesData?.length,
     );
     log(
       "Step4: newDynamicVariablesData.length",
-      newDynamicVariablesData?.length
+      newDynamicVariablesData?.length,
     );
 
     // execute different scenarios based on the count of variables
@@ -889,7 +1060,7 @@ export const usePanelDataLoader = (
       !newDependentVariablesData?.length && !newDynamicVariablesData?.length;
 
       log(
-        "Step4: 1: no variables are there, no waiting, can call the api, returning true..."
+        "Step4: 1: no variables are there, no waiting, can call the api, returning true...",
       );
 
       return true;
@@ -956,17 +1127,17 @@ export const usePanelDataLoader = (
 
       log(
         "Step4: 4: isAllRegularVariablesValuesSame",
-        isAllRegularVariablesValuesSame
+        isAllRegularVariablesValuesSame,
       );
       log(
         "Step4: 4: isAllDynamicVariablesValuesSame",
-        isAllDynamicVariablesValuesSame
+        isAllDynamicVariablesValuesSame,
       );
 
       // if any has changed
       if (isAllRegularVariablesValuesSame && isAllDynamicVariablesValuesSame) {
         log(
-          "Step4: 4: regular and dynamic variables has same old value, returning false"
+          "Step4: 4: regular and dynamic variables has same old value, returning false",
         );
         return false;
       }
@@ -997,6 +1168,11 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
+    // abort on unmount
+    if (abortController) {
+      // this will stop partition api call
+      abortController.abort();
+    }
     if (observer) {
       observer.disconnect();
     }

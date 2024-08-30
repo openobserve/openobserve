@@ -31,7 +31,10 @@ use super::{BLOCK_FIELDS, PARENT_SPAN_ID, PARENT_TRACE_ID, REF_TYPE, SERVICE, SE
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
-        traces::{Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType},
+        traces::{
+            Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanLink,
+            SpanLinkContext, SpanRefType,
+        },
     },
     service::{
         db, format_stream_name, ingestion::grpc::get_val_for_attr,
@@ -102,7 +105,7 @@ pub async fn traces_json(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Traces,
         &traces_stream_name,
@@ -184,15 +187,8 @@ pub async fn traces_json(
                         span.get("traceId").unwrap().as_str().unwrap().to_string();
 
                     let mut span_ref = HashMap::new();
-                    if span.get("parentSpanId").is_some() {
-                        span_ref.insert(
-                            PARENT_SPAN_ID.to_string(),
-                            span.get("parentSpanId")
-                                .unwrap()
-                                .as_str()
-                                .unwrap()
-                                .to_string(),
-                        );
+                    if let Some(v) = span.get("parentSpanId") {
+                        span_ref.insert(PARENT_SPAN_ID.to_string(), json::get_string_value(v));
                         span_ref.insert(PARENT_TRACE_ID.to_string(), trace_id.clone());
                         span_ref
                             .insert(REF_TYPE.to_string(), format!("{:?}", SpanRefType::ChildOf));
@@ -214,7 +210,9 @@ pub async fn traces_json(
                     }
 
                     let mut events = vec![];
+                    let mut links = vec![];
                     let mut event_att_map: HashMap<String, json::Value> = HashMap::new();
+                    let mut link_att_map: HashMap<String, json::Value> = HashMap::new();
 
                     let empty_vec = Vec::new();
                     let span_events = match span.get("events") {
@@ -233,6 +231,75 @@ pub async fn traces_json(
                             name: event.get("name").unwrap().as_str().unwrap().to_string(),
                             _timestamp: json::get_uint_value(event.get("timeUnixNano").unwrap()),
                             attributes: event_att_map.clone(),
+                        })
+                    }
+                    let span_links = match span.get("links") {
+                        Some(v) => v.as_array().unwrap(),
+                        None => &empty_vec,
+                    };
+                    for link in span_links {
+                        let attributes = link.get("attributes").unwrap().as_array().unwrap();
+                        for link_att in attributes {
+                            link_att_map.insert(
+                                link_att.get("key").unwrap().as_str().unwrap().to_string(),
+                                get_val_for_attr(link_att.get("value").unwrap().clone()),
+                            );
+                        }
+                        let (mut trace_id, mut span_id, mut trace_flags, mut trace_state) =
+                            (None, None, None, None);
+                        if let Some(link_trace) = link.get("traceId") {
+                            trace_id = Some(link_trace.as_str().unwrap().to_owned());
+                        }
+
+                        if let Some(link_span) = link.get("spanId") {
+                            span_id = Some(link_span.as_str().unwrap().to_owned());
+                        }
+
+                        if let Some(link_trace_flags) = link.get("traceFlags") {
+                            trace_flags = Some(link_trace_flags.as_u64().unwrap() as u32);
+                        }
+
+                        if trace_flags.is_none() {
+                            if let Some(link_trace_flags) = link.get("flags") {
+                                trace_flags = Some(link_trace_flags.as_u64().unwrap() as u32);
+                            }
+                        }
+
+                        if let Some(link_trace_state) = link.get("traceState") {
+                            trace_state = Some(link_trace_state.as_str().unwrap().to_owned());
+                        }
+
+                        if trace_id.is_none()
+                            || span_id.is_none()
+                            || trace_flags.is_none()
+                            || trace_state.is_none()
+                        {
+                            if let Some(span_context) = link.get("context") {
+                                let span_context: SpanLinkContext =
+                                    json::from_value(span_context.to_owned()).unwrap();
+                                if trace_id.is_none() {
+                                    trace_id = Some(span_context.trace_id);
+                                }
+                                if span_id.is_none() {
+                                    span_id = Some(span_context.span_id);
+                                }
+                                if trace_flags.is_none() {
+                                    trace_flags = span_context.trace_flags;
+                                }
+                                if trace_state.is_none() {
+                                    trace_state = span_context.trace_state;
+                                }
+                            }
+                        }
+                        links.push(SpanLink {
+                            context: SpanLinkContext {
+                                span_id: span_id.unwrap(),
+                                trace_id: trace_id.unwrap(),
+                                trace_flags,
+                                trace_state,
+                            },
+                            attributes: link_att_map.clone(),
+                            dropped_attributes_count: 0, // TODO: add appropriate value
                         })
                     }
 
@@ -260,6 +327,7 @@ pub async fn traces_json(
                         service: service_att_map.clone(),
                         flags: 1, // TODO add appropriate value
                         events: json::to_string(&events).unwrap(),
+                        links: json::to_string(&links).unwrap(),
                     };
 
                     let mut value: json::Value = json::to_value(local_val).unwrap();

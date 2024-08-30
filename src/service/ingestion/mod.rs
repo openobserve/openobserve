@@ -30,6 +30,7 @@ use config::{
     utils::{flatten, json::*},
     SIZE_IN_MB,
 };
+use proto::cluster_rpc::IngestionType;
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -43,8 +44,9 @@ use crate::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
         meta::{
-            alerts::Alert,
+            alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+            ingestion::IngestionRequest,
             stream::{SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,
@@ -53,6 +55,7 @@ use crate::{
 };
 
 pub mod grpc;
+pub mod ingestion_service;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -134,7 +137,8 @@ pub fn apply_vrl_fn(
 
 pub async fn get_stream_functions<'a>(
     streams: &[StreamParams],
-    stream_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
+    stream_before_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
+    stream_after_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
 ) {
     for stream in streams {
@@ -142,12 +146,15 @@ pub async fn get_stream_functions<'a>(
             "{}/{}/{}",
             stream.org_id, stream.stream_type, stream.stream_name
         );
-        if stream_functions_map.contains_key(&key) {
-            return;
+        if stream_after_functions_map.contains_key(&key)
+            || stream_before_functions_map.contains_key(&key)
+        {
+            // functions for this stream already fetched
+            continue;
         }
         //   let mut _local_trans: Vec<StreamTransform> = vec![];
         // let local_stream_vrl_map;
-        let (_local_trans, local_stream_vrl_map) =
+        let (before_local_trans, after_local_trans, local_stream_vrl_map) =
             crate::service::ingestion::register_stream_functions(
                 &stream.org_id,
                 &stream.stream_type,
@@ -155,7 +162,8 @@ pub async fn get_stream_functions<'a>(
             );
         stream_vrl_map.extend(local_stream_vrl_map);
 
-        stream_functions_map.insert(key, _local_trans);
+        stream_before_functions_map.insert(key.clone(), before_local_trans);
+        stream_after_functions_map.insert(key, after_local_trans);
     }
 }
 
@@ -324,15 +332,24 @@ pub fn register_stream_functions(
     org_id: &str,
     stream_type: &StreamType,
     stream_name: &str,
-) -> (Vec<StreamTransform>, HashMap<String, VRLResultResolver>) {
-    let mut local_trans = vec![];
+) -> (
+    Vec<StreamTransform>,
+    Vec<StreamTransform>,
+    HashMap<String, VRLResultResolver>,
+) {
+    let mut before_local_trans = vec![];
+    let mut after_local_trans = vec![];
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_trans = (*transforms.list).to_vec();
-        local_trans.sort_by(|a, b| a.order.cmp(&b.order));
-        for trans in &local_trans {
+        (before_local_trans, after_local_trans) = (*transforms.list)
+            .iter()
+            .cloned()
+            .partition(|elem| elem.apply_before_flattening);
+        before_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
+        after_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
+        for trans in before_local_trans.iter().chain(after_local_trans.iter()) {
             let func_key = format!("{}/{}", &stream_name, trans.transform.name);
             if let Ok(vrl_runtime_config) = compile_vrl_function(&trans.transform.function, org_id)
             {
@@ -352,7 +369,7 @@ pub fn register_stream_functions(
         }
     }
 
-    (local_trans, stream_vrl_map)
+    (before_local_trans, after_local_trans, stream_vrl_map)
 }
 
 pub fn apply_stream_functions(
@@ -559,6 +576,19 @@ pub async fn get_user_defined_schema(
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }
         }
+    }
+}
+
+pub fn create_log_ingestion_req(
+    ingestion_type: i32,
+    data: &bytes::Bytes,
+) -> Result<IngestionRequest> {
+    match IngestionType::try_from(ingestion_type) {
+        Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),
+        Ok(IngestionType::Multi) => Ok(IngestionRequest::Multi(data)),
+        Ok(IngestionType::Usage) => Ok(IngestionRequest::Usage(data)),
+        Ok(IngestionType::Rum) => Ok(IngestionRequest::RUM(data)),
+        _ => Err(anyhow::anyhow!("Not yet supported")),
     }
 }
 

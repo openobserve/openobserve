@@ -43,7 +43,7 @@ use super::{
 };
 use crate::{
     common::meta::{
-        alerts::Alert,
+        alerts::alert::Alert,
         ingestion::IngestionStatus,
         stream::{SchemaRecords, StreamParams},
     },
@@ -364,7 +364,7 @@ async fn write_logs(
             if let Some(alerts) = stream_alerts_map.get(&key) {
                 let mut trigger_alerts: TriggerAlertData = Vec::new();
                 for alert in alerts {
-                    if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
+                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
                         trigger_alerts.push((alert.clone(), v));
                     }
                 }

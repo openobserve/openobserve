@@ -49,11 +49,11 @@ pub async fn save_pipeline(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_string();
     pipeline.stream_name = stream_name;
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
+    pipeline.stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Ok(
@@ -80,7 +80,6 @@ pub async fn save_pipeline(
             routing.insert(formatted_key, value);
         }
     }
-    pipeline.stream_type = stream_type;
     crate::service::pipelines::save_pipeline(org_id, pipeline).await
 }
 
@@ -162,7 +161,8 @@ async fn delete_pipeline(
             return Ok(crate::common::meta::http::HttpResponse::bad_request(e));
         }
     };
-    crate::service::pipelines::delete_pipeline(&org_id, stream_type, &stream_name, &name).await
+    let pipeline_source = meta::stream::StreamParams::new(&org_id, &stream_name, stream_type);
+    crate::service::pipelines::delete_pipeline(&name, pipeline_source).await
 }
 
 /// UpdatePipeline
@@ -200,8 +200,8 @@ pub async fn update_pipeline(
     let name = name.trim();
     let mut pipeline = pipeline.into_inner();
     pipeline.name = name.to_string();
-    pipeline.stream_name = stream_name;
     pipeline.stream_type = stream_type;
+    pipeline.stream_name = stream_name;
 
     if let Some(ref mut routing) = &mut pipeline.routing {
         let keys_to_update: Vec<_> = routing.keys().cloned().collect();
@@ -219,5 +219,5 @@ pub async fn update_pipeline(
             routing.insert(formatted_key, value);
         }
     }
-    crate::service::pipelines::update_pipeline(&org_id, name, pipeline).await
+    crate::service::pipelines::update_pipeline(&org_id, pipeline).await
 }

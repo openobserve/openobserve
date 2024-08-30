@@ -210,7 +210,10 @@ pub fn cache_instance_id(instance_id: &str) {
 }
 
 pub fn get_instance_id() -> String {
-    INSTANCE_ID.get("instance_id").unwrap().clone()
+    match INSTANCE_ID.get("instance_id") {
+        Some(id) => id.clone(),
+        None => "".to_string(),
+    }
 }
 
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
@@ -503,7 +506,7 @@ pub struct Common {
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
     pub instance_name_short: String,
-    #[env_config(name = "ZO_WEB_URL", default = "")] // http://localhost:5080
+    #[env_config(name = "ZO_WEB_URL", default = "http://localhost:5080")]
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
@@ -558,8 +561,6 @@ pub struct Common {
     pub bloom_filter_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
     pub bloom_filter_disabled_on_search: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_ON_ALL_FIELDS", default = false)]
-    pub bloom_filter_on_all_fields: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
@@ -637,7 +638,7 @@ pub struct Common {
     pub usage_publish_interval: i64,
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = "false")]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
     pub mmdb_update_duration: u64,
@@ -710,14 +711,14 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
-    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "localhost:5082")]
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "http://localhost:5082")]
     pub report_server_url: String,
     #[env_config(name = "ZO_REPORT_SERVER_SKIP_TLS_VERIFY", default = false)]
     pub report_server_skip_tls_verify: bool,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
-    #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
-    pub skip_formatting_bulk_stream_name: bool,
+    #[env_config(name = "ZO_SKIP_FORMAT_STREAM_NAME", default = false)]
+    pub skip_formatting_stream_name: bool,
     #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
@@ -748,10 +749,22 @@ pub struct Common {
     pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = "false",
+        default = true,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_USE_MULTIPLE_RESULT_CACHE",
+        default = false,
+        help = "Enable to use mulple result caches for query results"
+    )]
+    pub use_multi_result_cache: bool,
+    #[env_config(
+        name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
+        default = "both",
+        help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
+    )]
+    pub result_cache_selection_strategy: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
         default = "60",
@@ -766,6 +779,7 @@ pub struct Common {
 pub struct Limit {
     // no need set by environment
     pub cpu_num: usize,
+    pub real_cpu_num: usize,
     pub mem_total: usize,
     pub disk_total: usize,
     pub disk_free: usize,
@@ -837,10 +851,22 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
-    #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
-    pub http_worker_num: usize,
-    #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)] // equals to 1024 if 0
-    pub http_worker_max_blocking: usize,
+    #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
+    pub http_worker_num: usize, // equals to cpu_num if 0
+    #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
+    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
+    pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
+    #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
+    pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    #[env_config(name = "ZO_GRPC_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub grpc_runtime_shutdown_timeout: u64,
+    #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
+    pub job_runtime_worker_num: usize, // equals to cpu_num if 0
+    #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
+    pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
@@ -850,7 +876,7 @@ pub struct Limit {
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub shutdown_timeout: u64,
+    pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -859,6 +885,8 @@ pub struct Limit {
     pub alert_schedule_timeout: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
+    #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
+    pub derived_stream_schedule_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
     pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
@@ -871,6 +899,8 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
+    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = false)]
+    pub quick_mode_force_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
@@ -903,6 +933,12 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_LIMIT",
+        default = 256,
+        help = "Maximum size of a single enrichment table in mb"
+    )]
+    pub max_enrichment_table_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1191,14 +1227,28 @@ pub fn init() -> Config {
         cfg.common.node_role_group = "".to_string();
     }
 
-    // set cpu num
-    let cpu_num = cgroup::get_cpu_limit();
+    // set real cpu num
+    cfg.limit.real_cpu_num = cgroup::get_cpu_limit();
+    // set at least 2 threads
+    let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;
     }
     if cfg.limit.http_worker_max_blocking == 0 {
         cfg.limit.http_worker_max_blocking = 1024;
+    }
+    if cfg.limit.grpc_runtime_worker_num == 0 {
+        cfg.limit.grpc_runtime_worker_num = cpu_num;
+    }
+    if cfg.limit.grpc_runtime_blocking_worker_num == 0 {
+        cfg.limit.grpc_runtime_blocking_worker_num = 512;
+    }
+    if cfg.limit.job_runtime_worker_num == 0 {
+        cfg.limit.job_runtime_worker_num = cpu_num;
+    }
+    if cfg.limit.job_runtime_blocking_worker_num == 0 {
+        cfg.limit.job_runtime_blocking_worker_num = 512;
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {

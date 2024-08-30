@@ -40,7 +40,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         self,
-        alerts::Alert,
+        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
         stream::{SchemaRecords, StreamParams},
@@ -220,7 +220,7 @@ pub async fn metrics_json_handler(
                     // End get stream alert
 
                     // Start Register Transforms for stream
-                    let (mut local_trans, mut stream_vrl_map) =
+                    let (_, mut local_trans, mut stream_vrl_map) =
                         crate::service::ingestion::register_stream_functions(
                             org_id,
                             &StreamType::Metrics,
@@ -348,7 +348,7 @@ pub async fn metrics_json_handler(
                             // End get stream alert
 
                             // Start Register Transforms for stream
-                            (local_trans, stream_vrl_map) =
+                            (_, local_trans, stream_vrl_map) =
                                 crate::service::ingestion::register_stream_functions(
                                     org_id,
                                     &StreamType::Metrics,
@@ -456,7 +456,7 @@ pub async fn metrics_json_handler(
                             if let Some(alerts) = stream_alerts_map.get(&key) {
                                 let mut trigger_alerts: TriggerAlertData = Vec::new();
                                 for alert in alerts {
-                                    if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                                    if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
                                         trigger_alerts.push((alert.clone(), v));
                                     }
                                 }

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       borderless
       dense
       class="q-mb-xs showLabelOnTop"
-      style="width: 88%"
+      style="width: calc(100% - 40px)"
     >
       <template #no-option>
         <q-item>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-folder-move-new-add"
       label="+"
       text-color="light-text"
-      padding="sm md"
+      style="width: 40px; height: 42px"
       no-caps
       @click="
         () => {

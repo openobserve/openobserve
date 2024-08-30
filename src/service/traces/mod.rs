@@ -41,10 +41,10 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts::Alert,
+        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         stream::{SchemaRecords, StreamParams},
-        traces::{Event, Span, SpanRefType},
+        traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
     service::{
         db, format_stream_name,
@@ -114,7 +114,7 @@ pub async fn handle_trace_request(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Traces,
         &traces_stream_name,
@@ -198,6 +198,36 @@ pub async fn handle_trace_request(
                     })
                 }
 
+                let mut links = vec![];
+                let mut link_att_map: HashMap<String, json::Value> = HashMap::new();
+                for link in span.links {
+                    for link_att in link.attributes {
+                        link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
+                    }
+                    let span_id: String = SpanId::from_bytes(
+                        link.span_id
+                            .try_into()
+                            .expect("slice with incorrect length"),
+                    )
+                    .to_string();
+                    let trace_id: String = TraceId::from_bytes(
+                        link.trace_id
+                            .try_into()
+                            .expect("slice with incorrect length"),
+                    )
+                    .to_string();
+                    links.push(SpanLink {
+                        context: SpanLinkContext {
+                            span_id,
+                            trace_id,
+                            trace_flags: Some(link.flags),
+                            trace_state: Some(link.trace_state),
+                        },
+                        attributes: link_att_map.clone(),
+                        dropped_attributes_count: link.dropped_attributes_count, // TODO: add appropriate value
+                    })
+                }
+
                 let timestamp = (start_time / 1000) as i64;
                 if timestamp < min_ts {
                     partial_success.rejected_spans += 1;
@@ -220,13 +250,14 @@ pub async fn handle_trace_request(
                     flags: 1, // TODO add appropriate value
                     //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
+                    links: json::to_string(&links).unwrap(),
                 };
                 let span_status_for_spanmetric = local_val.span_status.clone();
 
-                let value: json::Value = json::to_value(local_val).unwrap();
+                let mut value: json::Value = json::to_value(local_val).unwrap();
 
                 // JSON Flattening
-                let mut value = flatten::flatten(value).map_err(|e| {
+                value = flatten::flatten(value).map_err(|e| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                 })?;
 
@@ -503,7 +534,7 @@ async fn write_traces(
             if let Some(alerts) = stream_alerts_map.get(&key) {
                 let mut trigger_alerts: TriggerAlertData = Vec::new();
                 for alert in alerts {
-                    if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
+                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
                         trigger_alerts.push((alert.clone(), v));
                     }
                 }

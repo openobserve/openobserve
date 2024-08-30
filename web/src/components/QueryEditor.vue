@@ -34,12 +34,12 @@ import {
   onUnmounted,
   onActivated,
   watch,
+  computed,
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
@@ -125,7 +125,7 @@ export default defineComponent({
       });
     };
 
-    onMounted(async () => {
+    const setupEditor = () => {
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -154,8 +154,10 @@ export default defineComponent({
         value: props.query,
         language: props.language,
         theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-        showFoldingControls: "never",
+        showFoldingControls: enableCodeFolding.value ? "always" : "never",
+        folding: enableCodeFolding.value,
         wordWrap: "on",
+        automaticLayout: true,
         lineNumbers: "on",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
@@ -165,7 +167,6 @@ export default defineComponent({
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
-        folding: false,
         scrollBeyondLastColumn: 0,
         scrollBeyondLastLine: false,
         smoothScrolling: true,
@@ -185,7 +186,7 @@ export default defineComponent({
         debounce((e: any) => {
           emit("update-query", e, editorObj.getValue());
           emit("update:query", editorObj.getValue());
-        }, props.debounceTime)
+        }, props.debounceTime),
       );
 
       editorObj.createContextKey("ctrlenter", true);
@@ -196,7 +197,7 @@ export default defineComponent({
             emit("run-query");
           }, 300);
         },
-        "ctrlenter"
+        "ctrlenter",
       );
 
       editorObj.onDidFocusEditorWidget(() => {
@@ -210,6 +211,52 @@ export default defineComponent({
       window.addEventListener("click", () => {
         editorObj.layout();
       });
+
+      window.addEventListener("resize", async () => {
+        await nextTick();
+        editorObj.layout();
+        // queryEditorRef.value.resetEditorLayout();
+      });
+    };
+
+    onMounted(async () => {
+      provider.value?.dispose();
+
+      if (props.language === "vrl") {
+        monaco.languages.register({ id: "vrl" });
+
+        // Register a tokens provider for the language
+        monaco.languages.setMonarchTokensProvider(
+          "vrl",
+          vrlLanguageDefinition as any,
+        );
+      }
+
+      if (props.language === "sql") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
+        );
+      }
+
+      if (props.language === "json") {
+        await import(
+          "monaco-editor/esm/vs/language/json/monaco.contribution.js"
+        );
+      }
+
+      if (props.language === "html") {
+        await import(
+          "monaco-editor/esm/vs/language/html/monaco.contribution.js"
+        );
+      }
+
+      if (props.language === "markdown") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"
+        );
+      }
+
+      setupEditor();
     });
 
     onActivated(async () => {
@@ -226,31 +273,35 @@ export default defineComponent({
       provider.value?.dispose();
     });
 
+    const enableCodeFolding = computed(() => {
+      return ["json", "html"].includes(props.language);
+    });
+
     // update readonly when prop value changes
     watch(
       () => props.readOnly,
       () => {
         editorObj.updateOptions({ readOnly: props.readOnly });
-      }
+      },
     );
 
     watch(
       () => store.state.theme,
       () => {
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
-      }
+      },
     );
 
     // update readonly when prop value changes
     watch(
       () => props.query,
       () => {
-        if (props.readOnly || !editorObj.hasWidgetFocus()) {
-          editorObj.getModel().setValue(props.query);
+        if (props.readOnly || !editorObj?.hasWidgetFocus()) {
+          editorObj?.getModel().setValue(props.query);
         }
-      }
+      },
     );
 
     const setValue = (value: string) => {
@@ -305,7 +356,7 @@ export default defineComponent({
               suggestions: filteredSuggestions,
             };
           },
-        }
+        },
       );
     };
 
@@ -329,9 +380,14 @@ export default defineComponent({
       editorRef.value.dispatchEvent(escEvent);
     };
 
+    const formatDocument = () => {
+      editorObj?.getAction("editor.action.formatDocument")?.run();
+    };
+
     const getCursorIndex = () => {
       const currentPosition = editorObj.getPosition();
-      const cursorIndex = editorObj.getModel().getOffsetAt(currentPosition) - 1;
+      const cursorIndex =
+        editorObj?.getModel().getOffsetAt(currentPosition) - 1;
       return cursorIndex || null;
     };
 
@@ -344,6 +400,7 @@ export default defineComponent({
       triggerAutoComplete,
       getCursorIndex,
       searchObj,
+      formatDocument,
     };
   },
 });

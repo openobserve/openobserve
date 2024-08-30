@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             method: filterUsers,
           }"
         >
-          <template v-slot:select="slotProps">
+          <template v-slot:select="slotProps: any">
             <q-checkbox
               :data-test="`iam-users-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
               size="xs"

@@ -205,9 +205,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Your chart is not up to date
                         </div>
                         <div>
-                          Chart configuration has been updated, but the chart
-                          was not updated automatically. Click on the "Apply"
-                          button to run the query again
+                          Chart Configuration / Variables  has been updated, but
+                          the chart was not updated automatically. Click on the
+                          "Apply" button to run the query again
                         </div>
                       </div>
 
@@ -217,10 +217,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="variablesData"
+                          :variablesData="updatedVariablesData"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
+                          @updated:vrlFunctionFieldList="
+                            updateVrlFunctionFieldList
+                          "
                           searchType="Dashboards"
                         />
                         <q-dialog v-model="showViewPanel">
@@ -262,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
-                    :variablesData="variablesData"
+                    :variablesData="updatedVariablesData"
                   />
                 </PanelSidebar>
               </div>
@@ -366,7 +369,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     DashboardQueryEditor: defineAsyncComponent(
-      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue")
+      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
     QueryInspector,
     CustomHTMLEditor,
@@ -397,6 +400,10 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+
+    // used to provide values to chart only when apply is clicked (same as chart data)
+    let updatedVariablesData: any = reactive({});
+
     const metaData = ref(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
@@ -412,7 +419,18 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
+
+      // when this is called 1st time, we need to set the data for the updated variables data as well
+      // from the second time, it will only be updated after the apply button is clicked
+      if (
+        !updatedVariablesData?.values?.length    // Previous value of variables is empty
+        && variablesData?.values?.length > 0       // new values of variables is NOT empty
+      ) {
+          // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+          Object.assign(updatedVariablesData, variablesData);
+      }
     };
+
     const currentDashboardData: any = reactive({
       data: {},
     });
@@ -450,12 +468,23 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId,
           route.query.folder,
-          route.query.tab
+          route.query.tab,
         );
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData))
+          JSON.parse(JSON.stringify(panelData)),
         );
+
+        // check if vrl function exists
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery
+        ) {
+          // enable vrl function editor
+          dashboardPanelData.layout.vrlFunctionToggle = true;
+        }
+
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         updateDateTime(selectedDate.value);
@@ -494,9 +523,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default"
-          )
-        )
+            route.query.folder ?? "default",
+          ),
+        ),
       );
       // console.timeEnd("AddPanel:loadDashboard");
 
@@ -537,7 +566,7 @@ export default defineComponent({
         !dashboardPanelData.data.config.unit &&
         !dashboardPanelData.data.config.unit_custom &&
         dashboardPanelData.data.queries[0].fields.x.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.breakdown.length == 0 &&
+        dashboardPanelData.data.queries[0].fields?.breakdown?.length == 0 &&
         dashboardPanelData.data.queries[0].fields.y.length == 0 &&
         dashboardPanelData.data.queries[0].fields.z.length == 0 &&
         dashboardPanelData.data.queries[0].fields.filter.length == 0 &&
@@ -548,8 +577,11 @@ export default defineComponent({
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
       if (isInitailDashboardPanelData() && !editMode.value) return false;
-      //compare chartdata and dashboardpaneldata
-      return !isEqual(chartData.value, dashboardPanelData.data);
+      //compare chartdata and dashboardpaneldata and variables data as well
+      return (
+        !isEqual(chartData.value, dashboardPanelData.data) ||
+        !isEqual(variablesData, updatedVariablesData) 
+      );
     });
 
     watch(isOutDated, () => {
@@ -563,7 +595,7 @@ export default defineComponent({
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // console.timeEnd("watch:dashboardPanelData.data.type");
-      }
+      },
     );
 
     watch(selectedDate, () => {
@@ -579,7 +611,7 @@ export default defineComponent({
         // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
         // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
-      }
+      },
     );
 
     // resize the chart when query editor is opened and closed
@@ -596,7 +628,7 @@ export default defineComponent({
           }
         }
         // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
-      }
+      },
     );
 
     const runQuery = () => {
@@ -604,6 +636,10 @@ export default defineComponent({
       if (!isValid(true)) {
         return;
       }
+
+      // Also update variables data
+      Object.assign(updatedVariablesData, JSON.parse(JSON.stringify(variablesData)));
+
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       // refresh the date time based on current time if relative date is selected
@@ -642,7 +678,7 @@ export default defineComponent({
         }
         // console.timeEnd("watch:dashboardPanelData.data");
       },
-      { deep: true }
+      { deep: true },
     );
 
     const beforeUnloadHandler = (e: any) => {
@@ -705,7 +741,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
       }
 
@@ -729,11 +765,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
-              "Error saving panel configuration : " + errorMessageOnSave.message
+              "Error saving panel configuration : " +
+                errorMessageOnSave.message,
             );
             return;
           }
@@ -749,12 +786,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
               "Error saving panel configuration  : " +
-                errorMessageOnSave.message
+                errorMessageOnSave.message,
             );
             return;
           }
@@ -782,7 +819,7 @@ export default defineComponent({
               : "Error while creating panel"),
           {
             timeout: 2000,
-          }
+          },
         );
       }
     };
@@ -827,6 +864,157 @@ export default defineComponent({
       // console.timeEnd("onDataZoom");
     };
 
+    const updateVrlFunctionFieldList = (fieldList: any) => {
+      // extract all panelSchema alias
+      const aliasList: any = [];
+
+      // remove panelschema fields from field list
+
+      // add x axis alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.x?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add breakdown alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.breakdown?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add y axis alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.y?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add z axis alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.z?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add latitude alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.latitude.alias,
+        );
+      }
+
+      // add longitude alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.longitude.alias,
+        );
+      }
+
+      // add weight alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.weight.alias,
+        );
+      }
+
+      // add source alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.source.alias,
+        );
+      }
+
+      // add target alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.target.alias,
+        );
+      }
+
+      // add source alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.value.alias,
+        );
+      }
+
+      // remove custom query fields from field list
+      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
+        aliasList.push(it.name);
+      });
+
+      // rest will be vrl function fields
+      fieldList = fieldList
+        .filter((field: any) => aliasList.indexOf(field) < 0)
+        .map((field: any) => ({ name: field, type: "Utf8" }));
+
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
+    };
+
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
       panelId: -1,
@@ -840,7 +1028,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -873,6 +1061,7 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      updatedVariablesData,
       savePanelData,
       resetAggregationFunction,
       isOutDated,
@@ -884,6 +1073,7 @@ export default defineComponent({
       panelTitle,
       onDataZoom,
       showTutorial,
+      updateVrlFunctionFieldList,
     };
   },
   methods: {

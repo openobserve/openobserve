@@ -47,7 +47,7 @@
       filled
       data-test="dashboard-config-panel-drilldown-name"
       dense
-      :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
+      :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
       :lazy-rules="true"
     />
     <div
