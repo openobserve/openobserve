@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         minWidth: '100%',
         minHeight: totalSize + 'px',
         ...columnSizeVars,
-        width: !columnOrder.includes('source')
+        width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
             ? width
@@ -39,16 +39,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="headerGroup.id"
           :element="'table'"
           :animation="200"
-          :sort="!isResizingHeader || !columnOrder.includes('source')"
+          :sort="!isResizingHeader || !defaultColumns"
           handle=".table-head"
           :class="{
             'tw-cursor-move': table.getState().columnOrder.length > 1,
           }"
           :style="{
             width:
-              columnOrder.includes('source') && wrap
+              defaultColumns && wrap
                 ? width - 12 + 'px'
-                : tableRowSize + 'px',
+                : defaultColumns
+                  ? tableRowSize + 'px'
+                  : table.getTotalSize() + 'px',
             minWidth: '100%',
             background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
           }"
@@ -62,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="header.id"
             :id="header.id"
             class="tw-px-2 tw-relative table-head tw-text-ellipsis"
-            :style="{ width: header.getSize() + 'px' }"
+            :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
             :data-test="`log-search-result-table-th-${header.id}`"
           >
             <div
@@ -223,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
                 : 'w-border-gray-100 hover:tw-bg-zinc-100',
-              columnOrder.includes('source') &&
+              defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
@@ -279,8 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw-py-none tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
                 :style="{
                   width:
-                    cell.column.columnDef.id !== 'source'
-                      ? cell.column.getSize() + 'px'
+                    cell.column.columnDef.id !== 'source' ||
+                    cell.column.columnDef.enableResizing
+                      ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
@@ -389,6 +392,10 @@ const props = defineProps({
     type: Number,
     default: -1,
   },
+  defaultColumns: {
+    type: Boolean,
+    default: () => true,
+  },
 });
 
 const { t } = useI18n();
@@ -430,8 +437,12 @@ const tableRows = ref(props.rows);
 
 watch(
   () => props.columns,
-  (newVal) => {
+  async (newVal) => {
     columnOrder.value = newVal.map((column: any) => column.id);
+
+    await nextTick();
+
+    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -448,6 +459,9 @@ watch(
 
     expandedRowIndices.value = [];
     setExpandedRows();
+
+    await nextTick();
+    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -486,10 +500,6 @@ const table = useVueTable({
   },
   columnResizeMode,
   enableColumnResizing: true,
-  onStateChange: async (state) => {
-    await nextTick();
-    tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
-  },
 });
 
 const columnSizeVars = computed(() => {
@@ -510,6 +520,20 @@ watch(columnSizeVars, (newColSizes) => {
 onMounted(() => {
   setExpandedRows();
 });
+
+const updateTableWidth = async () => {
+  tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
+
+  setTimeout(() => {
+    let max = 0;
+    let width = max;
+    for (let i = 0; i < tableRows.value.length; i++) {
+      width = tableBodyRef?.value?.children[i]?.scrollWidth;
+      if (width > max) max = width;
+    }
+    tableRowSize.value = max;
+  }, 0);
+};
 
 const debouncedUpdate = debounce((newColSizes) => {
   emits("update:columnSizes", newColSizes);
