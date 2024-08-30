@@ -1,15 +1,6 @@
 <template>
   <div>
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
-      <app-tabs
-        class="logs-json-preview-tabs q-mr-sm"
-        style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
-        data-test="logs-json-preview-tabs"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="handleTabChange"
-      />
-
       <q-btn
         :label="t('common.copyToClipboard')"
         dense
@@ -98,17 +89,7 @@
         />
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <query-editor
-        v-model:query="nestedJson"
-        ref="queryEditorRef"
-        :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-        class="monaco-editor"
-        :class="mode"
-        language="json"
-      />
-    </div>
-    <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+    <div class="q-pl-md">
       {
       <div
         class="log_json_content"
@@ -223,16 +204,7 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  computed,
-  onMounted,
-  watch,
-  nextTick,
-  defineAsyncComponent,
-} from "vue";
+import { ref, onBeforeMount, computed, nextTick } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -242,7 +214,6 @@ import useLogs from "../../composables/useLogs";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
-import AppTabs from "@/components/common/AppTabs.vue";
 
 export default {
   name: "JsonPreview",
@@ -264,10 +235,6 @@ export default {
   components: {
     NotEqualIcon,
     EqualIcon,
-    AppTabs,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
-    ),
   },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
   setup(props: any, { emit }: any) {
@@ -282,32 +249,14 @@ export default {
 
     const tracesStreams = ref([]);
 
-    const activeTab = ref("flattened");
-
     const queryEditorRef = ref<any>();
 
     const previewId = ref("");
 
     const nestedJson = ref("");
 
-    const tabs = [
-      {
-        value: "flattened",
-        label: t("search.flattened"),
-      },
-      {
-        value: "unflattened",
-        label: t("search.unflattened"),
-      },
-    ];
-
     const copyLogToClipboard = () => {
-      emit(
-        "copy",
-        activeTab.value === "unflattened"
-          ? JSON.parse(nestedJson.value)
-          : props.value,
-      );
+      emit("copy", props.value);
     };
     const addSearchTerm = (value: string) => {
       emit("addSearchTerm", value);
@@ -329,17 +278,6 @@ export default {
       getTracesStreams();
       previewId.value = getUUID();
     });
-
-    onMounted(() => {
-      nestedJson.value = getNestedJson();
-    });
-
-    watch(
-      () => props.value,
-      () => {
-        nestedJson.value = getNestedJson();
-      },
-    );
 
     const getTracesStreams = async () => {
       await getStreams("traces", false)
@@ -381,59 +319,6 @@ export default {
       );
     });
 
-    const getNestedJson = () => {
-      const result = {};
-
-      try {
-        Object.keys(props.value).forEach((key) => {
-          let keys = key.split("_");
-
-          // If any field starts with _
-          let keyWithPrefix = "";
-          for (let i = 0; i < keys.length; i++) {
-            if (keys[i] === "") {
-              keyWithPrefix += "_";
-            } else {
-              if (keyWithPrefix.length) {
-                keyWithPrefix += keys[i];
-                keys[i] = keyWithPrefix;
-                keyWithPrefix = "";
-              }
-            }
-          }
-
-          keys = keys.filter((k) => k !== "");
-
-          type NestedObject = {
-            [key: string]: NestedObject | any;
-          };
-
-          // { [key: string]: string }
-          keys.reduce((acc: NestedObject, k: string, index: number) => {
-            if (index === keys.length - 1) {
-              acc[k] = props.value[key];
-            } else {
-              if (!(k in acc)) {
-                acc[k] = {};
-              }
-            }
-            return acc[k];
-          }, result);
-        });
-      } catch (e) {
-        console.log("Error in getNestedJson", e);
-      }
-
-      return JSON.stringify(result);
-    };
-
-    const handleTabChange = async () => {
-      if (activeTab.value === "unflattened") {
-        await nextTick();
-        queryEditorRef.value.formatDocument();
-      }
-    };
-
     return {
       t,
       copyLogToClipboard,
@@ -449,10 +334,7 @@ export default {
       filterStreamFn,
       streamSearchValue,
       showViewTraceBtn,
-      tabs,
-      activeTab,
       nestedJson,
-      handleTabChange,
       queryEditorRef,
       previewId,
     };
