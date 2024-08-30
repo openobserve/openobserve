@@ -51,7 +51,7 @@ use crate::service::search::{
 // 4. get physical plan
 // 5. add remote scan to physical plan
 // 6. execute physical plan to get stream
-pub async fn cluster_search(
+pub async fn search(
     flight_request: &FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>), Error> {
     let cfg = config::get_config();

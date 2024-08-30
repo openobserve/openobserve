@@ -41,7 +41,6 @@ pub struct RemoteScanRewriter {
 }
 
 impl RemoteScanRewriter {
-    #[allow(dead_code)]
     pub fn new(
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
@@ -127,14 +126,12 @@ impl TreeNodeRewriter for RemoteScanRewriter {
 
 // visit physical plan to get underlying table name and check is add a remote scan after current
 // physical plan
-#[allow(dead_code)]
 struct TableNameVisitor {
     table_name: Option<String>,
     is_remote_scan: bool, // is add remote scan after current physical plan
 }
 
 impl TableNameVisitor {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             table_name: None,

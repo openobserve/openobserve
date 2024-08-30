@@ -39,10 +39,7 @@ use crate::{common::infra::cluster as infra_cluster, service::file_list};
 pub mod cache_multi;
 pub mod cacher;
 pub mod flight;
-pub mod flight_leader;
 pub mod http;
-#[cfg(feature = "enterprise")]
-pub mod super_cluster;
 
 #[cfg(feature = "enterprise")]
 #[tracing::instrument(name = "work_group:checking", skip_all, fields(user_id = user_id))]
@@ -181,7 +178,7 @@ pub(crate) async fn get_file_list(
     files
 }
 
-fn handle_table_response(
+pub fn handle_table_response(
     schema: Arc<Schema>,
     sources: Vec<json::Value>,
 ) -> (Vec<String>, Vec<json::Value>) {
@@ -206,7 +203,7 @@ fn handle_table_response(
     (columns, table)
 }
 
-fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
+pub fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     // handle metrics response
     let mut results_metrics: HashMap<String, json::Value> = HashMap::with_capacity(16);
     let mut results_values: HashMap<String, Vec<[json::Value; 2]>> = HashMap::with_capacity(16);

@@ -64,6 +64,8 @@ pub(crate) mod grpc;
 pub(crate) mod new_sql;
 pub(crate) mod request;
 pub(crate) mod sql;
+#[cfg(feature = "enterprise")]
+pub(crate) mod super_cluster;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
@@ -146,7 +148,7 @@ pub async fn search(
     let handle = tokio::task::spawn(async move {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(request, query, req_regions, req_clusters).await
+            super_cluster::search(request, query, req_regions, req_clusters).await
         } else {
             cluster::http::search(request, query).await
         }

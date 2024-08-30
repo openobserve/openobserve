@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod follower;
+pub mod leader;
+
 use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
@@ -30,14 +33,18 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::functions::VRLResultResolver,
-    service::search::{new_sql::NewSql, request::Request},
+    service::search::{
+        cluster::{handle_metrics_response, handle_table_response},
+        new_sql::NewSql,
+        request::Request,
+    },
 };
 
 pub async fn search(
     req: Request,
     query: SearchQuery,
-    _req_regions: Vec<String>,
-    _req_clusters: Vec<String>,
+    req_regions: Vec<String>,
+    req_clusters: Vec<String>,
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();
@@ -55,23 +62,8 @@ pub async fn search(
     let mut query_fn = query.query_fn.clone();
 
     // handle query function
-    // let (_took, grpc_results) =
-    //     o2_enterprise::enterprise::super_cluster::search(req, req_regions, req_clusters).await?;
-
-    // handle query function
-    // let grpc_results = grpc_results
-    //     .into_iter()
-    //     .map(|v| (Node::default(), v))
-    //     .collect();
-    // let (merge_batches, scan_stats, is_partial) =
-    //     super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
-
-    // TODO super cluster, we don't need merge here, we need call flight
-    let (merge_batches, scan_stats, is_partial) = (
-        Vec::<RecordBatch>::new(),
-        search::ScanStats::default(),
-        false,
-    );
+    let (merge_batches, scan_stats, _took_wait, is_partial, _idx_took) =
+        leader::search(&trace_id, sql.clone(), req, req_regions, req_clusters).await?;
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);
@@ -164,9 +156,9 @@ pub async fn search(
         };
         // handle query type: json, metrics, table
         if query_type == "table" {
-            (result.columns, sources) = super::handle_table_response(schema, sources);
+            (result.columns, sources) = handle_table_response(schema, sources);
         } else if query_type == "metrics" {
-            sources = super::handle_metrics_response(sources);
+            sources = handle_metrics_response(sources);
         }
 
         if uses_zo_fn {

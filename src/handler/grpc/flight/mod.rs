@@ -36,7 +36,7 @@ use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::service::search::{cluster::flight_leader, grpc::flight as grpcFlight};
+use crate::service::search::{grpc::flight as grpcFlight, super_cluster::follower};
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -68,7 +68,7 @@ impl FlightService for FlightServiceImpl {
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
         let result = if req.is_leader {
-            flight_leader::cluster_search(&req).await
+            follower::search(&req).await
         } else {
             grpcFlight::search(&req).await
         };
