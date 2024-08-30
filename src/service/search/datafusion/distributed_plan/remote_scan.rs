@@ -158,11 +158,16 @@ impl ExecutionPlan for RemoteScanExec {
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         let req = self.req.clone();
+        let file_list = if self.file_list.is_empty() {
+            vec![]
+        } else {
+            self.file_list[partition].clone()
+        };
         let fut = get_remote_batch(
             self.input.clone(),
             partition,
             self.nodes[partition].clone(),
-            self.file_list[partition].clone(),
+            file_list,
             self.partition_keys.clone(),
             self.match_all_keys.clone(),
             self.is_leader,

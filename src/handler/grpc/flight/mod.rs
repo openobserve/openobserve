@@ -36,7 +36,9 @@ use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::service::search::{grpc::flight as grpcFlight, super_cluster::follower};
+use crate::service::search::grpc::flight as grpcFlight;
+#[cfg(feature = "enterprise")]
+use crate::service::search::super_cluster::follower;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -67,11 +69,14 @@ impl FlightService for FlightServiceImpl {
 
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
+        #[cfg(feature = "enterprise")]
         let result = if req.is_leader {
             follower::search(&req).await
         } else {
             grpcFlight::search(&req).await
         };
+        #[cfg(not(feature = "enterprise"))]
+        let result = grpcFlight::search(&req).await;
 
         // 2. prepare dataufion context
         let (ctx, physical_plan) = match result {
