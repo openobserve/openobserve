@@ -33,7 +33,7 @@ use crate::{
     service::search::{cluster::flight, new_sql::NewSql, request::Request},
 };
 
-#[tracing::instrument(name = "service:search:cluster", skip(req))]
+#[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(req: Request, query: SearchQuery) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();

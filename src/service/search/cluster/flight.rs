@@ -627,7 +627,7 @@ pub async fn get_file_lists(
     Ok(file_lists)
 }
 
-#[tracing::instrument(fields(org_id = org_id, stream_name = stream_name))]
+#[tracing::instrument(name = "service:search:cluster:flight:get_file_list", skip_all, fields(org_id = org_id, stream_name = stream_name))]
 pub(crate) async fn get_file_list(
     stream_name: &str,
     org_id: &str,
