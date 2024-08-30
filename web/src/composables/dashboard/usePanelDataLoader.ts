@@ -313,6 +313,13 @@ export const usePanelDataLoader = (
           queries: queryResults.map((it: any) => it?.metadata),
         };
       } else {
+        // reset old state data
+        state.data = [];
+        state.metadata = {
+          queries: [],
+        };
+        state.resultMetaData = [];
+
         // Call search API
 
         // Get the page type from the first query in the panel schema
@@ -372,15 +379,6 @@ export const usePanelDataLoader = (
             const histogramInterval = res?.data?.histogram_interval
               ? `${res?.data?.histogram_interval} seconds`
               : null;
-
-            // reset old state data
-            state.data = [];
-            state.metadata = {
-              queries: [],
-            };
-            state.resultMetaData = [];
-
-            const partitionResult: any = [];
 
             // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
             state.data.push([]);
@@ -449,12 +447,10 @@ export const usePanelDataLoader = (
                 );
               }
 
-              partitionResult.push(...searchRes.data.hits);
-
-              // Update the state with the new data after each partition API call
-              state.data[currentQueryIndex] = JSON.parse(
-                JSON.stringify(partitionResult),
-              );
+              state.data[currentQueryIndex] = [
+                ...searchRes.data.hits,
+                ...(state.data[currentQueryIndex] ?? []),
+              ];
 
               // update result metadata
               state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
