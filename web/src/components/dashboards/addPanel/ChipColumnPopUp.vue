@@ -59,7 +59,7 @@
         <div class="col-5">
           <q-input
             v-model="chipColumnData.values[index].property_value"
-            :label="index == 0 ? t('dashboard.propertyValue') + ' * ' : null"
+            :label="t('dashboard.propertyValue') + ' * '"
             color="input-border"
             bg-color="input-bg"
             class="q-py-md showLabelOnTop"
