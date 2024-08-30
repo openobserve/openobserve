@@ -25,6 +25,7 @@ const http = ({ headers } = {} as any) => {
 
   headers = {
     ...headers,
+    // Authorization: "Basic ZGRob29naGVAYWNjZXNzLWl0LmZyOkF6ZXJ0eTEyMyE=",
   };
 
   instance = axios.create({

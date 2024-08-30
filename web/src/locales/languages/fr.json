@@ -498,7 +498,16 @@
     "constant": "Constante",
     "textbox": "Zone de texte",
     "newFolder": "Nouveau dossier",
-    "updateFolder": "Mettre à jour le dossier"
+    "updateFolder": "Mettre à jour le dossier",
+    "nameOfChipColumn": "Nom de la colonne",
+    "nameChipColumnRequired": "Nom de la colonne obligatoire",
+    "propertyValue": "Valeur de la propriété",
+    "propertyValueRequired": "Valeur de la propriété obligatoire",
+    "colorOfChipColumn": "Couleur de la pastille",
+    "colorChipColumnRequired": "Couleur de la pastille obligatoire",
+    "when": "Quand",
+    "equals": "est égal",
+    "contains": "contient"
   },
   "panel": {
     "header": "Panneau",

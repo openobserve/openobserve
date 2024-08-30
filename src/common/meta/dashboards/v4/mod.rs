@@ -193,6 +193,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     drilldown: Option<Vec<DrillDown>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    chip_column: Option<Vec<ChipColumn>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     mark_line: Option<Vec<MarkLine>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
@@ -216,6 +218,16 @@ pub struct DrillDown {
     find_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<DrillDownData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct ChipColumn {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    column_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    operator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    values: Option<Vec<ChipColumnVariables>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -244,13 +256,19 @@ pub struct DrillDownData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pass_all_variables: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    variables: Option<Vec<DrillDownVariables>>,
+    values: Option<Vec<DrillDownVariables>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct DrillDownVariables {
     name: Option<String>,
     value: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct ChipColumnVariables {
+    property_value: Option<String>,
+    color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

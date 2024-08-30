@@ -552,9 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b
-                  >This is only applicable when breakdown field is available</b
-                >
+                <b>This is only applicable when breakdown field is available</b>
                 <br />
                 <br />
                 Specify the number of top N values to show when breakdown field
@@ -889,6 +887,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+      <ChipColumn></ChipColumn>
+      <!-- <TestTest></TestTest> -->
+
+      <div class="space"></div>
       <MarkLineConfig
         v-if="
           [
@@ -912,11 +914,13 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import TestTest from "@/components/dashboards/addPanel/TestTest.vue";
+import ChipColumn from "@/components/dashboards/addPanel/ChipColumn.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete, MarkLineConfig },
+  components: { Drilldown, CommonAutoComplete, MarkLineConfig, TestTest, ChipColumn },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(

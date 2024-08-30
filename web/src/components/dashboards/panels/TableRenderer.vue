@@ -30,13 +30,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-panel-table"
     @row-click="(...args: any) => $emit('row-click', ...args)"
   >
+    <template
+      v-for="config in dashboardPanelData.data.config.chip_column"
+      v-slot:[`body-cell-${config.column_name}`]="props"
+      :key="config.column_name"
+    >
+      <td>
+        <q-badge
+          v-if="isPropChipped(props.value, config)"
+          rounded
+          :color="getChipColor(props.value, config)"
+        />
+        {{ props.value }}
+      </td>
+    </template>
   </q-table>
 </template>
 
 <script lang="ts">
+import useDashboardPanelData from "@/composables/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
 import { exportFile } from "quasar";
-import { defineComponent, ref, onMounted, watch } from "vue";
+import { defineComponent, inject, ref } from "vue";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -73,6 +88,21 @@ export default defineComponent({
       return `"${formatted}"`;
     }
 
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
+    // const {
+    //   dashboardPanelData: {
+    //     data: {
+    //       config: { chip_column },
+    //     },
+    //   },
+    // } = useDashboardPanelData(dashboardPanelDataPageKey);
+
     const downloadTableAsCSV = (title?: any) => {
       // naive encoding to csv format
       const content = [
@@ -87,18 +117,18 @@ export default defineComponent({
                     ? col.field(row)
                     : row[col.field === void 0 ? col.name : col.field],
                   col.format,
-                  row
-                )
+                  row,
+                ),
               )
-              .join(",")
-          )
+              .join(","),
+          ),
         )
         .join("\r\n");
 
       const status = exportFile(
         (title ?? "table-export") + ".csv",
         content,
-        "text/csv"
+        "text/csv",
       );
 
       if (status === true) {
@@ -109,12 +139,57 @@ export default defineComponent({
         showErrorNotification("Browser denied file download...");
       }
     };
+
+    const isPropChipped = (propValue: string, config: any) => {
+      return config.values.some((x) => {
+        if (config.operator == "equals") return x.property_value == propValue;
+        if (config.operator == "contains") {
+          return propValue.includes(x.property_value);
+        }
+        return false;
+      });
+    };
+
+    const getChipColor = (propValue: string, config: any) => {
+      return config.values.find((x) => {
+        if (config.operator == "equals") return x.property_value == propValue;
+        else if (config.operator == "contains")
+          return propValue.includes(x.property_value);
+      }).color;
+    };
+
+    // const chipConfig = [
+    //   {
+    //     column_name: "Level",
+    //     operator: "equals",
+    //     values: [
+    //       {
+    //         property_value: "info",
+    //         color: "orange",
+    //       },
+    //     ],
+    //   },
+    //   {
+    //     column_name: "Log",
+    //     operator: "contains",
+    //     values: [
+    //       {
+    //         property_value: "POST",
+    //         color: "red",
+    //       },
+    //     ],
+    //   },
+    // ];
+
     return {
       pagination: ref({
         rowsPerPage: 0,
       }),
       downloadTableAsCSV,
       tableRef,
+      getChipColor,
+      isPropChipped,
+      dashboardPanelData,
     };
   },
 });
@@ -166,5 +241,10 @@ export default defineComponent({
     //   background-color: #fff;
     background-color: $dark-page !important;
   }
+}
+
+.pastille {
+  color: orange;
+  border-radius: 50%;
 }
 </style>
