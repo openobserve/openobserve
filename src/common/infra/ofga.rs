@@ -13,21 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use {
-    crate::common::{infra::config::USERS, meta::organization::DEFAULT_ORG, meta::user::UserRole},
-    crate::service::db,
-    hashbrown::HashSet,
-    infra::dist_lock,
-    o2_enterprise::enterprise::openfga::{
+use hashbrown::HashSet;
+use infra::dist_lock;
+use o2_enterprise::enterprise::{
+    common::infra::config::O2_CONFIG,
+    openfga::{
         authorizer::authz::{
             get_index_creation_tuples, get_org_creation_tuples, get_user_role_tuple, update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
+    super_cluster::kv::ofga::check_store_id,
 };
 
-#[cfg(feature = "enterprise")]
+use crate::{
+    common::{
+        infra::config::USERS,
+        meta::{organization::DEFAULT_ORG, user::UserRole},
+    },
+    service::db,
+};
+
 pub async fn init() {
     use o2_enterprise::enterprise::openfga::{
         authorizer::authz::get_tuple_for_new_index, get_all_init_tuples,
@@ -43,6 +49,14 @@ pub async fn init() {
             None
         }
     };
+
+    // check super cluster
+    if O2_CONFIG.super_cluster.enabled && existing_meta.is_some() {
+        let store_id = existing_meta.as_ref().unwrap().store_id.clone();
+        check_store_id(&store_id)
+            .await
+            .expect("Failed to check store id");
+    }
 
     let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model().await;
     get_all_init_tuples(&mut init_tuples).await;
