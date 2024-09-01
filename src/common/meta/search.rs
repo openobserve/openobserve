@@ -58,6 +58,7 @@ pub struct MultiCachedQueryResponse {
     pub is_descending: bool,
     pub limit: i64,
     pub took: usize,
+    pub histogram_interval: i64,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
