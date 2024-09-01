@@ -4040,7 +4040,9 @@ const useLogs = () => {
       );
     }
 
-    reorderArrayByReference(selectedFields, colOrder);
+    if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {
+      reorderArrayByReference(selectedFields, colOrder);
+    }
 
     return selectedFields;
   };
