@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
-          @end="(event) => handleDragEnd(event)"
+          @end="() => handleDragEnd()"
           class="tw-flex items-center"
         >
           <th
@@ -615,17 +615,16 @@ const handleDragStart = (event: any) => {
   }
 };
 
-const handleDragEnd = async (event: any) => {
+const handleDragEnd = async () => {
   if (
     columnOrder.value.includes(store.state.zoConfig.timestamp_column) &&
     columnOrder.value[0] !== store.state.zoConfig.timestamp_column
   ) {
-    await nextTick();
-    const newItem = columnOrder.value[event.newIndex];
-    columnOrder.value[event.newIndex] = columnOrder.value[event.oldIndex];
-    columnOrder.value[event.oldIndex] = newItem;
-
-    columnOrder.value = [...columnOrder.value];
+    const newColumnOrder = columnOrder.value.filter(
+      (column: any) => column !== store.state.zoConfig.timestamp_column,
+    );
+    newColumnOrder.unshift(store.state.zoConfig.timestamp_column);
+    columnOrder.value = [...newColumnOrder];
   }
 };
 
