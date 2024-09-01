@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
-          @end="(event) => handleDragEnd(event)"
+          @end="() => handleDragEnd()"
           class="tw-flex items-center"
         >
           <th
