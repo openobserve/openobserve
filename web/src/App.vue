@@ -21,8 +21,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
+import { Notify } from 'quasar'
+import { mdiCached } from '@quasar/extras/mdi-v6'
+import { useI18n } from "vue-i18n";
 export default {
+  mounted() {
+    const { t } = useI18n();
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data === 'reloadApp') {
+        if (confirm(t("common.swNewContentMsg"))) {
+          window.location.reload(); // Reload the page
+        }
+      } else {
+        Notify.create({
+      color: 'negative',
+      icon: mdiCached,
+      message: t("common.swUpdateContentMsg"),
+      timeout: 0,
+      multiLine: true,
+      position: 'bottom-right',
+      actions: [
+        {
+          label: t("common.refresh"),
+          color: 'yellow',
+          handler: () => {
+            window.location.reload();
+          }
+        },
+        {
+          label: t("common.dismiss"),
+          color: 'white',
+          handler: () => {}
+        }
+      ]
+    })
+      }
+      
+    });
+  },
   setup() {
     const store = useStore();
     // if (

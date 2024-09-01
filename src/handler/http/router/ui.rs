@@ -33,6 +33,8 @@ pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileRespon
         && !path.starts_with("assets/")
         && !path.starts_with("monacoeditorwork/")
         && !path.eq("favicon.ico")
+        && !path.eq("sw.js")
+        && !path.eq("manifest.json")
     {
         path = "index.html";
     }

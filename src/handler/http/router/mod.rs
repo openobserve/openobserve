@@ -254,6 +254,8 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                             || path.starts_with("assets/")
                             || path.starts_with("monacoeditorwork/")
                             || path.eq("favicon.ico")
+                            || path.eq("sw.js")
+                            || path.eq("manifest.json")
                         {
                             res
                         } else {

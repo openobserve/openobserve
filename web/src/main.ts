@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { createApp } from "vue";
+import { createApp, type Ref, ref } from "vue";
 import { Notify, Dialog, Quasar, AppFullscreen } from "quasar";
 import "quasar/src/css/index.sass";
 import "@quasar/extras/roboto-font/roboto-font.css";
@@ -31,6 +31,10 @@ import configService from "./services/config";
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
+
+const worker: Ref<Worker | null> = ref(null);
+
+const workerProcessId = ref(0);
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -99,5 +103,47 @@ const getConfig = async () => {
 };
 
 getConfig();
+
+if ("serviceWorker" in navigator) {
+  let swPath: string = "/sw.js";
+  let scopePath: string = "/";
+  let isWebPath: string = "false";
+  if (window.location.pathname.includes("/web/")) {
+    swPath = "/web/sw.js";
+    scopePath = "/web/";
+    isWebPath = "true";
+  }
+  navigator.serviceWorker
+    .register(
+      swPath +
+        "?version=" +
+        import.meta.env.VITE_COMMIT_HASH +
+        "&webpath=" +
+        isWebPath,
+      {
+        scope: scopePath,
+      },
+    )
+    .then((registration) => {
+      registration.addEventListener("updatefound", () => {
+        const installingWorker = registration.installing;
+        if (installingWorker) {
+          installingWorker.onstatechange = () => {
+            if (
+              installingWorker.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              // A new service worker is installed and ready to take over
+              // Notify the service worker to skip waiting and activate
+              registration?.waiting?.postMessage("skipWaiting");
+            }
+          };
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("Service Worker registration failed:", error);
+    });
+}
 
 app.mount("#app");
