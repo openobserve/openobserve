@@ -228,13 +228,15 @@ export const convertSQLData = async (
     if (
       !interval ||
       !metadata.queries ||
-      !["area-stacked", "line", "area"].includes(panelSchema.type)
+      !["area-stacked", "line", "area", "bar", "stacked"].includes(
+        panelSchema.type,
+      )
     ) {
       return JSON.parse(JSON.stringify(processedData));
     }
 
     // Extract and process metaDataStartTime
-    const metaDataStartTime = metadata.queries[0].startTime.toString();
+    const metaDataStartTime = metadata?.queries[0]?.startTime?.toString() ?? 0;
     const startTime = new Date(parseInt(metaDataStartTime) / 1000);
 
     // Calculate the binnedDate
@@ -262,7 +264,7 @@ export const convertSQLData = async (
     }
 
     // Extract and process metaDataEndTime
-    const metaDataEndTime = metadata.queries[0].endTime.toString();
+    const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
     const endTime = new Date(parseInt(metaDataEndTime) / 1000);
 
     const xAxisKeysWithoutTimeStamp = getXAxisKeys().filter(
@@ -939,6 +941,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -963,6 +966,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -1123,12 +1127,12 @@ export const convertSQLData = async (
       const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(processedData.map((obj: any) => obj[key1])),
+        ...new Set(missingValueData.map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = processedData.filter((it: any) => it[key1] == key);
+        const data = missingValueData.filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
@@ -1144,6 +1148,7 @@ export const convertSQLData = async (
                 yAxisKeys[0]
               ] ?? null,
           ),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
@@ -1353,6 +1358,7 @@ export const convertSQLData = async (
                 yAxisKeys[0]
               ] ?? null,
           ),
+          barMinHeight: 1,
         };
         return seriesObj;
       });

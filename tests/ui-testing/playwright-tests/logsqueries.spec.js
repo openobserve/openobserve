@@ -180,7 +180,7 @@ test.describe("Logs Queries testcases", () => {
 
                 force: true
               });
-    await page.getByText(/Reset Filters/).first().click({
+    await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({
       force: true
     });
     await page.waitForTimeout(5000);

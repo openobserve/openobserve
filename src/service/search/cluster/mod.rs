@@ -126,14 +126,15 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled
+    let use_inverted_index = cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
         && meta.use_inverted_index
+        && (meta.inverted_index_type == "parquet" || meta.inverted_index_type == "both")
         && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] search: is_inverted_index {}",
-        is_inverted_index
+        "[trace_id {trace_id}] search: use_inverted_index via parquet format {}",
+        use_inverted_index
     );
 
     // stream settings
@@ -162,7 +163,7 @@ pub async fn search(
     // then filter the file list based on the inverted index.
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if is_inverted_index {
+    if use_inverted_index {
         (file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
         log::info!(
@@ -701,7 +702,7 @@ async fn merge_grpc_result(
 ) -> Result<(Vec<RecordBatch>, ScanStats, bool)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
-    let mut batches: Vec<RecordBatch> = Vec::new();
+    let mut batches: Vec<Vec<RecordBatch>> = Vec::new();
     let mut is_partial = false;
     for (_, resp) in results {
         if resp.is_partial {
@@ -715,9 +716,16 @@ async fn merge_grpc_result(
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
             let batch = reader
                 .into_iter()
-                .map(std::result::Result::unwrap)
+                .map(|v| match v {
+                    Ok(v) => v,
+                    Err(e) => {
+                        panic!(
+                            "[trace_id {trace_id}] search->merge_grpc_result: read ipc error: {e}"
+                        );
+                    }
+                })
                 .collect::<Vec<_>>();
-            batches.extend(batch);
+            batches.push(batch);
         }
     }
 
@@ -733,18 +741,13 @@ async fn merge_grpc_result(
     let (schema_latest, _) = if select_wildcard {
         generate_select_start_search_schema(
             &sql,
-            schema_latest.clone(),
+            schema_latest.as_ref(),
             &schema_latest_map,
             &defined_schema_fields,
         )?
     } else {
-        generate_search_schema(&sql, schema_latest.clone(), &schema_latest_map)?
+        generate_search_schema(&sql, schema_latest.as_ref(), &schema_latest_map)?
     };
-
-    // only final phase need merge partitions
-    if !is_final_phase {
-        return Ok((batches, scan_stats, is_partial));
-    }
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -761,38 +764,71 @@ async fn merge_grpc_result(
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
     }
 
-    let merge_batch;
-    tokio::select! {
-        res = super::datafusion::exec::merge_partitions(
-            &sql.org_id,
-            sql.meta.offset,
-            sql.meta.limit,
-            &sql.origin_sql,
-            schema_latest,
-            batches,
-        ) => {
-            match res {
-                Ok(res) => merge_batch = res,
-                Err(err) => {
-                    log::error!("[trace_id {trace_id}] search->cluster: merge partitions error: {err}");
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
+    if !is_final_phase {
+        let merge_batch;
+        tokio::select! {
+            res = super::datafusion::exec::merge_partitions_cluster(
+                &sql.org_id,
+                sql.meta.offset,
+                sql.meta.limit,
+                &sql.origin_sql,
+                schema_latest,
+                batches,
+            ) => {
+                match res {
+                    Ok(res) => merge_batch = res,
+                    Err(err) => {
+                        log::error!("[trace_id {trace_id}] search->cluster: merge super cluster partitions error: {err}");
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            err.to_string(),
+                        )));
+                    }
                 }
             }
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
+                log::info!("[trace_id {trace_id}] search->cluster: super cluster merge task is cancel");
+                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: super cluster follow cluster merge task is cancel"))));
+            }
         }
-        _ = async {
-            #[cfg(feature = "enterprise")]
-            let _ = abort_receiver.await;
-            #[cfg(not(feature = "enterprise"))]
-            futures::future::pending::<()>().await;
-        } => {
-            log::info!("[trace_id {trace_id}] search->cluster: final merge task is cancel");
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: final merge task is cancel"))));
+        Ok((merge_batch, scan_stats, is_partial))
+    } else {
+        let merge_batch;
+        tokio::select! {
+            res = super::datafusion::exec::merge_partitions(
+                &sql.org_id,
+                sql.meta.offset,
+                sql.meta.limit,
+                &sql.origin_sql,
+                schema_latest,
+                batches,
+            ) => {
+                match res {
+                    Ok(res) => merge_batch = res,
+                    Err(err) => {
+                        log::error!("[trace_id {trace_id}] search->cluster: merge partitions error: {err}");
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            err.to_string(),
+                        )));
+                    }
+                }
+            }
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
+                log::info!("[trace_id {trace_id}] search->cluster: final merge task is cancel");
+                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: final merge task is cancel"))));
+            }
         }
+        Ok((merge_batch, scan_stats, is_partial))
     }
-
-    Ok((merge_batch, scan_stats, is_partial))
 }
 
 #[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
@@ -980,7 +1016,7 @@ async fn get_file_list_by_inverted_index(
 
     let fts_condition = terms
         .iter()
-        .map(|x| format!("term LIKE '{x}%'"))
+        .map(|x| format!("term LIKE '%{x}%'"))
         .collect::<Vec<_>>()
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {

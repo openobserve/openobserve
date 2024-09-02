@@ -123,7 +123,6 @@ const defaultObject = {
       showPagination: true,
     },
     scrollInfo: {},
-    flagWrapContent: true,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
     clusters: [],
@@ -165,6 +164,7 @@ const defaultObject = {
       currentPage: 1,
       columns: <any>[],
       colOrder: <any>{},
+      colSizes: <any>{},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -1542,6 +1542,7 @@ const useLogs = () => {
           router.currentRoute.value.name == "logs"
         ) {
           queryReq.query.from = 0;
+          searchObj.meta.refreshHistogram = true;
         }
 
         // get function definition
@@ -1702,7 +1703,9 @@ const useLogs = () => {
               if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
                 partitions.reverse();
               }
+
               await generateHistogramSkeleton();
+
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
@@ -1814,7 +1817,7 @@ const useLogs = () => {
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
       ); // Convert microseconds to milliseconds
       if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
-        startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 10, 0); // Round to the nearest whole minute
+        startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {
         startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
         // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
@@ -2029,27 +2032,6 @@ const useLogs = () => {
     queryReq: any,
     appendResult: boolean = false,
   ) => {
-    if (
-      searchObj.data.resultGrid.colOrder &&
-      searchObj.data.resultGrid.colOrder.hasOwnProperty(
-        searchObj.data.stream.selectedStream,
-      ) &&
-      searchObj.data.resultGrid.colOrder[
-        searchObj.data.stream.selectedStream
-      ][0].length > 0 &&
-      searchObj.data.stream.selectedFields.length > 0
-    ) {
-      searchObj.data.stream.selectedFields = [];
-      const colOrderObject =
-        searchObj.data.resultGrid.colOrder[
-          searchObj.data.stream.selectedStream
-        ];
-
-      const colOrderArray: any = Object.values(colOrderObject);
-
-      searchObj.data.stream.selectedFields = colOrderArray[0];
-    }
-    // searchObj.data.stream.selectedFields =
     return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
@@ -2354,9 +2336,11 @@ const useLogs = () => {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
-        notificationMsg.value = "Search query was cancelled";
-        searchObj.data.histogram.errorMsg = "Search query was cancelled";
-        searchObj.data.histogram.errorDetail = "Search query was cancelled";
+        if (!searchObj.data.histogram?.xData?.length) {
+          notificationMsg.value = "Search query was cancelled";
+          searchObj.data.histogram.errorMsg = "Search query was cancelled";
+          searchObj.data.histogram.errorDetail = "Search query was cancelled";
+        }
         return;
       }
 
@@ -2448,13 +2432,6 @@ const useLogs = () => {
                 notificationMsg.value += " TraceID:" + trace_id;
                 trace_id = "";
               }
-            }
-
-            if (err?.request?.status >= 429) {
-              notificationMsg.value = err?.response?.data?.message;
-              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
-              searchObj.data.histogram.errorDetail =
-                err?.response?.data?.error_detail;
             }
 
             reject(false);
@@ -2951,7 +2928,8 @@ const useLogs = () => {
           ],
         );
       }
-      const selectedFields = (logFilterField && logFieldSelectedValue) || [];
+      let selectedFields = (logFilterField && logFieldSelectedValue) || [];
+
       if (
         searchObj.data.stream.selectedFields.length == 0 &&
         selectedFields.length > 0
@@ -2959,9 +2937,23 @@ const useLogs = () => {
         return (searchObj.data.stream.selectedFields = selectedFields);
       }
 
+      // As in saved view, we observed field getting duplicated in selectedFields
+      // So, we are removing duplicates before applying saved view
+      if (searchObj.data.stream.selectedFields?.length) {
+        selectedFields = [...new Set(searchObj.data.stream.selectedFields)];
+      }
+
       const parsedSQL: any = fnParsedSQL();
 
-      if (searchObj.data.stream.selectedFields.length == 0) {
+      // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
+      // In SQL and Quick mode.
+      // If user adds timestamp manually then only we get it in response.
+      // If we don’t add timestamp and add timestamp to table it should show invalid date.
+
+      if (
+        selectedFields.length == 0 ||
+        !searchObj.data.queryResults?.hits?.length
+      ) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
         if (
           (searchObj.meta.sqlMode == true &&
@@ -2970,13 +2962,11 @@ const useLogs = () => {
               store.state.zoConfig.timestamp_column,
             )) ||
           searchObj.meta.sqlMode == false ||
-          searchObj.data.stream.selectedFields.includes(
-            store.state.zoConfig.timestamp_column,
-          )
+          selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
           searchObj.data.resultGrid.columns.push({
-            name: "@timestamp",
-            id: "@timestamp",
+            name: store.state.zoConfig.timestamp_column,
+            id: store.state.zoConfig.timestamp_column,
             accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
@@ -2999,11 +2989,11 @@ const useLogs = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 225,
+            size: 260,
           });
         }
 
-        if (searchObj.data.stream.selectedFields.length == 0) {
+        if (selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
             name: "source",
             id: "source",
@@ -3020,11 +3010,13 @@ const useLogs = () => {
           });
         }
       } else {
-        // searchObj.data.stream.selectedFields.forEach((field: any) => {
-        if (searchObj.data.hasSearchDataTimestampField == true) {
+        if (
+          searchObj.data.hasSearchDataTimestampField ||
+          selectedFields.includes(store.state.zoConfig.timestamp_column)
+        ) {
           searchObj.data.resultGrid.columns.unshift({
-            name: "@timestamp",
-            id: "@timestamp",
+            name: store.state.zoConfig.timestamp_column,
+            id: store.state.zoConfig.timestamp_column,
             accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
@@ -3047,29 +3039,41 @@ const useLogs = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 225,
+            size: 260,
           });
         }
 
-        //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
-        //@ts-ignore
-        const sizes = (searchObj.data.resultGrid as any)[
-          searchObj.data.stream.selectedStream
-        ];
+        let sizes: any;
+        if (
+          searchObj.data.resultGrid.colSizes &&
+          searchObj.data.resultGrid.colSizes.hasOwnProperty(
+            searchObj.data.stream.selectedStream,
+          )
+        ) {
+          sizes =
+            searchObj.data.resultGrid.colSizes[
+              searchObj.data.stream.selectedStream
+            ];
+        }
 
-        for (const field of searchObj.data.stream.selectedFields) {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        for (const field of selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             let foundKey, foundValue;
 
-            Object.keys(sizes[0]).forEach((key) => {
-              const trimmedKey = key
-                .replace(/^--(header|col)-/, "")
-                .replace(/-size$/, "");
-              if (trimmedKey === field) {
-                foundKey = key;
-                foundValue = sizes[0][key];
-              }
-            });
+            if (sizes?.length > 0) {
+              Object.keys(sizes[0]).forEach((key) => {
+                const trimmedKey = key
+                  .replace(/^--(header|col)-/, "")
+                  .replace(/-size$/, "");
+                if (trimmedKey === field) {
+                  foundKey = key;
+                  foundValue = sizes[0][key];
+                }
+              });
+            }
 
             searchObj.data.resultGrid.columns.push({
               name: field,
@@ -3085,19 +3089,55 @@ const useLogs = () => {
                 showWrap: true,
                 wrapContent: false,
               },
-
-              size: foundValue,
+              size: foundValue ? foundValue : getColumnWidth(context, field),
+              maxSize: window.innerWidth,
             });
           }
         }
       }
+
       extractFTSFields();
-      evaluateWrapContentFlag();
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while updating grid columns");
       notificationMsg.value = "Error while updating table columns.";
     }
+  };
+
+  /**
+   * Helper function to calculate width of the column based on its content(from first 5 rows)
+   * @param context - Canvas Context to calculate width of column using its content
+   * @param field - Field name for which width needs to be calculated
+   * @returns - Width of the column
+   */
+  const getColumnWidth = (context: any, field: string) => {
+    // Font of table header
+    context.font = "bold 14px sans-serif";
+    let max = context.measureText(field).width + 16;
+
+    // Font of the table content
+    context.font = "12px monospace";
+    let width = 0;
+    try {
+      for (let i = 0; i < 5; i++) {
+        if (searchObj.data.queryResults.hits?.[i]?.[field]) {
+          width = context.measureText(
+            searchObj.data.queryResults.hits[i][field],
+          ).width;
+
+          if (width > max) max = width;
+        }
+      }
+    } catch (err) {
+      console.log("Error while calculation column width");
+    }
+
+    max += 24; // 24px padding
+
+    if (max > 800) return 800;
+
+    if (max < 150) return 150;
+
+    return max;
   };
 
   function getHistogramTitle() {
@@ -3717,31 +3757,6 @@ const useLogs = () => {
     }
   };
 
-  const evaluateWrapContentFlag = () => {
-    // Initialize a flag to false
-    let flag = false;
-
-    // Iterate through the array of objects
-    for (const item of searchObj.data.resultGrid.columns) {
-      // Check if the item's name is 'source' (the static field)
-      // if (item.name.toLowerCase() === "source") {
-      //   flag = true; // Set the flag to true if 'source' exists
-      // }
-      // Check if the item's name is in the ftsFields array
-      if (ftsFields.value.includes(item.name.toLowerCase())) {
-        flag = true; // Set the flag to true if an ftsField exists
-      }
-
-      // If the flag is already true, no need to continue checking
-      if (flag) {
-        searchObj.meta.flagWrapContent = flag;
-        break;
-      }
-    }
-
-    searchObj.meta.flagWrapContent = flag;
-  };
-
   const getSavedViews = async () => {
     try {
       searchObj.loadingSavedView = true;
@@ -4002,6 +4017,38 @@ const useLogs = () => {
       });
   };
 
+  const reorderArrayByReference = (arr1: string[], arr2: string[]) => {
+    arr1.sort((a, b) => {
+      const indexA = arr2.indexOf(a);
+      const indexB = arr2.indexOf(b);
+
+      // If an element is not found in arr1, keep it at the end
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+
+      return indexA - indexB;
+    });
+  };
+
+  const reorderSelectedFields = () => {
+    const selectedFields = [...searchObj.data.stream.selectedFields];
+
+    let colOrder =
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
+
+    if (!selectedFields.includes(store.state.zoConfig.timestamp_column)) {
+      colOrder = colOrder.filter(
+        (v: any) => v !== store.state.zoConfig.timestamp_column,
+      );
+    }
+
+    if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {
+      reorderArrayByReference(selectedFields, colOrder);
+    }
+
+    return selectedFields;
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -4025,7 +4072,6 @@ const useLogs = () => {
     handleRunQuery,
     generateHistogramData,
     extractFTSFields,
-    evaluateWrapContentFlag,
     getSavedViews,
     onStreamChange,
     generateURLQuery,
@@ -4039,6 +4085,7 @@ const useLogs = () => {
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
+    reorderSelectedFields,
   };
 };
 

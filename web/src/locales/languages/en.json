@@ -121,7 +121,8 @@
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
     "flattened": "Flattened",
-    "unflattened": "Unflattened"
+    "unflattened": "Unflattened",
+    "resetFilters": "Reset Filters"
   },
   "menu": {
     "home": "Home",
@@ -750,6 +751,7 @@
     "header": "Alerts",
     "add": "Add alert",
     "edit": "Edit",
+    "clone": "Clone alert",
     "search": "Search alert",
     "name": "Name",
     "save": "Save",
@@ -786,12 +788,16 @@
     "prom_am": "Alert manager",
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
+    "cloneTitle": "Clone Alert",
     "start": "start",
     "pause": "Pause",
     "groupBy": "Group by",
     "row": "Row Template",
     "preview": "Preview",
-    "crontitle": "Enable Cron"
+    "crontitle": "Enable Cron",
+    "lastTriggered":"Last Triggered At",
+    "lastSatisfied":"Last Satisfied At",
+    "owner": "Owner"
   },
   "alert_templates": {
     "header": "Templates",

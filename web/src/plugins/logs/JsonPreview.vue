@@ -1,15 +1,6 @@
 <template>
   <div>
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
-      <app-tabs
-        class="logs-json-preview-tabs q-mr-sm"
-        style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
-        data-test="logs-json-preview-tabs"
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="handleTabChange"
-      />
-
       <q-btn
         :label="t('common.copyToClipboard')"
         dense
@@ -21,7 +12,7 @@
       />
 
       <div
-        v-if="showViewTraceBtn"
+        v-if="showViewTraceBtn && filteredTracesStreamOptions.length"
         class="o2-input flex items-center logs-trace-selector"
       >
         <q-select
@@ -98,16 +89,7 @@
         />
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <query-editor
-        v-model:query="nestedJson"
-        ref="queryEditorRef"
-        editor-id="logs-json-preview-unflattened-json-editor"
-        class="monaco-editor"
-        language="json"
-      />
-    </div>
-    <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+    <div class="q-pl-md">
       {
       <div
         class="log_json_content"
@@ -222,16 +204,8 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  computed,
-  onMounted,
-  watch,
-  nextTick,
-} from "vue";
-import { getImageURL } from "@/utils/zincutils";
+import { ref, onBeforeMount, computed, nextTick } from "vue";
+import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -240,8 +214,6 @@ import useLogs from "../../composables/useLogs";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
-import AppTabs from "@/components/common/AppTabs.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 
 export default {
   name: "JsonPreview",
@@ -255,8 +227,15 @@ export default {
       type: Boolean,
       default: true,
     },
+    mode: {
+      type: String,
+      default: "sidebar",
+    },
   },
-  components: { NotEqualIcon, EqualIcon, AppTabs, QueryEditor },
+  components: {
+    NotEqualIcon,
+    EqualIcon,
+  },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
@@ -270,30 +249,14 @@ export default {
 
     const tracesStreams = ref([]);
 
-    const activeTab = ref("flattened");
-
     const queryEditorRef = ref<any>();
+
+    const previewId = ref("");
 
     const nestedJson = ref("");
 
-    const tabs = [
-      {
-        value: "flattened",
-        label: t("search.flattened"),
-      },
-      {
-        value: "unflattened",
-        label: t("search.unflattened"),
-      },
-    ];
-
     const copyLogToClipboard = () => {
-      emit(
-        "copy",
-        activeTab.value === "unflattened"
-          ? JSON.parse(nestedJson.value)
-          : props.value,
-      );
+      emit("copy", props.value);
     };
     const addSearchTerm = (value: string) => {
       emit("addSearchTerm", value);
@@ -312,19 +275,9 @@ export default {
           multiStreamFields.value.push(item.name);
         }
       });
-      getTracesStreams();
+      if (showViewTraceBtn.value) getTracesStreams();
+      previewId.value = getUUID();
     });
-
-    onMounted(() => {
-      nestedJson.value = getNestedJson();
-    });
-
-    watch(
-      () => props.value,
-      () => {
-        nestedJson.value = getNestedJson();
-      },
-    );
 
     const getTracesStreams = async () => {
       await getStreams("traces", false)
@@ -333,8 +286,6 @@ export default {
           filteredTracesStreamOptions.value = JSON.parse(
             JSON.stringify(tracesStreams.value),
           );
-
-          console.log("tracesStreams", tracesStreams.value);
 
           if (!searchObj.meta.selectedTraceStream.length)
             searchObj.meta.selectedTraceStream = tracesStreams.value[0];
@@ -358,62 +309,12 @@ export default {
     const showViewTraceBtn = computed(() => {
       return (
         !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        filteredTracesStreamOptions.value.length && // Check if traces streams are available
         props.value[
           store.state.organizationData?.organizationSettings
             ?.trace_id_field_name
         ] // Check if trace_id_field_name is available in the log fields
       );
     });
-
-    const getNestedJson = () => {
-      const result = {};
-
-      Object.keys(props.value).forEach((key) => {
-        let keys = key.split("_");
-
-        // If any field starts with _
-        let keyWithPrefix = "";
-        for (let i = 0; i < keys.length; i++) {
-          if (keys[i] === "") {
-            keyWithPrefix += "_";
-          } else {
-            if (keyWithPrefix.length) {
-              keyWithPrefix += keys[i];
-              keys[i] = keyWithPrefix;
-              keyWithPrefix = "";
-            }
-          }
-        }
-
-        keys = keys.filter((k) => k !== "");
-
-        type NestedObject = {
-          [key: string]: NestedObject | any;
-        };
-
-        // { [key: string]: string }
-        keys.reduce((acc: NestedObject, k: string, index: number) => {
-          if (index === keys.length - 1) {
-            acc[k] = props.value[key];
-          } else {
-            if (!(k in acc)) {
-              acc[k] = {};
-            }
-          }
-          return acc[k];
-        }, result);
-      });
-
-      return JSON.stringify(result);
-    };
-
-    const handleTabChange = async () => {
-      if (activeTab.value === "unflattened") {
-        await nextTick();
-        queryEditorRef.value.formatDocument();
-      }
-    };
 
     return {
       t,
@@ -430,11 +331,9 @@ export default {
       filterStreamFn,
       streamSearchValue,
       showViewTraceBtn,
-      tabs,
-      activeTab,
       nestedJson,
-      handleTabChange,
       queryEditorRef,
+      previewId,
     };
   },
 };
@@ -449,6 +348,11 @@ export default {
 .monaco-editor {
   width: calc(100% - 16px) !important;
   height: calc(100vh - 250px) !important;
+
+  &.expanded {
+    height: 300px !important;
+    max-width: 1024px !important;
+  }
 }
 </style>
 

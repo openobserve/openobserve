@@ -52,6 +52,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let route = match matching_route {
         Some(matching_route) => matching_route,
         None => {
+            log::warn!("Syslogs from the IP {} are not allowed", ip);
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),

@@ -79,6 +79,7 @@ pub struct Sql {
     pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
     pub use_inverted_index: bool,
+    pub inverted_index_type: String,
 }
 
 impl Sql {
@@ -290,7 +291,7 @@ impl Sql {
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
-        if req_query.quick_mode
+        if (req_query.quick_mode || cfg.limit.quick_mode_force_enabled)
             && schema_fields.len() > cfg.limit.quick_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
@@ -530,6 +531,13 @@ impl Sql {
             checking_inverted_index(&meta, &fts_fields, &index_fields)
         };
 
+        // check index search type
+        let inverted_index_type = if req.index_type.is_empty() {
+            cfg.common.inverted_index_search_format.clone()
+        } else {
+            req.index_type.clone()
+        };
+
         Ok(Sql {
             origin_sql,
             rewrite_sql,
@@ -549,6 +557,7 @@ impl Sql {
                 .collect(),
             histogram_interval,
             use_inverted_index,
+            inverted_index_type,
         })
     }
 
@@ -977,6 +986,7 @@ mod tests {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            index_type: "".to_string(),
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -1085,6 +1095,7 @@ mod tests {
                 clusters: vec![],
                 timeout: 0,
                 search_type: None,
+                index_type: "".to_string(),
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();
@@ -1206,6 +1217,7 @@ mod tests {
                 clusters: vec![],
                 timeout: 0,
                 search_type: None,
+                index_type: "".to_string(),
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();

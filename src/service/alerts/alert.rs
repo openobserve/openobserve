@@ -81,6 +81,7 @@ pub async fn save(
                 return Err(anyhow::anyhow!("Alert already exists"));
             }
             alert.last_triggered_at = old_alert.last_triggered_at;
+            alert.last_satisfied_at = old_alert.last_satisfied_at;
             alert.owner = old_alert.owner;
         }
         Ok(None) => {
@@ -127,7 +128,8 @@ pub async fn save(
                 if !vrl.is_empty() && !vrl.ends_with('.') {
                     let vrl = base64::encode_url(&format!("{vrl} \n ."));
                     alert.query_condition.vrl_function = Some(vrl);
-                } else if vrl.is_empty() {
+                } else if vrl.is_empty() || vrl.eq(".") {
+                    // In case the vrl contains only ".", no need to save it
                     alert.query_condition.vrl_function = None;
                 }
             }
@@ -208,10 +210,12 @@ pub async fn save(
         }
     }
 
-    // test the alert
-    if let Err(e) = &alert.evaluate(None).await {
-        return Err(anyhow::anyhow!("Alert test failed: {}", e));
-    }
+    // Commented intentionally - in case the alert period is big and there
+    // is huge amount of data within the time period, the below can timeout and return error.
+    // // test the alert
+    // if let Err(e) = &alert.evaluate(None).await {
+    //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
+    // }
 
     // save the alert
     match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
