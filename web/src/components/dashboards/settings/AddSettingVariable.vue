@@ -345,6 +345,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="'Value ' + (index + 1) + ' *'"
                 name="value"
               />
+              <q-checkbox
+                dense
+                v-model="variableData.options[index].selected"
+                data-test="dashboard-custom-variable-checkbox"
+                @click="onCheckboxClick(index)"
+              />
               <div>
                 <q-btn
                   flat
@@ -379,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="
               variableData.multiSelect &&
-              ['custom', 'query_values'].includes(variableData.type)
+              ['query_values'].includes(variableData.type)
             "
           >
             <div
@@ -611,6 +617,7 @@ export default defineComponent({
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
+      customCheckboxValue: false,
     });
 
     const filterCycleError: any = ref("");
@@ -760,11 +767,15 @@ export default defineComponent({
     );
 
     const addField = () => {
-      variableData.options.push({ label: "", value: "" });
+      variableData.options.push({ label: "", value: "", selected: false });
+      console.log("variableData.options addField", variableData.options);
     };
 
     const removeField = (index: any) => {
+      console.log("removeField", index);
+
       variableData.options.splice(index, 1);
+      console.log("variableData.options", variableData.options);
     };
 
     const saveVariableApiCall = useLoading(async () => await saveData());
@@ -992,6 +1003,33 @@ export default defineComponent({
       variableData.customMultiSelectValue.splice(index, 1);
     };
 
+    // watch on multi select value change
+    watch(
+      () => variableData.multiSelect,
+      (newVal) => {
+        console.log("multiSelect", newVal);
+
+        if (!newVal) {
+          console.log("multiSelect is enabled");
+
+          variableData.options.forEach((option: any, index: any) => {
+            variableData.options[index].selected = false;
+          });
+          console.log("variableData.options", variableData.options);
+
+          variableData.options[0].selected = true;
+        }
+      },
+    );
+
+    const onCheckboxClick = (index: any) => {
+      if (!variableData.multiSelect) {
+        variableData.options.forEach((option: any, i: any) => {
+          variableData.options[i].selected = i === index;
+        });
+      }
+    };
+
     return {
       variableData,
       store,
@@ -1020,6 +1058,7 @@ export default defineComponent({
       dashboardVariablesFilterItems,
       addCustomValue,
       removeCustomValue,
+      onCheckboxClick,
     };
   },
 });
