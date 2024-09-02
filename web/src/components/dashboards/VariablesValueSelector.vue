@@ -398,7 +398,7 @@ export default defineComponent({
 
                     queryContext = queryContext.replace(
                       `'$${variable.name}'`,
-                      `${arrayValues}`,
+                      `(${arrayValues})`,
                     );
                   } else {
                     queryContext = queryContext.replace(
@@ -483,11 +483,25 @@ export default defineComponent({
                     currentVariable.value =
                       selectedValues.length > 0
                         ? selectedValues
-                        : currentVariable?.selectAllValueForMultiSelect === true
-                          ? currentVariable?.options?.map(
-                              (variableOption: any) => variableOption.value,
-                            ) ?? []
-                          : [currentVariable.options[0].value];
+                        : currentVariable?.selectAllValueForMultiSelect ==
+                            "custom"
+                          ? (
+                              currentVariable?.options?.map(
+                                (variableOption: any) => variableOption.value,
+                              ) ?? []
+                            ).filter((value: any) =>
+                              currentVariable?.customMultiSelectValue.includes(
+                                value,
+                              ),
+                            )
+                          : currentVariable?.selectAllValueForMultiSelect ==
+                                "all" ||
+                              currentVariable?.selectAllValueForMultiSelect ==
+                                "first"
+                            ? (currentVariable?.options?.map(
+                                (variableOption: any) => variableOption.value,
+                              ) ?? [])
+                            : [currentVariable.options[0].value];
                   } else {
                     currentVariable.value = currentVariable.options.some(
                       (option: any) =>
@@ -555,17 +569,26 @@ export default defineComponent({
                   oldVariableSelectedValues.includes(option.value),
                 )
                 .map((option: any) => option.value);
-              // if selected values are there, set the selected values. 
+              // if selected values are there, set the selected values.
               // otherwise, check selectAllValueForMultiSelect configuration.
               // if it is true, set the all values for multiselect else set the first value of the dropdown
               currentVariable.value =
                 selectedValues.length > 0
                   ? selectedValues
-                  : currentVariable?.selectAllValueForMultiSelect === true
-                    ? currentVariable?.options?.map(
-                        (variableOption: any) => variableOption.value,
-                      ) ?? []
-                    : [currentVariable.options[0].value];
+                  : currentVariable?.selectAllValueForMultiSelect == "custom"
+                    ? (
+                        currentVariable?.options?.map(
+                          (variableOption: any) => variableOption.value,
+                        ) ?? []
+                      ).filter((value: any) =>
+                        currentVariable?.customMultiSelectValue.includes(value),
+                      )
+                    : currentVariable?.selectAllValueForMultiSelect == "all" ||
+                        currentVariable?.selectAllValueForMultiSelect == "first"
+                      ? (currentVariable?.options?.map(
+                          (variableOption: any) => variableOption.value,
+                        ) ?? [])
+                      : [currentVariable.options[0].value];
             } else {
               // If multiSelect is false, set the value as a single value from options which is selected
               currentVariable.value =
