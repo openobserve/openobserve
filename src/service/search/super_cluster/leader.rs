@@ -113,7 +113,7 @@ pub async fn search(
                 stream_name.clone(),
                 fields
                     .iter()
-                    .map(|(k, v)| cluster_rpc::PartitionKeys::new(k, v))
+                    .map(|(k, v)| cluster_rpc::KvItem::new(k, v))
                     .collect::<Vec<_>>(),
             )
         })
@@ -140,7 +140,7 @@ pub async fn search(
             physical_plan,
             rewrite.file_lists.get(table_name).unwrap().clone(),
             rewrite
-                .partition_keys
+                .equal_keys
                 .get(table_name)
                 .cloned()
                 .unwrap_or_default(),

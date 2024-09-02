@@ -66,6 +66,7 @@ pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
+pub(crate) mod utlis;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =

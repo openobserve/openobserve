@@ -92,7 +92,7 @@ pub async fn search(
 
     // construct partition filters
     let search_partition_keys: Option<Vec<(String, String)>> = flight_request
-        .partition_keys
+        .equal_keys
         .iter()
         .filter_map(|v| {
             if schema_latest_map.contains_key(&v.key) {
@@ -144,7 +144,7 @@ pub async fn search(
         let remote_scan_exec = Arc::new(RemoteScanExec::new(
             physical_plan,
             partition_file_lists,
-            flight_request.partition_keys.clone(),
+            flight_request.equal_keys.clone(),
             flight_request.match_all_keys.clone(),
             false,
             req.clone(),
@@ -155,7 +155,7 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             partition_file_lists,
-            flight_request.partition_keys.clone(),
+            flight_request.equal_keys.clone(),
             flight_request.match_all_keys.clone(),
             false,
             req.clone(),

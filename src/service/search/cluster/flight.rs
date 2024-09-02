@@ -58,6 +58,7 @@ use crate::{
         generate_filter_from_equal_items, match_file,
         new_sql::NewSql,
         request::Request,
+        utlis::AsyncDefer,
     },
 };
 
@@ -92,33 +93,6 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
 
-    let trace_id = req.trace_id.clone();
-    #[cfg(feature = "enterprise")]
-    let user_id = req.user_id.clone();
-    #[cfg(feature = "enterprise")]
-    let user_id = user_id.as_deref();
-
-    // filter euqal_items with index_fields
-    // -- only support single table query for inverted index
-    let index_terms = if sql.equal_items.len() == 1 {
-        let schema = sql.schemas.values().next().unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let index_fields = get_stream_setting_index_fields(&stream_settings);
-        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
-    } else {
-        vec![]
-    };
-    let use_inverted_index = sql.stream_type != StreamType::Index
-        && sql.use_inverted_index
-        && cfg.common.inverted_index_enabled
-        && !cfg.common.feature_query_without_index
-        && (sql.match_items.is_some() || !index_terms.is_empty());
-
-    log::info!(
-        "[trace_id {trace_id}] flight->leader: use_inverted_index {}",
-        use_inverted_index
-    );
-
     // 1. get file list
     let mut file_list = get_file_lists(
         &sql.stream_names,
@@ -130,7 +104,7 @@ pub async fn search(
     )
     .await?;
 
-    let mut file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
+    let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] flight->leader: get file_list time_range: {:?}, num: {}, took: {} ms",
@@ -139,55 +113,20 @@ pub async fn search(
         file_list_took,
     );
 
-    // 1.1 use inverted index to filter file list
-    // If the query is of type inverted index and this is not an aggregations request,
-    // then filter the file list based on the inverted index.
-    let mut idx_scan_size = 0;
-    let mut idx_took = 0;
-    if use_inverted_index {
-        let stream_file_list;
-        let stream_name = sql.stream_names.first().unwrap();
-        let match_terms = sql.match_items.clone().unwrap_or_default();
-        let index_terms = generate_filter_from_equal_items(&index_terms);
-        (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
-            req.clone(),
-            query.clone(),
-            stream_name,
-            &file_list_vec,
-            &match_terms,
-            &index_terms,
-        )
-        .await?;
-        log::info!(
-            "[trace_id {trace_id}] flight->leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
-            sql.time_range,
-            stream_file_list.len(),
-            idx_scan_size,
-            idx_took,
-        );
-        file_list.insert(stream_name.to_string(), stream_file_list);
-        file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
-    }
+    // 2. get file list from inverted index
+    let (_use_inverted_index, mut scan_stats, idx_took) =
+        get_file_list_from_inverted_index(trace_id, &req, &sql, &query, &mut file_list).await?;
 
-    // 1.2 calculate records, original_size, compressed_size
-    let mut scan_stats = ScanStats::new();
-    scan_stats.files = file_list_vec.len() as i64;
-    for file in file_list_vec.iter() {
-        let file_meta = &file.meta;
-        scan_stats.records += file_meta.records;
-        scan_stats.original_size += file_meta.original_size;
-        scan_stats.compressed_size += file_meta.compressed_size;
-    }
-    scan_stats.original_size += idx_scan_size as i64;
-    scan_stats.idx_scan_size = idx_scan_size as i64;
+    #[cfg(feature = "enterprise")]
+    let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
 
-    // 2. get nodes
+    // 3. get nodes
     let node_group = req
         .search_event_type
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
+    let nodes = get_online_querier_nodes(trace_id, node_group).await?;
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
@@ -200,85 +139,18 @@ pub async fn search(
         .inc();
 
     #[cfg(not(feature = "enterprise"))]
-    let work_group: Option<String> = None;
-    // 1. get work group
+    let (took_wait, work_group_str, locker) =
+        check_work_group(&req, trace_id, &nodes, start, file_list_took).await?;
     #[cfg(feature = "enterprise")]
-    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list_vec),
-    );
-    #[cfg(feature = "enterprise")]
-    super::super::SEARCH_SERVER
-        .add_work_group(&trace_id, work_group.clone())
-        .await;
-    // 2. check concurrency
-    let work_group_str = if let Some(wg) = &work_group {
-        wg.to_string()
-    } else {
-        "global".to_string()
-    };
-
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
-    // get a cluster search queue lock
-    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
-        None
-    } else {
-        let node_ids = nodes
-            .iter()
-            .map(|node| node.uuid.to_string())
-            .collect::<HashSet<_>>();
-        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
-            .await
-            .map_err(|e| {
-                metrics::QUERY_PENDING_NUMS
-                    .with_label_values(&[&req.org_id])
-                    .dec();
-                Error::Message(e.to_string())
-            })?
-    };
-
-    // check global concurrency
-    #[cfg(feature = "enterprise")]
-    super::work_group_checking(&trace_id, start, &req, &work_group, &locker, None).await?;
-
-    // check user concurrency
-    #[cfg(feature = "enterprise")]
-    if user_id.is_some() {
-        super::work_group_checking(&trace_id, start, &req, &work_group, &locker, user_id).await?;
-    }
-
-    // 3. process the search in the work group
-    #[cfg(feature = "enterprise")]
-    if let Err(e) = work_group
-        .as_ref()
-        .unwrap()
-        .process(&trace_id, user_id)
-        .await
-    {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&req.org_id])
-            .dec();
-        dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(e.to_string()));
-    }
-    #[cfg(feature = "enterprise")]
-    if let Err(e) = dist_lock::unlock(&locker).await {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&req.org_id])
-            .dec();
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(&trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-        return Err(e);
-    }
-    // done in the queue
-    let took_wait = start.elapsed().as_millis() as usize - file_list_took;
-    log::info!(
-        "[trace_id {trace_id}] search: wait in queue took: {} ms",
-        took_wait,
-    );
+    let (took_wait, work_group_str, work_group) = check_work_group(
+        &req,
+        trace_id,
+        &nodes,
+        &file_list_vec,
+        start,
+        file_list_took,
+    )
+    .await?;
 
     // reset work_group
     req.work_group = Some(work_group_str);
@@ -286,48 +158,47 @@ pub async fn search(
     // 3. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
 
-    // 4. construct physical plan
-    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
-        Ok(v) => v,
-        Err(e) => {
+    // TODO: split it to two function for enterprise and non enterprise
+    #[cfg(feature = "enterprise")]
+    let user_id = req.user_id.clone();
+    let trace_id_move = trace_id.to_string();
+    let _defer = AsyncDefer::new({
+        async move {
             // search done, release lock
             #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
+            let _ = dist_lock::unlock(&locker).await.map_err(|e| {
+                log::error!(
+                    "[trace_id {trace_id_move}] release source in flight search error: {e}",
+                );
+                Error::Message(e.to_string())
+            });
             #[cfg(feature = "enterprise")]
-            {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(&trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
-            return Err(e);
-        }
-    };
-
-    // 5. register table
-    if let Err(e) = register_table(&ctx, &sql).await {
-        // search done, release lock
-        #[cfg(not(feature = "enterprise"))]
-        dist_lock::unlock(&locker).await?;
-        #[cfg(feature = "enterprise")]
-        {
-            work_group
+            let _ = work_group
                 .as_ref()
                 .unwrap()
-                .done(&trace_id, user_id)
+                .done(&trace_id_move, user_id.as_deref())
                 .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+                .map_err(|e| {
+                    log::error!(
+                        "[trace_id {trace_id_move}] release source in flight search error: {e}",
+                    );
+                    e.to_string();
+                });
+            log::info!("[trace_id {trace_id_move}] release source in flight search",);
         }
-        return Err(e);
-    }
+    });
+
+    // 4. construct physical plan
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+
+    // 5. register table
+    register_table(&ctx, &sql).await?;
 
     #[cfg(feature = "enterprise")]
     {
         super::super::SEARCH_SERVER
             .add_file_stats(
-                &trace_id,
+                trace_id,
                 scan_stats.files,
                 scan_stats.records,
                 scan_stats.original_size,
@@ -347,19 +218,13 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if super::super::SEARCH_SERVER
-        .insert_sender(&trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender)
         .await
         .is_err()
     {
         log::info!(
             "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
         );
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(&trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
@@ -368,42 +233,8 @@ pub async fn search(
     }
 
     // 5. create physical plan
-    let plan = match ctx.state().create_logical_plan(&sql.sql).await {
-        Ok(v) => v,
-        Err(e) => {
-            // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
-            #[cfg(feature = "enterprise")]
-            {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(&trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
-            return Err(e.into());
-        }
-    };
-    let mut physical_plan = match ctx.state().create_physical_plan(&plan).await {
-        Ok(v) => v,
-        Err(e) => {
-            // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
-            #[cfg(feature = "enterprise")]
-            {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(&trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
-            return Err(e.into());
-        }
-    };
+    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
+    let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
         let plan = displayable(physical_plan.as_ref())
@@ -439,24 +270,7 @@ pub async fn search(
         match_all_keys,
         false, // for super cluster
     );
-    physical_plan = match physical_plan.rewrite(&mut rewrite) {
-        Ok(v) => v.data,
-        Err(e) => {
-            // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
-            #[cfg(feature = "enterprise")]
-            {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(&trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
-            return Err(e.into());
-        }
-    };
+    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
     // add remote scan exec to top if physical plan is not changed
     if !rewrite.is_changed {
@@ -494,7 +308,7 @@ pub async fn search(
         stream_type = sql.stream_type.to_string(),
     );
 
-    let trace_id2 = trace_id.clone();
+    let trace_id_move = trace_id.to_string();
     let task = tokio::task::spawn(
         async move {
             tokio::select! {
@@ -502,14 +316,14 @@ pub async fn search(
                     match ret {
                         Ok(ret) => Ok(ret),
                         Err(err) => {
-                            log::error!("[trace_id {trace_id2}] flight->leader: datafusion execute error: {}", err); 
+                            log::error!("[trace_id {trace_id_move}] flight->leader: datafusion execute error: {}", err); 
                             Err(err)
                         }
                     }
                 },
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-                    log::error!("[trace_id {trace_id2}] flight->leader: search timeout");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] flight->leader: search timeout")))
+                    log::error!("[trace_id {trace_id_move}] flight->leader: search timeout");
+                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] flight->leader: search timeout")))
                 },
                 _ = async {
                     #[cfg(feature = "enterprise")]
@@ -517,8 +331,8 @@ pub async fn search(
                     #[cfg(not(feature = "enterprise"))]
                     futures::future::pending::<()>().await;
                 } => {
-                    log::info!("[trace_id {trace_id2}] flight->leader: search canceled");
-                     Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] flight->leader: search canceled")))
+                    log::info!("[trace_id {trace_id_move}] flight->leader: search canceled");
+                     Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] flight->leader: search canceled")))
                 }
             }
         }
@@ -529,40 +343,9 @@ pub async fn search(
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err.into()),
         Err(err) => Err(Error::Message(err.to_string())),
-    };
-    let data = match data {
-        Ok(v) => v,
-        Err(e) => {
-            // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
-            #[cfg(feature = "enterprise")]
-            {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(&trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
-            return Err(e);
-        }
-    };
+    }?;
 
     log::info!("[trace_id {trace_id}] flight->leader: search finished");
-
-    // search done, release lock
-    #[cfg(not(feature = "enterprise"))]
-    dist_lock::unlock(&locker).await?;
-    #[cfg(feature = "enterprise")]
-    {
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(&trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-    }
 
     scan_stats.format_to_mb();
     Ok((data, scan_stats, took_wait, false, idx_took))
@@ -677,6 +460,210 @@ pub(crate) async fn get_file_list(
     files.sort_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     files
+}
+
+pub async fn get_file_list_from_inverted_index(
+    trace_id: &str,
+    req: &Request,
+    sql: &Arc<NewSql>,
+    query: &SearchQuery,
+    file_list: &mut HashMap<String, Vec<FileKey>>,
+) -> Result<(bool, ScanStats, usize)> {
+    let cfg = get_config();
+    // filter euqal_items with index_fields
+    // TODO: current only support single table query for inverted index
+    let index_terms = if sql.equal_items.len() == 1 {
+        let schema = sql.schemas.values().next().unwrap().schema();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema);
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
+    } else {
+        vec![]
+    };
+
+    let use_inverted_index = sql.stream_type != StreamType::Index
+        && sql.use_inverted_index
+        && cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && (sql.match_items.is_some() || !index_terms.is_empty());
+
+    log::info!(
+        "[trace_id {trace_id}] flight->leader: use_inverted_index {}",
+        use_inverted_index
+    );
+
+    // use inverted index to filter file list
+    // If the query is of type inverted index and this is not an aggregations request,
+    // then filter the file list based on the inverted index.
+    let mut idx_scan_size = 0;
+    let mut idx_took = 0;
+    let mut file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
+    if use_inverted_index {
+        let stream_file_list;
+        let stream_name = sql.stream_names.first().unwrap();
+        let match_terms = sql.match_items.clone().unwrap_or_default();
+        let index_terms = generate_filter_from_equal_items(&index_terms);
+        (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
+            req.clone(),
+            query.clone(),
+            stream_name,
+            &file_list_vec,
+            &match_terms,
+            &index_terms,
+        )
+        .await?;
+        log::info!(
+            "[trace_id {trace_id}] flight->leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+            sql.time_range,
+            stream_file_list.len(),
+            idx_scan_size,
+            idx_took,
+        );
+        file_list.insert(stream_name.to_string(), stream_file_list);
+        file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
+    }
+
+    // calculate records, original_size, compressed_size
+    let mut scan_stats = ScanStats::new();
+    scan_stats.files = file_list_vec.len() as i64;
+    for file in file_list_vec.iter() {
+        let file_meta = &file.meta;
+        scan_stats.records += file_meta.records;
+        scan_stats.original_size += file_meta.original_size;
+        scan_stats.compressed_size += file_meta.compressed_size;
+    }
+    scan_stats.original_size += idx_scan_size as i64;
+    scan_stats.idx_scan_size = idx_scan_size as i64;
+
+    Ok((use_inverted_index, scan_stats, idx_took))
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_work_group(
+    req: &Request,
+    trace_id: &str,
+    nodes: &[Node],
+    start: std::time::Instant,
+    file_list_took: usize, // the time took to get file list
+) -> Result<(usize, String, Option<infra::dist_lock::Locker>)> {
+    let cfg = get_config();
+    let work_group_str = "global".to_string();
+
+    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
+        None
+    } else {
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.uuid.to_string())
+            .collect::<HashSet<_>>();
+        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
+            .await
+            .map_err(|e| {
+                metrics::QUERY_PENDING_NUMS
+                    .with_label_values(&[&req.org_id])
+                    .dec();
+                Error::Message(e.to_string())
+            })?
+    };
+
+    // done in the queue
+    let took_wait = start.elapsed().as_millis() as usize - file_list_took;
+    log::info!(
+        "[trace_id {trace_id}] search: wait in queue took: {} ms",
+        took_wait,
+    );
+    Ok((took_wait, work_group_str, locker))
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn check_work_group(
+    req: &Request,
+    trace_id: &str,
+    nodes: &[Node],
+    file_list_vec: &[&FileKey],
+    start: std::time::Instant,
+    file_list_took: usize, // the time took to get file list
+) -> Result<(
+    usize,
+    String,
+    Option<o2_enterprise::enterprise::search::WorkGroup>,
+)> {
+    let cfg = get_config();
+    let user_id = req.user_id.clone();
+    let user_id = user_id.as_deref();
+
+    // 1. get work group
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
+        o2_enterprise::enterprise::search::work_group::predict(nodes, file_list_vec),
+    );
+    super::super::SEARCH_SERVER
+        .add_work_group(trace_id, work_group.clone())
+        .await;
+    let work_group_str = work_group.as_ref().unwrap().to_string();
+
+    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    // 2. get a cluster search queue lock
+    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
+        None
+    } else {
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.uuid.to_string())
+            .collect::<HashSet<_>>();
+        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
+            .await
+            .map_err(|e| {
+                metrics::QUERY_PENDING_NUMS
+                    .with_label_values(&[&req.org_id])
+                    .dec();
+                Error::Message(e.to_string())
+            })?
+    };
+
+    // 3. check global concurrency
+    super::work_group_checking(trace_id, start, req, &work_group, &locker, None).await?;
+
+    // 4. check user concurrency
+    if user_id.is_some() {
+        super::work_group_checking(trace_id, start, req, &work_group, &locker, user_id).await?;
+    }
+
+    // 5. process the search in the work group
+    if let Err(e) = work_group
+        .as_ref()
+        .unwrap()
+        .process(trace_id, user_id)
+        .await
+    {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        dist_lock::unlock(&locker).await?;
+        return Err(Error::Message(e.to_string()));
+    }
+
+    // 6. unlock the queue in no enterprise version,
+    // TODO: locker and unlock for enterprise is need in this version?
+    if let Err(e) = dist_lock::unlock(&locker).await {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        return Err(e);
+    }
+    // done in the queue
+    let took_wait = start.elapsed().as_millis() as usize - file_list_took;
+    log::info!(
+        "[trace_id {trace_id}] search: wait in queue took: {} ms",
+        took_wait,
+    );
+    Ok((took_wait, work_group_str, work_group))
 }
 
 pub async fn partition_file_lists(
