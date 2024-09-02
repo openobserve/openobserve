@@ -291,7 +291,7 @@ impl Sql {
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
-        if req_query.quick_mode
+        if (req_query.quick_mode || cfg.limit.quick_mode_force_enabled)
             && schema_fields.len() > cfg.limit.quick_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {

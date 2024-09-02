@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              icon="transform"
+              icon="edit"
               class="q-ml-xs"
               padding="sm"
               unelevated

@@ -19,6 +19,7 @@ use crate::service::db::instance;
 
 pub mod cluster;
 pub mod config;
+#[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod wal;
 

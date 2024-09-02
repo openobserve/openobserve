@@ -256,6 +256,9 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
+    if is_aggregate && c_resp.histogram_interval > -1 {
+        res.histogram_interval = Some(c_resp.histogram_interval);
+    }
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
         response_time: time,
@@ -346,20 +349,26 @@ fn merge_response(
                 continue;
             }
             resp.hits.extend(res.hits.clone());
+            resp.histogram_interval = res.histogram_interval;
         }
         resp.took = cache_took;
         resp
     };
 
     if cache_response.hits.is_empty()
-        && search_response.is_empty()
-        && search_response.first().unwrap().hits.is_empty()
-        && search_response.last().unwrap().hits.is_empty()
+        && !search_response.is_empty()
+        && search_response
+            .first()
+            .map_or(true, |res| res.hits.is_empty())
+        && search_response
+            .last()
+            .map_or(true, |res| res.hits.is_empty())
     {
         for res in search_response {
             cache_response.total += res.total;
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
+            cache_response.histogram_interval = res.histogram_interval;
         }
         return cache_response;
     }

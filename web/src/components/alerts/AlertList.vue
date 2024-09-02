@@ -289,6 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="secondary"
                 padding="sm xl"
                 type="submit"
+                :disable="isSubmitting"
                 no-caps
               />
             </div>
@@ -375,6 +376,7 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
+    const  isSubmitting = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -645,8 +647,14 @@ export default defineComponent({
       
       showForm.value = true;
     }
-    const submitForm = () =>{
+    const submitForm = async () =>{
       const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value) as Alert;
+
+      const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
 
       if (!alertToBeCloned) {
         $q.notify({
@@ -672,11 +680,12 @@ export default defineComponent({
         });
         return;
       }
-      
+      isSubmitting.value = true;
+
         alertToBeCloned.name = toBeCloneAlertName.value;
         alertToBeCloned.stream_name = toBeClonestreamName.value;
         alertToBeCloned.stream_type = toBeClonestreamType.value;
-
+        
       try{
         alertsService.create(
             store.state.selectedOrganization.identifier,
@@ -684,6 +693,7 @@ export default defineComponent({
             alertToBeCloned.stream_type,
             alertToBeCloned,
           ).then((res) => {
+            dismiss();
             if (res.data.code == 200) {
               $q.notify({
                 type: "positive",
@@ -701,22 +711,27 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            dismiss();
             $q.notify({
               type: "negative",
               message: e.response.data.message,
               timeout: 2000,
             }); 
-          });
+          }).finally(() => {
+            isSubmitting.value = false;
+          })
 
       }
       catch(e : any) {
         showForm.value = true;
+        isSubmitting.value = false;
       $q.notify({
               type: "negative",
               message: e.data.message,
               timeout: 2000,
             });
       }
+
 
     }
     const showAddUpdateFn = (props: any) => {
@@ -944,6 +959,7 @@ export default defineComponent({
       indexOptions,
       streams,
       isFetchingStreams,
+      isSubmitting,
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery: ref(""),

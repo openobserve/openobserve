@@ -284,7 +284,7 @@ export const useLocalTimezone = (val = "", isDelete = false) => {
 };
 
 export const useLocalWrapContent = (val = "", isDelete = false) => {
-  const wrapcontent: any = useLocalStorage("wrapcontent", val, isDelete);
+  const wrapcontent: any = useLocalStorage("wrapContent", val, isDelete);
   return wrapcontent.value;
 };
 

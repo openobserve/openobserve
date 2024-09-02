@@ -313,6 +313,17 @@ export const usePanelDataLoader = (
           queries: queryResults.map((it: any) => it?.metadata),
         };
       } else {
+        // copy of current abortController
+        // which is used to check whether the current query has been aborted
+        const abortControllerRef = abortController;
+
+        // reset old state data
+        state.data = [];
+        state.metadata = {
+          queries: [],
+        };
+        state.resultMetaData = [];
+
         // Call search API
 
         // Get the page type from the first query in the panel schema
@@ -362,6 +373,11 @@ export const usePanelDataLoader = (
               traceparent,
             });
 
+            // if aborted, return
+            if (abortControllerRef?.signal?.aborted) {
+              return;
+            }
+
             // partition array from api response
             const partitionArr = res?.data?.partitions ?? [];
 
@@ -373,25 +389,12 @@ export const usePanelDataLoader = (
               ? `${res?.data?.histogram_interval} seconds`
               : null;
 
-            // reset old state data
-            state.data = [];
-            state.metadata = {
-              queries: [],
-            };
-            state.resultMetaData = [];
-
-            const partitionResult: any = [];
-
             // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
             state.data.push([]);
             state.metadata.queries.push({});
             state.resultMetaData.push({});
 
             const currentQueryIndex = state.data.length - 1;
-
-            // copy of current abortController
-            // which is used to check whether the current query has been aborted
-            const abortControllerRef = abortController;
 
             // Update the metadata for the current query
             Object.assign(state.metadata.queries[currentQueryIndex], metadata);
@@ -401,6 +404,8 @@ export const usePanelDataLoader = (
 
             // loop on all partitions and call search api for each partition
             for (let i = partitionArr.length - 1; i >= 0; i--) {
+              state.loading = true;
+
               const partition = partitionArr[i];
 
               if (abortControllerRef?.signal?.aborted) {
@@ -438,9 +443,9 @@ export const usePanelDataLoader = (
                 searchRes.data.is_partial != true
               ) {
                 // abort on unmount
-                if (abortController) {
+                if (abortControllerRef) {
                   // this will stop partition api call
-                  abortController.abort();
+                  abortControllerRef?.abort();
                 }
 
                 // throw error
@@ -449,20 +454,18 @@ export const usePanelDataLoader = (
                 );
               }
 
-              partitionResult.push(...searchRes.data.hits);
-
-              // Update the state with the new data after each partition API call
-              state.data[currentQueryIndex] = JSON.parse(
-                JSON.stringify(partitionResult),
-              );
-
-              // update result metadata
-              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
-
               // if the query is aborted or the response is partial, break the loop
               if (abortControllerRef?.signal?.aborted) {
                 break;
               }
+
+              state.data[currentQueryIndex] = [
+                ...searchRes.data.hits,
+                ...(state.data[currentQueryIndex] ?? []),
+              ];
+
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
               if (searchRes.data.is_partial == true) {
                 // set the new start time as the start time of query
@@ -519,8 +522,8 @@ export const usePanelDataLoader = (
             state.loading = false;
 
             // abort on done
-            if (abortController) {
-              abortController.abort();
+            if (abortControllerRef) {
+              abortControllerRef?.abort();
             }
           }
         }
