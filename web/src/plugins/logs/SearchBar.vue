@@ -1743,6 +1743,14 @@ export default defineComponent({
             // As we reassign columns from selectedFields and search results
             extractedObj.data.resultGrid.columns = [];
 
+            // As in saved view, we observed field getting duplicated in selectedFields
+            // So, we are removing duplicates before applying saved view
+            if (extractedObj.data.stream.selectedFields?.length) {
+              extractedObj.data.stream.selectedFields = [
+                ...new Set(extractedObj.data.stream.selectedFields),
+              ];
+            }
+
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
