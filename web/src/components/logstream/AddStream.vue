@@ -219,6 +219,7 @@ const saveStream = async () => {
           streamInputs.value.stream_type,
         )
         .then((streamRes: any) => {
+          //implement filter for original field
           addStream(streamRes.data);
           emits("streamAdded");
           emits("close");
