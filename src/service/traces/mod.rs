@@ -336,7 +336,7 @@ pub async fn handle_trace_request(
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("error while writing trace data"),
+                    format!("error while writing trace data: {e}",),
                 )),
             );
         }
