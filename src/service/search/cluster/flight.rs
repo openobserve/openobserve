@@ -113,12 +113,9 @@ pub async fn search(
         file_list_took,
     );
 
-    // 2. get file list from inverted index
+    // 2. filter file list using inverted index
     let (_use_inverted_index, mut scan_stats, idx_took) =
         get_file_list_from_inverted_index(trace_id, &req, &sql, &query, &mut file_list).await?;
-
-    #[cfg(feature = "enterprise")]
-    let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
 
     // 3. get nodes
     let node_group = req
@@ -138,9 +135,12 @@ pub async fn search(
         .with_label_values(&[&req.org_id])
         .inc();
 
+    // 4. check work group
     #[cfg(not(feature = "enterprise"))]
     let (took_wait, work_group_str, locker) =
         check_work_group(&req, trace_id, &nodes, start, file_list_took).await?;
+    #[cfg(feature = "enterprise")]
+    let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
     #[cfg(feature = "enterprise")]
     let (took_wait, work_group_str, work_group) = check_work_group(
         &req,
@@ -151,14 +151,21 @@ pub async fn search(
         file_list_took,
     )
     .await?;
+    // add work_group
+    req.add_work_group(Some(work_group_str));
 
-    // reset work_group
-    req.work_group = Some(work_group_str);
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .dec();
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .inc();
 
-    // 3. partition file list
+    // 5. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
 
     // TODO: split it to two function for enterprise and non enterprise
+    // release lock when search done or get error
     #[cfg(feature = "enterprise")]
     let user_id = req.user_id.clone();
     let trace_id_move = trace_id.to_string();
@@ -188,31 +195,16 @@ pub async fn search(
         }
     });
 
-    // 4. construct physical plan
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
-
-    // 5. register table
-    register_table(&ctx, &sql).await?;
-
     #[cfg(feature = "enterprise")]
-    {
-        super::super::SEARCH_SERVER
-            .add_file_stats(
-                trace_id,
-                scan_stats.files,
-                scan_stats.records,
-                scan_stats.original_size,
-                scan_stats.compressed_size,
-            )
-            .await;
-    }
-
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&sql.org_id])
-        .dec();
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[&sql.org_id])
-        .inc();
+    super::super::SEARCH_SERVER
+        .add_file_stats(
+            trace_id,
+            scan_stats.files,
+            scan_stats.records,
+            scan_stats.original_size,
+            scan_stats.compressed_size,
+        )
+        .await;
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -232,8 +224,13 @@ pub async fn search(
         ));
     }
 
-    // 5. create physical plan
+    // 6. construct physical plan
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+
+    register_table(&ctx, &sql).await?;
+
     let plan = ctx.state().create_logical_plan(&sql.sql).await?;
+
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
@@ -247,7 +244,7 @@ pub async fn search(
         println!("{}", plan);
     }
 
-    // 6. rewrite physical plan
+    // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
     let equal_keys = sql
         .equal_items
@@ -308,6 +305,7 @@ pub async fn search(
         stream_type = sql.stream_type.to_string(),
     );
 
+    // 8. execute physical plan
     let trace_id_move = trace_id.to_string();
     let task = tokio::task::spawn(
         async move {
@@ -339,6 +337,7 @@ pub async fn search(
         .instrument(datafusion_span),
     );
 
+    // 9. get data from datafusion
     let data = match task.await {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err.into()),
@@ -597,9 +596,11 @@ pub async fn check_work_group(
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
         o2_enterprise::enterprise::search::work_group::predict(nodes, file_list_vec),
     );
+
     super::super::SEARCH_SERVER
         .add_work_group(trace_id, work_group.clone())
         .await;
+
     let work_group_str = work_group.as_ref().unwrap().to_string();
 
     let locker_key = format!("/search/cluster_queue/{}", work_group_str);
@@ -657,6 +658,7 @@ pub async fn check_work_group(
             .map_err(|e| Error::Message(e.to_string()))?;
         return Err(e);
     }
+
     // done in the queue
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
