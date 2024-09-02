@@ -162,6 +162,22 @@ pub async fn search(
         println!("{}", plan);
     }
 
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    if super::super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::info!(
+            "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+        );
+        return Err(Error::ErrorCode(
+            infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+            )),
+        ));
+    }
+
     let datafusion_span = info_span!(
         "service:search:flight:super_cluster::datafusion",
         org_id = sql.org_id,
@@ -169,7 +185,7 @@ pub async fn search(
         stream_type = sql.stream_type.to_string(),
     );
 
-    let trace_id2 = trace_id.to_owned();
+    let trace_id_move = trace_id.to_owned();
     let task = tokio::task::spawn(
         async move {
             tokio::select! {
@@ -177,15 +193,19 @@ pub async fn search(
                     match ret {
                         Ok(ret) => Ok(ret),
                         Err(err) => {
-                            log::error!("[trace_id {trace_id2}] flight->leader: datafusion execute error: {}", err); 
+                            log::error!("[trace_id {trace_id_move}] super cluster leader: datafusion execute error: {}", err); 
                             Err(err)
                         }
                     }
                 },
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-                    log::error!("[trace_id {trace_id2}] flight->leader: search timeout");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] flight->leader: search timeout")))
+                    log::error!("[trace_id {trace_id_move}] super cluster leader: search timeout");
+                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] super cluster leader: search timeout")))
                 },
+                _ = abort_receiver => {
+                    log::info!("[trace_id {trace_id_move}] super cluster leader: search canceled");
+                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] super cluster leader: search canceled")))
+                }
             }
         }
         .instrument(datafusion_span),

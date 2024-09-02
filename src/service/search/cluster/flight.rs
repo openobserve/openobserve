@@ -32,7 +32,9 @@ use config::{
     INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
-    common::tree_node::TreeNode, physical_plan::displayable, prelude::SessionContext,
+    common::tree_node::TreeNode,
+    physical_plan::{displayable, ExecutionPlan},
+    prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -209,24 +211,6 @@ pub async fn search(
         )
         .await;
 
-    #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if super::super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
-        .await
-        .is_err()
-    {
-        log::info!(
-            "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
-        );
-        return Err(Error::ErrorCode(
-            infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
-            )),
-        ));
-    }
-
     // 6. construct physical plan
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
 
@@ -237,14 +221,7 @@ pub async fn search(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        let plan = displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan before rewrite");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
+        print_plan(&physical_plan, "before");
     }
 
     // 7. rewrite physical plan
@@ -291,14 +268,25 @@ pub async fn search(
     }
 
     if cfg.common.print_key_sql {
-        let plan = displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan after rewrite");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
+        print_plan(&physical_plan, "after");
+    }
+
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if super::super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::info!(
+            "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+        );
+        return Err(Error::ErrorCode(
+            infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+            )),
+        ));
     }
 
     let datafusion_span = info_span!(
@@ -648,7 +636,6 @@ pub async fn check_work_group(
     }
 
     // 6. unlock the queue in no enterprise version,
-    // TODO: locker and unlock for enterprise is need in this version?
     if let Err(e) = dist_lock::unlock(&locker).await {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&req.org_id])
@@ -1002,6 +989,17 @@ async fn get_file_list_by_inverted_index(
         resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
+}
+
+fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
+    let plan = displayable(physical_plan.as_ref())
+        .set_show_schema(false)
+        .indent(true)
+        .to_string();
+    println!("+---------------------------+----------+");
+    println!("leader physical plan {stage} rewrite");
+    println!("+---------------------------+----------+");
+    println!("{}", plan);
 }
 
 #[cfg(test)]
