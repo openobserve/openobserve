@@ -246,7 +246,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
         // this value is from the default arrow-rs object
         // https://github.com/apache/arrow-rs/blob/678517018ddfd21b202a94df13b06dfa1ab8a378/object_store/src/client/retry.rs#L171-L179
         retry_timeout: Duration::from_secs(3 * 60),
-        backoff: object_store::BackoffConfig::default()
+        backoff: object_store::BackoffConfig::default(),
     };
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
         .with_client_options(opts)
