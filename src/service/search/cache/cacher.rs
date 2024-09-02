@@ -143,6 +143,9 @@ pub async fn check_cache(
         return MultiCachedQueryResponse::default();
     }
     let mut multi_resp = MultiCachedQueryResponse::default();
+    if discard_interval > -1 {
+        multi_resp.histogram_interval = discard_interval / 1000 / 1000;
+    }
     if get_config().common.use_multi_result_cache {
         let mut multi_res = crate::service::search::cluster::cache_multi::get_cached_results(
             query_key.to_owned(),

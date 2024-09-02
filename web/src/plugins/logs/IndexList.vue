@@ -699,6 +699,7 @@ export default defineComponent({
       filterHitsColumns,
       extractFields,
       validateFilterForMultiStream,
+      reorderSelectedFields,
     } = useLogs();
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -784,14 +785,16 @@ export default defineComponent({
     };
 
     function clickFieldFn(row: { name: never }, pageIndex: number) {
-      if (searchObj.data.stream.selectedFields.includes(row.name)) {
-        searchObj.data.stream.selectedFields =
-          searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== row.name,
-          );
+      let selectedFields = reorderSelectedFields();
+
+      if (selectedFields.includes(row.name)) {
+        selectedFields = selectedFields.filter((v: any) => v !== row.name);
       } else {
-        searchObj.data.stream.selectedFields.push(row.name);
+        selectedFields.push(row.name);
       }
+
+      searchObj.data.stream.selectedFields = selectedFields;
+
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();

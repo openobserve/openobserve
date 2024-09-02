@@ -221,7 +221,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // RBAC model
     #[cfg(feature = "enterprise")]
     if O2_CONFIG.openfga.enabled {
-        crate::common::infra::ofga::init().await;
+        if let Err(e) = crate::common::infra::ofga::init().await {
+            log::error!("OFGA init failed: {}", e);
+        }
     }
 
     // Shouldn't serve request until initialization finishes
