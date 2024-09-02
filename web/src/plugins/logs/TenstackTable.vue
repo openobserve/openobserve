@@ -1,3 +1,19 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
     <table
@@ -7,7 +23,7 @@
         minWidth: '100%',
         minHeight: totalSize + 'px',
         ...columnSizeVars,
-        width: !columnOrder.includes('source')
+        width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
             ? width
@@ -23,22 +39,24 @@
           :key="headerGroup.id"
           :element="'table'"
           :animation="200"
-          :sort="!isResizingHeader || !columnOrder.includes('source')"
+          :sort="!isResizingHeader || !defaultColumns"
           handle=".table-head"
           :class="{
             'tw-cursor-move': table.getState().columnOrder.length > 1,
           }"
           :style="{
             width:
-              columnOrder.includes('source') && wrap
+              defaultColumns && wrap
                 ? width - 12 + 'px'
-                : tableRowSize + 'px',
+                : defaultColumns
+                  ? tableRowSize + 'px'
+                  : table.getTotalSize() + 'px',
             minWidth: '100%',
             background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
-          @end="(event) => handleDragEnd(event)"
+          @end="() => handleDragEnd()"
           class="tw-flex items-center"
         >
           <th
@@ -46,7 +64,7 @@
             :key="header.id"
             :id="header.id"
             class="tw-px-2 tw-relative table-head tw-text-ellipsis"
-            :style="{ width: header.getSize() + 'px' }"
+            :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
             :data-test="`log-search-result-table-th-${header.id}`"
           >
             <div
@@ -58,6 +76,9 @@
               "
               :class="[
                 'resizer',
+                store.state.theme === 'dark'
+                  ? 'tw-bg-zinc-800'
+                  : 'tw-bg-zinc-300',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
               :style="{}"
@@ -94,31 +115,6 @@
                   (header.column.columnDef.meta as any).showWrap
                 "
               >
-                <!-- <span
-                        v-if="(header.column.columnDef.meta as any).showWrap"
-                        style="font-weight: normal"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-white'
-                            : 'text-grey-9'
-                        "
-                        >{{ t("common.wrap") }}</span
-                      >
-                      <q-toggle
-                        v-if="(header.column.columnDef.meta as any).showWrap"
-                        class="text-normal q-ml-xs q-mr-sm"
-                        :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                        v-model="(header.column.columnDef.meta as any).wrapContent"
-                        color="primary"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-white'
-                            : 'text-grey-7'
-                        "
-                        size="xs"
-                        dense
-                      /> -->
-
                 <q-icon
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
@@ -229,11 +225,18 @@
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
                 : 'w-border-gray-100 hover:tw-bg-zinc-100',
-              columnOrder.includes('source') &&
+              defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
                 : 'tw-flex',
+              (tableRows[virtualRow.index] as any)[
+                store.state.zoConfig.timestamp_column
+              ] === highlightTimestamp
+                ? store.state.theme === 'dark'
+                  ? 'tw-bg-zinc-700'
+                  : 'tw-bg-zinc-300'
+                : '',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -275,15 +278,16 @@
                   '-' +
                   cell.column.columnDef.id
                 "
-                class="tw-py-1 tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
+                class="tw-py-none tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
                 :style="{
                   width:
-                    cell.column.columnDef.id !== 'source'
-                      ? cell.column.getSize() + 'px'
+                    cell.column.columnDef.id !== 'source' ||
+                    cell.column.columnDef.enableResizing
+                      ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
                       : wrap
-                        ? width - 225 - 12 + 'px'
+                        ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? '100%' : '26px',
+                  height: wrap ? '100%' : '20px',
                 }"
                 :class="[
                   columnOrder.includes('source') && !wrap
@@ -349,6 +353,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import { debounce } from "quasar";
 
 const props = defineProps({
   rows: {
@@ -382,6 +387,14 @@ const props = defineProps({
   expandedRows: {
     type: Array,
     default: () => [],
+  },
+  highlightTimestamp: {
+    type: Number,
+    default: -1,
+  },
+  defaultColumns: {
+    type: Boolean,
+    default: () => true,
   },
 });
 
@@ -424,8 +437,12 @@ const tableRows = ref(props.rows);
 
 watch(
   () => props.columns,
-  (newVal) => {
+  async (newVal) => {
     columnOrder.value = newVal.map((column: any) => column.id);
+
+    await nextTick();
+
+    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -441,9 +458,10 @@ watch(
     await nextTick();
 
     expandedRowIndices.value = [];
-    props.expandedRows.forEach((index) => {
-      expandRow(index as number);
-    });
+    setExpandedRows();
+
+    await nextTick();
+    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -473,21 +491,15 @@ const table = useVueTable({
     },
   },
   onSortingChange: setSorting,
+  enableSorting: false,
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   defaultColumn: {
     minSize: 60,
     maxSize: 800,
   },
-  debugTable: true,
-  debugHeaders: true,
-  debugColumns: true,
   columnResizeMode,
   enableColumnResizing: true,
-  onStateChange: async (state) => {
-    await nextTick();
-    tableRowSize.value = tableBodyRef.value.children[0]?.scrollWidth;
-  },
 });
 
 const columnSizeVars = computed(() => {
@@ -502,14 +514,30 @@ const columnSizeVars = computed(() => {
 });
 
 watch(columnSizeVars, (newColSizes) => {
-  emits("update:columnSizes", newColSizes);
+  debouncedUpdate(newColSizes);
 });
 
 onMounted(() => {
-  props.expandedRows.forEach((index) => {
-    expandRow(index as number);
-  });
+  setExpandedRows();
 });
+
+const updateTableWidth = async () => {
+  tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
+
+  setTimeout(() => {
+    let max = 0;
+    let width = max;
+    for (let i = 0; i < tableRows.value.length; i++) {
+      width = tableBodyRef?.value?.children[i]?.scrollWidth;
+      if (width > max) max = width;
+    }
+    tableRowSize.value = max;
+  }, 0);
+};
+
+const debouncedUpdate = debounce((newColSizes) => {
+  emits("update:columnSizes", newColSizes);
+}, 500);
 
 const formattedRows = computed(() => {
   return table.getRowModel().rows;
@@ -539,7 +567,7 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 26,
+    estimateSize: () => 20,
     overscan: 5,
     measureElement:
       typeof window !== "undefined" &&
@@ -555,8 +583,16 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
+const setExpandedRows = () => {
+  props.expandedRows.forEach((index: any) => {
+    if (index < props.rows.length) {
+      expandRow(index as number);
+    }
+  });
+};
+
 const copyLogToClipboard = (value: any) => {
-  emits("copy", value);
+  emits("copy", value, false);
 };
 const addSearchTerm = (value: string) => {
   emits("addSearchTerm", value);
@@ -579,17 +615,16 @@ const handleDragStart = (event: any) => {
   }
 };
 
-const handleDragEnd = async (event: any) => {
+const handleDragEnd = async () => {
   if (
     columnOrder.value.includes(store.state.zoConfig.timestamp_column) &&
     columnOrder.value[0] !== store.state.zoConfig.timestamp_column
   ) {
-    await nextTick();
-    const newItem = columnOrder.value[event.newIndex];
-    columnOrder.value[event.newIndex] = columnOrder.value[event.oldIndex];
-    columnOrder.value[event.oldIndex] = newItem;
-
-    columnOrder.value = [...columnOrder.value];
+    const newColumnOrder = columnOrder.value.filter(
+      (column: any) => column !== store.state.zoConfig.timestamp_column,
+    );
+    newColumnOrder.unshift(store.state.zoConfig.timestamp_column);
+    columnOrder.value = [...newColumnOrder];
   }
 };
 
@@ -669,7 +704,6 @@ defineExpose({
   top: 0;
   height: 100%;
   width: 5px;
-  background: rgba(0, 0, 0, 0.5);
   cursor: col-resize;
   user-select: none;
   touch-action: none;
@@ -684,18 +718,8 @@ defineExpose({
 }
 
 .resizer.isResizing {
-  background: blue;
+  background: $primary;
   opacity: 1;
-}
-
-@media (hover: hover) {
-  .resizer {
-    opacity: 0;
-  }
-
-  *:hover > .resizer {
-    opacity: 1;
-  }
 }
 
 .container {

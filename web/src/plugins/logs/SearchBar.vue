@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
-          label="Reset Filters"
+          :title="t('search.resetFilters')"
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-xs"
+          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         />
         <syntax-guide
@@ -1167,20 +1167,22 @@ export default defineComponent({
       data.forEach((item) => {
         if (item.expr && item.expr.column) {
           columnNames.push(item.expr.column);
-        } 
-        else if (item.expr && item.expr.args && item.expr.args.expr) {
+        } else if (item.expr && item.expr.args && item.expr.args.expr) {
           if (item.expr.args.expr.column) {
             columnNames.push(item.expr.args.expr.column);
           } else if (item.expr.args.expr.value) {
             columnNames.push(item.expr.args.expr.value);
           }
-        }
-        else if(item.expr && item.expr.name && item.expr.type ==="function"){
+        } else if (
+          item.expr &&
+          item.expr.name &&
+          item.expr.type === "function"
+        ) {
           item.expr.args.value.map((val) => {
             if (val.type === "column_ref") {
               columnNames.push(val.column);
             }
-          })
+          });
         }
       });
       return columnNames;
@@ -1246,7 +1248,6 @@ export default defineComponent({
                 }
               }
               useLocalInterestingFields(localFields);
-
             }
           }
 
@@ -1738,9 +1739,16 @@ export default defineComponent({
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
 
-            // Add colOrder to searchObj if saved view don't have colOrder property in resultGrid
-            if (!extractedObj.data.resultGrid.hasOwnProperty("colOrder")) {
-              searchObj.data.resultGrid.colOrder = [];
+            // Resetting columns as its not required in searchObj
+            // As we reassign columns from selectedFields and search results
+            extractedObj.data.resultGrid.columns = [];
+
+            // As in saved view, we observed field getting duplicated in selectedFields
+            // So, we are removing duplicates before applying saved view
+            if (extractedObj.data.stream.selectedFields?.length) {
+              extractedObj.data.stream.selectedFields = [
+                ...new Set(extractedObj.data.stream.selectedFields),
+              ];
             }
 
             if (extractedObj.data?.timezone) {
@@ -2742,6 +2750,15 @@ export default defineComponent({
   padding-bottom: 1px;
   height: 100%;
   overflow: visible;
+
+  .reset-filters {
+    width: 32px;
+    height: 32px;
+
+    .q-icon {
+      margin-right: 0;
+    }
+  }
 
   #logsQueryEditor,
   #fnEditor {

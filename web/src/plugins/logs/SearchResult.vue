@@ -132,14 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <tenstack-table
         ref="searchTableRef"
-        :columns="searchObj.data.resultGrid.columns"
-        :rows="searchObj.data.queryResults.hits"
+        :columns="getColumns || []"
+        :rows="searchObj.data.queryResults?.hits || []"
         :wrap="searchObj.meta.toggleSourceWrap"
         :width="getTableWidth"
         :err-msg="searchObj.data.missingStreamMessage"
         :loading="searchObj.loading"
-        :functionErrorMsg="searchObj.data.functionError"
+        :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
+        :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+        :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
         :style="{
           height: !searchObj.meta.showHistogram
@@ -247,36 +249,34 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
+      const prevColSizes =
+        this.searchObj.data.resultGrid?.colSizes[
+          this.searchObj.data.stream.selectedStream
+        ]?.[0] || {};
       this.searchObj.data.resultGrid.colSizes[
         this.searchObj.data.stream.selectedStream
-      ] = [newColSizes];
+      ] = [
+        {
+          ...prevColSizes,
+          ...newColSizes,
+        },
+      ];
     },
     handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
-      // Here we are checking if the columns are default columns
-      // As there can be case where user can have column with source like default source column
-      // So checking enableResizing as well as its off for default column
-      // If default columns not saving in colOrder
-      if (
-        newColOrder.length === 2 &&
-        newColOrder[0] === this.store.state.zoConfig.timestamp_column &&
-        newColOrder[1] === "source"
-      ) {
-        const sourceColIndex = columns.findIndex(
-          (col: any) => col.name === "source",
-        );
+      // Here we are checking if the columns are default columns ( _timestamp and source)
+      // If selected fields are empty, then we are setting colOrder to empty array as we
+      // don't change the order of default columns
+      // If you store the colOrder it will create issue when you save the view and load it again
 
-        if (columns[sourceColIndex].enableResizing === false) {
-          this.searchObj.data.resultGrid.colOrder[
-            this.searchObj.data.stream.selectedStream
-          ] = [];
-
-          return;
-        }
+      if (!this.searchObj.data.stream.selectedFields.length) {
+        this.searchObj.data.resultGrid.colOrder[
+          this.searchObj.data.stream.selectedStream
+        ] = [];
+      } else {
+        this.searchObj.data.resultGrid.colOrder[
+          this.searchObj.data.stream.selectedStream
+        ] = [...newColOrder];
       }
-
-      this.searchObj.data.resultGrid.colOrder[
-        this.searchObj.data.stream.selectedStream
-      ] = [...newColOrder];
     },
 
     getPageData(actionType: string) {
@@ -331,14 +331,17 @@ export default defineComponent({
       }
     },
     closeColumn(col: any) {
+      let selectedFields = this.reorderSelectedFields();
+
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.id);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name,
-      );
+      const SFIndex = selectedFields.indexOf(col.name);
 
-      this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
+      selectedFields.splice(SFIndex, 1);
+
+      this.searchObj.data.stream.selectedFields = selectedFields;
+
       this.searchObj.organizationIdetifier =
         this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
@@ -377,6 +380,7 @@ export default defineComponent({
       extractFTSFields,
       refreshPartitionPagination,
       filterHitsColumns,
+      reorderSelectedFields,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -521,8 +525,14 @@ export default defineComponent({
     });
 
     const scrollTableToTop = (value: number) => {
-      searchTableRef.value?.parentRef.scrollTo({ top: value });
+      searchTableRef.value?.parentRef?.scrollTo({ top: value });
     };
+
+    const getColumns = computed(() => {
+      return searchObj.data?.resultGrid?.columns?.filter(
+        (col: any) => !!col.id,
+      );
+    });
 
     return {
       t,
@@ -557,6 +567,8 @@ export default defineComponent({
       redirectToTraces,
       getTableWidth,
       scrollTableToTop,
+      getColumns,
+      reorderSelectedFields,
     };
   },
   computed: {

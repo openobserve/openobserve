@@ -231,11 +231,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
     <template>
-  <q-dialog class="q-pa-md"  v-model="showForm" persistent>
-    <q-card>
-      <q-card-section>
-        <div class="text-h6">Clone Alert</div>
-      </q-card-section>
+  <q-dialog class="q-pa-md "  v-model="showForm" persistent>
+    <q-card class="clone-alert-popup">
+      <div class="row items-center  no-wrap q-mx-md q-my-sm">
+      <div class="flex items-center">
+        <div
+          data-test="add-alert-back-btn"
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="showForm = false"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div class="text-h6" data-test="clone-alert-title">
+          {{ t("alerts.cloneTitle") }}
+        </div>
+      </div>
+    </div>
       <q-card-section>
         <q-form @submit="submitForm">
           <q-input v-model="toBeCloneAlertName" label="Alert Name" />
@@ -248,18 +266,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-select
             v-model="toBeClonestreamName"
             :loading="isFetchingStreams"
+             :disable="!toBeClonestreamType"
             label="Stream Name"
             :options="streamNames"
             @change="updateStreamName"
             @filter="filterStreams"
           />
-          <q-btn type="submit" class="q-ma-md" color="primary" label="Submit" />
-          <q-btn
-            type="button"
-            color="negative"
-            label="Cancel"
-            v-close-popup
-          />
+          <div class="flex justify-center q-mt-lg">
+              <q-btn
+                data-test="add-alert-cancel-btn"
+                v-close-popup="true"
+                class="q-mb-md text-bold"
+                :label="t('alerts.cancel')"
+                text-color="light-text"
+                padding="sm md"
+                no-caps
+              />
+              <q-btn
+                data-test="add-alert-submit-btn"
+                :label="t('alerts.save')"
+                class="q-mb-md text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                type="submit"
+                :disable="isSubmitting"
+                no-caps
+              />
+            </div>
+          
+    
         </q-form>
       </q-card-section>
     </q-card>
@@ -341,6 +376,7 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
+    const  isSubmitting = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -423,6 +459,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "last_satisfied_at",
+        field: "last_satisfied_at",
+        label: t("alerts.lastSatisfied"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("alerts.actions"),
@@ -484,6 +527,7 @@ export default defineComponent({
               uuid: data.uuid,
               owner: data.owner,
               last_triggered_at:convertUnixToQuasarFormat(data.last_triggered_at),
+              last_satisfied_at:convertUnixToQuasarFormat(data.last_satisfied_at),
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
@@ -598,10 +642,19 @@ export default defineComponent({
     const duplicateAlert = (row : any) =>{
       toBeCloneUUID.value = row.uuid
       toBeCloneAlertName.value = row.name;
+      toBeClonestreamName.value = "";
+      toBeClonestreamType.value = "";
+      
       showForm.value = true;
     }
-    const submitForm = () =>{
+    const submitForm = async () =>{
       const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value) as Alert;
+
+      const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
 
       if (!alertToBeCloned) {
         $q.notify({
@@ -611,10 +664,28 @@ export default defineComponent({
         });
         return;
       }
+      if(!toBeClonestreamType.value){
+        $q.notify({
+          type: "negative",
+          message: "Please select stream type ",
+          timeout: 2000,
+        });
+        return;
+      }
+      if(!toBeClonestreamName.value){
+        $q.notify({
+          type: "negative",
+          message: "Please select stream name",
+          timeout: 2000,
+        });
+        return;
+      }
+      isSubmitting.value = true;
+
         alertToBeCloned.name = toBeCloneAlertName.value;
         alertToBeCloned.stream_name = toBeClonestreamName.value;
         alertToBeCloned.stream_type = toBeClonestreamType.value;
-
+        
       try{
         alertsService.create(
             store.state.selectedOrganization.identifier,
@@ -622,6 +693,7 @@ export default defineComponent({
             alertToBeCloned.stream_type,
             alertToBeCloned,
           ).then((res) => {
+            dismiss();
             if (res.data.code == 200) {
               $q.notify({
                 type: "positive",
@@ -639,22 +711,27 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            dismiss();
             $q.notify({
               type: "negative",
               message: e.response.data.message,
               timeout: 2000,
             }); 
-          });
+          }).finally(() => {
+            isSubmitting.value = false;
+          })
 
       }
       catch(e : any) {
         showForm.value = true;
+        isSubmitting.value = false;
       $q.notify({
               type: "negative",
               message: e.data.message,
               timeout: 2000,
             });
       }
+
 
     }
     const showAddUpdateFn = (props: any) => {
@@ -803,6 +880,7 @@ export default defineComponent({
     };
     const filterStreams = (val: string, update: any) => {
       streamNames.value = filterColumns(indexOptions.value, val, update)
+
     };
 
     const toggleAlertState = (row: any) => {
@@ -881,6 +959,7 @@ export default defineComponent({
       indexOptions,
       streams,
       isFetchingStreams,
+      isSubmitting,
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery: ref(""),
@@ -920,6 +999,7 @@ export default defineComponent({
   }
 }
 
+
 .alerts-tabs {
   .q-tabs {
     &--vertical {
@@ -946,5 +1026,8 @@ export default defineComponent({
       }
     }
   }
+}
+.clone-alert-popup{
+  width: 400px;
 }
 </style>
