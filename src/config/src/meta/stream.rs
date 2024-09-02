@@ -498,6 +498,8 @@ pub struct UpdateStreamSettings {
     pub defined_schema_fields: UpdateStringSettingsArray,
     #[serde(default)]
     pub max_query_range: Option<i64>,
+    #[serde(default)]
+    pub store_original_data: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -655,7 +657,8 @@ impl From<&str> for StreamSettings {
 
         let store_original_data = settings
             .get("store_original_data")
-            .map_or(false, |v| v.as_bool().unwrap());
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         Self {
             partition_time_level,
