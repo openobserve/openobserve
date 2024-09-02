@@ -350,6 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="variableData.options[index].selected"
                 data-test="dashboard-custom-variable-checkbox"
                 @click="onCheckboxClick(index)"
+                class="q-mt-sm"
               />
               <div>
                 <q-btn
@@ -624,7 +625,6 @@ export default defineComponent({
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
-      customCheckboxValue: false,
     });
 
     const filterCycleError: any = ref("");
