@@ -9,7 +9,7 @@
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
-      data-test="dashboard-add-condition-logical-operator"
+      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
     <q-btn-group>
       <q-btn
@@ -22,7 +22,7 @@
         size="sm"
         :label="computedLabel(condition)"
         class="q-pl-sm"
-        data-test="dashboard-add-condition-label"
+        :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
         <q-menu
           class="q-pa-md"
@@ -45,14 +45,14 @@
               emit-value
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
-              data-test="dashboard-add-condition-column"
+              :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
             />
             <q-btn
               size="xs"
               dense
               @click="removeColumnName"
               icon="close"
-              data-test="dashboard-add-condition-remove-column"
+              :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
             />
           </div>
           <div style="height: 100%">
@@ -64,14 +64,14 @@
                     name="list"
                     :label="t('common.list')"
                     style="width: auto"
-                    data-test="dashboard-add-condition-list"
+                    :data-test="`dashboard-add-condition-list-${conditionIndex}`"
                   ></q-tab>
                   <q-tab
                     dense
                     name="condition"
                     :label="t('common.condition')"
                     style="width: auto"
-                    data-test="dashboard-add-condition-condition"
+                    :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></q-tab>
                 </q-tabs>
                 <q-separator></q-separator>
