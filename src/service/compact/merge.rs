@@ -22,14 +22,17 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
-    meta::stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
+    meta::{
+        inverted_index::InvertedIndexFormat,
+        stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
+    },
     metrics,
     utils::{
         json,
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::merge_record_batches,
+        record_batch_ext::{concat_batches, merge_record_batches},
         schema_ext::SchemaExt,
     },
     FILE_EXT_PARQUET,
@@ -51,7 +54,7 @@ use tokio::{
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::generate_index_on_compactor,
+    job::files::parquet::{generate_fst_inverted_index, generate_index_on_compactor},
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
@@ -608,6 +611,8 @@ pub async fn merge_files(
                         );
                     }
                 }
+                // QUESTION(taiming): since parquet files deleted, should we delete previously
+                // created fst index files as well if there's any?
                 deleted_files.push(file.key.clone());
                 total_records -= file.meta.records;
                 new_file_size -= file.meta.original_size;
@@ -777,15 +782,6 @@ pub async fn merge_files(
         ));
     }
 
-    // generate inverted index RecordBatch
-    let inverted_idx_batches = generate_inverted_idx_recordbatch(
-        schema_latest.clone(),
-        &new_batches,
-        stream_type,
-        &full_text_search_fields,
-        &index_fields,
-    );
-
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
     log::info!(
@@ -802,47 +798,77 @@ pub async fn merge_files(
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
             if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
-                let (index_file_name, filemeta) = generate_index_on_compactor(
-                    &retain_file_list,
-                    inverted_idx_batches,
-                    new_file_key.clone(),
-                    org_id,
-                    stream_name,
+                // generate inverted index RecordBatch
+                if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
+                    schema_latest.clone(),
+                    &new_batches,
                     stream_type,
                     &full_text_search_fields,
                     &index_fields,
-                )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "generate_index_on_compactor error: {}, need delete files: {:?}",
-                        e,
-                        retain_file_list
-                    )
-                })?;
-                if index_file_name.is_empty() {
-                    // there is no index file generated,
-                    // it means there is no inverted index terms can be generated
-                } else {
-                    log::info!("Created index file during compaction {}", index_file_name);
-                    // Notify that we wrote the index file to the db.
-                    if let Err(e) = write_file_list(
-                        org_id,
-                        &[FileKey {
-                            key: index_file_name.clone(),
-                            meta: filemeta,
-                            deleted: false,
-                            segment_ids: None,
-                        }],
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
-                            index_file_name,
-                            e.to_string(),
-                            retain_file_list
-                        );
+                )? {
+                    let index_format =
+                        InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+                    ) {
+                        let (index_file_name, filemeta) = generate_index_on_compactor(
+                            &retain_file_list,
+                            inverted_idx_batch.clone(),
+                            new_file_key.clone(),
+                            org_id,
+                            stream_name,
+                            stream_type,
+                            &full_text_search_fields,
+                            &index_fields,
+                        )
+                        .await
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "generate_index_on_compactor error: {}, need delete files: {:?}",
+                                e,
+                                retain_file_list
+                            )
+                        })?;
+                        if !index_file_name.is_empty() {
+                            log::info!(
+                                "Created parquet index file during compaction {}",
+                                index_file_name
+                            );
+                            // Notify that we wrote the index file to the db.
+                            if let Err(e) = write_file_list(
+                                org_id,
+                                &[FileKey {
+                                    key: index_file_name.clone(),
+                                    meta: filemeta,
+                                    deleted: false,
+                                    segment_ids: None,
+                                }],
+                            )
+                            .await
+                            {
+                                log::error!(
+                                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                                    index_file_name,
+                                    e.to_string(),
+                                    retain_file_list
+                                );
+                            }
+                        }
+                    }
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+                    ) {
+                        // generate fst inverted index and write to storage
+                        generate_fst_inverted_index(
+                            inverted_idx_batch,
+                            &new_file_key,
+                            &full_text_search_fields,
+                            &index_fields,
+                            Some(&retain_file_list),
+                        )
+                        .await?;
                     }
                 }
             }
@@ -1036,13 +1062,13 @@ pub fn generate_inverted_idx_recordbatch(
     stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Vec<RecordBatch> {
+) -> Result<Option<RecordBatch>, anyhow::Error> {
     let cfg = get_config();
     if !cfg.common.inverted_index_enabled
         || batches.is_empty()
         || !stream_type.create_inverted_index()
     {
-        return Vec::new();
+        return Ok(None);
     }
 
     let schema_fields = schema
@@ -1061,7 +1087,7 @@ pub fn generate_inverted_idx_recordbatch(
     inverted_idx_columns.dedup();
     inverted_idx_columns.retain(|f| schema_fields.contains(f));
     if inverted_idx_columns.is_empty() {
-        return Vec::new();
+        return Ok(None);
     }
     // add _timestamp column to columns_to_index
     if !inverted_idx_columns.contains(&cfg.common.column_timestamp) {
@@ -1092,7 +1118,34 @@ pub fn generate_inverted_idx_recordbatch(
         inverted_idx_batches.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
     }
 
-    inverted_idx_batches
+    if inverted_idx_batches.is_empty() {
+        Ok(None)
+    } else {
+        let mut new_batch = if inverted_idx_batches.len() == 1 {
+            inverted_idx_batches.remove(0)
+        } else {
+            let new_schema = inverted_idx_batches.first().unwrap().schema();
+            concat_batches(new_schema, inverted_idx_batches).map_err(anyhow::Error::from)?
+        };
+
+        let mut null_columns = 0;
+        for i in 0..new_batch.num_columns() {
+            let ni = i - null_columns;
+            if new_batch.column(ni).null_count() == new_batch.num_rows() {
+                new_batch.remove_column(ni);
+                null_columns += 1;
+            }
+        }
+
+        if matches!(
+            new_batch.schema().fields().len(),
+            0 | 1 if new_batch.schema().field(0).name() == &cfg.common.column_timestamp
+        ) {
+            Ok(None)
+        } else {
+            Ok(Some(new_batch))
+        }
+    }
 }
 
 pub async fn merge_parquet_files(

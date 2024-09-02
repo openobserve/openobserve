@@ -126,14 +126,15 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled
+    let use_inverted_index = cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
         && meta.use_inverted_index
+        && (meta.inverted_index_type == "parquet" || meta.inverted_index_type == "both")
         && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] search: is_inverted_index {}",
-        is_inverted_index
+        "[trace_id {trace_id}] search: use_inverted_index via parquet format {}",
+        use_inverted_index
     );
 
     // stream settings
@@ -162,7 +163,7 @@ pub async fn search(
     // then filter the file list based on the inverted index.
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if is_inverted_index {
+    if use_inverted_index {
         (file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
         log::info!(
@@ -1015,7 +1016,7 @@ async fn get_file_list_by_inverted_index(
 
     let fts_condition = terms
         .iter()
-        .map(|x| format!("term LIKE '{x}%'"))
+        .map(|x| format!("term LIKE '%{x}%'"))
         .collect::<Vec<_>>()
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {

@@ -221,6 +221,7 @@ impl QueryCondition {
             timeout: 0,
             search_type: Some(SearchEventType::Alerts), /* TODO(taiming): change the name to
                                                          * scheduled & inform FE */
+            index_type: "".to_string(),
         };
         let trace_id = ider::uuid();
         let resp = match SearchService::search(
