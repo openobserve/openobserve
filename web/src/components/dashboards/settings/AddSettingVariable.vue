@@ -386,12 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
-          <div
-            v-if="
-              variableData.multiSelect &&
-              ['query_values'].includes(variableData.type)
-            "
-          >
+          <div v-if="['query_values'].includes(variableData.type)">
             <div
               class="button-group multi-select-default-value-toggle q-mt-md"
               style="margin-bottom: 12px"
@@ -414,7 +409,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     First value
                   </button>
                 </div>
-                <div>
+
+                <div v-if="variableData.multiSelect">
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-all-values"
                     :class="
@@ -430,6 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     All values
                   </button>
                 </div>
+
                 <div>
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-custom"
@@ -454,11 +451,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="
                 variableData.selectAllValueForMultiSelect === 'custom' &&
-                variableData.type == 'query_values'
+                variableData.type === 'query_values'
               "
             >
               <div
-                v-for="(value, index) in variableData.customMultiSelectValue"
+                v-for="(value, index) in variableData.multiSelect
+                  ? variableData.customMultiSelectValue
+                  : [variableData.customMultiSelectValue[0]]"
                 :key="index"
                 class="q-mb-sm q-mt-md"
                 style="flex-wrap: wrap"
@@ -475,6 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     placeholder="Enter value"
                   />
                   <q-btn
+                    v-if="variableData.multiSelect"
                     size="sm"
                     padding="12px 5px"
                     flat
@@ -485,7 +485,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex" style="width: 50%">
+
+              <div
+                v-if="variableData.multiSelect"
+                class="flex"
+                style="width: 50%"
+              >
                 <q-btn
                   no-caps
                   icon="add"
@@ -498,6 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+
           <!-- hide on dashboard toggle -->
           <div>
             <q-toggle
