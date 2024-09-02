@@ -488,7 +488,7 @@ export default defineComponent({
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
-      storeOriginalData.value =  false;
+      storeOriginalData.value = false;
     });
 
     const isSchemaEvolutionEnabled = computed(() => {
