@@ -499,9 +499,14 @@ export default defineComponent({
         }
 
         selectedType.value = props.defaultType;
-        setAbsoluteTime(startTime, endTime);
 
-        setRelativeTime(props.defaultRelativeTime);
+        // if type is absolute
+        if (selectedType.value == "absolute") {
+          setAbsoluteTime(startTime, endTime);
+        } else {
+          // else type is relative
+          setRelativeTime(props.defaultRelativeTime);
+        }
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
