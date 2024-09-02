@@ -19,6 +19,7 @@ use crate::service::db::instance;
 
 pub mod cluster;
 pub mod config;
+#[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod wal;
 
@@ -34,7 +35,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
     cache_instance_id(&instance_id);
 
-    wal::init().await?;
+    wal::init()?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
