@@ -296,7 +296,9 @@ pub async fn update_stream_settings(
             if let Some(max_query_range) = update_settings.max_query_range {
                 settings.max_query_range = max_query_range;
             }
-
+            if let Some(store_original_data) = update_settings.store_original_data {
+                settings.store_original_data = store_original_data;
+            }
             if let Some(flatten_level) = update_settings.flatten_level {
                 settings.flatten_level = Some(flatten_level);
             }
