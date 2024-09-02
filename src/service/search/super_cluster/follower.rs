@@ -30,7 +30,9 @@ use infra::{
 use proto::cluster_rpc::FlightSearchRequest;
 
 use crate::service::search::{
-    cluster::flight::{get_file_list, get_online_querier_nodes, partition_filt_list},
+    cluster::flight::{
+        check_work_group, get_file_list, get_online_querier_nodes, partition_filt_list,
+    },
     datafusion::{
         distributed_plan::{
             codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
@@ -41,6 +43,7 @@ use crate::service::search::{
         exec::prepare_datafusion_context,
     },
     request::Request,
+    utlis::AsyncDefer,
 };
 
 #[allow(dead_code)]
@@ -53,9 +56,11 @@ use crate::service::search::{
 // 6. execute physical plan to get stream
 pub async fn search(
     flight_request: &FlightSearchRequest,
-) -> Result<(SessionContext, Arc<dyn ExecutionPlan>), Error> {
+) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, AsyncDefer), Error> {
+    let start = std::time::Instant::now();
     let cfg = config::get_config();
-    let req: Request = flight_request.clone().into();
+    let mut req: Request = flight_request.clone().into();
+    let trace_id = req.trace_id.clone();
 
     // create datafusion context, just used for decode plan, the params can use default
     let ctx = prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
@@ -119,21 +124,62 @@ pub async fn search(
     )
     .await;
 
+    let file_list_vec = file_list.iter().collect::<Vec<_>>();
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] flight->leader: get file_list time_range: ({}, {}), num: {}, took: {} ms",
+        flight_request.start_time,
+        flight_request.end_time,
+        file_list_vec.len(),
+        file_list_took,
+    );
+
     // get nodes
     let node_group = req
         .search_event_type
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let nodes = get_online_querier_nodes(&req.trace_id, node_group).await?;
+    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
 
-    // TODO
-    // req.work_group = xxx; // set work_group to xxx
+    // check work group
+    let file_list_vec = file_list.iter().collect::<Vec<_>>();
+    let (_took_wait, work_group_str, work_group) = check_work_group(
+        &req,
+        &trace_id,
+        &nodes,
+        &file_list_vec,
+        start,
+        file_list_took,
+    )
+    .await?;
+    // add work_group
+    req.add_work_group(Some(work_group_str));
+
+    // release work_group in flight follow search
+    let user_id = req.user_id.clone();
+    let trace_id_move = trace_id.to_string();
+    let defer = AsyncDefer::new({
+        async move {
+            let _ = work_group
+                .as_ref()
+                .unwrap()
+                .done(&trace_id_move, user_id.as_deref())
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[trace_id {trace_id_move}] release work_group in flight follow search error: {e}",
+                    );
+                    e.to_string();
+                });
+            log::info!("[trace_id {trace_id_move}] release work_group in flight follow search",);
+        }
+    });
 
     // partition file list
     let partition_file_lists = partition_filt_list(file_list, &nodes, node_group).await?;
@@ -163,5 +209,5 @@ pub async fn search(
         ));
     }
 
-    Ok((ctx, physical_plan))
+    Ok((ctx, physical_plan, defer))
 }

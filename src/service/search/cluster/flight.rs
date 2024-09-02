@@ -161,9 +161,6 @@ pub async fn search(
         .with_label_values(&[&sql.org_id])
         .inc();
 
-    // 5. partition file list
-    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
-
     // TODO: split it to two function for enterprise and non enterprise
     // release lock when search done or get error
     #[cfg(feature = "enterprise")]
@@ -175,7 +172,7 @@ pub async fn search(
             #[cfg(not(feature = "enterprise"))]
             let _ = dist_lock::unlock(&locker).await.map_err(|e| {
                 log::error!(
-                    "[trace_id {trace_id_move}] release source in flight search error: {e}",
+                    "[trace_id {trace_id_move}] release work group in flight search error: {e}",
                 );
                 Error::Message(e.to_string())
             });
@@ -187,13 +184,19 @@ pub async fn search(
                 .await
                 .map_err(|e| {
                     log::error!(
-                        "[trace_id {trace_id_move}] release source in flight search error: {e}",
+                        "[trace_id {trace_id_move}] release work group in flight search error: {e}",
                     );
                     e.to_string();
                 });
-            log::info!("[trace_id {trace_id_move}] release source in flight search",);
+            #[cfg(not(feature = "enterprise"))]
+            log::info!("[trace_id {trace_id_move}] release lock in flight search",);
+            #[cfg(feature = "enterprise")]
+            log::info!("[trace_id {trace_id_move}] release work group in flight search",);
         }
     });
+
+    // 5. partition file list
+    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
 
     #[cfg(feature = "enterprise")]
     super::super::SEARCH_SERVER

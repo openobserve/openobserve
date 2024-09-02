@@ -15,6 +15,7 @@
 
 use std::{
     io::Cursor,
+    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -34,9 +35,10 @@ use datafusion::{
 };
 use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use prost::Message;
+use proto::cluster_rpc::FlightSearchRequest;
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::service::search::grpc::flight as grpcFlight;
+use crate::service::search::{grpc::flight as grpcFlight, utlis::AsyncDefer};
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -68,16 +70,12 @@ impl FlightService for FlightServiceImpl {
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
         #[cfg(feature = "enterprise")]
-        let result = if req.is_super_cluster {
-            crate::service::search::super_cluster::follower::search(&req).await
-        } else {
-            grpcFlight::search(&req).await
-        };
+        let result = get_ctx_and_physical_plan(&req).await;
         #[cfg(not(feature = "enterprise"))]
-        let result = grpcFlight::search(&req).await;
+        let result = get_ctx_and_physical_plan(&req).await;
 
         // 2. prepare dataufion context
-        let (ctx, physical_plan) = match result {
+        let (ctx, physical_plan, defer) = match result {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
@@ -104,9 +102,12 @@ impl FlightService for FlightServiceImpl {
                 .set_show_schema(false)
                 .indent(true)
                 .to_string();
-            println!("+---------------------------+----------+");
-            println!("follow physical plan");
-            println!("+---------------------------+----------+");
+            println!("+---------------------------+--------------------------+");
+            println!(
+                "follow physical plan, is_super_cluster_follower_leader: {}",
+                req.is_super_cluster
+            );
+            println!("+---------------------------+--------------------------+");
             println!("{}", plan);
         }
 
@@ -125,6 +126,7 @@ impl FlightService for FlightServiceImpl {
                     );
                     Status::internal(e.to_string())
                 })?,
+                defer,
             ))
             .map_err(|err| Status::from_error(Box::new(err)));
 
@@ -200,11 +202,16 @@ impl FlightService for FlightServiceImpl {
 struct FlightSenderStream {
     trace_id: String,
     stream: SendableRecordBatchStream,
+    defer: Option<AsyncDefer>,
 }
 
 impl FlightSenderStream {
-    fn new(trace_id: String, stream: SendableRecordBatchStream) -> Self {
-        Self { trace_id, stream }
+    fn new(trace_id: String, stream: SendableRecordBatchStream, defer: Option<AsyncDefer>) -> Self {
+        Self {
+            trace_id,
+            stream,
+            defer,
+        }
     }
 }
 
@@ -228,13 +235,53 @@ impl Stream for FlightSenderStream {
 
 impl Drop for FlightSenderStream {
     fn drop(&mut self) {
-        log::info!(
-            "[trace_id {}] flight->search: drop FlightSenderStream",
-            self.trace_id
-        );
-        // clear session data
-        crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
-        // release wal lock files
-        crate::common::infra::wal::release_request(&self.trace_id);
+        if let Some(defer) = self.defer.take() {
+            drop(defer);
+        } else {
+            log::info!(
+                "[trace_id {}] flight->search: drop FlightSenderStream",
+                self.trace_id
+            );
+            // clear session data
+            crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
+            // release wal lock files
+            crate::common::infra::wal::release_request(&self.trace_id);
+        }
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn get_ctx_and_physical_plan(
+    req: &FlightSearchRequest,
+) -> Result<
+    (
+        datafusion::prelude::SessionContext,
+        Arc<dyn datafusion::physical_plan::ExecutionPlan>,
+        Option<AsyncDefer>,
+    ),
+    infra::errors::Error,
+> {
+    if req.is_super_cluster {
+        let (ctx, physical_plan, defer) =
+            crate::service::search::super_cluster::follower::search(req).await?;
+        Ok((ctx, physical_plan, Some(defer)))
+    } else {
+        let (ctx, physical_plan) = grpcFlight::search(req).await?;
+        Ok((ctx, physical_plan, None))
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn get_ctx_and_physical_plan(
+    req: &FlightSearchRequest,
+) -> Result<
+    (
+        datafusion::prelude::SessionContext,
+        Arc<dyn datafusion::physical_plan::ExecutionPlan>,
+        Option<AsyncDefer>,
+    ),
+    infra::errors::Error,
+> {
+    let (ctx, physical_plan) = grpcFlight::search(req).await?;
+    Ok((ctx, physical_plan, None))
 }
