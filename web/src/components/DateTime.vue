@@ -191,8 +191,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <table class="q-px-md startEndTime">
                 <tr>
-                  <td class="label">Start time</td>
-                  <td class="label">End time</td>
+                  <td class="label tw-px-2">Start time</td>
+                  <td class="label tw-px-2">End time</td>
                 </tr>
                 <tr>
                   <td>
