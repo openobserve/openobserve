@@ -67,10 +67,16 @@ const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
 
+pub enum RequestType {
+    Http,
+    Grpc,
+    Protobuf,
+}
+
 pub async fn handle_trace_request(
     org_id: &str,
     request: ExportTraceServiceRequest,
-    is_grpc: bool,
+    req_type: RequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -224,7 +230,7 @@ pub async fn handle_trace_request(
                             trace_state: Some(link.trace_state),
                         },
                         attributes: link_att_map.clone(),
-                        dropped_attributes_count: link.dropped_attributes_count, // TODO: add appropriate value
+                        dropped_attributes_count: link.dropped_attributes_count,
                     })
                 }
 
@@ -248,7 +254,6 @@ pub async fn handle_trace_request(
                     attributes: span_att_map,
                     service: service_att_map.clone(),
                     flags: 1, // TODO add appropriate value
-                    //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
                     links: json::to_string(&links).unwrap(),
                 };
@@ -298,7 +303,7 @@ pub async fn handle_trace_request(
                         span_metrics.push(sm);
                         v
                     }
-                    _ => unreachable!(""),
+                    _ => unreachable!(""), // TODO return error properly
                 };
 
                 // add timestamp
@@ -313,23 +318,22 @@ pub async fn handle_trace_request(
 
     // if no data, fast return
     if json_data.is_empty() {
-        return format_response(partial_success);
+        return format_response(partial_success, req_type);
     }
 
     let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error while writing traces: {}", e);
-            return format_response(partial_success);
+            return format_response(partial_success, req_type);
         }
     };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
-    let ep = if is_grpc {
-        "/grpc/otlp/traces"
-    } else {
-        "/api/otlp/v1/traces"
+    let ep = match req_type {
+        RequestType::Grpc => "/grpc/otlp/traces",
+        _ => "/api/otlp/v1/traces",
     };
 
     // record span metrics
@@ -384,7 +388,7 @@ pub async fn handle_trace_request(
     )
     .await;
 
-    format_response(partial_success)
+    format_response(partial_success, req_type)
 }
 
 fn get_span_status(status: Option<Status>) -> String {
@@ -394,27 +398,42 @@ fn get_span_status(status: Option<Status>) -> String {
             StatusCode::Error => "ERROR".to_string(),
             StatusCode::Unset => "UNSET".to_string(),
         },
-        None => "".to_string(),
+        // unset is the default status for span - https://opentelemetry.io/docs/languages/go/instrumentation/#set-span-status
+        None => "UNSET".to_string(),
     }
 }
 
-fn format_response(mut partial_success: ExportTracePartialSuccess) -> Result<HttpResponse, Error> {
-    let res = ExportTraceServiceResponse {
-        partial_success: if partial_success.rejected_spans > 0 {
-            partial_success.error_message =
-                "Some spans were rejected due to exceeding the allowed retention period"
-                    .to_string();
-            Some(partial_success)
-        } else {
-            None
-        },
+fn format_response(
+    mut partial_success: ExportTracePartialSuccess,
+    req_type: RequestType,
+) -> Result<HttpResponse, Error> {
+    let partial = partial_success.rejected_spans > 0;
+
+    let res = if partial {
+        partial_success.error_message =
+            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        ExportTraceServiceResponse {
+            partial_success: Some(partial_success),
+        }
+    } else {
+        ExportTraceServiceResponse::default()
     };
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
-    Ok(HttpResponse::Ok()
-        .status(http::StatusCode::OK)
-        .content_type("application/x-protobuf")
-        .body(out))
+
+    match req_type {
+        RequestType::Http => Ok(if partial {
+            HttpResponse::PartialContent().json(res)
+        } else {
+            HttpResponse::Ok().json(res)
+        }),
+        _ => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            Ok(HttpResponse::Ok()
+                .status(http::StatusCode::OK)
+                .content_type("application/x-protobuf")
+                .body(out))
+        }
+    }
 }
 
 async fn write_traces(
