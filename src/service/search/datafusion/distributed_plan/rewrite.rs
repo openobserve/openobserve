@@ -24,7 +24,7 @@ use datafusion::{
     physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
 };
 use hashbrown::HashMap;
-use proto::cluster_rpc::PartitionKeys;
+use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
 use crate::service::search::request::Request;
@@ -34,7 +34,7 @@ pub struct RemoteScanRewriter {
     pub req: Request,
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
-    pub partition_keys: HashMap<String, Vec<PartitionKeys>>,
+    pub equal_keys: HashMap<String, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
@@ -45,7 +45,7 @@ impl RemoteScanRewriter {
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_lists: HashMap<String, Vec<Vec<FileKey>>>,
-        partition_keys: HashMap<String, Vec<PartitionKeys>>,
+        equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         is_leader: bool,
     ) -> Self {
@@ -53,7 +53,7 @@ impl RemoteScanRewriter {
             req,
             nodes,
             file_lists,
-            partition_keys,
+            equal_keys,
             match_all_keys,
             is_leader,
             is_changed: false,
@@ -79,7 +79,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .get(&table_name)
                         .unwrap_or(&empty_files)
                         .clone(),
-                    self.partition_keys
+                    self.equal_keys
                         .get(&table_name)
                         .unwrap_or(&empty_keys)
                         .clone(),
@@ -109,7 +109,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .get(&table_name)
                         .unwrap_or(&empty_files)
                         .clone(),
-                    self.partition_keys
+                    self.equal_keys
                         .get(&table_name)
                         .unwrap_or(&empty_keys)
                         .clone(),

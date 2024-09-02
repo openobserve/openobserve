@@ -33,7 +33,7 @@ impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
     }
 }
 
-impl cluster_rpc::PartitionKeys {
+impl cluster_rpc::KvItem {
     pub fn new(key: &str, value: &str) -> Self {
         Self {
             key: key.to_owned(),

@@ -27,7 +27,7 @@ message FlightSearchRequest {
     string                    stream_type = 4;
     bytes                            plan = 6;
     repeated FileKey            file_list = 7;
-    repeated PartitionKeys partition_keys = 8;
+    repeated KvItem            equal_keys = 8;
     repeated string        match_all_keys = 9;
     int64                     start_time = 10;
     int64                       end_time = 11;
@@ -38,7 +38,7 @@ message FlightSearchRequest {
     optional string    search_event_type = 16;
 }
 
-message PartitionKeys {
+message KvItem {
     string   key = 1;
     string value = 2;
 }

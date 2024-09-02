@@ -3139,7 +3139,7 @@ pub struct FlightSearchRequest {
     #[prost(message, repeated, tag = "7")]
     pub file_list: ::prost::alloc::vec::Vec<FileKey>,
     #[prost(message, repeated, tag = "8")]
-    pub partition_keys: ::prost::alloc::vec::Vec<PartitionKeys>,
+    pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
     #[prost(string, repeated, tag = "9")]
     pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(int64, tag = "10")]
@@ -3159,7 +3159,7 @@ pub struct FlightSearchRequest {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PartitionKeys {
+pub struct KvItem {
     #[prost(string, tag = "1")]
     pub key: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]

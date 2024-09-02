@@ -114,7 +114,7 @@ pub async fn search(
 
     // construct partition filters
     let search_partition_keys: Option<Vec<(String, String)>> = req
-        .partition_keys
+        .equal_keys
         .iter()
         .filter_map(|v| {
             if schema_latest_map.contains_key(&v.key) {

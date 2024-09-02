@@ -39,7 +39,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use futures::{Stream, StreamExt, TryStreamExt};
 use prost::Message;
-use proto::cluster_rpc::{self, FlightSearchRequest, PartitionKeys};
+use proto::cluster_rpc::{self, FlightSearchRequest, KvItem};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -55,7 +55,7 @@ use crate::service::search::request::Request;
 pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
     file_list: Vec<Vec<FileKey>>,
-    partition_keys: Vec<PartitionKeys>,
+    equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
     is_super_cluster: bool,
     req: Request,
@@ -69,7 +69,7 @@ impl RemoteScanExec {
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
         file_list: Vec<Vec<FileKey>>,
-        partition_keys: Vec<PartitionKeys>,
+        equal_keys: Vec<KvItem>,
         match_all_keys: Vec<String>,
         is_super_cluster: bool,
         req: Request,
@@ -81,7 +81,7 @@ impl RemoteScanExec {
             input,
             req,
             file_list,
-            partition_keys,
+            equal_keys,
             match_all_keys,
             is_super_cluster,
             nodes,
@@ -168,7 +168,7 @@ impl ExecutionPlan for RemoteScanExec {
             partition,
             self.nodes[partition].clone(),
             file_list,
-            self.partition_keys.clone(),
+            self.equal_keys.clone(),
             self.match_all_keys.clone(),
             self.is_super_cluster,
             req,
@@ -191,7 +191,7 @@ async fn get_remote_batch(
     partition: usize,
     node: Arc<dyn NodeInfo>,
     file_list: Vec<FileKey>,
-    partition_keys: Vec<PartitionKeys>,
+    equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
     is_super_cluster: bool,
     req: Request,
@@ -208,7 +208,7 @@ async fn get_remote_batch(
         stream_type: req.stream_type.to_string(),
         plan: physical_plan_bytes.to_vec(),
         file_list: file_list.iter().map(cluster_rpc::FileKey::from).collect(),
-        partition_keys,
+        equal_keys,
         match_all_keys,
         is_super_cluster,
         start_time,

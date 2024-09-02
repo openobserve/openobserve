@@ -132,6 +132,9 @@ pub async fn search(
         return Err(Error::Message("no querier node online".to_string()));
     }
 
+    // TODO
+    // req.work_group = xxx; // set work_group to xxx
+
     // partition file list
     let partition_file_lists = partition_filt_list(file_list, &nodes, node_group).await?;
 
