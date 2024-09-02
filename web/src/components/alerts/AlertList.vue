@@ -422,6 +422,13 @@ export default defineComponent({
         sortable: false,
       },
       {
+        name: "description",
+        field: "description",
+        label: t("alerts.description"),
+        align: "center",
+        sortable: false,
+      },
+      {
         name: "last_triggered_at",
         field: "last_triggered_at",
         label: t("alerts.lastTriggered"),
