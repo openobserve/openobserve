@@ -275,7 +275,7 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams();
+    const { getStreams , getStream} = useStreams();
 
     const filteredTracesStreamOptions = ref([]);
 
