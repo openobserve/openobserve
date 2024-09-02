@@ -373,7 +373,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- multiselect toggle for query values and custom variables-->
-          <div v-if="['query_values', 'custom'].includes(variableData.type)">
+          <div
+            v-if="['query_values', 'custom'].includes(variableData.type)"
+            class="q-mt-md"
+          >
             <q-toggle
               v-model="variableData.multiSelect"
               :label="t('dashboard.multiSelect')"
@@ -389,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <div
-              class="button-group multi-select-default-value-toggle"
+              class="button-group multi-select-default-value-toggle q-mt-md"
               style="margin-bottom: 12px"
             >
               <div class="multi-select-default-value">By Default Select:</div>
@@ -446,49 +449,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </div>
-          <!-- if selectAllValueForMultiSelect is custom then show this input -->
-          <div
-            v-if="
-              variableData.selectAllValueForMultiSelect === 'custom' &&
-              variableData.type == 'query_values'
-            "
-          >
+            <!-- if selectAllValueForMultiSelect is custom then show this input -->
             <div
-              v-for="(value, index) in variableData.customMultiSelectValue"
-              :key="index"
-              class="q-mb-sm"
+              v-if="
+                variableData.selectAllValueForMultiSelect === 'custom' &&
+                variableData.type == 'query_values'
+              "
             >
-              <q-input
-                dense
-                filled
-                outlined
-                stack-label
-                class="col textbox showLabelOnTop q-mr-sm"
-                v-model="variableData.customMultiSelectValue[index]"
-                label="Custom Value"
-                name="value"
-              />
-              <q-btn
-                size="sm"
-                padding="12px 5px"
-                flat
-                dense
-                @click="removeCustomValue(index)"
-                icon="close"
-                :data-test="`dashboard-variable-custom-close-${index}`"
-              />
+              <div
+                v-for="(value, index) in variableData.customMultiSelectValue"
+                :key="index"
+                class="q-mb-sm q-mt-md"
+                style="flex-wrap: wrap"
+              >
+                <div class="flex q-mr-sm" style="width: 50%">
+                  <q-input
+                    dense
+                    filled
+                    outlined
+                    stack-label
+                    class="col textbox showLabelOnTop"
+                    v-model="variableData.customMultiSelectValue[index]"
+                    name="value"
+                    placeholder="Enter value"
+                  />
+                  <q-btn
+                    size="sm"
+                    padding="12px 5px"
+                    flat
+                    dense
+                    @click="removeCustomValue(index)"
+                    icon="close"
+                    :data-test="`dashboard-variable-custom-close-${index}`"
+                  />
+                </div>
+              </div>
+              <div class="flex" style="width: 50%">
+                <q-btn
+                  no-caps
+                  icon="add"
+                  no-outline
+                  class="q-mt-md"
+                  @click="addCustomValue"
+                  data-test="dashboard-add-custom-value-btn"
+                >
+                </q-btn>
+              </div>
             </div>
-            <q-btn
-              no-caps
-              icon="add"
-              no-outline
-              class="q-mt-md"
-              @click="addCustomValue"
-              data-test="dashboard-add-custom-value-btn"
-            >
-              Add Custom Value
-            </q-btn>
           </div>
           <!-- hide on dashboard toggle -->
           <div>
@@ -1005,19 +1012,24 @@ export default defineComponent({
 
     // watch on multi select value change
     watch(
-      () => variableData.multiSelect,
+      () => variableData?.multiSelect,
       (newVal) => {
         console.log("multiSelect", newVal);
 
         if (!newVal) {
           console.log("multiSelect is enabled");
 
-          variableData.options.forEach((option: any, index: any) => {
-            variableData.options[index].selected = false;
-          });
-          console.log("variableData.options", variableData.options);
+          if (Array.isArray(variableData?.options)) {
+            variableData.options.forEach((option: any, index: any) => {
+              if (variableData.options[index]) {
+                variableData.options[index].selected = false;
+              }
+            });
 
-          variableData.options[0].selected = true;
+            if (variableData.options.length > 0 && variableData.options[0]) {
+              variableData.options[0].selected = true;
+            }
+          }
         }
       },
     );
