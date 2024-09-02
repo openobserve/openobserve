@@ -1040,6 +1040,16 @@ export default defineComponent({
       },
     );
 
+    watch(
+      () => variableData.selectAllValueForMultiSelect,
+      (newVal, oldVal) => {
+        if (newVal !== oldVal) {
+          variableData.customMultiSelectValue = [];
+          console.log("customMultiSelectValue has been cleared.");
+        }
+      },
+    );
+
     const onCheckboxClick = (index: any) => {
       if (!variableData.multiSelect) {
         variableData.options.forEach((option: any, i: any) => {
