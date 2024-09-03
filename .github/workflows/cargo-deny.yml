@@ -4,6 +4,8 @@ on:
     paths:
       - "**/Cargo.lock"
       - "**/Cargo.toml"
+      - "deny.toml"
+      - ".github/workflows/cargo-deny.yml" # run when this file changes, so we know nothing is broken
 
 jobs:
   check:

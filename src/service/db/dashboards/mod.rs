@@ -17,7 +17,7 @@ use actix_web::web;
 use config::utils::json;
 
 use crate::{
-    common::meta::dashboards::{v1, v2, v3, v4, Dashboard, DashboardVersion},
+    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
     service::db,
 };
 
@@ -54,11 +54,18 @@ pub(crate) async fn get(
             version: 3,
             ..Default::default()
         })
-    } else {
+    } else if d_version.version == 4 {
         let dash: v4::Dashboard = json::from_slice(&bytes)?;
         Ok(Dashboard {
             v4: Some(dash),
             version: 4,
+            ..Default::default()
+        })
+    } else {
+        let dash: v5::Dashboard = json::from_slice(&bytes)?;
+        Ok(Dashboard {
+            v5: Some(dash),
+            version: 5,
             ..Default::default()
         })
     }
@@ -119,7 +126,7 @@ pub(crate) async fn put(
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
         }
-    } else {
+    } else if d_version.version == 4 {
         let mut dash: v4::Dashboard = json::from_slice(&body)?;
         dash.title = dash.title.trim().to_string();
         if dash.title.is_empty() {
@@ -130,6 +137,21 @@ pub(crate) async fn put(
             Ok(_) => Ok(Dashboard {
                 v4: Some(dash),
                 version: 4,
+                ..Default::default()
+            }),
+            Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
+        }
+    } else {
+        let mut dash: v5::Dashboard = json::from_slice(&body)?;
+        dash.title = dash.title.trim().to_string();
+        if dash.title.is_empty() {
+            return Err(anyhow::anyhow!("Dashboard should have title"));
+        };
+        dash.dashboard_id = dashboard_id.to_string();
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
+            Ok(_) => Ok(Dashboard {
+                v5: Some(dash),
+                version: 5,
                 ..Default::default()
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
@@ -166,11 +188,18 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                     version: 3,
                     ..Default::default()
                 })
-            } else {
+            } else if d_version.version == 4 {
                 let dash: v4::Dashboard = json::from_slice(&val).unwrap();
                 Ok(Dashboard {
                     v4: Some(dash),
                     version: 4,
+                    ..Default::default()
+                })
+            } else {
+                let dash: v5::Dashboard = json::from_slice(&val).unwrap();
+                Ok(Dashboard {
+                    v5: Some(dash),
+                    version: 5,
                     ..Default::default()
                 })
             }
