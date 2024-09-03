@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <grid-layout
         ref="gridLayoutRef"
         v-if="panels.length > 0"
-        :layout.sync="getDashboardLayout(panels)"
+        :layout="getDashboardLayout(panels)"
         :col-num="48"
         :row-height="30"
         :is-draggable="!viewOnly"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="item"
               :dashboardId="dashboardData.dashboardId"
               :folderId="folderId"
-              :selectedTimeDate="currentTimeObj[item.id] || currentTimeObj['__global']"
+              :selectedTimeDate="currentTimeObj[item.id] || currentTimeObj['__global'] || {}"
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
@@ -227,6 +227,10 @@ export default defineComponent({
     const onMovePanel = (panelId: any, newTabId: any) => {
       emit("onMovePanel", panelId, newTabId);
     };
+
+    watch(() => props.currentTimeObj, () => {
+      console.log('Render dashboard component: panelcache: currentTimeObj changed', JSON.parse(JSON.stringify(props.currentTimeObj)))
+    })
 
     // variables data
     const variablesData = reactive({});
@@ -384,7 +388,8 @@ export default defineComponent({
 
     const getDashboardLayout: any = (panels: any) => {
       //map on each panels and return array of layouts
-      return panels?.map((item: any) => item.layout) || [];
+      // TODO: This deep copying object breaks drag and drop
+      return panels?.map((item: any) => JSON.parse(JSON.stringify(item.layout))) || [];
     };
 
     const getPanelLayout = (panelData, position) => {

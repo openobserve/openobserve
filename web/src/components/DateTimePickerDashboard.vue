@@ -59,6 +59,7 @@ export default defineComponent({
     const dateTimePicker: any = ref(null);
 
     const updateDateTime = (date: any) => {
+      console.log("datepickerdashboard: panelcache: updateDateTime", date);
       const newValue = {
         startTime: date.startTime,
         endTime: date.endTime,

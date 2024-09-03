@@ -432,6 +432,7 @@ export default defineComponent({
           (currentDashboardData.data?.defaultDatetimeDuration?.type ??
             "relative") === "relative"
         ) {
+          console.log('viewdashboard: panelcache: default time settings relative', currentDashboardData.data?.defaultDatetimeDuration);
           selectedDate.value = {
             valueType: "relative",
             relativeTimePeriod:
@@ -439,6 +440,7 @@ export default defineComponent({
                 ?.relativeTimePeriod ?? "15m",
           };
         } else {
+          console.log('viewdashboard: panelcache: default time settings absolute', currentDashboardData.data?.defaultDatetimeDuration);
           // else, dashboard will have absolute time settings
           selectedDate.value = {
             valueType: "absolute",
@@ -449,6 +451,8 @@ export default defineComponent({
           };
         }
       } else {
+        console.log('viewdashboard: panelcache: default time settings from route', currentDashboardData.data?.defaultDatetimeDuration);
+
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
@@ -460,6 +464,7 @@ export default defineComponent({
 
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
+      console.log('viewdashboard: panelcache: selected date updated', JSON.parse(JSON.stringify(selectedDate.value)));
       if (selectedDate.value && dateTimePicker.value) {
         const date = dateTimePicker.value?.getConsumableDateTime();
 
@@ -518,6 +523,7 @@ export default defineComponent({
     };
 
     const refreshData = () => {
+      console.log('viewdashboard: panelcache: refreshData');
       dateTimePicker.value.refresh();
     };
 
@@ -537,6 +543,7 @@ export default defineComponent({
       }
 
       // set it as a absolute time
+      console.log('viewdashboard: panelcache: onDataZoom etting absolute date', selectedDateObj);
       dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
     };
 

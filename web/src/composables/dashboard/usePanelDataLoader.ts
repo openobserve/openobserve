@@ -356,7 +356,7 @@ export const usePanelDataLoader = (
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
         // Handle each query sequentially
-        for (const it of panelSchema.value.queries) {
+        for (const [panelQueryIndex, it] of panelSchema.value.queries.entries()) {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -573,9 +573,20 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
+    () => [panelSchema?.value],
     async () => {
-      log("PanelSchema/Time Wather: called");
+      log("PanelSchema Wather:panelcache: called");
+      log("PanelSchema Wather: called");
+      loadData(); // Loading the data
+    },
+  );
+
+  watch(
+    // Watching for changes in panelSchema, selectedTimeObj and forceLoad
+    () => [selectedTimeObj?.value],
+    async () => {
+      log("Time Wather:panelcache: called");
+      log("Time Wather: called");
       loadData(); // Loading the data
     },
   );
@@ -1238,9 +1249,13 @@ export const usePanelDataLoader = (
 
     // now we have a cache
     const { key: tempPanelCacheKey, value: tempPanelCacheValue} = cache
-    log("tempPanelCache", tempPanelCacheValue);
+    log("usePanelDataLoader: panelcache: tempPanelCache", tempPanelCacheValue);
     
     let isRestoredFromCache = false
+
+    console.log("usePanelDataLoader: panelcache: comparing cache key 1", JSON.parse(JSON.stringify(getCacheKey() || {})))
+    console.log("usePanelDataLoader: panelcache: comparing tempPanelCacheKey", JSON.parse(JSON.stringify(tempPanelCacheKey || {})))
+    console.log("usePanelDataLoader: panelcache: comparision: equal?", isEqual(getCacheKey(), tempPanelCacheKey))
     
     // check if it is stale or not
     if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && isEqual(getCacheKey(), tempPanelCacheKey)) {

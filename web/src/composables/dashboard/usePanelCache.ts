@@ -24,6 +24,8 @@ export const usePanelCache = (folderId: string, dashboardId: string, panelId: st
     console.log("PanelCache: Missing folderId, dashboardId or panelId", folderId, dashboardId, panelId)
     const savePanelCache = (data: any) => {
       // do nothing
+      console.log('panelCache: savePanelCache: doing nothing')
+      console.log('panelCache: savePanelCache: cache', JSON.parse(JSON.stringify(cache)))
     }
 
     const getPanelCache = () => {
@@ -59,6 +61,8 @@ export const usePanelCache = (folderId: string, dashboardId: string, panelId: st
       key: key,
       value: data
     }
+    console.log('panelCache: savePanelCache: updated cache')
+    console.log('panelCache: savePanelCache: cache', JSON.parse(JSON.stringify(cache)))
   }
 
   const getPanelCache = () => {

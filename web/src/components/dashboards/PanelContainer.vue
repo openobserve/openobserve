@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, defineAsyncComponent, watch } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -304,6 +304,10 @@ export default defineComponent({
     };
 
     const maxQueryRange: any = ref([]);
+
+    watch(() => [props.selectedTimeDate], () => {
+      console.log('panelcontiner: panelcache: selected date time updated', JSON.stringify(props.selectedTimeDate, null, 2))
+    })
 
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
