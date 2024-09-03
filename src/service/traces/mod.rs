@@ -538,7 +538,9 @@ async fn write_traces(
                         trigger_alerts.push((alert.clone(), v));
                     }
                 }
-                trigger = Some(trigger_alerts);
+                if !trigger_alerts.is_empty() {
+                    trigger = Some(trigger_alerts);
+                }
             }
         }
         // End check for alert trigger
