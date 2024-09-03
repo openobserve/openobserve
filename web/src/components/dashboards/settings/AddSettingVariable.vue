@@ -316,8 +316,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
             ></q-input>
           </div>
-          <label v-if="['custom'].includes(variableData.type)">Select</label>
-          <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
             <div
               v-for="(option, index) in variableData.options"
@@ -344,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="'Value ' + (index + 1) + ' *'"
                 name="value"
               />
+              <label v-if="index === 0" class="q-mb-lg">Select</label>
               <q-checkbox
                 dense
                 v-model="variableData.options[index].selected"
