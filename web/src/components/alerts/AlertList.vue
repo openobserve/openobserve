@@ -845,7 +845,7 @@ export default defineComponent({
         return;
       }
 
-      if (!toBeClonestreamType) return Promise.resolve();
+      if (!toBeClonestreamType.value) return Promise.resolve();
 
       isFetchingStreams.value = true;
       return getStreams(toBeClonestreamType.value, false)
@@ -949,7 +949,24 @@ export default defineComponent({
         var filtered = [];
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) ||
+            (rows[i]["stream_name"] != null &&
+              rows[i]["stream_name"].toLowerCase().includes(terms)) ||
+            (rows[i]["owner"] != null &&
+              rows[i]["owner"].toLowerCase().includes(terms)) ||
+            (rows[i]["enabled"] != null &&
+              rows[i]["enabled"].toString().toLowerCase().includes(terms)) ||
+            (rows[i]["alert_type"] != null &&
+              rows[i]["alert_type"].toString().toLowerCase().includes(terms)) ||
+            (rows[i]["stream_type"] != null &&
+              rows[i]["stream_type"]
+                .toString()
+                .toLowerCase()
+                .includes(terms)) ||
+            (rows[i]["description"] != null &&
+              rows[i]["description"].toString().toLowerCase().includes(terms))
+          ) {
             filtered.push(rows[i]);
           }
         }
