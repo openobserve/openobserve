@@ -1061,8 +1061,8 @@ test.describe("dashboard UI testcases", () => {
       )
       .click();
  
-      await page.locator('[data-test="dashboard-add-condition-label"]').click();
-      await page.locator('[data-test="dashboard-add-condition-condition"]').click();
+      await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+      await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
 
 
       await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
@@ -1071,8 +1071,8 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(200);
 
-    await page.locator('[data-test="dashboard-add-condition-label"]').click();
-    await page.locator('[data-test="dashboard-add-condition-condition"]').click();
+    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
     await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
 
 
@@ -1089,8 +1089,8 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
 
-    await page.locator('[data-test="dashboard-add-condition-label"]').click();
-    await page.locator('[data-test="dashboard-add-condition-condition"]').click();
+    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
     await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
 
     await page.getByText("Is Not Null").click();
