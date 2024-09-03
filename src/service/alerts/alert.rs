@@ -457,8 +457,8 @@ pub async fn send_http_notification(
     let resp = req.body(msg.clone()).send().await?;
     let resp_status = resp.status();
     let resp_body = resp.text().await?;
-    log::info!(
-        "Alert sent to {} with status {}, body: {:?}",
+    log::debug!(
+        "Alert sent to destination {} with status: {}, body: {:?}",
         dest.url,
         resp_status,
         resp_body,
