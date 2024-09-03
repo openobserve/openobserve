@@ -302,6 +302,98 @@ export default defineComponent({
       // load all variables
       loadAllVariablesData();
     };
+    const handleQueryValuesLogic = (
+      currentVariable: any,
+      oldVariableSelectedValues: any[],
+    ) => {
+      if (currentVariable.multiSelect) {
+        const selectedValues = currentVariable.options
+          .filter((option: any) =>
+            oldVariableSelectedValues.includes(option.value),
+          )
+          .map((option: any) => option.value);
+
+        currentVariable.value =
+          selectedValues.length > 0
+            ? selectedValues
+            : currentVariable?.selectAllValueForMultiSelect === "custom"
+              ? (currentVariable?.options
+                  ?.map((variableOption: any) => variableOption.value)
+                  ?.filter((value: any) =>
+                    currentVariable?.customMultiSelectValue.includes(value),
+                  ) ?? [])
+              : currentVariable?.selectAllValueForMultiSelect === "all" ||
+                  currentVariable?.selectAllValueForMultiSelect === "first"
+                ? (currentVariable?.options?.map(
+                    (variableOption: any) => variableOption.value,
+                  ) ?? [])
+                : [currentVariable.options[0].value];
+      } else {
+        currentVariable.value =
+          currentVariable.options.find(
+            (option: any) => option.value === oldVariableSelectedValues[0],
+          )?.value ??
+          (currentVariable.options.length > 0
+            ? currentVariable.selectAllValueForMultiSelect === "custom"
+              ? currentVariable?.options.find(
+                  (variableOption: any) =>
+                    variableOption.value ===
+                    currentVariable.customMultiSelectValue[0],
+                )?.value || currentVariable.options[0].value
+              : currentVariable.selectAllValueForMultiSelect === "first"
+                ? currentVariable?.options.map(
+                    (variableOption: any) => variableOption.value,
+                  )
+                : currentVariable.options[0].value
+            : null);
+      }
+    };
+
+    const handleCustomVariablesLogic = (
+      currentVariable: any,
+      oldVariableSelectedValues: any[],
+    ) => {
+      if (currentVariable.multiSelect) {
+        const selectedValues = currentVariable.options
+          .filter((option: any) =>
+            oldVariableSelectedValues.includes(option.value),
+          )
+          .map((option: any) => option.value);
+
+        currentVariable.value =
+          selectedValues.length > 0
+            ? selectedValues
+            : currentVariable?.options
+                  ?.filter(
+                    (variableOption: any) => variableOption.selected === true,
+                  )
+                  ?.map((variableObj: any) => variableObj.value).length > 0
+              ? (currentVariable?.options
+                  ?.filter(
+                    (variableOption: any) => variableOption.selected === true,
+                  )
+                  ?.map((variableObj: any) => variableObj.value) ?? [])
+              : [currentVariable.options[0].value];
+      } else {
+        currentVariable.value =
+          currentVariable.options.find(
+            (option: any) => option.value === oldVariableSelectedValues[0],
+          )?.value ??
+          (currentVariable.options.length > 0
+            ? currentVariable?.options
+                ?.filter(
+                  (variableOption: any) => variableOption.selected === true,
+                )
+                ?.map((variableObj: any) => variableObj.value).length > 0
+              ? currentVariable?.options
+                  ?.filter(
+                    (variableOption: any) => variableOption.selected === true,
+                  )
+                  ?.map((variableObj: any) => variableObj.value)[0]
+              : currentVariable.options[0].value
+            : null);
+      }
+    };
 
     // get single variable data based on index
     const loadSingleVariableDataByIndex = async (variableIndex: number) => {
@@ -470,47 +562,16 @@ export default defineComponent({
                   oldVariablesData[currentVariable.name] !== undefined ||
                   oldVariablesData[currentVariable.name] !== null
                 ) {
-                  if (currentVariable.multiSelect) {
-                    const selectedValues = currentVariable.options
-                      .filter((option: any) =>
-                        oldVariableSelectedValues.includes(option.value),
-                      )
-                      .map((option: any) => option.value);
-
-                    // if selected values are there, set the selected values.
-                    // otherwise, check selectAllValueForMultiSelect configuration.
-                    // if it is true, set the all values for multiselect else set the first value of the dropdown
-                    currentVariable.value =
-                      selectedValues.length > 0
-                        ? selectedValues
-                        : currentVariable?.selectAllValueForMultiSelect ==
-                            "custom"
-                          ? (
-                              currentVariable?.options?.map(
-                                (variableOption: any) => variableOption.value,
-                              ) ?? []
-                            ).filter((value: any) =>
-                              currentVariable?.customMultiSelectValue.includes(
-                                value,
-                              ),
-                            )
-                          : currentVariable?.selectAllValueForMultiSelect ==
-                                "all" ||
-                              currentVariable?.selectAllValueForMultiSelect ==
-                                "first"
-                            ? (currentVariable?.options?.map(
-                                (variableOption: any) => variableOption.value,
-                              ) ?? [])
-                            : [currentVariable.options[0].value];
+                  if (currentVariable.type === "custom") {
+                    handleCustomVariablesLogic(
+                      currentVariable,
+                      oldVariableSelectedValues,
+                    );
                   } else {
-                    currentVariable.value = currentVariable.options.some(
-                      (option: any) =>
-                        option.value === oldVariablesData[currentVariable.name],
-                    )
-                      ? oldVariablesData[currentVariable.name]
-                      : currentVariable.options.length
-                        ? currentVariable.options[0].value
-                        : null;
+                    handleQueryValuesLogic(
+                      currentVariable,
+                      oldVariableSelectedValues,
+                    );
                   }
                 } else {
                   currentVariable.value = currentVariable.options.length
@@ -563,44 +624,17 @@ export default defineComponent({
             }
 
             // If multiSelect is true, set the value as an array containing old value and selected value
-            if (currentVariable.multiSelect) {
-              const selectedValues = currentVariable.options
-                .filter((option: any) =>
-                  oldVariableSelectedValues.includes(option.value),
-                )
-                .map((option: any) => option.value);
-              // if selected values are there, set the selected values.
-              // otherwise, check selectAllValueForMultiSelect configuration.
-              // if it is true, set the all values for multiselect else set the first value of the dropdown
-              currentVariable.value =
-                selectedValues.length > 0
-                  ? selectedValues
-                  : currentVariable?.selectAllValueForMultiSelect == "custom"
-                    ? (
-                        currentVariable?.options?.map(
-                          (variableOption: any) => variableOption.value,
-                        ) ?? []
-                      ).filter((value: any) =>
-                        currentVariable?.customMultiSelectValue.includes(value),
-                      )
-                    : currentVariable?.selectAllValueForMultiSelect == "all" ||
-                        currentVariable?.selectAllValueForMultiSelect == "first"
-                      ? (currentVariable?.options?.map(
-                          (variableOption: any) => variableOption.value,
-                        ) ?? [])
-                      : [currentVariable.options[0].value];
+            if (currentVariable.type === "custom") {
+              handleCustomVariablesLogic(
+                currentVariable,
+                oldVariableSelectedValues,
+              );
             } else {
-              // If multiSelect is false, set the value as a single value from options which is selected
-              currentVariable.value =
-                currentVariable.options.find(
-                  (option: any) =>
-                    option.value === oldVariableSelectedValues[0],
-                )?.value ??
-                (currentVariable.options.length > 0
-                  ? currentVariable.options[0].value
-                  : null);
+              handleQueryValuesLogic(
+                currentVariable,
+                oldVariableSelectedValues,
+              );
             }
-
             resolve(true);
             break;
           }
