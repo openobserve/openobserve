@@ -705,6 +705,18 @@ export default defineComponent({
         const edit = (data || []).find(
           (it: any) => it.name === props.variableName,
         );
+
+        // for already created variable, need to add selected fields
+        // check if variable type is custom
+        if (edit?.type === "custom") {
+          //  loop on on options, and assing selected = false if selected key is not found
+          edit.options.forEach((option: any) => {
+            if (option.selected === undefined) {
+              option.selected = false;
+            }
+          });
+        }
+
         // Assign edit data to variableData
         Object.assign(variableData, edit);
       } else {
@@ -772,7 +784,14 @@ export default defineComponent({
     );
 
     const addField = () => {
-      variableData.options.push({ label: "", value: "", selected: false });
+      // add new field for options
+      // selected will be true if it is the first field
+      // otherwise it will be false
+      variableData.options.push({
+        label: "",
+        value: "",
+        selected: variableData.options.length ? false : true,
+      });
       console.log("variableData.options addField", variableData.options);
     };
 

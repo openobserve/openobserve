@@ -322,8 +322,7 @@ export default defineComponent({
                   ?.filter((value: any) =>
                     currentVariable?.customMultiSelectValue.includes(value),
                   ) ?? [])
-              : currentVariable?.selectAllValueForMultiSelect === "all" ||
-                  currentVariable?.selectAllValueForMultiSelect === "first"
+              : currentVariable?.selectAllValueForMultiSelect === "all"
                 ? (currentVariable?.options?.map(
                     (variableOption: any) => variableOption.value,
                   ) ?? [])
@@ -335,16 +334,12 @@ export default defineComponent({
           )?.value ??
           (currentVariable.options.length > 0
             ? currentVariable.selectAllValueForMultiSelect === "custom"
-              ? currentVariable?.options.find(
+              ? (currentVariable?.options.find(
                   (variableOption: any) =>
                     variableOption.value ===
                     currentVariable.customMultiSelectValue[0],
-                )?.value || currentVariable.options[0].value
-              : currentVariable.selectAllValueForMultiSelect === "first"
-                ? currentVariable?.options.map(
-                    (variableOption: any) => variableOption.value,
-                  )
-                : currentVariable.options[0].value
+                )?.value ?? currentVariable.options[0].value)
+              : currentVariable.options[0].value
             : null);
       }
     };
@@ -363,11 +358,9 @@ export default defineComponent({
         currentVariable.value =
           selectedValues.length > 0
             ? selectedValues
-            : currentVariable?.options
-                  ?.filter(
-                    (variableOption: any) => variableOption.selected === true,
-                  )
-                  ?.map((variableObj: any) => variableObj.value).length > 0
+            : currentVariable?.options?.filter(
+                  (variableOption: any) => variableOption.selected === true,
+                )?.length > 0
               ? (currentVariable?.options
                   ?.filter(
                     (variableOption: any) => variableOption.selected === true,
@@ -380,11 +373,9 @@ export default defineComponent({
             (option: any) => option.value === oldVariableSelectedValues[0],
           )?.value ??
           (currentVariable.options.length > 0
-            ? currentVariable?.options
-                ?.filter(
-                  (variableOption: any) => variableOption.selected === true,
-                )
-                ?.map((variableObj: any) => variableObj.value).length > 0
+            ? currentVariable?.options?.filter(
+                (variableOption: any) => variableOption.selected === true,
+              )?.length > 0
               ? currentVariable?.options
                   ?.filter(
                     (variableOption: any) => variableOption.selected === true,
