@@ -402,7 +402,7 @@ test.describe(" visualize UI testcases", () => {
     try {
       await expect(
         page.locator(
-          '[data-test="dashboard-filter-item-kubernetes_container_hash"]'
+          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
         )
       ).toBeVisible();
     } catch (e) {
