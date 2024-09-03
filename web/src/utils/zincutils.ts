@@ -866,16 +866,24 @@ export const isValidResourceName = (name: string) => {
   return roleNameRegex.test(name);
 };
 
-
 export const escapeSingleQuotes = (value: any) => {
   return value?.replace(/'/g, "''");
 };
 
+/**
+ * Splits a string into an array of elements, allowing quoted strings to
+ * contain commas.
+ *
+ * @param {string} input - The input string to split
+ * @returns {array} An array of elements, or the original input if it is null
+ * or empty
+ */
 export const splitQuotedString = (input: any) => {
   // Check if the input is null or empty
   if (input == null) {
     return input;
   }
+
   // Trim the input to remove any leading/trailing whitespace
   input = input.trim();
 
