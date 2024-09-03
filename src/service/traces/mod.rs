@@ -189,15 +189,13 @@ pub async fn handle_trace_request(
             let spans = inst_span.spans;
             for span in spans {
                 if span.span_id.len() != 8 {
-                    // invalid trace id, should we skip or return error?
                     log::info!("skipping span with invalid span id");
                     partial_success.rejected_spans += 1;
                     continue;
                 }
                 let span_id: String =
                     SpanId::from_bytes(span.span_id.try_into().unwrap()).to_string();
-                if span.trace_id.len() != 8 {
-                    // invalid trace id, should we skip or return error?
+                if span.trace_id.len() != 16 {
                     log::info!("skipping span with invalid trace id");
                     partial_success.rejected_spans += 1;
                     continue;
@@ -249,7 +247,7 @@ pub async fn handle_trace_request(
                     }
                     let span_id: String =
                         SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
-                    if link.trace_id.len() != 8 {
+                    if link.trace_id.len() != 16 {
                         log::info!("skipping link with invalid trace id");
                         continue;
                     }
