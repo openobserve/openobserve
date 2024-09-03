@@ -306,41 +306,68 @@ export default defineComponent({
       currentVariable: any,
       oldVariableSelectedValues: any[],
     ) => {
+      // Pre-calculate the options values array
+      const optionsValues =
+        currentVariable.options.map((option: any) => option.value) ?? [];
+
+      // if multi select
       if (currentVariable.multiSelect) {
+        // old selected values
         const selectedValues = currentVariable.options
           .filter((option: any) =>
             oldVariableSelectedValues.includes(option.value),
           )
           .map((option: any) => option.value);
 
-        currentVariable.value =
-          selectedValues.length > 0
-            ? selectedValues
-            : currentVariable?.selectAllValueForMultiSelect === "custom"
-              ? (currentVariable?.options
-                  ?.map((variableOption: any) => variableOption.value)
-                  ?.filter((value: any) =>
-                    currentVariable?.customMultiSelectValue.includes(value),
-                  ) ?? [])
-              : currentVariable?.selectAllValueForMultiSelect === "all"
-                ? (currentVariable?.options?.map(
-                    (variableOption: any) => variableOption.value,
-                  ) ?? [])
-                : [currentVariable.options[0].value];
+        // if selected values exist, select the values
+        if (selectedValues.length > 0) {
+          currentVariable.value = selectedValues;
+        } else {
+          //here, multiselect and old values will be not exist
+
+          switch (currentVariable?.selectAllValueForMultiSelect) {
+            case "custom":
+              currentVariable.value = optionsValues.filter((value: any) =>
+                currentVariable?.customMultiSelectValue.includes(value),
+              );
+              break;
+            case "all":
+              currentVariable.value = optionsValues;
+              break;
+            default:
+              currentVariable.value = [currentVariable.options[0].value];
+          }
+        }
       } else {
-        currentVariable.value =
-          currentVariable.options.find(
-            (option: any) => option.value === oldVariableSelectedValues[0],
-          )?.value ??
-          (currentVariable.options.length > 0
-            ? currentVariable.selectAllValueForMultiSelect === "custom"
-              ? (currentVariable?.options.find(
-                  (variableOption: any) =>
-                    variableOption.value ===
-                    currentVariable.customMultiSelectValue[0],
-                )?.value ?? currentVariable.options[0].value)
-              : currentVariable.options[0].value
-            : null);
+        // here, multi select is false
+
+        // old selected value
+        const oldValue = currentVariable.options.find(
+          (option: any) => option.value === oldVariableSelectedValues[0],
+        )?.value;
+
+        // if old value exist, select the old value
+        if (oldValue) {
+          currentVariable.value = oldValue;
+        } else if (currentVariable.options.length > 0) {
+          // here, multi select is false and old value not exist
+
+          if (currentVariable.selectAllValueForMultiSelect === "custom") {
+            const customValue = currentVariable.options.find(
+              (variableOption: any) =>
+                variableOption.value ===
+                currentVariable.customMultiSelectValue[0],
+            );
+
+            // customValue can be undefined or default value
+            currentVariable.value =
+              customValue?.value ?? currentVariable.options[0].value;
+          } else {
+            currentVariable.value = currentVariable.options[0].value;
+          }
+        } else {
+          currentVariable.value = null;
+        }
       }
     };
 
@@ -348,41 +375,55 @@ export default defineComponent({
       currentVariable: any,
       oldVariableSelectedValues: any[],
     ) => {
+      // Pre-calculate the selected options values array
+      const selectedOptionsValues =
+        currentVariable.options
+          .filter((option: any) => option.selected)
+          .map((option: any) => option.value) ?? [];
+
+      // if multi select
       if (currentVariable.multiSelect) {
+        // old selected values
         const selectedValues = currentVariable.options
           .filter((option: any) =>
             oldVariableSelectedValues.includes(option.value),
           )
           .map((option: any) => option.value);
 
-        currentVariable.value =
-          selectedValues.length > 0
-            ? selectedValues
-            : currentVariable?.options?.filter(
-                  (variableOption: any) => variableOption.selected === true,
-                )?.length > 0
-              ? (currentVariable?.options
-                  ?.filter(
-                    (variableOption: any) => variableOption.selected === true,
-                  )
-                  ?.map((variableObj: any) => variableObj.value) ?? [])
+        // if old selected values exist, select the values
+        if (selectedValues.length > 0) {
+          currentVariable.value = selectedValues;
+        } else {
+          // here, multiselect is true and old values will be not exist
+
+          // if custom value is not defined, select the first option
+          currentVariable.value =
+            selectedOptionsValues.length > 0
+              ? selectedOptionsValues
               : [currentVariable.options[0].value];
+        }
       } else {
-        currentVariable.value =
-          currentVariable.options.find(
-            (option: any) => option.value === oldVariableSelectedValues[0],
-          )?.value ??
-          (currentVariable.options.length > 0
-            ? currentVariable?.options?.filter(
-                (variableOption: any) => variableOption.selected === true,
-              )?.length > 0
-              ? currentVariable?.options
-                  ?.filter(
-                    (variableOption: any) => variableOption.selected === true,
-                  )
-                  ?.map((variableObj: any) => variableObj.value)[0]
-              : currentVariable.options[0].value
-            : null);
+        // here, multi select is false
+
+        // old selected value
+        const oldValue = currentVariable.options.find(
+          (option: any) => option.value === oldVariableSelectedValues[0],
+        )?.value;
+
+        // if old value exist, select the old value
+        if (oldValue) {
+          currentVariable.value = oldValue;
+        } else if (currentVariable.options.length > 0) {
+          // here, multi select is false and old value not exist
+
+          // if custom value is not defined, select the first option
+          currentVariable.value =
+            selectedOptionsValues.length > 0
+              ? selectedOptionsValues[0]
+              : currentVariable.options[0].value;
+        } else {
+          currentVariable.value = null;
+        }
       }
     };
 

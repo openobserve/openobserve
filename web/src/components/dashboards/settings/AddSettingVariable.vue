@@ -711,7 +711,7 @@ export default defineComponent({
         if (edit?.type === "custom") {
           //  loop on on options, and assing selected = false if selected key is not found
           edit.options.forEach((option: any) => {
-            if (option.selected === undefined) {
+            if (option.selected === undefined || option.selected === null) {
               option.selected = false;
             }
           });
@@ -785,12 +785,10 @@ export default defineComponent({
 
     const addField = () => {
       // add new field for options
-      // selected will be true if it is the first field
-      // otherwise it will be false
       variableData.options.push({
         label: "",
         value: "",
-        selected: variableData.options.length ? false : true,
+        selected: false,
       });
       console.log("variableData.options addField", variableData.options);
     };
