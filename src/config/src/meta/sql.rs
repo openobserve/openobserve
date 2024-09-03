@@ -23,6 +23,7 @@ use sqlparser::{
         GroupByExpr, Offset as SqlOffset, OrderByExpr, Query, Select, SelectItem, SetExpr,
         Statement, TableFactor, TableWithJoins, Value,
     },
+    dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
@@ -33,7 +34,10 @@ pub const MAX_OFFSET: i64 = 100000;
 
 /// get stream name from a sql
 pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
-    let statement = DFParser::parse_sql(sql).unwrap().pop_back().unwrap();
+    let dialect = &PostgreSqlDialect {};
+    let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
+        .pop_back()
+        .unwrap();
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {

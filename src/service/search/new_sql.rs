@@ -38,7 +38,7 @@ use sqlparser::{
         FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, SetExpr, VisitMut,
         VisitorMut,
     },
-    dialect::GenericDialect,
+    dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
@@ -83,7 +83,7 @@ impl NewSql {
         let offset = query.from as i64;
 
         // 1. get table name
-        let stream_names = resolve_stream_names(&sql).unwrap();
+        let stream_names = resolve_stream_names(&sql).map_err(|e| Error::Message(e.to_string()))?;
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream_name in stream_names.iter() {
             let schema = infra::schema::get(org_id, stream_name, stream_type)
@@ -92,8 +92,8 @@ impl NewSql {
             total_schemas.insert(stream_name.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
-        let mut statement = Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
+        let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .map_err(|e| Error::Message(e.to_string()))?
             .pop()
             .unwrap();
 
