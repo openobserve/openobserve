@@ -307,29 +307,15 @@ impl Accumulator for PercentileContAccumulator {
         let lower_index = rank.floor() as usize;
         let upper_index = rank.ceil() as usize;
 
-        if lower_index == upper_index {
-            let q = self.data[lower_index];
-            return Ok(match &self.return_type {
-                DataType::Int8 => ScalarValue::Int8(Some(q as i8)),
-                DataType::Int16 => ScalarValue::Int16(Some(q as i16)),
-                DataType::Int32 => ScalarValue::Int32(Some(q as i32)),
-                DataType::Int64 => ScalarValue::Int64(Some(q as i64)),
-                DataType::UInt8 => ScalarValue::UInt8(Some(q as u8)),
-                DataType::UInt16 => ScalarValue::UInt16(Some(q as u16)),
-                DataType::UInt32 => ScalarValue::UInt32(Some(q as u32)),
-                DataType::UInt64 => ScalarValue::UInt64(Some(q as u64)),
-                DataType::Float32 => ScalarValue::Float32(Some(q as f32)),
-                DataType::Float64 => ScalarValue::Float64(Some(q)),
-                v => unreachable!("unexpected return type {:?}", v),
-            });
-        }
-
-        // Calculate the delta and return the fractioned value
-        let lower_value = self.data[lower_index];
-        let upper_value = self.data[upper_index];
-        let fraction = rank - lower_index as f64;
-
-        let q = lower_value + (upper_value - lower_value) * fraction;
+        let q = if lower_index == upper_index {
+            self.data[lower_index]
+        } else {
+            // Calculate the delta and return the fractioned value
+            let lower_value = self.data[lower_index];
+            let upper_value = self.data[upper_index];
+            let fraction = rank - lower_index as f64;
+            lower_value + (upper_value - lower_value) * fraction
+        };
         Ok(match &self.return_type {
             DataType::Int8 => ScalarValue::Int8(Some(q as i8)),
             DataType::Int16 => ScalarValue::Int16(Some(q as i16)),
