@@ -20,7 +20,11 @@ use config::meta::alerts::alert::{Alert, AlertListFilter};
 
 use crate::{
     common::{
-        meta::{dashboards::datetime_now, http::HttpResponse as MetaHttpResponse},
+        meta::{
+            alerts::alert::{Alert, AlertHistoryFilter, AlertListFilter},
+            dashboards::datetime_now,
+            http::HttpResponse as MetaHttpResponse,
+        },
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
     service::alerts::alert,
@@ -456,7 +460,29 @@ async fn show_alert_history(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alert::history(&org_id, stream_type, &stream_name, &name).await {
+    let limit = match query.get("limit") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 20,
+    };
+    let offset = match query.get("offset") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let from = match query.get("from") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let to = match query.get("to") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let filters = AlertHistoryFilter {
+        from,
+        to,
+        limit,
+        offset,
+    };
+    match alert::history(&org_id, stream_type, &stream_name, &name, filters).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => match e {
             (http::StatusCode::SERVICE_UNAVAILABLE, e) => {

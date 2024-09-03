@@ -25,7 +25,7 @@ use config::{
     get_config, ider,
     meta::{
         alerts::{
-            alert::{Alert, AlertListFilter},
+            alert::{Alert, AlertHistoryFilter, AlertListFilter},
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
@@ -353,6 +353,7 @@ pub async fn history(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
+    filters: AlertHistoryFilter,
 ) -> Result<config::meta::search::Response, (http::StatusCode, anyhow::Error)> {
     let config = get_config();
     if !config.common.usage_enabled {
@@ -363,10 +364,19 @@ pub async fn history(
     }
     let usage_org = &config.common.usage_org;
 
-    let now = Utc::now().timestamp_micros();
+    let end_time = if filters.to == 0 {
+        Utc::now().timestamp_micros()
+    } else {
+        filters.to
+    };
+    let start_time = if filters.from == 0 {
+        // 15 minutes ago by default
+        end_time - Duration::minutes(15).num_microseconds().unwrap()
+    } else {
+        filters.from
+    };
     let key = format!("{}/{}/{}", stream_type, stream_name, name);
     let req = config::meta::search::Request {
-        // TODO: Add more filters/flexibility to this query
         query: config::meta::search::Query {
             sql: format!(
                 "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert' AND key = '{}'",
@@ -374,9 +384,10 @@ pub async fn history(
                 org_id,
                 key
             ),
-            size: 20,
-            // end_time: now,
-            // start_time: now - Duration::days(7).num_microseconds().unwrap(),
+            size: filters.limit,
+            from: filters.offset,
+            end_time,
+            start_time,
             ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -388,7 +399,7 @@ pub async fn history(
     };
 
     let trace_id = ider::uuid();
-    let resp = match SearchService::search(&trace_id, usage_org, stream_type, None, &req).await {
+    let res = match SearchService::search(&trace_id, usage_org, stream_type, None, &req).await {
         Ok(v) => v,
         Err(e) => {
             return Err((
@@ -397,7 +408,8 @@ pub async fn history(
             ));
         }
     };
-    Ok(resp)
+    // TODO: Publish usage event
+    Ok(res)
 }
 
 #[async_trait]
