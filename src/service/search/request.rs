@@ -26,6 +26,7 @@ pub struct Request {
     pub work_group: Option<String>,
     pub time_range: Option<(i64, i64)>,
     pub search_event_type: Option<String>, // node rule
+    pub use_inverted_index: bool,
 }
 
 impl Default for Request {
@@ -39,6 +40,7 @@ impl Default for Request {
             work_group: None,
             time_range: None,
             search_event_type: None,
+            use_inverted_index: false,
         }
     }
 }
@@ -63,6 +65,7 @@ impl Request {
             work_group: None,
             time_range,
             search_event_type,
+            use_inverted_index: false,
         }
     }
 
@@ -81,6 +84,10 @@ impl Request {
     pub fn add_search_event_type(&mut self, search_event_type: Option<String>) {
         self.search_event_type = search_event_type;
     }
+
+    pub fn set_use_inverted_index(&mut self, use_inverted_index: bool) {
+        self.use_inverted_index = use_inverted_index;
+    }
 }
 
 impl From<FlightSearchRequest> for Request {
@@ -94,6 +101,7 @@ impl From<FlightSearchRequest> for Request {
             work_group: request.work_group,
             time_range: Some((request.start_time, request.end_time)),
             search_event_type: request.search_event_type,
+            use_inverted_index: request.use_inverted_index,
         }
     }
 }

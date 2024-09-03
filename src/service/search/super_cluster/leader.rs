@@ -26,7 +26,7 @@ use proto::cluster_rpc::{self};
 use tracing::{info_span, Instrument};
 
 use crate::service::search::{
-    cluster::flight::{generate_context, register_table},
+    cluster::flight::{generate_context, is_use_inverted_index, register_table},
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     new_sql::NewSql,
     request::Request,
@@ -63,6 +63,9 @@ pub async fn search(
     {
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
+
+    let use_inverted_index = is_use_inverted_index(&sql);
+    req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
     let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters).await?;

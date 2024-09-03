@@ -3126,6 +3126,7 @@ pub struct NewEmptyExecNode {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FlightSearchRequest {
+    /// query identifier
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
     #[prost(uint32, tag = "2")]
@@ -3134,6 +3135,7 @@ pub struct FlightSearchRequest {
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
     pub stream_type: ::prost::alloc::string::String,
+    /// used for search
     #[prost(bytes = "vec", tag = "6")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(message, repeated, tag = "7")]
@@ -3148,13 +3150,16 @@ pub struct FlightSearchRequest {
     pub end_time: i64,
     #[prost(int64, tag = "12")]
     pub timeout: i64,
+    /// used for super cluster and enterprise
     #[prost(bool, tag = "13")]
     pub is_super_cluster: bool,
-    #[prost(string, optional, tag = "14")]
-    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, tag = "14")]
+    pub use_inverted_index: bool,
     #[prost(string, optional, tag = "15")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "16")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "17")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]

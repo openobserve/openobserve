@@ -217,6 +217,7 @@ async fn get_remote_batch(
         work_group: req.work_group.clone(),
         user_id: req.user_id.clone(),
         search_event_type: req.search_event_type,
+        use_inverted_index: req.use_inverted_index,
     };
 
     let mut buf: Vec<u8> = Vec::new();

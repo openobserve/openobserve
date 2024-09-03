@@ -18,6 +18,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use config::meta::{
     cluster::{IntoArcVec, RoleGroup},
     search::SearchEventType,
+    stream::FileKey,
 };
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::ExecutionPlan, prelude::SessionContext,
@@ -25,13 +26,16 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
     errors::Error,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+    },
 };
-use proto::cluster_rpc::FlightSearchRequest;
+use proto::cluster_rpc::{FlightSearchRequest, KvItem, SearchQuery};
 
 use crate::service::search::{
     cluster::flight::{
-        check_work_group, get_file_list, get_online_querier_nodes, partition_filt_list,
+        check_work_group, filter_index_fields, get_file_list, get_file_list_by_inverted_index,
+        get_online_querier_nodes, partition_filt_list,
     },
     datafusion::{
         distributed_plan::{
@@ -42,6 +46,7 @@ use crate::service::search::{
         },
         exec::prepare_datafusion_context,
     },
+    generate_filter_from_equal_items,
     request::Request,
     utlis::AsyncDefer,
 };
@@ -113,7 +118,7 @@ pub async fn search(
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, req.stream_type);
     // get file list
-    let file_list = get_file_list(
+    let mut file_list = get_file_list(
         stream_name,
         &req.org_id,
         req.stream_type,
@@ -133,6 +138,19 @@ pub async fn search(
         file_list_vec.len(),
         file_list_took,
     );
+
+    // check inverted index
+    if req.use_inverted_index {
+        file_list = get_file_list_from_inverted_index(
+            &trace_id,
+            &req,
+            stream_name,
+            &flight_request.equal_keys,
+            &flight_request.match_all_keys,
+            &file_list,
+        )
+        .await?;
+    }
 
     // get nodes
     let node_group = req
@@ -210,4 +228,72 @@ pub async fn search(
     }
 
     Ok((ctx, physical_plan, defer))
+}
+
+// TODO: unify this impl with the one in cluster/flight.rs
+async fn get_file_list_from_inverted_index(
+    trace_id: &str,
+    req: &Request,
+    stream_name: &str,
+    equal_terms: &[KvItem],
+    match_terms: &[String],
+    file_list: &[FileKey],
+) -> Result<Vec<FileKey>, Error> {
+    let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
+    let schema_map = schema
+        .fields
+        .iter()
+        .map(|f| (f.name().clone(), f))
+        .collect::<HashMap<_, _>>();
+
+    // construct partition filters
+    let equal_terms: Vec<(String, String)> = equal_terms
+        .iter()
+        .filter_map(|v| {
+            if schema_map.contains_key(&v.key) {
+                Some((v.key.to_string(), v.value.to_string()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // filter euqal_items with index_fields
+    let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
+    let stream_settings = infra::schema::unwrap_stream_settings(&schema);
+    let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let index_terms = filter_index_fields(&equal_terms, &index_fields);
+
+    log::info!("[trace_id {trace_id}] flight->leader: use_inverted_index true",);
+
+    // construct SearchQuery for inverted index search
+    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+    let query = SearchQuery {
+        start_time,
+        end_time,
+        ..Default::default()
+    };
+
+    // use inverted index to filter file list
+    let file_list_vec = file_list.iter().collect::<Vec<_>>();
+    let index_terms = generate_filter_from_equal_items(&index_terms);
+    let (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
+        req.clone(),
+        query,
+        stream_name,
+        &file_list_vec,
+        match_terms,
+        &index_terms,
+    )
+    .await?;
+
+    log::info!(
+        "[trace_id {trace_id}] flight->leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        req.time_range,
+        stream_file_list.len(),
+        idx_scan_size,
+        idx_took,
+    );
+
+    Ok(stream_file_list)
 }

@@ -832,7 +832,7 @@ pub fn filter_index_fields(
     result
 }
 
-async fn get_file_list_by_inverted_index(
+pub async fn get_file_list_by_inverted_index(
     mut req: Request,
     mut query: SearchQuery,
     stream_name: &str,
@@ -1000,6 +1000,25 @@ fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     println!("leader physical plan {stage} rewrite");
     println!("+---------------------------+----------+");
     println!("{}", plan);
+}
+
+#[allow(dead_code)]
+pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> bool {
+    let cfg = get_config();
+    let index_terms = if sql.equal_items.len() == 1 {
+        let schema = sql.schemas.values().next().unwrap().schema();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema);
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
+    } else {
+        vec![]
+    };
+
+    sql.stream_type != StreamType::Index
+        && sql.use_inverted_index
+        && cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && (sql.match_items.is_some() || !index_terms.is_empty())
 }
 
 #[cfg(test)]
