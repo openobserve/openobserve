@@ -130,6 +130,12 @@ mod tests {
     }
 
     #[test]
+    fn test_min_character() {
+        let result = split_token("t", "");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
     fn test_empty_delimiter() {
         let result = split_token("Hello, world! This is a test.", "");
         assert_eq!(

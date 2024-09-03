@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check for Mediafire in comments
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
           # Set the owner, so the token can be used in all repositories
