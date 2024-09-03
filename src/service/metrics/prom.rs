@@ -459,7 +459,9 @@ pub async fn remote_write(
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in stream_trigger_map {
-        evaluate_trigger(entry).await;
+        if let Some(entry) = entry {
+            evaluate_trigger(entry).await;
+        }
     }
 
     metrics::HTTP_RESPONSE_TIME
