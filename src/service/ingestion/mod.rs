@@ -222,6 +222,7 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
     if trigger.is_none() {
         return;
     }
+    log::info!("Evaluating trigger: {:?}", trigger);
     let trigger = trigger.unwrap();
     let mut trigger_usage_reports = vec![];
     for (alert, val) in trigger.iter() {
