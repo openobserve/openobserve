@@ -223,7 +223,7 @@
 </template>
 
 <script lang="ts">
-import { ref, onBeforeMount, computed, nextTick } from "vue";
+import { ref, onBeforeMount, computed, nextTick, onMounted,watch } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -236,6 +236,8 @@ import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
+import { defineAsyncComponent } from "vue";
+
 
 export default {
   name: "JsonPreview",
@@ -257,11 +259,16 @@ export default {
   components: {
     NotEqualIcon,
     EqualIcon,
+    AppTabs,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue"),
+    ),
   },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
+    const activeTab = ref("flattened");
 
     const streamSearchValue = ref<string>("");
 
@@ -291,8 +298,12 @@ export default {
     ];
 
     const copyLogToClipboard = () => {
-      emit("copy", props.value, true);
-    };
+      emit(
+        "copy",
+        activeTab.value === "unflattened"
+          ? JSON.parse(nestedJson.value)
+          : props.value,
+      );    };
     const addSearchTerm = (value: string) => {
       emit("addSearchTerm", value);
     };
@@ -321,7 +332,7 @@ export default {
         })
     });
 
-    watch(
+    watch (
       () => props.value,
     
       async () =>  {
@@ -433,8 +444,8 @@ export default {
           }
 }
   const filteredTabs = computed(() => {
+    console.log(tabs,"tabs")
         return tabs.filter(tab => {
-          // Only include the 'Unflattened' tab if checkIsOriginalData() returns true
           if (!storeOriginalDataVar.value && (tab.value === 'unflattened' || tab.value === 'flattened')) {
           return false;
         }
@@ -456,6 +467,7 @@ export default {
       filteredTracesStreamOptions,
       filterStreamFn,
       streamSearchValue,
+      activeTab,
       showViewTraceBtn,
       nestedJson,
       handleTabChange,
