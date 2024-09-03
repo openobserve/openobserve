@@ -406,96 +406,40 @@ function parseCondition(condition: any) {
         };
       }
     } else if (condition.type === "function") {
-      // str_match function
-      if (condition?.name?.name[0]?.value?.toLowerCase() == "str_match") {
+      let conditionName = condition?.name?.name[0]?.value?.toLowerCase();
+
+      // function with field name and value
+      let conditionsWithFieldName = [
+        "str_match",
+        "str_match_ignore_case",
+        "re_match",
+        "re_not_match",
+      ];
+
+      // function without field name and with value
+      let conditionsWithoutFieldName = [
+        "match_all",
+        "match_all_raw",
+        "match_all_raw_ignore_case",
+      ];
+
+      if (conditionsWithFieldName.includes(conditionName)) {
         return {
           type: "condition",
           values: [],
           column: condition?.args?.value[0]?.column ?? "",
-          operator: "str_match",
+          operator: conditionName,
           value: condition?.args?.value[1]?.value ?? "",
           logicalOperator: "AND",
           filterType: "condition",
         };
-      }
-      // str_match_ignore_case function
-      else if (
-        condition?.name?.name[0]?.value?.toLowerCase() ==
-        "str_match_ignore_case"
-      ) {
-        return {
-          type: "condition",
-          values: [],
-          column: condition?.args?.value[0]?.column ?? "",
-          operator: "str_match_ignore_case",
-          value: condition?.args?.value[1]?.value ?? "",
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
-      }
-      // match_all function
-      else if (condition?.name?.name[0]?.value?.toLowerCase() == "match_all") {
+      } else if (conditionsWithoutFieldName.includes(conditionName)) {
         return {
           type: "condition",
           values: [],
           column: "",
-          operator: "match_all",
+          operator: conditionName,
           value: condition?.args?.value[0]?.value ?? "",
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
-      }
-      // match_all_raw function
-      else if (
-        condition?.name?.name[0]?.value?.toLowerCase() == "match_all_raw"
-      ) {
-        return {
-          type: "condition",
-          values: [],
-          column: "",
-          operator: "match_all_raw",
-          value: condition?.args?.value[0]?.value ?? "",
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
-      }
-      // match_all_raw_ignore_case function
-      else if (
-        condition?.name?.name[0]?.value?.toLowerCase() ==
-        "match_all_raw_ignore_case"
-      ) {
-        return {
-          type: "condition",
-          values: [],
-          column: "",
-          operator: "match_all_raw_ignore_case",
-          value: condition?.args?.value[0]?.value ?? "",
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
-      }
-      // re_match function
-      else if (condition?.name?.name[0]?.value?.toLowerCase() == "re_match") {
-        return {
-          type: "condition",
-          values: [],
-          column: condition?.args?.value[0]?.column ?? "",
-          operator: "re_match",
-          value: condition?.args?.value[1]?.value ?? "",
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
-      }
-      // re_not_match function
-      else if (
-        condition?.name?.name[0]?.value?.toLowerCase() == "re_not_match"
-      ) {
-        return {
-          type: "condition",
-          values: [],
-          column: condition?.args?.value[0]?.column ?? "",
-          operator: "re_not_match",
-          value: condition?.args?.value[1]?.value ?? "",
           logicalOperator: "AND",
           filterType: "condition",
         };
