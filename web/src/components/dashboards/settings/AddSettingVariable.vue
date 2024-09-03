@@ -1043,7 +1043,9 @@ export default defineComponent({
     watch(
       () => variableData.selectAllValueForMultiSelect,
       (newVal, oldVal) => {
-        if (newVal !== oldVal) {
+        console.log("selectAllValueForMultiSelect", newVal, oldVal);
+
+        if (newVal != "custom") {
           variableData.customMultiSelectValue = [];
           console.log("customMultiSelectValue has been cleared.");
         }
