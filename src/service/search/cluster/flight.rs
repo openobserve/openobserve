@@ -61,6 +61,7 @@ use crate::{
         new_sql::NewSql,
         request::Request,
         utlis::AsyncDefer,
+        DATAFUSION_RUNTIME,
     },
 };
 
@@ -296,40 +297,46 @@ pub async fn search(
         stream_type = sql.stream_type.to_string(),
     );
 
-    // 8. execute physical plan
     let trace_id_move = trace_id.to_string();
-    let task = tokio::task::spawn(
-        async move {
-            tokio::select! {
-                ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx()) => {
-                    match ret {
-                        Ok(ret) => Ok(ret),
-                        Err(err) => {
-                            log::error!("[trace_id {trace_id_move}] flight->leader: datafusion execute error: {}", err); 
-                            Err(err)
-                        }
-                    }
-                },
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-                    log::error!("[trace_id {trace_id_move}] flight->leader: search timeout");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] flight->leader: search timeout")))
-                },
-                _ = async {
-                    #[cfg(feature = "enterprise")]
-                    let _ = abort_receiver.await;
-                    #[cfg(not(feature = "enterprise"))]
-                    futures::future::pending::<()>().await;
-                } => {
-                    log::info!("[trace_id {trace_id_move}] flight->leader: search canceled");
-                     Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] flight->leader: search canceled")))
+    let query_task = DATAFUSION_RUNTIME.spawn(async move {
+        let ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx())
+            .instrument(datafusion_span)
+            .await;
+        log::info!("[trace_id {trace_id_move}] flight->leader: datafusion collect done");
+        ret
+    });
+    tokio::pin!(query_task);
+
+    // 8. execute physical plan
+    let task = tokio::select! {
+        ret = &mut query_task => {
+            match ret {
+                Ok(ret) => Ok(ret),
+                Err(err) => {
+                    log::error!("[trace_id {trace_id}] flight->leader: datafusion execute error: {}", err);
+                    Err(datafusion::error::DataFusionError::Execution(err.to_string()))
                 }
             }
+        },
+        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
+            query_task.abort();
+            log::error!("[trace_id {trace_id}] flight->leader: search timeout");
+            Err(datafusion::error::DataFusionError::ResourcesExhausted("flight->leader: search timeout".to_string()))
+        },
+        _ = async {
+            #[cfg(feature = "enterprise")]
+            let _ = abort_receiver.await;
+            #[cfg(not(feature = "enterprise"))]
+            futures::future::pending::<()>().await;
+        } => {
+            query_task.abort();
+            log::info!("[trace_id {trace_id}] flight->leader: search canceled");
+            Err(datafusion::error::DataFusionError::ResourcesExhausted("flight->leader: search canceled".to_string()))
         }
-        .instrument(datafusion_span),
-    );
+    };
 
     // 9. get data from datafusion
-    let data = match task.await {
+    let data = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err.into()),
         Err(err) => Err(Error::Message(err.to_string())),

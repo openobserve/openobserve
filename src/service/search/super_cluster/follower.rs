@@ -82,7 +82,8 @@ pub async fn search(
     let mut visitor = NewEmptyExecVisitor::default();
     if physical_plan.visit(&mut visitor).is_err() || visitor.get_data().is_none() {
         return Err(Error::Message(
-            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+            "super cluster follower leader: physical plan visit error: there is no EmptyTable"
+                .to_string(),
         ));
     }
     let empty_exec = visitor
@@ -132,7 +133,7 @@ pub async fn search(
     let file_list_vec = file_list.iter().collect::<Vec<_>>();
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->leader: get file_list time_range: ({}, {}), num: {}, took: {} ms",
+        "[trace_id {trace_id}] super cluster follower leader: get file_list time_range: ({}, {}), num: {}, took: {} ms",
         flight_request.start_time,
         flight_request.end_time,
         file_list_vec.len(),
@@ -226,6 +227,10 @@ pub async fn search(
             nodes.into_arc_vec(),
         ));
     }
+
+    log::info!(
+        "[trace_id {trace_id}] super cluster follower leader: generate physical plan finish",
+    );
 
     Ok((ctx, physical_plan, defer))
 }

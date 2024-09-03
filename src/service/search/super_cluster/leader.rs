@@ -30,6 +30,7 @@ use crate::service::search::{
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     new_sql::NewSql,
     request::Request,
+    DATAFUSION_RUNTIME,
 };
 
 #[async_recursion]
@@ -188,33 +189,39 @@ pub async fn search(
         stream_type = sql.stream_type.to_string(),
     );
 
-    let trace_id_move = trace_id.to_owned();
-    let task = tokio::task::spawn(
-        async move {
-            tokio::select! {
-                ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx()) => {
-                    match ret {
-                        Ok(ret) => Ok(ret),
-                        Err(err) => {
-                            log::error!("[trace_id {trace_id_move}] super cluster leader: datafusion execute error: {}", err); 
-                            Err(err)
-                        }
-                    }
-                },
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-                    log::error!("[trace_id {trace_id_move}] super cluster leader: search timeout");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] super cluster leader: search timeout")))
-                },
-                _ = abort_receiver => {
-                    log::info!("[trace_id {trace_id_move}] super cluster leader: search canceled");
-                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id_move}] super cluster leader: search canceled")))
+    let trace_id_move = trace_id.to_string();
+    let query_task = DATAFUSION_RUNTIME.spawn(async move {
+        let ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx())
+            .instrument(datafusion_span)
+            .await;
+        log::info!("[trace_id {trace_id_move}] super cluster leader: datafusion collect done");
+        ret
+    });
+    tokio::pin!(query_task);
+
+    let task = tokio::select! {
+        ret = &mut query_task => {
+            match ret {
+                Ok(ret) => Ok(ret),
+                Err(err) => {
+                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
+                    Err(datafusion::error::DataFusionError::Execution(err.to_string()))
                 }
             }
+        },
+        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
+            query_task.abort();
+            log::error!("[trace_id {trace_id}] super cluster leader: search timeout");
+            Err(datafusion::error::DataFusionError::ResourcesExhausted("super cluster leader: search timeout".to_string()))
+        },
+        _ = abort_receiver => {
+            query_task.abort();
+            log::info!("[trace_id {trace_id}] super cluster leader: search canceled");
+            Err(datafusion::error::DataFusionError::ResourcesExhausted("super cluster leader: search canceled".to_string()))
         }
-        .instrument(datafusion_span),
-    );
+    };
 
-    let data = match task.await {
+    let data = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err.into()),
         Err(err) => Err(Error::Message(err.to_string())),
@@ -226,7 +233,7 @@ pub async fn search(
         }
     };
 
-    log::info!("[trace_id {trace_id}] flight->leader: search finished");
+    log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
     let scan_stats = ScanStats::new();
     Ok((data, scan_stats, 0, false, 0))

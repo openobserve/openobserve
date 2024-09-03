@@ -39,6 +39,7 @@ use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
+use tokio::runtime::Runtime;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -78,6 +79,15 @@ pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 #[cfg(not(feature = "enterprise"))]
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
+
+pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(config::get_config().limit.cpu_num)
+        .thread_name("datafusion_runtime")
+        .enable_all()
+        .build()
+        .unwrap()
+});
 
 pub async fn search(
     trace_id: &str,
