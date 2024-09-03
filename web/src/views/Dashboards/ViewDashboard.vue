@@ -166,6 +166,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t("dashboard.fullscreen")
               }}</q-tooltip></q-btn
             >
+            <q-btn-dropdown
+              outline
+              no-caps
+              size="sm"
+              icon="more_vert"
+              dropdown-icon="none"
+              class="q-px-sm q-ml-sm more-options-dropdown-icon"
+            >
+              <q-list>
+                <q-item clickable v-close-popup @click="openScheduledReports">
+                  <q-item-section>
+                    <q-item-label>{{
+                      t("dashboard.scheduledReports")
+                    }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
           </div>
         </div>
         <q-separator></q-separator>
@@ -197,6 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
       >
         <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
+
+      <q-dialog
+        v-model="showScheduledReportsDialog"
+        position="right"
+        full-height
+        maximized
+      >
+        <ScheduledDashboards />
       </q-dialog>
     </div>
   </q-page>
@@ -231,6 +258,7 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
+import ScheduledDashboards from "./ScheduledDashboards.vue";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -245,6 +273,7 @@ export default defineComponent({
     ExportDashboard,
     DashboardSettings,
     RenderDashboardCharts,
+    ScheduledDashboards,
   },
   setup() {
     const { t } = useI18n();
@@ -255,6 +284,7 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+    const showScheduledReportsDialog = ref(false);
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
     let moment: any = () => {};
@@ -705,6 +735,10 @@ export default defineComponent({
       }
     };
 
+    const openScheduledReports = () => {
+      showScheduledReportsDialog.value = true;
+    };
+
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });
@@ -773,6 +807,8 @@ export default defineComponent({
       timeString,
       searchType,
       quasar,
+      openScheduledReports,
+      showScheduledReportsDialog,
     };
   },
 });
@@ -822,5 +858,13 @@ export default defineComponent({
 
 .dashboard-icons {
   height: 30px;
+}
+</style>
+
+<style lang="scss">
+.more-options-dropdown-icon {
+  .q-btn-dropdown__arrow {
+    display: none;
+  }
 }
 </style>

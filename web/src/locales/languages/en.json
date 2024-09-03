@@ -645,7 +645,9 @@
     "textbox": "Textbox",
     "ad-hoc-variable": "Dynamic variables",
     "newFolder": "New Folder",
-    "updateFolder": "Update Folder"
+    "updateFolder": "Update Folder",
+    "scheduledReports": "Scheduled Reports",
+    "newReport": "New Report"
   },
   "panel": {
     "header": "Panel",
@@ -895,7 +897,12 @@
     "title": "Title",
     "description": "Description",
     "cron": "Cron Job",
-    "cronExpression": "Cron expression"
+    "cronExpression": "Cron expression",
+    "timeRange": "Time Range",
+    "frequency": "Frequency",
+    "lastTriggeredAt": "Last Triggered At",
+    "createdAt": "Created At",
+    "tab": "Tab"
   },
   "queries": {
     "runningQueries": "Running Queries",
