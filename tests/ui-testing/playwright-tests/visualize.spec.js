@@ -392,11 +392,7 @@ test.describe(" visualize UI testcases", () => {
       exceptionBefore = e;
     }
 
-    await page
-      .locator(
-        '[data-test="dashboard-filter-item-kubernetes_container_hash-remove"]'
-      )
-      .click();
+    await page.locator('[data-test="dashboard-add-condition-remove"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
