@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Error, sync::Arc};
 
-use actix_web::{http, HttpResponse};
+use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -58,8 +58,6 @@ use crate::{
     },
 };
 
-pub mod otlp_http;
-
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
@@ -68,9 +66,43 @@ const SERVICE: &str = "service";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
 
 pub enum RequestType {
-    Http,
     Grpc,
-    Protobuf,
+    HttpJson,
+    HttpProtobuf,
+}
+
+pub async fn traces_proto(
+    org_id: &str,
+    body: web::Bytes,
+    in_stream_name: Option<&str>,
+) -> Result<HttpResponse, Error> {
+    let request = match ExportTraceServiceRequest::decode(body) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid proto: {}", e),
+            )));
+        }
+    };
+    handle_trace_request(org_id, request, RequestType::HttpProtobuf, in_stream_name).await
+}
+
+pub async fn traces_json(
+    org_id: &str,
+    body: web::Bytes,
+    in_stream_name: Option<&str>,
+) -> Result<HttpResponse, Error> {
+    let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
+        Ok(req) => req,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid json: {}", e),
+            )));
+        }
+    };
+    handle_trace_request(org_id, request, RequestType::HttpJson, in_stream_name).await
 }
 
 pub async fn handle_trace_request(
@@ -433,7 +465,7 @@ fn format_response(
     };
 
     match req_type {
-        RequestType::Http => Ok(if partial {
+        RequestType::HttpJson => Ok(if partial {
             HttpResponse::PartialContent().json(res)
         } else {
             HttpResponse::Ok().json(res)
@@ -621,4 +653,19 @@ async fn write_traces(
     evaluate_trigger(trigger).await;
 
     Ok(req_stats)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::json::json;
+
+    use crate::service::ingestion::grpc::get_val_for_attr;
+
+    #[test]
+    fn test_get_val_for_attr() {
+        let in_val = 10.00;
+        let input = json!({ "key": in_val });
+        let resp = get_val_for_attr(input);
+        assert_eq!(resp.as_str().unwrap(), in_val.to_string());
+    }
 }
