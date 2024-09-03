@@ -15,6 +15,21 @@
 // allow unused code
 #![allow(unused)]
 
+use arrow_schema::DataType;
+
 pub(crate) mod percentile_acc;
 
 pub(crate) const PERCENTILE_EXACT: &str = "percentile_cont";
+
+pub static NUMERICS: &[DataType] = &[
+    DataType::Int8,
+    DataType::Int16,
+    DataType::Int32,
+    DataType::Int64,
+    DataType::UInt8,
+    DataType::UInt16,
+    DataType::UInt32,
+    DataType::UInt64,
+    DataType::Float32,
+    DataType::Float64,
+];

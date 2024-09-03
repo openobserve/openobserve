@@ -15,7 +15,10 @@
 use std::sync::Arc;
 
 use arrow::{
-    array::{Array, RecordBatch},
+    array::{
+        Array, ArrowNumericType, AsArray, Float32Array, GenericListArray, Int16Array, Int32Array,
+        Int64Array, Int8Array, RecordBatch, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    },
     compute::{filter, is_not_null},
 };
 use arrow_schema::Schema;
@@ -24,11 +27,11 @@ use datafusion::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{downcast_value, not_impl_err, DFSchema, DataFusionError},
+    common::{downcast_value, internal_err, not_impl_err, plan_err, DFSchema, DataFusionError},
     error::Result,
     logical_expr::{
         function::AccumulatorArgs, Accumulator, AggregateUDFImpl, ColumnarValue, Signature,
-        TypeSignature,
+        TypeSignature, Volatility,
     },
     physical_expr_common::{
         aggregate::tdigest::TryIntoF64,
@@ -38,17 +41,19 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use super::PERCENTILE_EXACT;
+use super::{NUMERICS, PERCENTILE_EXACT};
 
 #[derive(Debug)]
 struct PercentileContUdaf(Signature);
 
 impl PercentileContUdaf {
     pub fn new() -> Self {
-        Self(Signature {
-            type_signature: TypeSignature::Exact(vec![DataType::Float64, DataType::Float64]),
-            volatility: datafusion::logical_expr::Volatility::Immutable,
-        })
+        let mut variants = Vec::with_capacity(NUMERICS.len());
+        // Accept any numeric value paired with a float64 percentile
+        for num in NUMERICS {
+            variants.push(TypeSignature::Exact(vec![num.clone(), DataType::Float64]));
+        }
+        Self(Signature::one_of(variants, Volatility::Immutable))
     }
 }
 
@@ -65,13 +70,33 @@ impl AggregateUDFImpl for PercentileContUdaf {
         &self.0
     }
 
-    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Float64)
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType> {
+        if !arg_types[0].is_numeric() {
+            return plan_err!("percentile_cont requires numeric input types");
+        }
+        Ok(arg_types[0].clone())
     }
 
     fn accumulator(&self, acc_args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
         let percentile = validate_input_percentile_expr(&acc_args.input_exprs[1])?;
-        Ok(Box::new(PercentileCont::new(Some(percentile))))
+        let accumulator = match &acc_args.input_types[0] {
+            t @ (DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+            | DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::Float32
+            | DataType::Float64) => PercentileCont::new(Some(percentile), t.clone()),
+            other => {
+                return not_impl_err!(
+                    "Support for 'APPROX_PERCENTILE_CONT' for data type {other} is not implemented"
+                );
+            }
+        };
+        Ok(Box::new(accumulator))
     }
 }
 
@@ -105,53 +130,111 @@ fn get_lit_value(expr: &Expr) -> Result<ScalarValue> {
     }
 }
 
-fn merge_sorted_arrays(existing: &mut Vec<f64>, new: &[f64]) {
-    let mut result = Vec::with_capacity(existing.len() + new.len());
-    let mut i = 0;
-    let mut j = 0;
-
-    while i < existing.len() && j < new.len() {
-        if existing[i] <= new[j] {
-            result.push(existing[i]);
-            i += 1;
-        } else {
-            result.push(new[j]);
-            j += 1;
-        }
-    }
-
-    // Append remaining elements
-    if i < existing.len() {
-        result.extend_from_slice(&existing[i..]);
-    }
-    if j < new.len() {
-        result.extend_from_slice(&new[j..]);
-    }
-
-    // Copy result back to existing
-    existing.clear();
-    existing.extend_from_slice(&result);
-}
-
 /// This accumulator will return the exact percentile value
 /// from the given data
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct PercentileCont {
     data: Vec<f64>,
     percentile: f64,
+    return_type: DataType,
 }
 
 impl PercentileCont {
     // Default to median
-    fn new(percentile: Option<f64>) -> Self {
+    fn new(percentile: Option<f64>, return_type: DataType) -> Self {
         Self {
             data: Vec::new(),
             percentile: percentile.unwrap_or(0.5),
+            return_type,
+        }
+    }
+
+    fn convert_to_f64_array(values: &ArrayRef) -> Result<Vec<f64>> {
+        match values.data_type() {
+            DataType::Float64 => {
+                let array = downcast_value!(values, Float64Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::Float32 => {
+                let array = downcast_value!(values, Float32Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::Int64 => {
+                let array = downcast_value!(values, Int64Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::Int32 => {
+                let array = downcast_value!(values, Int32Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::Int16 => {
+                let array = downcast_value!(values, Int16Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::Int8 => {
+                let array = downcast_value!(values, Int8Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::UInt64 => {
+                let array = downcast_value!(values, UInt64Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::UInt32 => {
+                let array = downcast_value!(values, UInt32Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::UInt16 => {
+                let array = downcast_value!(values, UInt16Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            DataType::UInt8 => {
+                let array = downcast_value!(values, UInt8Array);
+                Ok(array
+                    .values()
+                    .iter()
+                    .filter_map(|v| v.try_as_f64().transpose())
+                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+            }
+            e => internal_err!("PERCENTILE_CONT is not expected to receive the type {e:?}"),
         }
     }
 }
-
-// TODO(Uddhav): Add function to convert DataTypes to f64Array for this accumulator
 
 impl Accumulator for PercentileCont {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
@@ -166,6 +249,8 @@ impl Accumulator for PercentileCont {
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
+        // Sort the data
+        self.data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let percentile = self.percentile; // default: median
         if self.data.is_empty() {
             return Ok(ScalarValue::Float64(None));
@@ -185,9 +270,20 @@ impl Accumulator for PercentileCont {
         let upper_value = self.data[upper_index];
         let fraction = rank - lower_index as f64;
 
-        Ok(ScalarValue::from(
-            lower_value + (upper_value - lower_value) * fraction,
-        ))
+        let q = lower_value + (upper_value - lower_value) * fraction;
+        Ok(match &self.return_type {
+            DataType::Int8 => ScalarValue::Int8(Some(q as i8)),
+            DataType::Int16 => ScalarValue::Int16(Some(q as i16)),
+            DataType::Int32 => ScalarValue::Int32(Some(q as i32)),
+            DataType::Int64 => ScalarValue::Int64(Some(q as i64)),
+            DataType::UInt8 => ScalarValue::UInt8(Some(q as u8)),
+            DataType::UInt16 => ScalarValue::UInt16(Some(q as u16)),
+            DataType::UInt32 => ScalarValue::UInt32(Some(q as u32)),
+            DataType::UInt64 => ScalarValue::UInt64(Some(q as u64)),
+            DataType::Float32 => ScalarValue::Float32(Some(q as f32)),
+            DataType::Float64 => ScalarValue::Float64(Some(q)),
+            v => unreachable!("unexpected return type {:?}", v),
+        })
     }
 
     fn size(&self) -> usize {
@@ -195,40 +291,18 @@ impl Accumulator for PercentileCont {
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
-        let mut values = Arc::clone(&values[0]);
-        // Filter out null values
-        if values.nulls().is_some() {
-            values = filter(&values, &is_not_null(&values)?)?;
-        }
-
-        let sorted_values = &arrow::compute::sort(&values, None)?;
-        let array = downcast_value!(sorted_values, Float64Array);
-        let array = array
-            .values()
-            .iter()
-            .filter_map(|v| v.try_as_f64().transpose())
-            .collect::<Result<Vec<f64>>>()?;
-        merge_sorted_arrays(&mut self.data, &array);
+        let values = PercentileCont::convert_to_f64_array(&values[0])?;
+        // let values = downcast_value!(&values[0], Float64Array);
+        self.data.reserve(values.len());
+        self.data.extend(values);
         Ok(())
     }
 
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
-        // TODO(Uddhav): Most of the code is duplicated from update_batch.
-        // Reduce duplication and improve performance.
-        let mut values = Arc::clone(&states[0]);
-        // Filter out null values
-        if values.nulls().is_some() {
-            values = filter(&values, &is_not_null(&values)?)?;
+        let array = states[0].as_list::<i32>();
+        for v in array.iter().flatten() {
+            self.update_batch(&[v])?
         }
-
-        let sorted_values = &arrow::compute::sort(&values, None)?;
-        let array = downcast_value!(sorted_values, Float64Array);
-        let array = array
-            .values()
-            .iter()
-            .filter_map(|v| v.try_as_f64().transpose())
-            .collect::<Result<Vec<f64>>>()?;
-        merge_sorted_arrays(&mut self.data, &array);
         Ok(())
     }
 }
@@ -275,7 +349,7 @@ mod test {
 
     #[test]
     fn test_exact_percentile() {
-        let mut acc = PercentileCont::new(Some(0.75));
+        let mut acc = PercentileCont::new(Some(0.75), DataType::Float64);
         let values: Vec<_> = NUMBERS.into_iter().map(|v| v as f64).collect();
         // Convert values to arrayref
         let values = vec![arrow::array::Float64Array::from(values)]
