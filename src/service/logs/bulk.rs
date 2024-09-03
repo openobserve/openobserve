@@ -149,7 +149,7 @@ pub async fn ingest(
             }
             // End get stream keys
 
-            crate::service::ingestion::get_ud_schema_and_original_data_streams(
+            crate::service::ingestion::get_uds_and_original_data_streams(
                 &streams,
                 &mut user_defined_schema_map,
                 &mut streams_need_original_set,
@@ -306,7 +306,7 @@ pub async fn ingest(
                 );
                 local_val.insert(
                     ID_COL_NAME.to_string(),
-                    json::Value::Number(record_id.into()),
+                    json::Value::String(record_id.to_string()),
                 );
             }
 
