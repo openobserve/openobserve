@@ -72,6 +72,9 @@ pub struct ScanStats {
     /// unit: MB
     #[prost(int64, tag = "8")]
     pub idx_scan_size: i64,
+    /// unit: ms
+    #[prost(int64, tag = "9")]
+    pub idx_took: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -1368,9 +1371,11 @@ pub struct SearchRequest {
     pub timeout: i64,
     #[prost(string, tag = "9")]
     pub work_group: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "10")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, tag = "10")]
+    pub index_type: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "11")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "12")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Eq)]
