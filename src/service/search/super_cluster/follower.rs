@@ -269,7 +269,7 @@ async fn get_file_list_from_inverted_index(
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let index_terms = filter_index_fields(&equal_terms, &index_fields);
 
-    log::info!("[trace_id {trace_id}] flight->leader: use_inverted_index true",);
+    log::info!("[trace_id {trace_id}] super cluster follower leader: use_inverted_index true",);
 
     // construct SearchQuery for inverted index search
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
@@ -293,7 +293,7 @@ async fn get_file_list_from_inverted_index(
     .await?;
 
     log::info!(
-        "[trace_id {trace_id}] flight->leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] super cluster follower leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
         req.time_range,
         stream_file_list.len(),
         idx_scan_size,
