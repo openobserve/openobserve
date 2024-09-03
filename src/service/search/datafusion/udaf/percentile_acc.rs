@@ -92,7 +92,7 @@ impl AggregateUDFImpl for PercentileContUdaf {
             | DataType::Float64) => PercentileCont::new(Some(percentile), t.clone()),
             other => {
                 return not_impl_err!(
-                    "Support for 'APPROX_PERCENTILE_CONT' for data type {other} is not implemented"
+                    "Support for 'PERCENTILE_CONT' for data type {other} is not implemented"
                 );
             }
         };
@@ -314,7 +314,7 @@ mod test {
     use arrow::array::{ArrayRef, RecordBatch};
     use arrow_schema::{Field, Schema};
     use datafusion::{
-        common::cast::as_float64_array,
+        common::cast::{as_float64_array, as_uint32_array},
         datasource::MemTable,
         logical_expr::{Accumulator, AggregateUDF, Volatility},
         prelude::{create_udaf, SessionContext},
@@ -335,11 +335,19 @@ mod test {
 
     fn create_context() -> SessionContext {
         let ctx = SessionContext::new();
-        let schema = Schema::new(vec![Field::new("value", DataType::Float64, false)]);
-        let values: Vec<_> = NUMBERS.into_iter().map(|v| v as f64).collect();
+        // Create two fields with the same data but different data types
+        let schema = Schema::new(vec![
+            Field::new("value_float", DataType::Float64, false),
+            Field::new("value_uint", DataType::UInt32, false),
+        ]);
+        let values_float: Vec<_> = NUMBERS.into_iter().map(|v| v as f64).collect();
+        let values_uint: Vec<_> = NUMBERS.into_iter().map(|v| v as u32).collect();
         let batch = RecordBatch::try_new(
             Arc::new(schema.clone()),
-            vec![Arc::new(Float64Array::from(values))],
+            vec![
+                Arc::new(Float64Array::from(values_float)),
+                Arc::new(UInt32Array::from(values_uint)),
+            ],
         )
         .unwrap();
         let table = MemTable::try_new(Arc::new(schema), vec![vec![batch]]).unwrap();
@@ -366,16 +374,22 @@ mod test {
     async fn test_percentile_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
-        let sql = &format!("select percentile_cont(value, {}) from t", percentile);
+        let sql_float_field =
+            &format!("select percentile_cont(value_float, {}) from t", percentile);
+        let sql_uint_field = &format!("select percentile_cont(value_uint, {}) from t", percentile);
         let acc_udaf = AggregateUDF::from(PercentileContUdaf::new());
         ctx.register_udaf(acc_udaf);
 
-        let df = ctx.sql(sql).await.unwrap();
+        let df = ctx.sql(sql_float_field).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result = as_float64_array(results[0].column(0)).unwrap();
-
-        // verify that the calculation is correct
         assert_eq!(result.value(0), 2456.5);
+
+        let df = ctx.sql(sql_uint_field).await.unwrap();
+        let results = df.collect().await.unwrap();
+        // downcast the array to the expected type
+        let result = as_uint32_array(results[0].column(0)).unwrap();
+        assert_eq!(result.value(0), 2456);
     }
 }
