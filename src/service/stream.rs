@@ -289,7 +289,6 @@ pub async fn update_stream_settings(
 ) -> Result<HttpResponse, Error> {
     match infra::schema::get_settings(org_id, stream_name, stream_type).await {
         Some(mut settings) => {
-
             if let Some(max_query_range) = update_settings.max_query_range {
                 settings.max_query_range = max_query_range;
             }
