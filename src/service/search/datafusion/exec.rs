@@ -48,6 +48,7 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
         session_state::SessionStateBuilder,
     },
+    logical_expr::AggregateUDF,
     physical_plan::{collect, memory::MemoryExec},
     prelude::{Expr, SessionContext},
 };
@@ -811,6 +812,9 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::percentile_cont::PercentileCont::new(),
+    ));
 
     {
         let udf_list = get_all_transform(_org_id).await;

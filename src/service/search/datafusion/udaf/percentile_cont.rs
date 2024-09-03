@@ -12,16 +12,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use std::sync::Arc;
 
-use arrow::{
-    array::{
-        Array, ArrowNumericType, AsArray, Float32Array, GenericListArray, Int16Array, Int32Array,
-        Int64Array, Int8Array, RecordBatch, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-    },
-    compute::{filter, is_not_null},
+use std::{fmt::Formatter, sync::Arc};
+
+use arrow::array::{
+    Array, AsArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, RecordBatch,
+    UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow_schema::Schema;
+use arrow_schema::{Field, Schema};
 use datafusion::{
     arrow::{
         array::{ArrayRef, Float64Array},
@@ -30,8 +28,9 @@ use datafusion::{
     common::{downcast_value, internal_err, not_impl_err, plan_err, DFSchema, DataFusionError},
     error::Result,
     logical_expr::{
-        function::AccumulatorArgs, Accumulator, AggregateUDFImpl, ColumnarValue, Signature,
-        TypeSignature, Volatility,
+        function::{AccumulatorArgs, StateFieldsArgs},
+        utils::format_state_name,
+        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
     },
     physical_expr_common::{
         aggregate::tdigest::TryIntoF64,
@@ -41,12 +40,13 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use super::{NUMERICS, PERCENTILE_EXACT};
+use super::NUMERICS;
 
-#[derive(Debug)]
-struct PercentileContUdaf(Signature);
+const PERCENTILE_CONT: &str = "percentile_cont";
 
-impl PercentileContUdaf {
+pub(crate) struct PercentileCont(Signature);
+
+impl PercentileCont {
     pub fn new() -> Self {
         let mut variants = Vec::with_capacity(NUMERICS.len());
         // Accept any numeric value paired with a float64 percentile
@@ -57,13 +57,28 @@ impl PercentileContUdaf {
     }
 }
 
-impl AggregateUDFImpl for PercentileContUdaf {
+impl std::fmt::Debug for PercentileCont {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        f.debug_struct("PercentileCont")
+            .field("name", &self.name())
+            .field("signature", &self.0)
+            .finish()
+    }
+}
+
+impl Default for PercentileCont {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AggregateUDFImpl for PercentileCont {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 
     fn name(&self) -> &str {
-        PERCENTILE_EXACT
+        PERCENTILE_CONT
     }
 
     fn signature(&self) -> &datafusion::logical_expr::Signature {
@@ -77,19 +92,30 @@ impl AggregateUDFImpl for PercentileContUdaf {
         Ok(arg_types[0].clone())
     }
 
-    fn accumulator(&self, acc_args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
-        let percentile = validate_input_percentile_expr(&acc_args.input_exprs[1])?;
-        let accumulator = match &acc_args.input_types[0] {
-            t @ (DataType::UInt8
-            | DataType::UInt16
-            | DataType::UInt32
-            | DataType::UInt64
-            | DataType::Int8
+    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
+        // Intermediate state is a list of the elements we have collected so far
+        let field = Field::new("item", DataType::Float64, true);
+        let state_name = "percentile_cont";
+        Ok(vec![Field::new(
+            format_state_name(args.name, state_name),
+            DataType::List(Arc::new(field)),
+            true,
+        )])
+    }
+
+    fn accumulator(&self, args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
+        let percentile = validate_input_percentile_expr(&args.input_exprs[1])?;
+        let accumulator = match &args.input_types[0] {
+            t @ (DataType::Int8
             | DataType::Int16
             | DataType::Int32
             | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
             | DataType::Float32
-            | DataType::Float64) => PercentileCont::new(Some(percentile), t.clone()),
+            | DataType::Float64) => PercentileContAccumulator::new(percentile, t.clone()),
             other => {
                 return not_impl_err!(
                     "Support for 'PERCENTILE_CONT' for data type {other} is not implemented"
@@ -130,26 +156,34 @@ fn get_lit_value(expr: &Expr) -> Result<ScalarValue> {
     }
 }
 
-/// This accumulator will return the exact percentile value
-/// from the given data
-#[derive(Debug)]
-struct PercentileCont {
+/// This accumulator will return the exact percentile value from the given data
+struct PercentileContAccumulator {
     data: Vec<f64>,
     percentile: f64,
     return_type: DataType,
 }
 
-impl PercentileCont {
+impl std::fmt::Debug for PercentileContAccumulator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "PercentileContAccumulator({}, {})",
+            self.return_type, self.percentile
+        )
+    }
+}
+
+impl PercentileContAccumulator {
     // Default to median
-    fn new(percentile: Option<f64>, return_type: DataType) -> Self {
+    fn new(percentile: f64, return_type: DataType) -> Self {
         Self {
             data: Vec::new(),
-            percentile: percentile.unwrap_or(0.5),
+            percentile,
             return_type,
         }
     }
 
-    fn convert_to_f64_array(values: &ArrayRef) -> Result<Vec<f64>> {
+    fn convert_to_float(values: &ArrayRef) -> Result<Vec<f64>> {
         match values.data_type() {
             DataType::Float64 => {
                 let array = downcast_value!(values, Float64Array);
@@ -236,7 +270,7 @@ impl PercentileCont {
     }
 }
 
-impl Accumulator for PercentileCont {
+impl Accumulator for PercentileContAccumulator {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
         Ok(vec![ScalarValue::List(ScalarValue::new_list_nullable(
             &self
@@ -251,9 +285,21 @@ impl Accumulator for PercentileCont {
     fn evaluate(&mut self) -> Result<ScalarValue> {
         // Sort the data
         self.data.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let percentile = self.percentile; // default: median
+        let percentile = self.percentile;
         if self.data.is_empty() {
-            return Ok(ScalarValue::Float64(None));
+            return Ok(match &self.return_type {
+                DataType::Int8 => ScalarValue::Int8(None),
+                DataType::Int16 => ScalarValue::Int16(None),
+                DataType::Int32 => ScalarValue::Int32(None),
+                DataType::Int64 => ScalarValue::Int64(None),
+                DataType::UInt8 => ScalarValue::UInt8(None),
+                DataType::UInt16 => ScalarValue::UInt16(None),
+                DataType::UInt32 => ScalarValue::UInt32(None),
+                DataType::UInt64 => ScalarValue::UInt64(None),
+                DataType::Float32 => ScalarValue::Float32(None),
+                DataType::Float64 => ScalarValue::Float64(None),
+                v => unreachable!("unexpected return type {:?}", v),
+            });
         }
 
         // Calculate rank of the percentile
@@ -262,7 +308,20 @@ impl Accumulator for PercentileCont {
         let upper_index = rank.ceil() as usize;
 
         if lower_index == upper_index {
-            return Ok(ScalarValue::from(self.data[lower_index]));
+            let q = self.data[lower_index];
+            return Ok(match &self.return_type {
+                DataType::Int8 => ScalarValue::Int8(Some(q as i8)),
+                DataType::Int16 => ScalarValue::Int16(Some(q as i16)),
+                DataType::Int32 => ScalarValue::Int32(Some(q as i32)),
+                DataType::Int64 => ScalarValue::Int64(Some(q as i64)),
+                DataType::UInt8 => ScalarValue::UInt8(Some(q as u8)),
+                DataType::UInt16 => ScalarValue::UInt16(Some(q as u16)),
+                DataType::UInt32 => ScalarValue::UInt32(Some(q as u32)),
+                DataType::UInt64 => ScalarValue::UInt64(Some(q as u64)),
+                DataType::Float32 => ScalarValue::Float32(Some(q as f32)),
+                DataType::Float64 => ScalarValue::Float64(Some(q)),
+                v => unreachable!("unexpected return type {:?}", v),
+            });
         }
 
         // Calculate the delta and return the fractioned value
@@ -291,14 +350,17 @@ impl Accumulator for PercentileCont {
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
-        let values = PercentileCont::convert_to_f64_array(&values[0])?;
-        // let values = downcast_value!(&values[0], Float64Array);
+        let values = PercentileContAccumulator::convert_to_float(&values[0])?;
         self.data.reserve(values.len());
         self.data.extend(values);
         Ok(())
     }
 
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        if states.is_empty() {
+            return Ok(());
+        }
+
         let array = states[0].as_list::<i32>();
         for v in array.iter().flatten() {
             self.update_batch(&[v])?
@@ -316,11 +378,11 @@ mod test {
     use datafusion::{
         common::cast::{as_float64_array, as_uint32_array},
         datasource::MemTable,
-        logical_expr::{Accumulator, AggregateUDF, Volatility},
-        prelude::{create_udaf, SessionContext},
+        logical_expr::{Accumulator, AggregateUDF},
+        prelude::SessionContext,
     };
 
-    use super::{super::PERCENTILE_EXACT, *};
+    use super::*;
 
     // list of numbers to test
     const NUMBERS: [u16; 92] = [
@@ -356,8 +418,8 @@ mod test {
     }
 
     #[test]
-    fn test_exact_percentile() {
-        let mut acc = PercentileCont::new(Some(0.75), DataType::Float64);
+    fn test_percentile_cont() {
+        let mut acc = PercentileContAccumulator::new(0.75, DataType::Float64);
         let values: Vec<_> = NUMBERS.into_iter().map(|v| v as f64).collect();
         // Convert values to arrayref
         let values = vec![arrow::array::Float64Array::from(values)]
@@ -371,13 +433,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_percentile_udaf() {
+    async fn test_percentile_cont_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
         let sql_float_field =
             &format!("select percentile_cont(value_float, {}) from t", percentile);
         let sql_uint_field = &format!("select percentile_cont(value_uint, {}) from t", percentile);
-        let acc_udaf = AggregateUDF::from(PercentileContUdaf::new());
+        let acc_udaf = AggregateUDF::from(PercentileCont::new());
         ctx.register_udaf(acc_udaf);
 
         let df = ctx.sql(sql_float_field).await.unwrap();

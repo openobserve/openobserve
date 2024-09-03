@@ -12,14 +12,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-// allow unused code
-#![allow(unused)]
 
 use arrow_schema::DataType;
 
-pub(crate) mod percentile_acc;
-
-pub(crate) const PERCENTILE_EXACT: &str = "percentile_cont";
+pub mod percentile_cont;
 
 pub static NUMERICS: &[DataType] = &[
     DataType::Int8,
