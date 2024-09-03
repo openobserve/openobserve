@@ -52,10 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
                 </div>
                 <div class="col" style="width: 100%; height: 100%">
-                  <FieldList
-                    :editMode="true"
-                    @update:stream-list="streamListUpdated"
-                  />
+                  <FieldList :editMode="true" />
                 </div>
               </div>
             </div>
@@ -293,7 +290,7 @@ export default defineComponent({
     CustomMarkdownEditor,
     AddToDashboard,
   },
-  emits: ["handleChartApiError", "update:streamList"],
+  emits: ["handleChartApiError"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -396,10 +393,6 @@ export default defineComponent({
     // used provide and inject to share data between components
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
-
-    const streamListUpdated = () => {
-      emit("update:streamList");
-    };
 
     const addToDashboard = () => {
       const errors: any = [];
@@ -589,7 +582,6 @@ export default defineComponent({
       metaDataValue,
       metaData,
       chartData,
-      streamListUpdated,
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,

@@ -50,6 +50,7 @@ pub async fn check_cache(
     file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
+    max_query_range: i64,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -147,27 +148,28 @@ pub async fn check_cache(
         multi_resp.histogram_interval = discard_interval / 1000 / 1000;
     }
     if get_config().common.use_multi_result_cache {
-        let mut multi_res = crate::service::search::cluster::cache_multi::get_cached_results(
-            query_key.to_owned(),
-            file_path.to_string(),
-            trace_id.to_owned(),
-            CacheQueryRequest {
-                q_start_time: req.query.start_time,
-                q_end_time: req.query.end_time,
-                is_aggregate,
-                ts_column: result_ts_col.clone(),
-                discard_interval,
-                is_descending,
-            },
-        )
-        .await;
+        let mut cached_responses =
+            crate::service::search::cluster::cache_multi::get_cached_results(
+                query_key.to_owned(),
+                file_path.to_string(),
+                trace_id.to_owned(),
+                CacheQueryRequest {
+                    q_start_time: req.query.start_time,
+                    q_end_time: req.query.end_time,
+                    is_aggregate,
+                    ts_column: result_ts_col.clone(),
+                    discard_interval,
+                    is_descending,
+                },
+            )
+            .await;
         if is_descending {
-            multi_res.sort_by_key(|meta| meta.response_end_time);
+            cached_responses.sort_by_key(|meta| meta.response_end_time);
         } else {
-            multi_res.sort_by_key(|meta| meta.response_start_time);
+            cached_responses.sort_by_key(|meta| meta.response_start_time);
         }
 
-        let total_hits = multi_res
+        let total_hits = cached_responses
             .iter()
             .map(|v| v.cached_response.total)
             .sum::<usize>();
@@ -176,15 +178,21 @@ pub async fn check_cache(
             *should_exec_query = false;
             vec![]
         } else {
-            calculate_deltas_multi(
-                &multi_res,
+            let (deltas, updated_start_time, cache_duration) = calculate_deltas_multi(
+                &cached_responses,
                 req.query.start_time,
                 req.query.end_time,
                 discard_interval,
-            )
+                max_query_range,
+            );
+            multi_resp.total_cache_duration = cache_duration as usize;
+            if let Some(start_time) = updated_start_time {
+                req.query.start_time = start_time;
+            }
+            deltas
         };
 
-        for res in multi_res {
+        for res in cached_responses {
             if res.has_cached_data {
                 multi_resp.has_cached_data = true;
                 multi_resp.cached_response.push(res.cached_response);
@@ -209,6 +217,7 @@ pub async fn check_cache(
         multi_resp.limit = meta.meta.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
+
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -613,10 +622,13 @@ fn calculate_deltas_multi(
     start_time: i64,
     end_time: i64,
     histogram_interval: i64,
-) -> Vec<QueryDelta> {
+    max_query_range: i64,
+) -> (Vec<QueryDelta>, Option<i64>, i64) {
     let mut deltas = Vec::new();
-
+    let mut cache_duration = 0_i64;
     // Track the current end of coverage
+    let mut new_start_time = end_time - max_query_range * 1000 * 1000 * 60 * 60;
+
     let mut current_end_time = start_time;
 
     for meta in results {
@@ -626,7 +638,7 @@ fn calculate_deltas_multi(
             meta.response_end_time,
             meta.cached_response.hits.len()
         );
-
+        cache_duration += meta.response_end_time - meta.response_start_time;
         let delta_end_time = if current_end_time != start_time && histogram_interval > 0 {
             // If there is a histogram interval, we need to adjust the end time to the nearest
             // interval
@@ -648,6 +660,11 @@ fn calculate_deltas_multi(
         }
         // Update the current end time to the end of the current meta
         current_end_time = meta.response_end_time;
+
+        // this is to shift the start time by cache duration
+        if meta.response_start_time >= new_start_time {
+            new_start_time -= meta.response_end_time - meta.response_start_time;
+        }
     }
 
     // Check if there is a gap at the end
@@ -659,5 +676,23 @@ fn calculate_deltas_multi(
         });
     }
 
-    deltas
+    // remove all deltas that are within the cache duration
+    deltas.retain(|d| d.delta_start_time >= new_start_time);
+
+    deltas.sort(); // Sort the deltas to bring duplicates together
+    deltas.dedup(); // Remove consecutive duplicates
+
+    // update the start time to the new start time
+    let updated_start_time = if new_start_time < start_time {
+        log::info!(
+            "found cache of duration : {:?} microseconds, updated_start_time: {:?}",
+            cache_duration,
+            new_start_time
+        );
+        Some(new_start_time)
+    } else {
+        None
+    };
+
+    (deltas, updated_start_time, cache_duration)
 }
