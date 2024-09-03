@@ -63,6 +63,8 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 impl PartialEq for Alert {
@@ -94,6 +96,7 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
+            error: None,
         }
     }
 }
