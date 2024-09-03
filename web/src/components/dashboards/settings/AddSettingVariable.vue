@@ -316,6 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
             ></q-input>
           </div>
+          <label v-if="['custom'].includes(variableData.type)">Select</label>
           <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
             <div
@@ -327,9 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 filled
                 outlined
-                stack-label
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                class="col textbox showLabelOnTop q-mr-sm"
+                class="col textbox q-mr-sm"
                 v-model="variableData.options[index].label"
                 :label="'Label ' + (index + 1) + ' *'"
                 name="label"
@@ -338,9 +338,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 filled
                 outlined
-                stack-label
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                class="col textbox showLabelOnTop q-mr-sm"
+                class="col textbox q-mr-sm"
                 v-model="variableData.options[index].value"
                 :label="'Value ' + (index + 1) + ' *'"
                 name="value"
@@ -350,16 +349,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="variableData.options[index].selected"
                 data-test="dashboard-custom-variable-checkbox"
                 @click="onCheckboxClick(index)"
-                class="q-mt-sm"
+                class="q-mb-lg"
               />
               <div>
-                <q-btn
-                  flat
-                  style="margin-top: 33px"
-                  round
-                  @click="removeField(index)"
-                  icon="cancel"
-                />
+                <q-btn flat round @click="removeField(index)" icon="cancel" />
               </div>
             </div>
             <div class="flex flex-col">
