@@ -333,6 +333,8 @@ pub struct Filters {
 pub struct CustomFieldsOption {
     pub label: String,
     pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
