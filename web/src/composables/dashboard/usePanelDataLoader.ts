@@ -35,7 +35,7 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext, escapeSingleQuotes } from "@/utils/zincutils";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -639,7 +639,7 @@ export const usePanelDataLoader = (
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value = variable.value
-            .map((value: any) => `'${value}'`)
+            .map((value: any) => `'${escapeSingleQuotes(value)}'`)
             .join(",");
           const possibleVariablesPlaceHolderTypes = [
             {
@@ -682,7 +682,9 @@ export const usePanelDataLoader = (
             );
           });
         } else {
-          variableValue = variable.value === null ? "" : variable.value;
+          variableValue = escapeSingleQuotes(
+            variable.value === null ? "" : variable.value,
+          );
           if (query.includes(variableName)) {
             metadata.push({
               type: "variable",
