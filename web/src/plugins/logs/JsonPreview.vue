@@ -316,52 +316,49 @@ export default {
 
     onMounted(async () => {
       await updateStoreOriginalData();
-      if(checkIsOriginalData() && !storeOriginalDataVar.value){
-        nestedJson.value = getNestedJson();
-      }
-      
+      nestedJson.value = JSON.stringify( {
+          "test":"this needs to be covered after fixing api"
+        })
     });
 
     watch(
       () => props.value,
-      // if(store.state.zoConfig.unflatten_data_enabled )
     
       async () =>  {
-       
         await updateStoreOriginalData();
-        if(checkIsOriginalData()  && !storeOriginalDataVar.value){
-        nestedJson.value = getNestedJson();
-      }
-      else{
+        const o2_id = BigInt(props.value._o2_id);
         const {traceparent,traceId} = generateTraceContext();
-        searchService
-        .search(
-          {
-            org_identifier: searchObj.organizationIdetifier,
-            query: {
-              "query":{
-                "start_time":props.value._timestamp - 10 * 60 * 1000,
-                "sql":`SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _timestamp = ${props.value._timestamp} and _o2_id = ${props.value._o2_id}`,
-    
-              "end_time": props.value._timestamp + 10 * 60 * 1000,
-              'sql_mode':"full",
-              "size":1,
-              "from":0,
-              "quick_mode":false,
-              }
 
-            },
-            page_type: searchObj.data.stream.streamType,
-            traceparent,
-          },
-          "UI",
-        ).then((res: any) => {
-
-          nestedJson.value = res?.data?.hits[0]._original;
-        }).catch((err: any) => {
-          console.log("err", err);
+        nestedJson.value = JSON.stringify( {
+          "test":"this needs to be covered after fixing api"
         })
-      }
+        // searchService
+        // .search(
+        //   {
+        //     org_identifier: searchObj.organizationIdetifier,
+        //     query: {
+        //       "query":{
+        //         "start_time":props.value._timestamp - 10 * 60 * 1000,
+        //         "sql":`SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _o2_id = ${o2_id} and _timestamp = ${props.value._timestamp}`,
+    
+        //       "end_time": props.value._timestamp + 10 * 60 * 1000,
+        //       'sql_mode':"full",
+        //       "size":1,
+        //       "from":0,
+        //       "quick_mode":false,
+        //       }
+
+        //     },
+        //     page_type: searchObj.data.stream.streamType,
+        //     traceparent,
+        //   },
+        //   "UI",
+        // ).then((res: any) => {
+        //   console.log(res,"res getting")
+        // }).catch((err: any) => {
+        //   console.log("err", err);
+        // })
+      
       },
     );
 
@@ -412,73 +409,7 @@ export default {
       );
     });
 
-    const getNestedJson = () => {
-  const result = {};
-  try {
-    Object.keys(props.value).forEach((key) => {
-      let keys = key.split("_");
-      // Handle keys that start with underscores
-      let keyWithPrefix = "";
-      for (let i = 0; i < keys.length; i++) {
-        if (keys[i] === "") {
-          keyWithPrefix += "_";
-        } else {
-          if (keyWithPrefix.length) {
-            keyWithPrefix += keys[i];
-            keys[i] = keyWithPrefix;
-            keyWithPrefix = "";
-          }
-        }
-      }
-      keys = keys.filter((k) => k !== "");
-      type NestedObject = {
-        [key: string]: NestedObject | any;
-      };
-      // Reduce the keys to create nested objects
-      keys.reduce((acc: NestedObject, k: string, index: number) => {
-        if (index === keys.length - 1) {
-          // Last key in the sequence
-          if (k in acc) {
-            // If key already exists, move existing value to `outerText`
-            if (typeof acc[k] === 'string') {
-              acc[k] = {
-                outerText: acc[k],
-              };
-            }
-            acc[k] = {
-              ...acc[k],
-              [k]: props.value[key],
-            };
-          } else {
-            acc[k] = props.value[key];
-          }
-        } else {
-          // Intermediate keys
-          if (!(k in acc)) {
-            acc[k] = {};
-          } else if (typeof acc[k] === 'string') {
-            // If an existing key is a string, move it to `outerText`
-            acc[k] = {
-              outerText: acc[k],
-            };
-          }
-        }
-        return acc[k];
-      }, result);
-    });
-  } catch (e) {
-    console.log("Error in getNestedJson", e);
-  }
-  return JSON.stringify(result);
-};
 
-
-const checkIsOriginalData = () => {
-  if(storeOriginalDataVar.value || store.state.zoConfig.unflatten_data_enabled) {
-    return true;
-  }
-  return false;
-}
 
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
@@ -504,7 +435,7 @@ const checkIsOriginalData = () => {
   const filteredTabs = computed(() => {
         return tabs.filter(tab => {
           // Only include the 'Unflattened' tab if checkIsOriginalData() returns true
-          if (!checkIsOriginalData() && (tab.value === 'unflattened' || tab.value === 'flattened')) {
+          if (!storeOriginalDataVar.value && (tab.value === 'unflattened' || tab.value === 'flattened')) {
           return false;
         }
           return true;
@@ -533,7 +464,6 @@ const checkIsOriginalData = () => {
       previewId,
       schemaToBeSearch,
       updateStoreOriginalData,
-      checkIsOriginalData,
       filteredTabs,
     };
   },
