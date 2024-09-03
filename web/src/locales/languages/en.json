@@ -55,7 +55,9 @@
     "date": "Date",
     "description": "Description",
     "cancelChanges": "Cancel Changes",
-    "logs": "Logs"
+    "logs": "Logs",
+    "addGroup":"Add Group",
+    "addCondition":"Add Condition"
   },
   "search": {
     "selectIndex": "Select Stream First",
