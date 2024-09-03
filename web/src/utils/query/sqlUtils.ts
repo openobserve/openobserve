@@ -1,3 +1,5 @@
+import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+
 let parser: any;
 let parserInitialized = false;
 
@@ -22,42 +24,46 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
       dummyQuery,
       label.name,
       label.value,
-      label.operator
+      label.operator,
     );
   }
 
-  const astOfOriginalQuery: any = parser.astify(originalQuery);
-  const astOfDummy: any = parser.astify(dummyQuery);
+  try {
+    const astOfOriginalQuery: any = parser.astify(originalQuery);
+    const astOfDummy: any = parser.astify(dummyQuery);
 
-  // if ast already has a where clause
-  if (astOfOriginalQuery.where) {
-    const newWhereClause = {
-      type: "binary_expr",
-      operator: "AND",
-      left: {
-        ...astOfOriginalQuery.where,
-        parentheses: true,
-      },
-      right: {
-        ...astOfDummy.where,
-        parentheses: true,
-      },
-    };
-    const newAst = {
-      ...astOfOriginalQuery,
-      where: newWhereClause,
-    };
-    const sql = parser.sqlify(newAst);
-    const quotedSql = sql.replace(/`/g, '"');
-    return quotedSql;
-  } else {
-    const newAst = {
-      ...astOfOriginalQuery,
-      where: astOfDummy.where,
-    };
-    const sql = parser.sqlify(newAst);
-    const quotedSql = sql.replace(/`/g, '"');
-    return quotedSql;
+    // if ast already has a where clause
+    if (astOfOriginalQuery.where) {
+      const newWhereClause = {
+        type: "binary_expr",
+        operator: "AND",
+        left: {
+          ...astOfOriginalQuery.where,
+          parentheses: true,
+        },
+        right: {
+          ...astOfDummy.where,
+          parentheses: true,
+        },
+      };
+      const newAst = {
+        ...astOfOriginalQuery,
+        where: newWhereClause,
+      };
+      const sql = parser.sqlify(newAst);
+      const quotedSql = sql.replace(/`/g, '"');
+      return quotedSql;
+    } else {
+      const newAst = {
+        ...astOfOriginalQuery,
+        where: astOfDummy.where,
+      };
+      const sql = parser.sqlify(newAst);
+      const quotedSql = sql.replace(/`/g, '"');
+      return quotedSql;
+    }
+  } catch (error: any) {
+    console.error("There was an error generating query:", error);
   }
 };
 
@@ -65,7 +71,7 @@ export const addLabelToSQlQuery = async (
   originalQuery: any,
   label: any,
   value: any,
-  operator: any
+  operator: any,
 ) => {
   await importSqlParser();
 
@@ -74,17 +80,43 @@ export const addLabelToSQlQuery = async (
   switch (operator) {
     case "Contains":
       operator = "LIKE";
-      value = "%" + value + "%";
+      value = "%" + escapeSingleQuotes(value) + "%";
       break;
     case "Not Contains":
       operator = "NOT LIKE";
-      value = "%" + value + "%";
+      value = "%" + escapeSingleQuotes(value) + "%";
       break;
     case "Is Null":
       operator = "IS NULL";
       break;
     case "Is Not Null":
       operator = "IS NOT NULL";
+      break;
+    case "IN":
+      operator = "IN";
+      // add brackets if not present in "IN" conditions
+      value = splitQuotedString(value).map((it: any) => ({
+        type: "single_quote_string",
+        value: escapeSingleQuotes(it),
+      }));
+      break;
+    case "=":
+    case "<>":
+    case "!=":
+    case "<":
+    case ">":
+    case "<=":
+    case ">=":
+      // If value starts and ends with quote, remove it
+      value =
+        value &&
+        value.length > 1 &&
+        value.startsWith("'") &&
+        value.endsWith("'")
+          ? value.substring(1, value.length - 1)
+          : value;
+      // escape single quotes by doubling them
+      value = escapeSingleQuotes(value);
       break;
   }
 
@@ -112,7 +144,7 @@ export const addLabelToSQlQuery = async (
             column: label,
           },
           right: {
-            type: "string",
+            type: operator === "IN" ? "expr_list" : "string",
             value: value,
           },
         };
@@ -174,7 +206,7 @@ export const getStreamFromQuery = async (query: any) => {
 
 export const isGivenFieldInOrderBy = async (
   sqlQuery: string,
-  fieldAlias: string
+  fieldAlias: string,
 ) => {
   await importSqlParser();
   const ast: any = parser.astify(sqlQuery);
@@ -218,7 +250,7 @@ function extractFields(parsedAst: any, timeField: string) {
 
   // Check if all fields are selected and remove the `*` entry
   const allFieldsSelected = parsedAst.columns.some(
-    (column: any) => column.expr && column.expr.column === "*"
+    (column: any) => column.expr && column.expr.column === "*",
   );
 
   if (allFieldsSelected) {
@@ -233,7 +265,7 @@ function extractFields(parsedAst: any, timeField: string) {
         column: timeField,
         alias: "y_axis_1",
         aggregationFunction: "count",
-      }
+      },
     );
 
     // Filter out the `*` entry from fields
@@ -243,79 +275,225 @@ function extractFields(parsedAst: any, timeField: string) {
   return fields;
 }
 
-// Function to extract conditions from the WHERE clause
-function extractConditions(parsedAst: any) {
-  const conditions: any = [];
+function parseCondition(condition: any) {
+  try {
+    if (condition.type === "binary_expr") {
+      if (condition.operator == "OR" || condition.operator == "AND") {
+        const left: any = parseCondition(condition.left);
+        const right: any = parseCondition(condition.right);
 
-  function traverseCondition(node: any) {
-    if (node.type === "binary_expr") {
-      const condition = {
-        column: "",
-        operator: node.operator,
-        value: "",
-      };
+        // set current logical operator to the right side
+        if (Array.isArray(right)) {
+          right[0].logicalOperator = condition.operator ?? "AND";
+        } else {
+          right.logicalOperator = condition.operator ?? "AND";
+        }
 
-      if (node.left.type === "column_ref") {
-        condition.column = node.left.column;
-      }
+        // conditions array
+        const conditions = [];
 
-      if (
-        node.right.type === "string" ||
-        node.right.type === "number" ||
-        node.right.type === "single_quote_string"
+        // if left is array
+        if (Array.isArray(left)) {
+          // distructure left array and push
+          conditions.push(...left);
+        } else {
+          // if left is not array, push left object
+          conditions.push(left);
+        }
+
+        // if right is array
+        if (Array.isArray(right)) {
+          // distructure right array and push
+          conditions.push(...right);
+        } else {
+          // if right is not array, push right object
+          conditions.push(right);
+        }
+
+        // if parentheses are true, create new group
+        // else return conditions array
+        if (condition.parentheses == true) {
+          return {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: conditions,
+          };
+        } else {
+          return conditions;
+        }
+      } else if (
+        condition.operator == "=" ||
+        condition.operator == "<" ||
+        condition.operator == ">" ||
+        condition.operator == "<=" ||
+        condition.operator == ">="
       ) {
-        condition.value = node.right.value;
-      } else if (node.right.type === "column_ref") {
-        condition.value = node.right.column;
-      } else if (node.right.type === "expr_list") {
-        condition.value = node.right.value.map(
-          (item: any) => item.value || item.column
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: condition?.operator,
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "!=" || condition.operator == "<>") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "<>",
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "IN") {
+        // create values array based on right side of condition
+        const values = condition.right.value.map(
+          (value: any) => `${value?.value}`,
         );
-      } else if (node.right.type === "null") {
-        condition.operator += " NULL";
-      }
 
-      conditions.push(condition);
-    } else if (node.type === "unary_expr" && node.operator === "NOT") {
-      const condition = {
-        column: "",
-        operator: "NOT",
-        value: "",
+        return {
+          type: "list",
+          values: values,
+          column: condition?.left?.column ?? "",
+          operator: null,
+          value: null,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "IS") {
+        // consider this as "IS NULL"
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Is Null",
+          value: null,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "IS NOT") {
+        // consider this as "IS NOT NULL"
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Is Not Null",
+          value: null,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition?.operator == "LIKE") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Contains",
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition?.operator == "NOT LIKE") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Not Contains",
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      }
+    } else if (condition.type === "function") {
+      let conditionName = condition?.name?.name[0]?.value?.toLowerCase();
+
+      // function with field name and value
+      let conditionsWithFieldName = [
+        "str_match",
+        "str_match_ignore_case",
+        "re_match",
+        "re_not_match",
+      ];
+
+      // function without field name and with value
+      let conditionsWithoutFieldName = [
+        "match_all",
+        "match_all_raw",
+        "match_all_raw_ignore_case",
+      ];
+
+      if (conditionsWithFieldName.includes(conditionName)) {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.args?.value[0]?.column ?? "",
+          operator: conditionName,
+          value: condition?.args?.value[1]?.value ?? "",
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (conditionsWithoutFieldName.includes(conditionName)) {
+        return {
+          type: "condition",
+          values: [],
+          column: "",
+          operator: conditionName,
+          value: condition?.args?.value[0]?.value ?? "",
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      }
+    }
+  } catch (error) {
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
+  }
+}
+
+function convertWhereToFilter(where: any) {
+  try {
+    if (!where) {
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
       };
-
-      if (node.expr.type === "binary_expr") {
-        condition.operator = `NOT ${node.expr.operator}`;
-        if (node.expr.left.type === "column_ref") {
-          condition.column = node.expr.left.column;
-        }
-        if (
-          node.expr.right.type === "string" ||
-          node.expr.right.type === "number" ||
-          node.expr.right.type === "single_quote_string"
-        ) {
-          condition.value = node.expr.right.value;
-        } else if (node.expr.right.type === "column_ref") {
-          condition.value = node.expr.right.column;
-        }
-      }
-
-      conditions.push(condition);
     }
+    const parsedCondition = parseCondition(where);
 
-    if (node.left && node.left.type === "binary_expr") {
-      traverseCondition(node.left);
+    // if parsed condition is an array, it means it's a group
+    if (Array.isArray(parsedCondition)) {
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: parsedCondition,
+      };
     }
-
-    if (node.right && node.right.type === "binary_expr") {
-      traverseCondition(node.right);
-    }
+    // if parsed condition is an object, it means it's a condition
+    return parsedCondition;
+  } catch (error) {
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
   }
+}
 
-  if (parsedAst.where) {
-    traverseCondition(parsedAst.where);
+function extractFilters(parsedAst: any) {
+  try {
+    return convertWhereToFilter(parsedAst.where);
+  } catch (error) {
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
   }
-
-  return conditions;
 }
 
 // Function to extract the table name
@@ -325,7 +503,7 @@ function extractTableName(parsedAst: any) {
 
 export const getFieldsFromQuery = async (
   query: any,
-  timeField: string = "_timestamp"
+  timeField: string = "_timestamp",
 ) => {
   try {
     await importSqlParser();
@@ -333,18 +511,24 @@ export const getFieldsFromQuery = async (
     const ast: any = parser.astify(query);
 
     const streamName = extractTableName(ast) ?? null;
-    const fields = extractFields(ast, timeField);
-    const conditions = extractConditions(ast);
+    let fields = extractFields(ast, timeField);
+    let filters: any = extractFilters(ast);
 
-    // filter fields and conditions
-    const filteredFields = fields.filter((field: any) => field.column);
-    const filteredConditions = conditions.filter(
-      (condition: any) => condition.column
-    );
+    // remove wrong fields and filters
+    fields = fields.filter((field: any) => field.column);
+
+    // if type is condition
+    if (filters?.filterType === "condition") {
+      filters = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [filters],
+      };
+    }
 
     return {
-      fields: filteredFields,
-      conditions: filteredConditions,
+      fields,
+      filters,
       streamName,
     };
   } catch (error) {
@@ -361,7 +545,11 @@ export const getFieldsFromQuery = async (
           aggregationFunction: "count",
         },
       ],
-      conditions: [],
+      filters: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      },
       streamName: null,
     };
   }
@@ -370,7 +558,7 @@ export const getFieldsFromQuery = async (
 export const buildSqlQuery = (
   tableName: string,
   fields: any,
-  whereClause: string
+  whereClause: string,
 ) => {
   let query = "SELECT ";
 
@@ -392,77 +580,6 @@ export const buildSqlQuery = (
   // Return the constructed query
   return query;
 };
-
-export const getValidConditionObj = (condition: any) => {
-  switch (condition.operator) {
-    case "in": {
-      condition.type = "list";
-      condition.values = condition.value;
-      condition.operator = "IN";
-      condition.operator = null;
-      condition.value = null;
-      break;
-    }
-    case "not in": {
-      // currently not supported
-      break;
-    }
-    case "is null": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Is Null";
-      condition.value = null;
-
-      break;
-    }
-    case "is not null": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Is Not Null";
-      condition.value = null;
-      break;
-    }
-    case "like": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Contains";
-      // remove % from the start and end
-      condition.value = condition?.value?.replace(/^%|%$/g, "");
-      break;
-    }
-    case "not like": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Not Contains";
-      // remove % from the start and end
-      condition.value = condition?.value?.replace(/^%|%$/g, "");
-      break;
-    }
-    case "<>":
-    case "!=": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "<>";
-      condition.value = `'${condition.value}'`;
-      break;
-    }
-    case "=":
-    case "<":
-    case ">":
-    case "<=":
-    case ">=": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.value = `'${condition.value}'`;
-      break;
-    }
-    default:
-      break;
-  }
-
-  return condition;
-};
-
 export const changeHistogramInterval = async (
   query: any,
   histogramInterval: any,

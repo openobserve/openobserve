@@ -530,7 +530,7 @@ export default defineComponent({
 
     // watch for filter changes and set default value for Is Null and Is Not Null operators
     watch(
-      () => variableData.query_data.filter,
+      () => variableData?.query_data?.filter,
       (newValue) => {
         if (newValue && newValue.length > 0) {
           newValue.forEach((filter: any) => {
