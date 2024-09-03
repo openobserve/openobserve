@@ -213,19 +213,20 @@ pub async fn get_stream_alerts(
             })
             .cloned()
             .collect::<Vec<_>>();
-
+        if alerts.is_empty() {
+            return;
+        }
         stream_alerts_map.insert(key, alerts);
     }
 }
 
-pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
-    if trigger.is_none() {
+pub async fn evaluate_trigger(triggers: TriggerAlertData) {
+    if triggers.is_empty() {
         return;
     }
-    log::debug!("Evaluating trigger: {:?}", trigger);
-    let trigger = trigger.unwrap();
+    log::debug!("Evaluating triggers: {:?}", triggers);
     let mut trigger_usage_reports = vec![];
-    for (alert, val) in trigger.iter() {
+    for (alert, val) in triggers.iter() {
         let module_key = format!(
             "{}/{}/{}",
             &alert.stream_type, &alert.stream_name, &alert.name

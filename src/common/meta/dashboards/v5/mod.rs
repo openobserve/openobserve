@@ -160,7 +160,7 @@ pub enum AggregationFunc {
 pub enum PanelFilter {
     #[serde(rename = "condition")]
     Condition(FilterCondition),
-    
+
     #[serde(rename = "group")]
     Group(GroupType),
 }

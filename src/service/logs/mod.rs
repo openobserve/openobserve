@@ -263,7 +263,6 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut trigger: Option<TriggerAlertData> = None;
     crate::service::ingestion::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
@@ -273,6 +272,10 @@ async fn write_logs(
         &mut stream_alerts_map,
     )
     .await;
+    let cur_stream_alerts =
+        stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
+    let mut triggers: TriggerAlertData =
+        Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
     // End get stream alert
 
     // start check for schema
@@ -359,17 +362,12 @@ async fn write_logs(
         }
 
         // start check for alert trigger
-        if trigger.is_none() && !stream_alerts_map.is_empty() {
-            let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-            if let Some(alerts) = stream_alerts_map.get(&key) {
-                let mut trigger_alerts: TriggerAlertData = Vec::new();
+        if let Some(alerts) = cur_stream_alerts {
+            if triggers.len() < alerts.len() {
                 for alert in alerts {
                     if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
-                        trigger_alerts.push((alert.clone(), v));
+                        triggers.push((alert.clone(), v));
                     }
-                }
-                if !trigger_alerts.is_empty() {
-                    trigger = Some(trigger_alerts);
                 }
             }
         }
@@ -447,7 +445,7 @@ async fn write_logs(
     }
 
     // only one trigger per request
-    evaluate_trigger(trigger).await;
+    evaluate_trigger(triggers).await;
 
     Ok(req_stats)
 }
