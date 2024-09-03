@@ -464,10 +464,6 @@ export default {
       unflattendData,
       schemaToBeSearch,
       filteredTabs,
-      handleTabChange,
-    };
-  },
-};
 </script>
 
 
