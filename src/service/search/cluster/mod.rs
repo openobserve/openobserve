@@ -996,7 +996,7 @@ async fn get_file_list_by_inverted_index(
     let cfg = get_config();
 
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
-    let file_list = file_list
+    let file_list_map = file_list
         .iter()
         .map(|f| (&f.key, &f.meta))
         .collect::<HashMap<_, _>>();
@@ -1005,12 +1005,18 @@ async fn get_file_list_by_inverted_index(
     let terms = meta
         .fts_terms
         .iter()
-        .map(|t| {
+        .filter_map(|t| {
             let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-            tokens
-                .into_iter()
-                .max_by_key(|key| key.len())
-                .unwrap_or_default()
+            // If tokens empty return None so terms is empty hashset
+            if tokens.is_empty() {
+                return None;
+            }
+            Some(
+                tokens
+                    .into_iter()
+                    .max_by_key(|key| key.len())
+                    .unwrap_or_default(),
+            )
         })
         .collect::<HashSet<String>>();
 
@@ -1049,12 +1055,17 @@ async fn get_file_list_by_inverted_index(
         })
         .collect::<Vec<_>>();
     let index_condition = index_terms.join(" OR ");
-    let search_condition = if fts_condition.is_empty() {
-        index_condition
-    } else if index_condition.is_empty() {
-        fts_condition
-    } else {
-        format!("{} OR {}", fts_condition, index_condition)
+
+    // If both empty return original file list with other params as 0
+    let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
+        (true, true) => {
+            return Ok((file_list.to_vec(), 0, 0));
+        }
+        (true, false) => fts_condition,
+        (false, true) => index_condition,
+        _ => {
+            format!("{} OR {}", fts_condition, index_condition)
+        }
     };
 
     let index_stream_name =
@@ -1104,7 +1115,7 @@ async fn get_file_list_by_inverted_index(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
         );
-        let Some(file_meta) = file_list.get(&prefixed_filename) else {
+        let Some(file_meta) = file_list_map.get(&prefixed_filename) else {
             continue;
         };
         let segment_ids = match item.get("segment_ids") {
