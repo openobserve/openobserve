@@ -591,7 +591,7 @@ pub async fn get_stream_routing(
     }
 }
 
-pub async fn get_ud_schema_and_original_data_streams(
+pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
     streams_need_original: &mut HashSet<String>,

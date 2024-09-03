@@ -101,7 +101,7 @@ pub async fn handle_grpc_request(
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     let mut streams_need_original_set: HashSet<String> = HashSet::new();
-    crate::service::ingestion::get_ud_schema_and_original_data_streams(
+    crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_set,
@@ -305,7 +305,7 @@ pub async fn handle_grpc_request(
                     );
                     local_val.insert(
                         ID_COL_NAME.to_string(),
-                        json::Value::Number(record_id.into()),
+                        json::Value::String(record_id.to_string()),
                     );
                 }
 
