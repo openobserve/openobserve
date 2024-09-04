@@ -216,12 +216,12 @@ export default defineComponent({
       type: String || null,
     },
     dashboardId: {
-      default: null,
-      type: String || null,
+      default: '',
+      type: String,
     },
     folderId: {
-      default: null,
-      type: String || null,
+      default: '',
+      type: String,
     },
   },
   emits: [
@@ -299,9 +299,9 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
-        console.log('data updated')
+        console.log('data updated', JSON.parse(JSON.stringify(data.value)));
         // emit vrl function field list
-        if (data.value.length && data.value[0] && data.value[0].length) {
+        if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
           const maxAttributesIndex = data.value[0].reduce(
             (
@@ -457,7 +457,7 @@ export default defineComponent({
       // Check if the queryType is 'promql'
       else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
-        return data.value.length &&
+        return data.value?.length &&
           data.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data

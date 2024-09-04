@@ -35,9 +35,13 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode, generateTraceContext, escapeSingleQuotes } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  generateTraceContext,
+  escapeSingleQuotes,
+} from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
-import { isEqual } from "lodash-es"
+import { isEqual, omit } from "lodash-es";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -60,18 +64,25 @@ export const usePanelDataLoader = (
     }
   };
 
+  let runCount = 0;
+
   /**
-   * Calculate cache key for panel 
+   * Calculate cache key for panel
    * @returns cache key
    */
   const getCacheKey = () => ({
     panelSchema: toRaw(panelSchema.value),
     variablesData: toRaw(variablesData.value),
     forceLoad: toRaw(forceLoad.value),
-    searchType: toRaw(searchType.value),
+    // searchType: toRaw(searchType.value),
     dashboardId: toRaw(dashboardId?.value),
     folderId: toRaw(folderId?.value),
-  })
+  });
+
+  console.log(
+    "usepaneldataloader: panelcache: ",
+    JSON.parse(JSON.stringify(panelSchema?.value)),
+  );
 
   const { getPanelCache, savePanelCache } = usePanelCache(
     folderId?.value,
@@ -87,7 +98,7 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     resultMetaData: [] as any,
-    lastTriggeredAt: null as any
+    lastTriggeredAt: null as any,
   });
 
   // observer for checking if panel is visible on the screen
@@ -283,6 +294,23 @@ export const usePanelDataLoader = (
         return;
       }
 
+
+      if (runCount == 0) {
+        log('loadData: panelcache: run count is 0');
+        // restore from the cache and return
+        const isRestoredFromCache = restoreFromCache();
+        log('loadData: panelcache: isRestoredFromCache', isRestoredFromCache);
+        if (isRestoredFromCache) {
+          log('loadData: panelcache: restored from cache');
+          runCount++;
+          return;
+        }
+      }
+
+      log("loadData: panelcache: no cache restored, continue firing, runCount ", runCount);
+
+      runCount++;
+
       state.loading = true;
 
       // Check if the query type is "promql"
@@ -338,6 +366,9 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: queryResults.map((it: any) => it?.metadata),
         };
+
+        console.log("panelCache: savePanelCache: saving panel data");
+        savePanelCache(getCacheKey(), { ...toRaw(state) });
       } else {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
@@ -356,7 +387,10 @@ export const usePanelDataLoader = (
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
         // Handle each query sequentially
-        for (const [panelQueryIndex, it] of panelSchema.value.queries.entries()) {
+        for (const [
+          panelQueryIndex,
+          it,
+        ] of panelSchema.value.queries.entries()) {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -555,6 +589,7 @@ export const usePanelDataLoader = (
         }
 
         state.loading = false;
+        savePanelCache(getCacheKey(), { ...toRaw(state) });
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
@@ -1228,60 +1263,92 @@ export const usePanelDataLoader = (
   watch(
     state,
     () => {
-      log("usePanelDataLoader: panelcache: state changed");
+      // log("usePanelDataLoader: panelcache: state changed");
       if (state.loading == false) {
-        log("usePanelDataLoader: panelcache: updating cache");
-        savePanelCache(getCacheKey(), { ...toRaw(state) });
+        // log("usePanelDataLoader: panelcache: updating cache");
+        // savePanelCache(getCacheKey(), { ...toRaw(state) });
       }
     },
     { deep: true },
   );
 
-  onMounted(() => {
-
+  onMounted(async () => {
     // check if we have a cache available
     const cache = getPanelCache();
-    if(!cache) {
+    if (!cache) {
       // cache is not there, we need to load the data
       loadData(); // Loading the data
       return;
     }
 
+    // const isRestoredFromCache = restoreFromCache();
+
+    // // If cache was there, but cache wasn't restored due to outdated, then load the data
+    // if (!isRestoredFromCache) {
+    //   log("PanelSchema/Time Initial: should load the data");
+      loadData(); // Loading the data
+    // }
+  });
+
+  const restoreFromCache: () => boolean = () => {
+    const cache =  getPanelCache();
+
+    if (!cache) {
+      log('usePanelDataLoader: panelcache: cache is not there');
+      // cache is not there, we need to load the data
+      return false;
+    }
     // now we have a cache
-    const { key: tempPanelCacheKey, value: tempPanelCacheValue} = cache
+    const { key: tempPanelCacheKey, value: tempPanelCacheValue } =
+      cache;
     log("usePanelDataLoader: panelcache: tempPanelCache", tempPanelCacheValue);
-    
-    let isRestoredFromCache = false
 
-    console.log("usePanelDataLoader: panelcache: comparing cache key 1", JSON.parse(JSON.stringify(getCacheKey() || {})))
-    console.log("usePanelDataLoader: panelcache: comparing tempPanelCacheKey", JSON.parse(JSON.stringify(tempPanelCacheKey || {})))
-    console.log("usePanelDataLoader: panelcache: comparision: equal?", isEqual(getCacheKey(), tempPanelCacheKey))
-    
+    let isRestoredFromCache = false;
+
+    const keysToIgnore = [
+      "panelSchema.version",
+      "panelSchema.layout",
+      "panelSchema.htmlContent",
+      "panelSchema.markdownContent",
+    ]
+
+    console.log(
+      "usePanelDataLoader: panelcache: comparing cache key 1",
+      JSON.parse(JSON.stringify(getCacheKey() || {})),
+    );
+    console.log(
+      "usePanelDataLoader: panelcache: comparing tempPanelCacheKey",
+      JSON.parse(JSON.stringify(tempPanelCacheKey || {})),
+    );
+    console.log(
+      "usePanelDataLoader: panelcache: comparision: equal?",
+      isEqual(omit(getCacheKey(), keysToIgnore), omit(tempPanelCacheKey, keysToIgnore)),
+    );
+
+   
+
     // check if it is stale or not
-    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && isEqual(getCacheKey(), tempPanelCacheKey)) {
-
+    if (
+      tempPanelCacheValue &&
+      Object.keys(tempPanelCacheValue).length > 0 &&
+      isEqual(omit(getCacheKey(), keysToIgnore), omit(tempPanelCacheKey, keysToIgnore))
+    ) {
       // const cache = getPanelCache();
       state.data = tempPanelCacheValue.data;
       state.loading = tempPanelCacheValue.loading;
       state.errorDetail = tempPanelCacheValue.errorDetail;
       state.metadata = tempPanelCacheValue.metadata;
-      state.resultMetaData = tempPanelCacheValue.resultMetaData;    
+      state.resultMetaData = tempPanelCacheValue.resultMetaData;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
 
       // set that the cache is restored
-      isRestoredFromCache = true
-      
-      log(
-        "usePanelDataLoader: panelcache: panel data loaded from cache"
-      );
+      isRestoredFromCache = true;
+
+      log("usePanelDataLoader: panelcache: panel data loaded from cache");
     }
 
-    // If cache was there, but cache wasn't restored due to outdated, then load the data
-    if (!isRestoredFromCache) {
-      log("PanelSchema/Time Initial: should load the data");
-      loadData(); // Loading the data
-    }
-  });
+    return isRestoredFromCache;
+  };
 
   return {
     ...toRefs(state),

@@ -38,9 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ props.data.title }} 
         </div>
         <q-space />
-        <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-            <span class="lastRefreshedAtIcon">🕑</span><RelativeTime :timestamp="lastTriggeredAt" fullTimePrefix="Last Refreshed At: "/>
-        </span>
         <q-icon
           v-if="
             !viewOnly && isCurrentlyHoveredPanel && props.data.description != ''
@@ -112,6 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
+        <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+            <span class="lastRefreshedAtIcon">🕑</span><RelativeTime :timestamp="lastTriggeredAt" fullTimePrefix="Last Refreshed At: "/>
+        </span>
         <q-btn
           icon="refresh"
           flat

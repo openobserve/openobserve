@@ -107,6 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-card style="overflow: hidden">
         <ViewPanel
+          :folderId="folderId"
+          :dashboardId="dashboardData.dashboardId"
           :panelId="viewPanelId"
           :selectedDateForViewPanel="selectedDateForViewPanel"
           :initialVariableValues="variablesData"

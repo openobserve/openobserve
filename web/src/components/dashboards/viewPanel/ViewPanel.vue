@@ -81,8 +81,11 @@
               />
               <div style="flex: 1; overflow: hidden">
                 <PanelSchemaRenderer
+                  v-if="chartData"
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"
+                  :dashboard-id="dashboardId"
+                  :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
                   :variablesData="variablesData"
                   :width="6"
@@ -150,6 +153,14 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    dashboardId: {
+      type: String,
+      required: false,
+    },
+    folderId: {
+      type: String,
+      required: false,
+    },
     selectedDateForViewPanel: {
       type: Object,
     },
@@ -165,7 +176,7 @@ export default defineComponent({
   setup(props, { emit }) {
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
-    const chartData = ref({});
+    const chartData = ref();
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();

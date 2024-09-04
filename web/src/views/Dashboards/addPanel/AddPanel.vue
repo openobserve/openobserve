@@ -213,11 +213,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <div class="col" style="flex: 1">
                         <PanelSchemaRenderer
+                          v-if="chartData"
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
+                          :dashboard-id="queryParams.dashboard"
+                          :folder-id="queryParams.folder"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="updatedVariablesData"
+                          :variablesData="variablesData"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
@@ -380,7 +383,7 @@ export default defineComponent({
 
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
-    const chartData = ref({});
+    const chartData = ref();
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -1076,6 +1079,7 @@ export default defineComponent({
       onDataZoom,
       showTutorial,
       updateVrlFunctionFieldList,
+      queryParams: route.query,
     };
   },
   methods: {
