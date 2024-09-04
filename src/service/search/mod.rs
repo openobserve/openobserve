@@ -667,11 +667,9 @@ pub async fn match_file(
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
-    let mut filters: Vec<(&str, Vec<String>)> = generate_filter_from_equal_items(equal_items);
-    let partition_keys: HashMap<&str, &StreamPartition> = partition_keys
-        .iter()
-        .map(|v| (v.field.as_str(), v))
-        .collect();
+    let mut filters = generate_filter_from_equal_items(equal_items);
+    let partition_keys: HashMap<&String, &StreamPartition> =
+        partition_keys.iter().map(|v| (&v.field, v)).collect();
     for (key, value) in filters.iter_mut() {
         if let Some(partition_key) = partition_keys.get(key) {
             for val in value.iter_mut() {
@@ -694,10 +692,13 @@ pub async fn match_file(
 /// after [("a", ["3", "4"]), ("b", ["5", "6"])]
 pub fn generate_filter_from_equal_items(
     equal_items: &[(String, String)],
-) -> Vec<(&str, Vec<String>)> {
-    let mut filters: HashMap<&str, Vec<String>> = HashMap::new();
+) -> Vec<(String, Vec<String>)> {
+    let mut filters: HashMap<String, Vec<String>> = HashMap::new();
     for (field, value) in equal_items {
-        filters.entry(field).or_default().push(value.to_string());
+        filters
+            .entry(field.to_string())
+            .or_default()
+            .push(value.to_string());
     }
     filters.into_iter().collect()
 }
@@ -706,7 +707,7 @@ pub fn generate_filter_from_equal_items(
 pub async fn match_source(
     stream: StreamParams,
     time_range: Option<(i64, i64)>,
-    filters: &[(&str, Vec<String>)],
+    filters: &[(String, Vec<String>)],
     source: &FileKey,
     is_wal: bool,
     match_min_ts_only: bool,
@@ -771,7 +772,7 @@ pub async fn match_source(
 }
 
 /// match a source is a needed file or not, return true if needed
-fn filter_source_by_partition_key(source: &str, filters: &[(&str, Vec<String>)]) -> bool {
+fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
     !filters.iter().any(|(k, v)| {
         let field = format_partition_key(&format!("{k}="));
         find(source, &format!("/{field}"))
@@ -869,77 +870,98 @@ mod tests {
         let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
         let filters = vec![
             (vec![], true),
-            (vec![("kuberneteshost", vec!["gke-dev1".to_string()])], true),
             (
-                vec![("kuberneteshost", vec!["gke-dev2".to_string()])],
+                vec![("kuberneteshost".to_string(), vec!["gke-dev1".to_string()])],
+                true,
+            ),
+            (
+                vec![("kuberneteshost".to_string(), vec!["gke-dev2".to_string()])],
                 false,
             ),
             (
                 vec![(
-                    "kuberneteshost",
+                    "kuberneteshost".to_string(),
                     vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                 )],
                 true,
             ),
             (
-                vec![("some_other_key", vec!["no-matter".to_string()])],
+                vec![("some_other_key".to_string(), vec!["no-matter".to_string()])],
                 true,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev1".to_string()]),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 true,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev1".to_string()]),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev2".to_string()]),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev2".to_string()]),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 true,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("some_other_key", vec!["no-matter".to_string()]),
+                    ("some_other_key".to_string(), vec!["no-matter".to_string()]),
                 ],
                 true,
             ),

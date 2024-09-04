@@ -553,12 +553,10 @@ impl Sql {
     ) -> bool {
         let mut filters = generate_filter_from_quick_text(&self.meta.quick_text);
         // rewrite partition filters
-        let partition_keys: HashMap<&str, &StreamPartition> = partition_keys
-            .iter()
-            .map(|v| (v.field.as_str(), v))
-            .collect();
+        let partition_keys: HashMap<&String, &StreamPartition> =
+            partition_keys.iter().map(|v| (&v.field, v)).collect();
         for entry in filters.iter_mut() {
-            if let Some(partition_key) = partition_keys.get(entry.0) {
+            if let Some(partition_key) = partition_keys.get(&entry.0) {
                 for val in entry.1.iter_mut() {
                     *val = partition_key.get_partition_value(val);
                 }
@@ -578,7 +576,7 @@ impl Sql {
 
 pub fn generate_filter_from_quick_text(
     data: &[(String, String, SqlOperator)],
-) -> Vec<(&str, Vec<String>)> {
+) -> Vec<(String, Vec<String>)> {
     let quick_text_len = data.len();
     let mut filters = HashMap::with_capacity(quick_text_len);
     for i in 0..quick_text_len {
@@ -586,7 +584,7 @@ pub fn generate_filter_from_quick_text(
         if op == &SqlOperator::And
             || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
         {
-            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+            let entry = filters.entry(k.to_string()).or_insert_with(Vec::new);
             entry.push(v.to_string());
         } else {
             filters.clear();

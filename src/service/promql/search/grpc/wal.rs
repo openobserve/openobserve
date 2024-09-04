@@ -57,7 +57,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &mut [(&str, Vec<String>)],
+    filters: &mut [(String, Vec<String>)],
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // get file list
@@ -201,7 +201,7 @@ async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &[(&str, Vec<String>)],
+    filters: &[(String, Vec<String>)],
 ) -> Result<Vec<cluster_rpc::MetricsWalFile>> {
     let nodes = get_cached_online_ingester_nodes().await;
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {

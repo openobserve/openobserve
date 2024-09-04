@@ -145,8 +145,22 @@ pub async fn search(
     );
 
     // check inverted index
+    let cfg = get_config();
+    let inverted_index_type =
+        if req.index_type.is_none() || req.index_type.as_ref().unwrap().is_empty() {
+            cfg.common.inverted_index_search_format.clone()
+        } else {
+            req.index_type.as_ref().unwrap().to_string()
+        };
+    let use_inverted_index = req.use_inverted_index
+        && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    log::info!(
+        "[trace_id {trace_id}] flight->follower_leader: use_inverted_index {} with parquet format",
+        use_inverted_index
+    );
+
     let mut idx_scan_size = 0;
-    if req.use_inverted_index {
+    if use_inverted_index {
         (file_list, idx_scan_size) = get_file_list_from_inverted_index(
             &trace_id,
             &req,
@@ -250,25 +264,11 @@ async fn get_file_list_from_inverted_index(
     match_terms: &[String],
     file_list: &[FileKey],
 ) -> Result<(Vec<FileKey>, usize)> {
-    let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
-    let schema_map = schema
-        .fields
-        .iter()
-        .map(|f| (f.name().clone(), f))
-        .collect::<HashMap<_, _>>();
-
     // construct partition filters
     let equal_terms: Vec<(String, String)> = equal_terms
         .iter()
-        .filter_map(|v| {
-            if schema_map.contains_key(&v.key) {
-                Some((v.key.to_string(), v.value.to_string()))
-            } else {
-                None
-            }
-        })
+        .map(|v| (v.key.to_string(), v.value.to_string()))
         .collect::<Vec<_>>();
-
     // filter euqal_items with index_fields
     let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&schema);

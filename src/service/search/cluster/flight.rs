@@ -468,10 +468,19 @@ pub async fn get_file_list_from_inverted_index(
     query: &SearchQuery,
     file_list: &mut HashMap<String, Vec<FileKey>>,
 ) -> Result<(bool, ScanStats, usize)> {
-    let (use_inverted_index, index_terms) =
-        is_use_inverted_index(sql, &req.inverted_index_type, "parquet");
+    let cfg = get_config();
+    let inverted_index_type = if req.inverted_index_type.is_none()
+        || req.inverted_index_type.as_ref().unwrap().is_empty()
+    {
+        cfg.common.inverted_index_search_format.clone()
+    } else {
+        req.inverted_index_type.as_ref().unwrap().to_string()
+    };
+    let (use_inverted_index, index_terms) = is_use_inverted_index(sql);
+    let use_inverted_index =
+        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
     log::info!(
-        "[trace_id {trace_id}] flight->leader: use_inverted_index {}",
+        "[trace_id {trace_id}] flight->leader: use_inverted_index {} with parquet format",
         use_inverted_index
     );
 
@@ -831,14 +840,14 @@ pub async fn get_file_list_by_inverted_index(
     stream_name: &str,
     file_list: &[&FileKey],
     match_terms: &[String],
-    index_terms: &[(&str, Vec<String>)],
+    index_terms: &[(String, Vec<String>)],
 ) -> Result<(Vec<FileKey>, usize, usize)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     let org_id = req.org_id.clone();
     let stream_type = req.stream_type;
-    let file_list = file_list
+    let file_list_map = file_list
         .iter()
         .map(|f| (&f.key, &f.meta))
         .collect::<HashMap<_, _>>();
@@ -846,18 +855,24 @@ pub async fn get_file_list_by_inverted_index(
     // Get all the unique terms which the user has searched.
     let terms = match_terms
         .iter()
-        .map(|t| {
+        .filter_map(|t| {
             let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-            tokens
-                .into_iter()
-                .max_by_key(|key| key.len())
-                .unwrap_or_default()
+            if tokens.is_empty() {
+                None
+            } else {
+                Some(
+                    tokens
+                        .into_iter()
+                        .max_by_key(|key| key.len())
+                        .unwrap_or_default(),
+                )
+            }
         })
         .collect::<HashSet<String>>();
 
     let fts_condition = terms
         .iter()
-        .map(|x| format!("term LIKE '{x}%'"))
+        .map(|x| format!("term LIKE '%{x}%'"))
         .collect::<Vec<_>>()
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {
@@ -889,12 +904,20 @@ pub async fn get_file_list_by_inverted_index(
         })
         .collect::<Vec<_>>();
     let index_condition = index_terms.join(" OR ");
-    let search_condition = if fts_condition.is_empty() {
-        index_condition
-    } else if index_condition.is_empty() {
-        fts_condition
-    } else {
-        format!("{} OR {}", fts_condition, index_condition)
+    // If both empty return original file list with other params as 0
+    let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
+        (true, true) => {
+            return Ok((
+                file_list.iter().map(|v| (*v).clone()).collect::<Vec<_>>(),
+                0,
+                0,
+            ));
+        }
+        (true, false) => fts_condition,
+        (false, true) => index_condition,
+        _ => {
+            format!("{} OR {}", fts_condition, index_condition)
+        }
     };
 
     let index_stream_name =
@@ -944,7 +967,7 @@ pub async fn get_file_list_by_inverted_index(
             "files/{}/{}/{}/{}",
             &org_id, stream_type, stream_name, filename
         );
-        let Some(file_meta) = file_list.get(&prefixed_filename) else {
+        let Some(file_meta) = file_list_map.get(&prefixed_filename) else {
             continue;
         };
         let segment_ids = match item.get("segment_ids") {
@@ -995,12 +1018,7 @@ fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     println!("{}", plan);
 }
 
-#[allow(dead_code)]
-pub fn is_use_inverted_index(
-    sql: &Arc<NewSql>,
-    inverted_index_type: &Option<String>,
-    working_index_type: &str, // parquet, fst
-) -> (bool, Vec<(String, String)>) {
+pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> (bool, Vec<(String, String)>) {
     let cfg = get_config();
     let index_terms = if sql.equal_items.len() == 1 {
         let schema = sql.schemas.values().next().unwrap().schema();
@@ -1011,18 +1029,10 @@ pub fn is_use_inverted_index(
         vec![]
     };
 
-    let inverted_index_type =
-        if inverted_index_type.is_none() || inverted_index_type.as_ref().unwrap().is_empty() {
-            cfg.common.inverted_index_search_format.clone()
-        } else {
-            inverted_index_type.as_ref().unwrap().to_string()
-        };
-
     let use_inverted_index = sql.stream_type != StreamType::Index
         && sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (inverted_index_type == working_index_type || inverted_index_type == "both")
         && (sql.match_items.is_some() || !index_terms.is_empty());
 
     (use_inverted_index, index_terms)

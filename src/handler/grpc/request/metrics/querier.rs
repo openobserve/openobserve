@@ -99,7 +99,7 @@ impl Metrics for MetricsQuerier {
             .get_ref()
             .filters
             .iter()
-            .map(|f| (f.field.as_str(), f.value.clone()))
+            .map(|f| (f.field.to_string(), f.value.clone()))
             .collect::<Vec<_>>();
         let mut resp = MetricsWalFileResponse::default();
 

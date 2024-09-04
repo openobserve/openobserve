@@ -133,6 +133,8 @@ pub async fn search(
         stream_name: stream_name.to_string(),
         time_range: Some((req.start_time, req.end_time)),
         work_group: work_group.clone(),
+        use_inverted_index: req.use_inverted_index,
+        inverted_index_type: req.index_type.clone(),
     });
 
     // get all tables
@@ -147,6 +149,8 @@ pub async fn search(
             query_params.clone(),
             schema_latest.clone(),
             &file_list,
+            &req.equal_keys,
+            &req.match_all_keys,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
         )
