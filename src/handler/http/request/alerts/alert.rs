@@ -20,7 +20,9 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use crate::{
     common::{
         meta::{
-            alerts::alert::Alert, dashboards::datetime_now, http::HttpResponse as MetaHttpResponse,
+            alerts::alert::{Alert, AlertListFilter},
+            dashboards::datetime_now,
+            http::HttpResponse as MetaHttpResponse,
         },
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
@@ -136,7 +138,26 @@ async fn list_stream_alerts(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alert::list(&org_id, stream_type, Some(stream_name.as_str()), None).await {
+    let user_filter = query.get("owner").map(|v| v.to_string());
+    let enabled_filter = query
+        .get("enabled")
+        .and_then(|field| match field.parse::<bool>() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        });
+    let alert_filter = AlertListFilter {
+        owner: user_filter,
+        enabled: enabled_filter,
+    };
+    match alert::list(
+        &org_id,
+        stream_type,
+        Some(stream_name.as_str()),
+        None,
+        alert_filter,
+    )
+    .await
+    {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             for alert in data.iter_mut() {
@@ -167,14 +188,15 @@ async fn list_stream_alerts(
     )
 )]
 #[get("/{org_id}/alerts")]
-async fn list_alerts(path: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
     let mut _alert_list_from_rbac = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
+        let user_id = req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
             user_id.to_str().unwrap(),
@@ -195,7 +217,29 @@ async fn list_alerts(path: web::Path<String>, _req: HttpRequest) -> Result<HttpR
         // Get List of allowed objects ends
     }
 
-    match alert::list(&org_id, None, None, _alert_list_from_rbac).await {
+    let user_filter = query.get("owner").map(|v| v.to_string());
+    let enabled_filter = query
+        .get("enabled")
+        .and_then(|field| match field.parse::<bool>() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        });
+    let stream_type_filter = get_stream_type_from_request(&query).unwrap_or_default();
+    let stream_name_filter = query.get("stream_name").map(|v| v.as_str());
+
+    let alert_filter = AlertListFilter {
+        owner: user_filter,
+        enabled: enabled_filter,
+    };
+    match alert::list(
+        &org_id,
+        stream_type_filter,
+        stream_name_filter,
+        _alert_list_from_rbac,
+        alert_filter,
+    )
+    .await
+    {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             for alert in data.iter_mut() {
