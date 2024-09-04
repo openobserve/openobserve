@@ -79,11 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-tab-panel name="json" class="q-pa-none">
         <q-card-section
           data-test="log-detail-json-content"
-          class="q-pa-none q-mb-lg"
+          class="q-pa-none q-mb-lg q-pt-sm"
         >
           <json-preview
             :value="rowData"
             show-copy-button
+            mode="sidebar"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
@@ -146,13 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         clickable
                         v-close-popup="true"
-                        v-if="searchObj.data.stream.selectedStreamFields.some(
-                                (item: any) =>
-                                  item.name === value
-                                    ? item.isSchemaField
-                                    : ''
-                              )
-                            "
+                        v-if="
+                          searchObj.data.stream.selectedStreamFields.some(
+                            (item: any) =>
+                              item.name === value ? item.isSchemaField : '',
+                          )
+                        "
                       >
                         <q-item-section>
                           <q-item-label
@@ -177,13 +177,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         clickable
                         v-close-popup="true"
-                        v-if="searchObj.data.stream.selectedStreamFields.some(
-                                (item: any) =>
-                                  item.name === value
-                                    ? item.isSchemaField
-                                    : ''
-                              )
-                            "
+                        v-if="
+                          searchObj.data.stream.selectedStreamFields.some(
+                            (item: any) =>
+                              item.name === value ? item.isSchemaField : '',
+                          )
+                        "
                       >
                         <q-item-section>
                           <q-item-label
@@ -208,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
-                            value.toString()
+                            value.toString(),
                           )
                         "
                         clickable
@@ -437,7 +436,7 @@ export default defineComponent({
     const toggleWrapLogDetails = () => {
       window.localStorage.setItem(
         "wrap-log-details",
-        shouldWrapValues.value ? "true" : "false"
+        shouldWrapValues.value ? "true" : "false",
       );
     };
 
@@ -464,7 +463,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        })
+        }),
       );
     };
 

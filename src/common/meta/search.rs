@@ -31,7 +31,9 @@ pub struct CachedQueryResponse {
     pub is_descending: bool,
     pub limit: i64,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, ToSchema, Default, Eq, PartialEq, Ord, PartialOrd,
+)]
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
@@ -58,6 +60,8 @@ pub struct MultiCachedQueryResponse {
     pub is_descending: bool,
     pub limit: i64,
     pub took: usize,
+    pub histogram_interval: i64,
+    pub total_cache_duration: usize,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]

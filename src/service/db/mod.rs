@@ -28,6 +28,7 @@ pub mod functions;
 pub mod instance;
 pub mod kv;
 pub mod metrics;
+#[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod organization;
 pub mod pipelines;

@@ -17,7 +17,7 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search,
+        search::{self, ResponseTook},
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -79,12 +79,19 @@ pub async fn search(
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
 
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
     let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = if let Some(vrl_function) = &query_fn {
-        h.sum64(&format!("{}{}", origin_sql, vrl_function))
-    } else {
-        h.sum64(&origin_sql)
-    };
+    let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
@@ -92,6 +99,11 @@ pub async fn search(
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
+
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let max_query_range = settings.map_or(0, |s| s.max_query_range);
+
+    let orig_start_time = req.query.start_time;
 
     let mut file_path = format!(
         "{}/{}/{}/{}",
@@ -106,6 +118,7 @@ pub async fn search(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
+            max_query_range,
         )
         .await
     } else {
@@ -118,7 +131,7 @@ pub async fn search(
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
             delta_removed_hits: false,
-        })
+        });
     } else if use_cache {
         log::info!(
             "[trace_id {trace_id}] Query deltas are: {:?}",
@@ -249,6 +262,25 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
+    if is_aggregate && c_resp.histogram_interval > -1 {
+        res.histogram_interval = Some(c_resp.histogram_interval);
+    }
+
+    // get stream settings
+    let mut range_error = "".to_string();
+
+    if orig_start_time != req.query.start_time {
+        range_error = format!(
+            "Query duration is modified due to query range restriction of {} hours ",
+            max_query_range
+        );
+        res.set_partial(true);
+    }
+
+    if !range_error.is_empty() {
+        res.function_error = format!("{}. {}", res.function_error, range_error);
+    }
+
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
         response_time: time,
@@ -339,20 +371,26 @@ fn merge_response(
                 continue;
             }
             resp.hits.extend(res.hits.clone());
+            resp.histogram_interval = res.histogram_interval;
         }
         resp.took = cache_took;
         resp
     };
 
     if cache_response.hits.is_empty()
-        && search_response.is_empty()
-        && search_response.first().unwrap().hits.is_empty()
-        && search_response.last().unwrap().hits.is_empty()
+        && !search_response.is_empty()
+        && search_response
+            .first()
+            .map_or(true, |res| res.hits.is_empty())
+        && search_response
+            .last()
+            .map_or(true, |res| res.hits.is_empty())
     {
         for res in search_response {
             cache_response.total += res.total;
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
+            cache_response.histogram_interval = res.histogram_interval;
         }
         return cache_response;
     }
@@ -362,6 +400,8 @@ fn merge_response(
 
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
+
+    let mut res_took = ResponseTook::default();
 
     for res in search_response.clone() {
         cache_response.total += res.total;
@@ -375,13 +415,26 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
+        if let Some(mut took_details) = res.took_detail {
+            res_took.cluster_total += took_details.cluster_total;
+            res_took.cluster_wait_queue += took_details.cluster_wait_queue;
+            res_took.idx_took += took_details.idx_took;
+            res_took.wait_queue += took_details.wait_queue;
+            res_took.total += took_details.total;
+            res_took.nodes.append(&mut took_details.nodes);
+        }
+
         cache_response.hits.extend(res.hits.clone());
     }
     sort_response(is_descending, &mut cache_response, ts_column);
 
-    if cache_response.hits.len() > limit as usize {
+    if cache_response.hits.len() > (limit as usize) {
         cache_response.hits.truncate(limit as usize);
     }
+    if limit > 0 {
+        cache_response.total = cache_response.hits.len();
+    }
+
     if !search_response.is_empty() {
         cache_response.cached_ratio = files_cache_ratio / search_response.len();
     }
@@ -389,10 +442,12 @@ fn merge_response(
     log::info!(
         "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
         cache_hits_len,
-        result_cache_len,
+        result_cache_len
     );
-    cache_response.result_cache_ratio =
-        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+    cache_response.took_detail = Some(res_took);
+    cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
+        / ((result_cache_len + cache_hits_len) as f64))
+        as usize;
     cache_response
 }
 

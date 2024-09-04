@@ -248,7 +248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
-              @update:stream-list="streamListUpdated"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -286,11 +285,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import {
-  buildSqlQuery,
-  getFieldsFromQuery,
-  getValidConditionObj,
-} from "@/utils/query/sqlUtils";
+import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
@@ -304,6 +299,9 @@ export default defineComponent({
     ),
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
+    ),
+    ConfirmDialog: defineAsyncComponent(
+      () => import("@/components/ConfirmDialog.vue"),
     ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
@@ -452,11 +450,9 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     let parser: any;
-    const expandedLogs = ref({});
-    const splitterModel = ref(10);
 
-    // flag to know if it is the first time visualize
-    let firstTimeVisualizeFlag = false;
+    const expandedLogs = ref([]);
+    const splitterModel = ref(10);
 
     const { showErrorNotification } = useNotifications();
 
@@ -618,7 +614,6 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
-      // expandedLogs.value = {};
       try {
         await getQueryData();
         refreshHistogramChart();
@@ -765,10 +760,10 @@ export default defineComponent({
       return !!searchObj.data.stream.streamLists.length;
     });
 
-    const toggleExpandLog = async (index: number) => {
-      if (expandedLogs.value[index.toString()])
-        delete expandedLogs.value[index.toString()];
-      else expandedLogs.value[index.toString()] = true;
+    const toggleExpandLog = (index: number) => {
+      if (expandedLogs.value.includes(index))
+        expandedLogs.value = expandedLogs.value.filter((item) => item != index);
+      else expandedLogs.value.push(index);
     };
 
     const onSplitterUpdate = () => {
@@ -949,16 +944,13 @@ export default defineComponent({
         );
       }
 
-      const { fields, conditions, streamName } = await getFieldsFromQuery(
+      const { fields, filters, streamName } = await getFieldsFromQuery(
         logsQuery ?? "",
         store.state.zoConfig.timestamp_column ?? "_timestamp",
       );
 
       // set stream type and stream name
       if (streamName && streamName != "undefined") {
-        // set firstTimeVisualizeFlag as true
-        firstTimeVisualizeFlag = true;
-
         dashboardPanelData.data.queries[0].fields.stream_type =
           searchObj.data.stream.streamType ?? "logs";
         dashboardPanelData.data.queries[0].fields.stream = streamName;
@@ -993,15 +985,8 @@ export default defineComponent({
         dashboardPanelData.data.type = "table";
       }
 
-      // set conditions
-      conditions.forEach((condition) => {
-        condition.operator = condition.operator.toLowerCase();
-
-        // get valid condition object
-        condition = getValidConditionObj(condition);
-
-        dashboardPanelData.data.queries[0].fields.filter.push(condition);
-      });
+      // set filters
+      dashboardPanelData.data.queries[0].fields.filter = filters;
     };
 
     // watch for changes in the visualize toggle
@@ -1019,6 +1004,9 @@ export default defineComponent({
 
           // set fields and conditions
           await setFieldsAndConditions();
+
+          // run query
+          handleRunQueryFn();
         }
       },
     );
@@ -1086,17 +1074,6 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
-    const streamListUpdated = () => {
-      if (
-        searchObj.meta.logsVisualizeToggle == "visualize" &&
-        firstTimeVisualizeFlag
-      ) {
-        firstTimeVisualizeFlag = false;
-        // run query
-        handleRunQueryFn();
-      }
-    };
-
     return {
       t,
       store,
@@ -1134,7 +1111,6 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
-      streamListUpdated,
       disableMoreErrorDetails,
     };
   },
@@ -1202,7 +1178,6 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-
       if (
         this.searchObj.meta.showHistogram &&
         !this.searchObj.shouldIgnoreWatcher
@@ -1216,18 +1191,17 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
-            (res: any) => {
-                 this.refreshTimezone();
-                 this.searchResultRef.reDrawChart();
-
-            }          
-            ).catch((err: any) => {
-            console.log(err,"err in updating chart");
-          }).finally(() => {
-            this.searchObj.loadingHistogram = false;
-
-          })
+          this.getHistogramQueryData(this.searchObj.data.histogramQuery)
+            .then((res: any) => {
+              this.refreshTimezone();
+              this.searchResultRef.reDrawChart();
+            })
+            .catch((err: any) => {
+              console.log(err, "err in updating chart");
+            })
+            .finally(() => {
+              this.searchObj.loadingHistogram = false;
+            });
         }
       }
 

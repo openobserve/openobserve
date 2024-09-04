@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
-          label="Reset Filters"
+          :title="t('search.resetFilters')"
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-xs"
+          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         />
         <syntax-guide
@@ -288,7 +288,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
-          v-if="searchObj.meta.flagWrapContent"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
           :title="t('search.messageWrapContent')"
@@ -959,7 +958,7 @@ export default defineComponent({
     },
     changeFunctionName(value) {
       // alert(value)
-      console.log(value);
+      // console.log(value);
     },
     createNewValue(inputValue, doneFn) {
       // Call the doneFn with the new value
@@ -997,7 +996,6 @@ export default defineComponent({
         return;
       }
       // const queryReq = this.buildSearch();
-      // console.log(this.searchObj.data.customDownloadQueryObj)
       this.searchObj.data.customDownloadQueryObj.query.from = initNumber;
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
@@ -1175,6 +1173,16 @@ export default defineComponent({
           } else if (item.expr.args.expr.value) {
             columnNames.push(item.expr.args.expr.value);
           }
+        } else if (
+          item.expr &&
+          item.expr.name &&
+          item.expr.type === "function"
+        ) {
+          item.expr.args.value.map((val) => {
+            if (val.type === "column_ref") {
+              columnNames.push(val.column);
+            }
+          });
         }
       });
       return columnNames;
@@ -1626,7 +1634,6 @@ export default defineComponent({
     const resetEditorLayout = () => {
       setTimeout(() => {
         queryEditorRef?.value?.resetEditorLayout();
-        console.log("resetEditorLayout", fnEditorRef.value);
         fnEditorRef?.value?.resetEditorLayout();
       }, 100);
     };
@@ -1731,6 +1738,18 @@ export default defineComponent({
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
+
+            // Resetting columns as its not required in searchObj
+            // As we reassign columns from selectedFields and search results
+            extractedObj.data.resultGrid.columns = [];
+
+            // As in saved view, we observed field getting duplicated in selectedFields
+            // So, we are removing duplicates before applying saved view
+            if (extractedObj.data.stream.selectedFields?.length) {
+              extractedObj.data.stream.selectedFields = [
+                ...new Set(extractedObj.data.stream.selectedFields),
+              ];
+            }
 
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
@@ -1969,6 +1988,35 @@ export default defineComponent({
                 console.log(e);
               }
             }, 1000);
+
+            if (
+              extractedObj.data.resultGrid.colOrder &&
+              extractedObj.data.resultGrid.colOrder.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ) {
+              searchObj.data.stream.selectedFields =
+                extractedObj.data.resultGrid.colOrder[
+                  searchObj.data.stream.selectedStream
+                ];
+            } else {
+              searchObj.data.stream.selectedFields =
+                extractedObj.data.stream.selectedFields;
+            }
+
+            if (
+              extractedObj.data.resultGrid.colSizes &&
+              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ) {
+              searchObj.data.resultGrid.colSizes[
+                searchObj.data.stream.selectedStream
+              ] =
+                extractedObj.data.resultGrid.colSizes[
+                  searchObj.data.stream.selectedStream
+                ];
+            }
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
@@ -2283,9 +2331,7 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-          ",",
-        )}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream}"`;
         if (
           searchObj.data.stream.interestingFieldList.length > 0 &&
           searchObj.meta.quickMode
@@ -2705,6 +2751,15 @@ export default defineComponent({
   height: 100%;
   overflow: visible;
 
+  .reset-filters {
+    width: 32px;
+    height: 32px;
+
+    .q-icon {
+      margin-right: 0;
+    }
+  }
+
   #logsQueryEditor,
   #fnEditor {
     height: 100% !important;
@@ -3049,11 +3104,6 @@ export default defineComponent({
 }
 
 .logs-visualize-toggle {
-  .selected {
-    background-color: var(--q-primary) !important;
-    color: white;
-  }
-
   .button-group {
     border: 1px solid gray !important;
     border-radius: 9px;
@@ -3071,11 +3121,17 @@ export default defineComponent({
   .button-left {
     border-top-left-radius: 4px;
     border-bottom-left-radius: 4px;
+    color: black;
   }
 
   .button-right {
     border-top-right-radius: 4px;
     border-bottom-right-radius: 4px;
+    color: black;
+  }
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
   }
 }
 </style>

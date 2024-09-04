@@ -1119,6 +1119,9 @@ export default defineComponent({
 
       delete query.aggs;
 
+      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
+      query.query.start_time = query.query.start_time + 780000000;
+
       query.query.sql = formData.value.query_condition.sql;
 
       if (formData.value.query_condition.vrl_function)

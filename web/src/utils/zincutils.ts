@@ -45,6 +45,7 @@ const useLocalStorage = (
     const value = ref(defaultValue);
     const read = () => {
       const v = window.localStorage.getItem(key);
+
       if (v != null && isJSONValue === true) value.value = JSON.parse(v);
       else if (v != null) value.value = v;
       else value.value = null;
@@ -79,10 +80,10 @@ const useLocalStorage = (
     if (
       window.localStorage.getItem(key) == null &&
       !isDelete &&
-      defaultValue != ""
+      defaultValue !== ""
     )
       write();
-    else if (value.value != defaultValue && defaultValue != "") write();
+    else if (value.value !== defaultValue && defaultValue !== "") write();
 
     const remove = () => {
       window.localStorage.removeItem(key);
@@ -283,7 +284,7 @@ export const useLocalTimezone = (val = "", isDelete = false) => {
 };
 
 export const useLocalWrapContent = (val = "", isDelete = false) => {
-  const wrapcontent: any = useLocalStorage("wrapcontent", val, isDelete);
+  const wrapcontent: any = useLocalStorage("wrapContent", val, isDelete);
   return wrapcontent.value;
 };
 
@@ -863,4 +864,51 @@ export const isValidResourceName = (name: string) => {
   const roleNameRegex = /^[^:#?&%'"\s]+$/;
   // Check if the role name is valid
   return roleNameRegex.test(name);
+};
+
+export const escapeSingleQuotes = (value: any) => {
+  return value?.replace(/'/g, "''");
+};
+
+/**
+ * Splits a string into an array of elements, allowing quoted strings to
+ * contain commas.
+ *
+ * @param {string} input - The input string to split
+ * @returns {array} An array of elements, or the original input if it is null
+ * or empty
+ */
+export const splitQuotedString = (input: any) => {
+  // Check if the input is null or empty
+  if (input == null) {
+    return input;
+  }
+
+  // Trim the input to remove any leading/trailing whitespace
+  input = input.trim();
+
+  // Regular expression to match elements which can be:
+  // - Enclosed in single or double quotes (allowing commas inside)
+  // - Not enclosed in any quotes
+  const regex = /'([^']*?)'|"([^"]*?)"|([^,()]+)/g;
+
+  // Result array to store the parsed elements
+  const result = [];
+
+  // Match all elements according to the pattern
+  let match;
+  while ((match = regex.exec(input)) !== null) {
+    // Use the first non-null captured group
+    const value = match[1] || match[2] || match[3];
+
+    // Trim whitespace around the element (though quotes should handle this)
+    const trimmedValue = value.trim();
+
+    // Push non-empty values to the result array
+    if (trimmedValue) {
+      result.push(trimmedValue);
+    }
+  }
+
+  return result;
 };

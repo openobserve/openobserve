@@ -60,6 +60,7 @@ pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
+pub const FILE_EXT_PUFFIN: &str = ".puffin";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -694,6 +695,18 @@ pub struct Common {
     )]
     pub inverted_index_old_format: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_STORE_FORMAT",
+        default = "parquet",
+        help = "InvertedIndex store format, parquet(default), fst, or both."
+    )]
+    pub inverted_index_store_format: String,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
+        default = "parquet",
+        help = "InvertedIndex search format. Can only be configured when store format is both. Otherwise, it's set by store format"
+    )]
+    pub inverted_index_search_format: String,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -899,6 +912,8 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
+    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = false)]
+    pub quick_mode_force_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
@@ -1179,6 +1194,8 @@ pub struct S3 {
     pub allow_invalid_certificates: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
     pub sync_to_cache_interval: u64,
+    #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
+    pub max_retries: usize,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1438,6 +1455,21 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.bloom_filter_ndv_ratio == 0 {
         cfg.common.bloom_filter_ndv_ratio = 100;
     }
+
+    // check default inverted index search format
+    cfg.common.inverted_index_store_format = cfg.common.inverted_index_store_format.to_lowercase();
+    if cfg.common.inverted_index_store_format.is_empty() {
+        cfg.common.inverted_index_search_format = "parquet".to_string();
+    }
+    if !["both", "parquet", "fst"].contains(&cfg.common.inverted_index_store_format.as_str()) {
+        return Err(anyhow::anyhow!(
+            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet, fst."
+        ));
+    }
+    if cfg.common.inverted_index_store_format != "both" {
+        cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
+    }
+
     Ok(())
 }
 
