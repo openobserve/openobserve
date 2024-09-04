@@ -850,17 +850,13 @@ export default defineComponent({
         value: "",
         selected: false,
       });
-      console.log("variableData.options addField", variableData.options);
 
       // if all values are selected, then check customSelectAllModel = true
       handleCustomSelectAll();
     };
 
     const removeField = (index: any) => {
-      console.log("removeField", index);
-
       variableData.options.splice(index, 1);
-      console.log("variableData.options", variableData.options);
 
       // if all values are selected, then check customSelectAllModel = true
       handleCustomSelectAll();
@@ -1095,11 +1091,7 @@ export default defineComponent({
     watch(
       () => variableData?.multiSelect,
       (newVal) => {
-        console.log("multiSelect", newVal);
-
         if (!newVal) {
-          console.log("multiSelect is enabled");
-
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {
@@ -1118,11 +1110,8 @@ export default defineComponent({
     watch(
       () => variableData.selectAllValueForMultiSelect,
       (newVal, oldVal) => {
-        console.log("selectAllValueForMultiSelect", newVal, oldVal);
-
         if (newVal != "custom") {
           variableData.customMultiSelectValue = [];
-          console.log("customMultiSelectValue has been cleared.");
         }
       },
     );
