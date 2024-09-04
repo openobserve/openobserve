@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-w-full tw-table-auto"
       :style="{
         minWidth: '100%',
-        minHeight: totalSize + 'px',
         ...columnSizeVars,
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
