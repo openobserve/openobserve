@@ -369,6 +369,9 @@ pub async fn register_udf(ctx: &SessionContext, _org_id: &str) {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::percentile_cont::PercentileCont::new(),
+    ));
 
     {
         let udf_list = get_all_transform(_org_id).await;

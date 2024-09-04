@@ -40,7 +40,7 @@ fn generate_index_file_name_from_compacted_file(
     format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
 }
 
-pub(crate) async fn write_to_disk(
+pub(crate) async fn write_parquet_index_to_disk(
     batches: Vec<arrow::record_batch::RecordBatch>,
     file_size: u64,
     org_id: &str,

@@ -39,8 +39,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request,
+                get_index_type_from_request, get_or_create_trace_id, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
             },
         },
     },
@@ -147,6 +147,12 @@ pub async fn search(
     // set search event type
     req.search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    // set index_type
+    req.index_type = match get_index_type_from_request(&query) {
+        Ok(typ) => typ,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
@@ -446,6 +452,7 @@ pub async fn around(
         clusters: clusters.clone(),
         timeout,
         search_type: Some(SearchEventType::UI),
+        index_type: "".to_string(),
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
@@ -496,6 +503,7 @@ pub async fn around(
         clusters,
         timeout,
         search_type: Some(SearchEventType::UI),
+        index_type: "".to_string(),
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)
@@ -849,6 +857,7 @@ async fn values_v1(
         clusters,
         timeout,
         search_type: Some(SearchEventType::Values),
+        index_type: "".to_string(),
     };
 
     // skip fields which aren't part of the schema
@@ -1145,6 +1154,7 @@ async fn values_v2(
         clusters,
         timeout,
         search_type: Some(SearchEventType::Values),
+        index_type: "".to_string(),
     };
     let search_res = SearchService::search(
         &trace_id,

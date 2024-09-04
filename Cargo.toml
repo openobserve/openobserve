@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.10.9"
+version = "0.11.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -85,6 +85,7 @@ csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
+datafusion-functions-json = "0.41.0"
 arrow.workspace = true
 arrow-flight.workspace = true
 arrow-schema.workspace = true
@@ -95,6 +96,7 @@ etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
+fst.workspace = true
 hex.workspace = true
 hashbrown.workspace = true
 http-auth-basic = "0.3"
@@ -206,7 +208,6 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
-
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.8"
 actix-web-prometheus = { version = "0.1", features = ["process"] }
@@ -242,6 +243,7 @@ etcd-client = { version = "0.12", features = ["tls"] }
 faststr = "0.2"
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
+fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
 hashlink = "0.9.1"
