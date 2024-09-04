@@ -475,7 +475,7 @@ export default defineComponent({
     }
 
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
-      const copyData = copyAsJson ? JSON.stringify(log) : log;
+      const copyData = JSON.stringify(log);
       copyToClipboard(copyData).then(() =>
         $q.notify({
           type: "positive",
