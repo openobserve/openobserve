@@ -17,7 +17,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use config::meta::{
     cluster::{IntoArcVec, RoleGroup},
-    search::SearchEventType,
+    search::{ScanStats, SearchEventType},
     stream::FileKey,
 };
 use datafusion::{
@@ -25,7 +25,7 @@ use datafusion::{
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
-    errors::Error,
+    errors::{Error, Result},
     schema::{
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
     },
@@ -51,7 +51,6 @@ use crate::service::search::{
     utlis::AsyncDefer,
 };
 
-#[allow(dead_code)]
 /// in cluster search function only single stream take part in
 // 1. get nodes
 // 2. get file list
@@ -61,7 +60,12 @@ use crate::service::search::{
 // 6. execute physical plan to get stream
 pub async fn search(
     flight_request: &FlightSearchRequest,
-) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, AsyncDefer), Error> {
+) -> Result<(
+    SessionContext,
+    Arc<dyn ExecutionPlan>,
+    AsyncDefer,
+    ScanStats,
+)> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
     let mut req: Request = flight_request.clone().into();
@@ -141,8 +145,9 @@ pub async fn search(
     );
 
     // check inverted index
+    let mut idx_scan_size = 0;
     if req.use_inverted_index {
-        file_list = get_file_list_from_inverted_index(
+        (file_list, idx_scan_size) = get_file_list_from_inverted_index(
             &trace_id,
             &req,
             stream_name,
@@ -152,6 +157,7 @@ pub async fn search(
         )
         .await?;
     }
+    let scan_stats = calc_scan_stats(&file_list, idx_scan_size);
 
     // get nodes
     let node_group = req
@@ -232,7 +238,7 @@ pub async fn search(
         "[trace_id {trace_id}] super cluster follower leader: generate physical plan finish",
     );
 
-    Ok((ctx, physical_plan, defer))
+    Ok((ctx, physical_plan, defer, scan_stats))
 }
 
 // TODO: unify this impl with the one in cluster/flight.rs
@@ -243,7 +249,7 @@ async fn get_file_list_from_inverted_index(
     equal_terms: &[KvItem],
     match_terms: &[String],
     file_list: &[FileKey],
-) -> Result<Vec<FileKey>, Error> {
+) -> Result<(Vec<FileKey>, usize)> {
     let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
     let schema_map = schema
         .fields
@@ -300,5 +306,20 @@ async fn get_file_list_from_inverted_index(
         idx_took,
     );
 
-    Ok(stream_file_list)
+    Ok((stream_file_list, idx_scan_size))
+}
+
+fn calc_scan_stats(file_list_vec: &[FileKey], idx_scan_size: usize) -> ScanStats {
+    // calculate records, original_size, compressed_size
+    let mut scan_stats = ScanStats::new();
+    scan_stats.files = file_list_vec.len() as i64;
+    for file in file_list_vec.iter() {
+        let file_meta = &file.meta;
+        scan_stats.records += file_meta.records;
+        scan_stats.original_size += file_meta.original_size;
+        scan_stats.compressed_size += file_meta.compressed_size;
+    }
+    scan_stats.original_size += idx_scan_size as i64;
+    scan_stats.idx_scan_size = idx_scan_size as i64;
+    scan_stats
 }

@@ -28,6 +28,8 @@ use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
+use arrow_schema::Schema;
+use config::meta::search::ScanStats;
 use datafusion::{
     common::{DataFusionError, Result},
     execution::SendableRecordBatchStream,
@@ -75,7 +77,7 @@ impl FlightService for FlightServiceImpl {
         let result = get_ctx_and_physical_plan(&req).await;
 
         // 2. prepare dataufion context
-        let (ctx, physical_plan, defer) = match result {
+        let (ctx, physical_plan, defer, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
@@ -91,11 +93,12 @@ impl FlightService for FlightServiceImpl {
         };
 
         log::info!(
-            "[trace_id {}] flight->search: executing stream",
-            req.trace_id
+            "[trace_id {}] flight->search: executing stream, is super cluster: {}",
+            req.trace_id,
+            req.is_super_cluster
         );
 
-        let schema = physical_plan.schema();
+        let mut schema = physical_plan.schema();
 
         if cfg.common.print_key_sql {
             let plan = displayable(physical_plan.as_ref())
@@ -110,6 +113,8 @@ impl FlightService for FlightServiceImpl {
             println!("+---------------------------+--------------------------+");
             println!("{}", plan);
         }
+
+        schema = add_scan_stats_to_schema(schema, scan_stats);
 
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
             .try_with_compression(Some(CompressionType::ZSTD))
@@ -258,16 +263,17 @@ async fn get_ctx_and_physical_plan(
         datafusion::prelude::SessionContext,
         Arc<dyn datafusion::physical_plan::ExecutionPlan>,
         Option<AsyncDefer>,
+        ScanStats,
     ),
     infra::errors::Error,
 > {
     if req.is_super_cluster {
-        let (ctx, physical_plan, defer) =
+        let (ctx, physical_plan, defer, scan_stats) =
             crate::service::search::super_cluster::follower::search(req).await?;
-        Ok((ctx, physical_plan, Some(defer)))
+        Ok((ctx, physical_plan, Some(defer), scan_stats))
     } else {
-        let (ctx, physical_plan) = grpcFlight::search(req).await?;
-        Ok((ctx, physical_plan, None))
+        let (ctx, physical_plan, scan_stats) = grpcFlight::search(req).await?;
+        Ok((ctx, physical_plan, None, scan_stats))
     }
 }
 
@@ -279,9 +285,17 @@ async fn get_ctx_and_physical_plan(
         datafusion::prelude::SessionContext,
         Arc<dyn datafusion::physical_plan::ExecutionPlan>,
         Option<AsyncDefer>,
+        ScanStats,
     ),
     infra::errors::Error,
 > {
-    let (ctx, physical_plan) = grpcFlight::search(req).await?;
-    Ok((ctx, physical_plan, None))
+    let (ctx, physical_plan, scan_stats) = grpcFlight::search(req).await?;
+    Ok((ctx, physical_plan, None, scan_stats))
+}
+
+fn add_scan_stats_to_schema(schema: Arc<Schema>, scan_stats: ScanStats) -> Arc<Schema> {
+    let mut metadata = schema.metadata().clone();
+    let stats_string = serde_json::to_string(&scan_stats).unwrap_or_default();
+    metadata.insert("scan_stats".to_string(), stats_string);
+    Arc::new(schema.as_ref().clone().with_metadata(metadata))
 }

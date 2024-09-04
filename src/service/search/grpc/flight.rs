@@ -48,7 +48,7 @@ use crate::service::{
 #[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::FlightSearchRequest,
-) -> Result<(SessionContext, Arc<dyn ExecutionPlan>), Error> {
+) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     // let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -235,5 +235,5 @@ pub async fn search(
 
     log::info!("[trace_id {trace_id}] flight->search: generated physical plan");
 
-    Ok((ctx, physical_plan))
+    Ok((ctx, physical_plan, scan_stats))
 }

@@ -26,7 +26,7 @@ use arrow_flight::{
     Ticket,
 };
 use arrow_schema::{Schema, SchemaRef};
-use config::meta::{cluster::NodeInfo, stream::FileKey};
+use config::meta::{cluster::NodeInfo, search::ScanStats, stream::FileKey};
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -38,6 +38,7 @@ use datafusion::{
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use futures::{Stream, StreamExt, TryStreamExt};
+use parking_lot::Mutex;
 use prost::Message;
 use proto::cluster_rpc::{self, FlightSearchRequest, KvItem};
 use tonic::{
@@ -62,6 +63,7 @@ pub struct RemoteScanExec {
     nodes: Vec<Arc<dyn NodeInfo>>,
     partitions: usize,
     cache: PlanProperties,
+    pub scan_stats: Arc<Mutex<ScanStats>>,
 }
 
 impl RemoteScanExec {
@@ -87,6 +89,7 @@ impl RemoteScanExec {
             nodes,
             partitions: output_partitions,
             cache,
+            scan_stats: Arc::new(Mutex::new(ScanStats::default())),
         }
     }
 
@@ -172,6 +175,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.match_all_keys.clone(),
             self.is_super_cluster,
             req,
+            self.scan_stats.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -195,6 +199,7 @@ async fn get_remote_batch(
     match_all_keys: Vec<String>,
     is_super_cluster: bool,
     req: Request,
+    scan_stats: Arc<Mutex<ScanStats>>,
 ) -> Result<SendableRecordBatchStream> {
     let proto = ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
@@ -281,6 +286,11 @@ async fn get_remote_batch(
     let flight_data = stream.message().await.unwrap().unwrap();
     // convert FlightData to a stream
     let schema = Arc::new(Schema::try_from(&flight_data)?);
+
+    if let Some(stats) = schema.metadata().get("scan_stats") {
+        let stats: ScanStats = serde_json::from_str(stats).unwrap_or_default();
+        scan_stats.lock().add(&stats);
+    }
 
     Ok(Box::pin(FlightStream::new(schema, stream)))
 }

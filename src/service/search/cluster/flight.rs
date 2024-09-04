@@ -33,7 +33,7 @@ use config::{
 };
 use datafusion::{
     common::tree_node::TreeNode,
-    physical_plan::{displayable, ExecutionPlan},
+    physical_plan::{displayable, visit_execution_plan, ExecutionPlan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -60,7 +60,7 @@ use crate::{
         generate_filter_from_equal_items, match_file,
         new_sql::NewSql,
         request::Request,
-        utlis::AsyncDefer,
+        utlis::{AsyncDefer, ScanStatsVisitor},
         DATAFUSION_RUNTIME,
     },
 };
@@ -117,7 +117,7 @@ pub async fn search(
     );
 
     // 2. filter file list using inverted index
-    let (_use_inverted_index, mut scan_stats, idx_took) =
+    let (_use_inverted_index, _scan_stats, idx_took) =
         get_file_list_from_inverted_index(trace_id, &req, &sql, &query, &mut file_list).await?;
 
     // 3. get nodes
@@ -201,16 +201,17 @@ pub async fn search(
     // 5. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
 
-    #[cfg(feature = "enterprise")]
-    super::super::SEARCH_SERVER
-        .add_file_stats(
-            trace_id,
-            scan_stats.files,
-            scan_stats.records,
-            scan_stats.original_size,
-            scan_stats.compressed_size,
-        )
-        .await;
+    // TODO: how to do this
+    // #[cfg(feature = "enterprise")]
+    // super::super::SEARCH_SERVER
+    //     .add_file_stats(
+    //         trace_id,
+    //         scan_stats.files,
+    //         scan_stats.records,
+    //         scan_stats.original_size,
+    //         scan_stats.compressed_size,
+    //     )
+    //     .await;
 
     // 6. construct physical plan
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -299,11 +300,13 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        let ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx())
+        let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx())
             .instrument(datafusion_span)
             .await;
+        let mut visit = ScanStatsVisitor::new();
+        let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
         log::info!("[trace_id {trace_id_move}] flight->leader: datafusion collect done");
-        ret
+        ret.map(|data| (data, visit.scan_stats))
     });
     tokio::pin!(query_task);
 
@@ -336,7 +339,7 @@ pub async fn search(
     };
 
     // 9. get data from datafusion
-    let data = match task {
+    let (data, mut scan_stats): (Vec<RecordBatch>, ScanStats) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err.into()),
         Err(err) => Err(Error::Message(err.to_string())),

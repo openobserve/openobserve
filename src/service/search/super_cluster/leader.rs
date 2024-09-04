@@ -18,7 +18,10 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{get_config, meta::search::ScanStats};
-use datafusion::{common::tree_node::TreeNode, physical_plan::displayable};
+use datafusion::{
+    common::tree_node::TreeNode,
+    physical_plan::{displayable, visit_execution_plan},
+};
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
@@ -30,6 +33,7 @@ use crate::service::search::{
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     new_sql::NewSql,
     request::Request,
+    utlis::ScanStatsVisitor,
     DATAFUSION_RUNTIME,
 };
 
@@ -173,11 +177,11 @@ pub async fn search(
         .is_err()
     {
         log::info!(
-            "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+            "[trace_id {trace_id}] super cluster leader: search canceled before call flight->search"
         );
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+                "[trace_id {trace_id}] super cluster leader: search canceled before call flight->search"
             )),
         ));
     }
@@ -191,11 +195,13 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        let ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx())
+        let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx())
             .instrument(datafusion_span)
             .await;
+        let mut visit = ScanStatsVisitor::new();
+        let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
         log::info!("[trace_id {trace_id_move}] super cluster leader: datafusion collect done");
-        ret
+        ret.map(|data| (data, visit.scan_stats))
     });
     tokio::pin!(query_task);
 
@@ -226,7 +232,7 @@ pub async fn search(
         Ok(Err(err)) => Err(err.into()),
         Err(err) => Err(Error::Message(err.to_string())),
     };
-    let data = match data {
+    let (data, mut scan_stats) = match data {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
@@ -235,6 +241,6 @@ pub async fn search(
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
-    let scan_stats = ScanStats::new();
+    scan_stats.format_to_mb();
     Ok((data, scan_stats, 0, false, 0))
 }
