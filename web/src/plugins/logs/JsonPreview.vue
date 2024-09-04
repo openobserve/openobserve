@@ -287,7 +287,7 @@ export default {
     const schemaToBeSearch = ref({});
 
     const $q = useQuasar();
-    const unflattendData = ref(null);
+    const unflattendData : any = ref("");
     const loading = ref(false);
 
     const tabs = [
@@ -365,7 +365,7 @@ export default {
             "UI"
           );
           unflattendData.value = res.data.hits[0]._original
-        } catch (err) {
+        } catch (err : any) {
           loading.value = false
           $q.notify({
           message:
