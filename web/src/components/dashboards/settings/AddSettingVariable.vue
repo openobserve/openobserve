@@ -73,10 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="text-body1 text-bold q-mt-lg"
+              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-lg"
               v-if="variableData.type !== 'dynamic_filters'"
             >
-              {{ t("dashboard.extraOptions") }}
+              <span>{{ t("dashboard.extraOptions") }}</span>
+              <div
+                v-if="variableData.type == 'custom' && variableData.multiSelect"
+              ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
               <div class="row">
@@ -298,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop"
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
+              data-test="dashboard-variable-constant-value"
               dense
               filled
               outlined
@@ -310,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop"
               v-model="variableData.value"
               :label="t('dashboard.DefaultValue')"
+              data-test="dashboard-variable-textbox-default-value"
               dense
               filled
               outlined
@@ -317,11 +322,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-input>
           </div>
           <div v-if="variableData.type == 'custom'">
+            <div class="tw-flex">
+              <div class="tw-w-6"></div>
+              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+                Label
+              </div>
+              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+                Value
+              </div>
+              <div class="tw-w-12 tw-flex tw-flex-col tw-items-center">
+                <span v-if="!variableData.multiSelect"> Default </span>
+                <q-checkbox
+                  v-if="variableData.multiSelect"
+                  dense
+                  v-model="customSelectAllModel"
+                  data-test="dashboard-custom-variable-select-all-checkbox"
+                  @click="onCustomSelectAllClick"
+                  class="tw-ml-[0.4rem]"
+                >
+                  <q-tooltip anchor="top middle" self="bottom middle">
+                    Default - Select All
+                  </q-tooltip>
+                </q-checkbox>
+              </div>
+              <div class="tw-w-[2.62rem]"></div>
+            </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
               class="row"
             >
+              <span class="tw-pt-3.5 tw-w-6">{{ index + 1 }}</span>
               <q-input
                 dense
                 filled
@@ -329,7 +360,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 class="col textbox q-mr-sm"
                 v-model="variableData.options[index].label"
-                :label="'Label ' + (index + 1) + ' *'"
+                :data-test="`dashboard-custom-variable-${index}-label`"
+                :placeholder="'Label ' + (index + 1)"
                 name="label"
               />
               <q-input
@@ -339,19 +371,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 class="col textbox q-mr-sm"
                 v-model="variableData.options[index].value"
-                :label="'Value ' + (index + 1) + ' *'"
+                :data-test="`dashboard-custom-variable-${index}-value`"
+                :placeholder="'Value ' + (index + 1)"
                 name="value"
               />
-              <label v-if="index === 0" class="q-mb-lg">Select</label>
-              <q-checkbox
-                dense
-                v-model="variableData.options[index].selected"
-                data-test="dashboard-custom-variable-checkbox"
-                @click="onCheckboxClick(index)"
-                class="q-mb-lg"
-              />
+              <div class="tw-flex tw-w-12 tw-item-center tw-justify-center">
+                <q-checkbox
+                  dense
+                  v-model="variableData.options[index].selected"
+                  :data-test="`dashboard-custom-variable-${index}-checkbox`"
+                  @click="onCheckboxClick(index)"
+                  class="q-mb-lg"
+                />
+              </div>
               <div>
-                <q-btn flat round @click="removeField(index)" icon="cancel" />
+                <q-btn
+                  flat
+                  round
+                  @click="removeField(index)"
+                  :data-test="`dashboard-custom-variable-${index}-remove`"
+                  icon="cancel"
+                />
               </div>
             </div>
             <div class="flex flex-col">
@@ -627,6 +667,18 @@ export default defineComponent({
 
     const filterCycleError: any = ref("");
 
+    // select all values as default value for custom typed variable
+    const customSelectAllModel: any = ref(false);
+
+    const handleCustomSelectAll = () => {
+      // if all values are selected, then check customSelectAllModel = true
+      if (variableData.options.every((option: any) => option.selected)) {
+        customSelectAllModel.value = true;
+      } else {
+        customSelectAllModel.value = false;
+      }
+    };
+
     const addFilter = () => {
       if (!variableData.query_data.filter) {
         variableData.query_data.filter = [];
@@ -715,6 +767,14 @@ export default defineComponent({
               option.selected = false;
             }
           });
+
+          // for custom, check if all are selected
+          const allSelected = edit.options.every(
+            (option: any) => option.selected === true,
+          );
+          if (allSelected) {
+            customSelectAllModel.value = true;
+          }
         }
 
         // Assign edit data to variableData
@@ -791,6 +851,9 @@ export default defineComponent({
         selected: false,
       });
       console.log("variableData.options addField", variableData.options);
+
+      // if all values are selected, then check customSelectAllModel = true
+      handleCustomSelectAll();
     };
 
     const removeField = (index: any) => {
@@ -798,6 +861,9 @@ export default defineComponent({
 
       variableData.options.splice(index, 1);
       console.log("variableData.options", variableData.options);
+
+      // if all values are selected, then check customSelectAllModel = true
+      handleCustomSelectAll();
     };
 
     const saveVariableApiCall = useLoading(async () => await saveData());
@@ -1067,6 +1133,21 @@ export default defineComponent({
           variableData.options[i].selected = i === index;
         });
       }
+
+      // if all values are selected, then check customSelectAllModel = true
+      handleCustomSelectAll();
+    };
+
+    const onCustomSelectAllClick = () => {
+      if (customSelectAllModel.value) {
+        variableData.options.forEach((option: any) => {
+          option.selected = true;
+        });
+      } else {
+        variableData.options.forEach((option: any) => {
+          option.selected = false;
+        });
+      }
     };
 
     return {
@@ -1098,6 +1179,8 @@ export default defineComponent({
       addCustomValue,
       removeCustomValue,
       onCheckboxClick,
+      customSelectAllModel,
+      onCustomSelectAllClick,
     };
   },
 });
