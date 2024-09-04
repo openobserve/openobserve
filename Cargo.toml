@@ -85,6 +85,7 @@ csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
+datafusion-functions-aggregate-common.workspace = true
 datafusion-functions-json = "0.41.0"
 arrow.workspace = true
 arrow-flight.workspace = true
@@ -228,8 +229,9 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "6.0", features = ["serde"] }
-datafusion = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "c6d05da998376082218070edc08b20a489a56c84" }
-datafusion-proto = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "c6d05da998376082218070edc08b20a489a56c84" }
+datafusion = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "bc7f8e9431c716fd642346c1e45f0c33acfdaf43" }
+datafusion-proto = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "bc7f8e9431c716fd642346c1e45f0c33acfdaf43" }
+datafusion-functions-aggregate-common = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "bc7f8e9431c716fd642346c1e45f0c33acfdaf43" }
 arrow = { version = "52.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "52.2.0"
 arrow-json = "52.2.0"

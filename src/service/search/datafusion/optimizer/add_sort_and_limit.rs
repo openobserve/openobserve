@@ -23,7 +23,7 @@ use datafusion::{
         },
         DFSchema, Result,
     },
-    logical_expr::{col, Expr, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan},
+    logical_expr::{col, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan},
     optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
 };
 
@@ -153,11 +153,11 @@ fn generate_sort_plan(
     limit: usize,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
     let config = get_config();
-    let timestamp = Expr::Sort(SortExpr {
-        expr: Box::new(col(config.common.column_timestamp.clone())),
+    let timestamp = SortExpr {
+        expr: col(config.common.column_timestamp.clone()),
         asc: false,
         nulls_first: false,
-    });
+    };
     let schema = input.schema().clone();
     if schema
         .field_with_name(None, config.common.column_timestamp.as_str())

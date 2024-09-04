@@ -45,6 +45,7 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
         session_state::SessionStateBuilder,
     },
+    logical_expr::AggregateUDF,
     optimizer::OptimizerRule,
     prelude::{Expr, SessionContext},
 };
@@ -441,15 +442,12 @@ pub async fn create_parquet_table(
 
     if sorted_by_time {
         // specify sort columns for parquet file
-        listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
-            datafusion::logical_expr::SortExpr {
-                expr: Box::new(Expr::Column(Column::new_unqualified(
-                    cfg.common.column_timestamp.clone(),
-                ))),
+        listing_options =
+            listing_options.with_file_sort_order(vec![vec![datafusion::logical_expr::SortExpr {
+                expr: Expr::Column(Column::new_unqualified(cfg.common.column_timestamp.clone())),
                 asc: false,
                 nulls_first: false,
-            },
-        )]]);
+            }]]);
     }
 
     let schema_key = schema.hash_key();
