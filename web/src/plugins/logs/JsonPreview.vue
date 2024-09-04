@@ -275,7 +275,7 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams , getStream} = useStreams();
+    const { getStreams } = useStreams();
 
     const filteredTracesStreamOptions = ref([]);
 
@@ -461,6 +461,8 @@ export default {
       showViewTraceBtn,
       queryEditorRef,
       previewId,
+      loading,
+      unflattendData,
       schemaToBeSearch,
       filteredTabs,
 </script>
