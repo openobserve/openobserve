@@ -46,7 +46,7 @@ const enterpriseResolverPlugin = {
 
       const enterprisePath = path.resolve(
         __dirname,
-        `./src/enterprise/${fileName}`
+        `./src/enterprise/${fileName}`,
       );
       const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
 
@@ -119,7 +119,7 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@enterprise": fileURLToPath(
-        new URL("./src/enterprise", import.meta.url)
+        new URL("./src/enterprise", import.meta.url),
       ),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
@@ -142,20 +142,21 @@ export default defineConfig({
           brotliSize: true,
         }),
       ],
-      manualChunks: {
-        "o2cs-analytics": ["rudder-sdk-js"],
-        "o2cs-oo-rum": [
-          "@openobserve/browser-logs",
-          "@openobserve/browser-rum",
-        ],
-        "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-      },
       output: {
+        manualChunks: {
+          "o2cs-analytics": ["rudder-sdk-js"],
+          "o2cs-oo-rum": [
+            "@openobserve/browser-logs",
+            "@openobserve/browser-rum",
+          ],
+          "o2cs-date-fns": ["date-fns", "date-fns-tz"],
+          "editor.api": ["monaco-editor"],
+        },
         chunkFileNames: ({ name }) => {
           if (name.startsWith("o2cs-")) {
             return `assets/vendor/${name}.[hash].js`;
           }
-          
+
           if (name.includes("editor.api")) {
             return `assets/${name}.v1.js`;
           }
