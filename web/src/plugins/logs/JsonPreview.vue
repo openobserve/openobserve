@@ -432,7 +432,6 @@ export default {
     };
 
   const filteredTabs = computed(() => {
-
         return tabs.filter(tab => {
           if (props.value._o2_id == undefined || searchAggData.hasAggregation || searchObj.data.stream.selectedStream.length > 1) {
           return false;
