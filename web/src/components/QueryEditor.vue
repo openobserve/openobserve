@@ -209,12 +209,12 @@ export default defineComponent({
       });
 
       window.addEventListener("click", () => {
-        editorObj.layout();
+        editorObj?.layout();
       });
 
       window.addEventListener("resize", async () => {
         await nextTick();
-        editorObj.layout();
+        editorObj?.layout();
         // queryEditorRef.value.resetEditorLayout();
       });
     };
@@ -307,7 +307,7 @@ export default defineComponent({
     const setValue = (value: string) => {
       if (editorObj?.setValue) {
         editorObj.setValue(value);
-        editorObj.layout();
+        editorObj?.layout();
       }
     };
 
@@ -361,7 +361,7 @@ export default defineComponent({
     };
 
     const resetEditorLayout = () => {
-      editorObj.layout();
+      editorObj?.layout();
     };
 
     const triggerAutoComplete = async (value: string) => {
