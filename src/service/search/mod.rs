@@ -27,7 +27,11 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, sql::is_aggregate_query, str::find},
+    utils::{
+        base64,
+        sql::is_aggregate_query,
+        str::{find, StringExt},
+    },
 };
 use hashbrown::HashMap;
 use infra::{
@@ -153,6 +157,7 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
+        in_req.index_type.optinal(),
     );
 
     let handle = tokio::task::spawn(async move {

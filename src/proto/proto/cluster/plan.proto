@@ -38,8 +38,9 @@ message FlightSearchRequest {
     bool                is_super_cluster = 13;
     bool              use_inverted_index = 14;
     optional string           work_group = 15;
-    optional string              user_id = 16;
-    optional string    search_event_type = 17;
+    optional string           index_type = 16;
+    optional string              user_id = 17;
+    optional string    search_event_type = 18;
 }
 
 message KvItem {

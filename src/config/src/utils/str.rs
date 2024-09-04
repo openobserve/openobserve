@@ -25,6 +25,26 @@ pub fn find(haystack: &str, needle: &str) -> bool {
     haystack.contains(needle)
 }
 
+pub trait StringExt {
+    fn find(&self, needle: &str) -> bool;
+    fn optinal(&self) -> Option<String>;
+}
+
+impl StringExt for String {
+    #[inline(always)]
+    fn find(&self, needle: &str) -> bool {
+        find(self, needle)
+    }
+
+    fn optinal(&self) -> Option<String> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.clone())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

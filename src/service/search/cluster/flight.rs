@@ -469,24 +469,8 @@ pub async fn get_file_list_from_inverted_index(
     query: &SearchQuery,
     file_list: &mut HashMap<String, Vec<FileKey>>,
 ) -> Result<(bool, ScanStats, usize)> {
-    let cfg = get_config();
-    // filter euqal_items with index_fields
-    // TODO: current only support single table query for inverted index
-    let index_terms = if sql.equal_items.len() == 1 {
-        let schema = sql.schemas.values().next().unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let index_fields = get_stream_setting_index_fields(&stream_settings);
-        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
-    } else {
-        vec![]
-    };
-
-    let use_inverted_index = sql.stream_type != StreamType::Index
-        && sql.use_inverted_index
-        && cfg.common.inverted_index_enabled
-        && !cfg.common.feature_query_without_index
-        && (sql.match_items.is_some() || !index_terms.is_empty());
-
+    let (use_inverted_index, index_terms) =
+        is_use_inverted_index(sql, &req.inverted_index_type, "parquet");
     log::info!(
         "[trace_id {trace_id}] flight->leader: use_inverted_index {}",
         use_inverted_index
@@ -1013,7 +997,11 @@ fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
 }
 
 #[allow(dead_code)]
-pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> bool {
+pub fn is_use_inverted_index(
+    sql: &Arc<NewSql>,
+    inverted_index_type: &Option<String>,
+    working_index_type: &str, // parquet, fst
+) -> (bool, Vec<(String, String)>) {
     let cfg = get_config();
     let index_terms = if sql.equal_items.len() == 1 {
         let schema = sql.schemas.values().next().unwrap().schema();
@@ -1024,11 +1012,21 @@ pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> bool {
         vec![]
     };
 
-    sql.stream_type != StreamType::Index
+    let inverted_index_type =
+        if inverted_index_type.is_none() || inverted_index_type.as_ref().unwrap().is_empty() {
+            cfg.common.inverted_index_search_format.clone()
+        } else {
+            inverted_index_type.as_ref().unwrap().to_string()
+        };
+
+    let use_inverted_index = sql.stream_type != StreamType::Index
         && sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.match_items.is_some() || !index_terms.is_empty())
+        && (inverted_index_type == working_index_type || inverted_index_type == "both")
+        && (sql.match_items.is_some() || !index_terms.is_empty());
+
+    (use_inverted_index, index_terms)
 }
 
 #[cfg(test)]
