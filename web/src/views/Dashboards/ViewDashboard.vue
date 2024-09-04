@@ -223,7 +223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         full-height
         maximized
       >
-        <ScheduledDashboards />
+        <ScheduledDashboards
+          :reports="scheduledReports"
+          :loading="isLoadingReports"
+          :folderId="folderId"
+          :dashboardId="dashboardId"
+          :tabId="tabId"
+        />
       </q-dialog>
     </div>
   </q-page>
@@ -259,6 +265,8 @@ import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
+import reports from "@/services/reports";
+import { convertUnixToQuasarFormat } from "@/utils/date";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -293,6 +301,15 @@ export default defineComponent({
       const momentModule: any = await import("moment-timezone");
       moment = momentModule.default;
     };
+
+    const scheduledReports = reactive([]);
+    const isLoadingReports = ref(false);
+
+    const dashboardId = computed(() => route.query.dashboard);
+
+    const folderId = computed(() => route.query.folder);
+
+    const tabId = computed(() => route.query.tab);
 
     onBeforeMount(async () => {
       await importMoment();
@@ -737,6 +754,36 @@ export default defineComponent({
 
     const openScheduledReports = () => {
       showScheduledReportsDialog.value = true;
+      scheduledReports.length = 0;
+      isLoadingReports.value = true;
+      reports
+        .list(
+          store.state.selectedOrganization.identifier,
+          currentDashboardData.data?.folderId,
+          currentDashboardData.data?.dashboardId,
+          true,
+        )
+        .then((response) => {
+          response.data.forEach((report, index) => {
+            scheduledReports.push({
+              "#": index + 1,
+              name: report.name,
+              tab: report.dashboards?.[0]?.tabs?.[0],
+              time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
+              frequency: getFrequencyValue(report.frequency),
+              last_triggered_at: convertUnixToQuasarFormat(
+                report.lastTriggeredAt,
+              ),
+              created_at: convertUnixToQuasarFormat(
+                new Date(report.createdAt).getTime() * 1000,
+              ),
+              orgId: report.orgId,
+            });
+          });
+        })
+        .finally(() => {
+          isLoadingReports.value = false;
+        });
     };
 
     onMounted(() => {
@@ -767,6 +814,37 @@ export default defineComponent({
         };
 
         setTimeString();
+      }
+    };
+
+    const getFrequencyValue = (frequency: any) => {
+      if (frequency.type === "cron") {
+        return `Cron ${frequency.cron}`;
+      } else {
+        switch (frequency.type) {
+          case "once":
+            return `Once`;
+          case "hours":
+            return `Every ${frequency.interval} ${frequency.interval > 1 ? "hours" : "hour"}`;
+          case "weeks":
+            return `Every ${frequency.interval} ${frequency.interval > 1 ? "weeks" : "week"}`;
+          case "months":
+            return `Every ${frequency.interval} ${frequency.interval > 1 ? "months" : "month"}`;
+          case "days":
+            return `Every ${frequency.interval} ${frequency.interval > 1 ? "days" : "day"}`;
+          default:
+            return "";
+        }
+      }
+    };
+
+    const getTimeRangeValue = (dateTime: any) => {
+      if (dateTime.type === "relative") {
+        return `Past ${dateTime.period}`;
+      } else {
+        const startDateTime = convertUnixTime(startTime);
+        const endDateTime = convertUnixTime(endTime);
+        return `${startDateTime.date} ${startDateTime.time} - ${endDateTime.date} ${endDateTime.time}`;
       }
     };
 
@@ -809,6 +887,11 @@ export default defineComponent({
       quasar,
       openScheduledReports,
       showScheduledReportsDialog,
+      isLoadingReports,
+      scheduledReports,
+      dashboardId,
+      folderId,
+      tabId,
     };
   },
 });

@@ -102,6 +102,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 600px"
             />
           </div>
+
+          <div class="tw-flex tw-items-center tw-pt-4">
+            <q-toggle
+              data-test="report-cached-toggle-btn"
+              v-model="isCachedReport"
+              :label="t('reports.cached')"
+            />
+          </div>
+
           <q-stepper
             v-model="step"
             vertical
@@ -603,6 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-stepper-navigation>
                 <q-btn
+                  v-if="!isCachedReport"
                   data-test="add-report-step2-continue-btn"
                   @click="step = 3"
                   color="secondary"
@@ -622,6 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
+              v-if="!isCachedReport"
               data-test="add-report-share-step"
               :name="3"
               title="Share"
@@ -821,10 +832,13 @@ const defaultReport = {
   updatedAt: "",
   owner: "",
   lastEditedBy: "",
+  report_type: "PDF",
 };
 
 const { t } = useI18n();
 const router = useRouter();
+
+const isCachedReport = ref(false);
 
 const originalReportData: Ref<string> = ref("");
 
@@ -923,6 +937,8 @@ onBeforeMount(() => {
 
   isEditingReport.value = !!router.currentRoute.value.query?.name;
 
+  if (!isEditingReport.value) setInitialReportData();
+
   if (isEditingReport.value) {
     isEditingReport.value = true;
     isFetchingReport.value = true;
@@ -968,6 +984,29 @@ const isValidName = computed(() => {
   // Check if the role name is valid
   return roleNameRegex.test(formData.value.name);
 });
+
+const setInitialReportData = () => {
+  const queryParams = router.currentRoute.value.query;
+
+  if (queryParams.type === "cached") {
+    isCachedReport.value = true;
+  } else {
+    isCachedReport.value = false;
+  }
+
+  if (queryParams.folderId) {
+    formData.value.dashboards[0].folder = queryParams.folderId as string;
+    onFolderSelection(queryParams.folderId as string);
+  }
+
+  if (queryParams.dashboardId) {
+    formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
+  }
+
+  if (queryParams.tabId) {
+    formData.value.dashboards[0].tabs = [queryParams.tabId as string];
+  }
+};
 
 const onFolderSelection = (id: string) => {
   formData.value.dashboards.forEach((dashboard: any) => {
@@ -1237,6 +1276,8 @@ const saveReport = async () => {
     formData.value.updatedAt = new Date().toISOString();
   }
 
+  if (isCachedReport.value) formData.value.destinations = [];
+
   // Check if all report input fields are valid
   try {
     validateReportData();
@@ -1431,6 +1472,8 @@ const setupEditingReport = async (report: any) => {
   emails.value = report.destinations
     .map((destination: { email: string }) => destination.email)
     .join(";");
+
+  if (!report.destinations.length) isCachedReport.value = true;
 
   // set frequency
   if (report.frequency.type === "cron") {

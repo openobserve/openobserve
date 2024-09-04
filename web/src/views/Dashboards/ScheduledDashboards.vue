@@ -26,14 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filterQuery"
       :filter-method="filterData"
       style="width: 100%"
-      class="tw-h-full"
+      class="tw-h-full q-px-md"
+      @row-click="openReport"
     >
       <template #no-data>
         <NoData />
       </template>
       <template #top="scope">
         <div class="q-table__title" data-test="alerts-list-title">
-          {{ t("alerts.header") }}
+          {{ t("dashboard.scheduledDashboards") }}
         </div>
         <q-input
           data-test="alert-list-search-input"
@@ -42,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
           class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('alerts.search')"
+          :placeholder="t('reports.search')"
         >
           <template #prepend>
             <q-icon name="search" class="cursor-pointer" />
@@ -55,12 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="secondary"
           no-caps
           :label="t(`dashboard.newReport`)"
-          @click="createNewReport()"
+          @click="createNewReport"
         />
 
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('alerts.header')"
+          :pageTitle="t('dashboard.scheduledDashboards')"
           :position="'top'"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
@@ -85,12 +86,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { QTable, QTableProps } from "quasar";
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+
+const props = defineProps({
+  reports: {
+    type: Array,
+    required: true,
+  },
+  loading: {
+    type: Boolean,
+    required: true,
+  },
+  folderId: {
+    type: String,
+    required: true,
+  },
+  dashboardId: {
+    type: String,
+    required: true,
+  },
+  tabId: {
+    type: String,
+    required: true,
+  },
+});
 
 const { t } = useI18n();
 
-const scheduledReports = reactive([]);
+const scheduledReports = reactive(props.reports || []);
 
 const tableRef = ref<InstanceType<typeof QTable> | null>();
+
+const router = useRouter();
 
 const columns: any = reactive<QTableProps["columns"]>([
   {
@@ -135,8 +163,8 @@ const columns: any = reactive<QTableProps["columns"]>([
     sortable: false,
   },
   {
-    name: "createad_at",
-    field: "createad_at",
+    name: "created_at",
+    field: "created_at",
     label: t("reports.createdAt"),
     align: "left",
     sortable: false,
@@ -174,7 +202,27 @@ const filterData = (rows: any, terms: string) => {
   });
 };
 
-const createNewReport = () => {};
+const createNewReport = () => {
+  router.push({
+    name: "createReport",
+    query: {
+      folderId: props.folderId,
+      dashboardId: props.dashboardId,
+      tabId: props.tabId,
+      type: "cached",
+    },
+  });
+};
+
+const openReport = (event: any, row: any, index: number) => {
+  router.push({
+    name: "createReport",
+    query: {
+      name: row.name,
+      org_identifier: row.orgId,
+    },
+  });
+};
 </script>
 
 <style lang="scss" scoped></style>

@@ -647,7 +647,8 @@
     "newFolder": "New Folder",
     "updateFolder": "Update Folder",
     "scheduledReports": "Scheduled Reports",
-    "newReport": "New Report"
+    "newReport": "New Report",
+    "scheduledDashboards": "Scheduled Dashboards"
   },
   "panel": {
     "header": "Panel",
@@ -902,7 +903,9 @@
     "frequency": "Frequency",
     "lastTriggeredAt": "Last Triggered At",
     "createdAt": "Created At",
-    "tab": "Tab"
+    "tab": "Tab",
+    "cached": "Cached Report",
+    "destination": "Destination"
   },
   "queries": {
     "runningQueries": "Running Queries",
