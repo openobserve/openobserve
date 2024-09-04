@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
+        minHeight: totalSize + 'px',
+
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -31,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '100%',
       }"
     >
-      <thead class="tw-sticky tw-top-0 tw-z-50">
+      <thead
+        class="tw-sticky tw-top-0 tw-z-50"
+        style="max-height: 44px; height: 22px"
+      >
         <vue-draggable
           v-model="columnOrder"
           v-for="headerGroup in table.getHeaderGroups()"
@@ -578,12 +583,6 @@ const rowVirtualizerOptions = computed(() => {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
     estimateSize: () => 20,
-    overscan: 5,
-    measureElement:
-      typeof window !== "undefined" &&
-      navigator.userAgent.indexOf("Firefox") === -1
-        ? (element: any) => element?.getBoundingClientRect().height
-        : undefined,
   };
 });
 
@@ -601,8 +600,8 @@ const setExpandedRows = () => {
   });
 };
 
-const copyLogToClipboard = (value: any) => {
-  emits("copy", value, false);
+const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
+  emits("copy", value, copyAsJson);
 };
 const addSearchTerm = (value: string) => {
   emits("addSearchTerm", value);
