@@ -455,12 +455,20 @@ pub async fn send_http_notification(
     }
 
     let resp = req.body(msg.clone()).send().await?;
-    if !resp.status().is_success() {
+    let resp_status = resp.status();
+    let resp_body = resp.text().await?;
+    log::debug!(
+        "Alert sent to destination {} with status: {}, body: {:?}",
+        dest.url,
+        resp_status,
+        resp_body,
+    );
+    if !resp_status.is_success() {
         log::error!("Alert body: {}", msg);
         return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {:?}",
-            resp.status(),
-            resp.bytes().await
+            "sent error status: {}, err: {}",
+            resp_status,
+            resp_body
         ));
     }
 

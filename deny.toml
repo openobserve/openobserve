@@ -2,18 +2,11 @@
 #   https://embarkstudios.github.io/cargo-deny/index.html
 
 [advisories]
-vulnerability = "deny"
 yanked = "deny"
-unmaintained = "warn"
-notice = "warn"
 ignore = []
 git-fetch-with-cli = true
 
 [licenses]
-allow-osi-fsf-free = "either"
-copyleft = "deny"
-unlicensed = "deny"
-default = "deny"
 
 exceptions = [
     # We should probably NOT bundle CA certs but use the OS ones.
@@ -25,19 +18,33 @@ exceptions = [
     { name = "wal", allow = ["AGPL-3.0"] },
     { name = "proto", allow = ["AGPL-3.0"] },
     { name = "report_server", allow = ["AGPL-3.0"] },
+    { name = "arrayref", allow = ["BSD-2-Clause"] },
+    { name = "mach", allow = ["BSD-2-Clause"] },
+
+    # These two are transitive deps of vrl via dep rustyline.
+    # However, rustyline is needed only when we enable feature cli
+    # which we haven't. Probably in Cargo.lock due to old code, need
+    # to take a look and remove.
+    { name = "clipboard-win", allow = ["BSL-1.0"] },
+    { name = "error-code", allow = ["BSL-1.0"] },
+
+    { name = "base16", allow = ["CC0-1.0"] },
+    { name = "tiny-keccak", allow = ["CC0-1.0"] },
+    { name = "enum-iterator-derive", allow = ["0BSD"] },
+    { name = "quoted_printable", allow = ["0BSD"] },
+    { name = "ring", allow = ["BSD-4-Clause","OpenSSL"] },
+    { name = "unicode-ident", allow = ["Unicode-DFS-2016"] },
+    { name = "adler32", allow = ["Zlib"] },
 ]
 
 allow = [
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "MPL-2.0",
-]
-
-# List of explicitly disallowed licenses
-# See https://spdx.org/licenses/ for list of possible licenses
-# [possible values: any SPDX 3.11 short identifier (+ optional exception)].
-deny = [
-    #"Nokia",
+    "MIT",
+    "BSD-3-Clause", # OSI + fsf free
+    "Unicode-3.0", # OSI
+    "ISC", # OSI + fsf free
 ]
 
 [[licenses.clarify]]
@@ -47,3 +54,6 @@ license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 [sources.allow-org]
 github = ["openobserve", "apache"]
+
+[sources]
+allow-git = ["https://github.com/mattsse/chromiumoxide"]
