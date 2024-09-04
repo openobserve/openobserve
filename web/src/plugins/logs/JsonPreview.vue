@@ -314,7 +314,7 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
-    const { searchObj } = useLogs();
+    const { searchObj,searchAggData } = useLogs();
     let multiStreamFields: any = ref([]);
 
     onBeforeMount(() => {
@@ -334,9 +334,8 @@ export default {
 
     watch (
       () => props.value,
-    
       async () =>  {
-        if (!props.value._o2_id) {
+        if (!props.value._o2_id || searchAggData.hasAggregation || searchObj.data.stream.selectedStream.length > 1  ) {
           return; 
         }
 
@@ -433,9 +432,8 @@ export default {
     };
 
   const filteredTabs = computed(() => {
-
         return tabs.filter(tab => {
-          if (props.value._o2_id == undefined) {
+          if (props.value._o2_id == undefined || searchAggData.hasAggregation || searchObj.data.stream.selectedStream.length > 1) {
           return false;
         }
           return true;
