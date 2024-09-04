@@ -102,6 +102,7 @@ pub async fn sql(
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // register empty table
     let empty_table = NewEmptyTable::new("tbl", schema.clone(), sort_by_timestamp_desc)
@@ -239,6 +240,7 @@ pub async fn merge_partitions(
 
     // register UDF
     register_udf(&mut ctx, org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Debug SQL
     let cfg = get_config();
