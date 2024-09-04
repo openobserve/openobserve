@@ -117,7 +117,7 @@ impl FlightService for FlightServiceImpl {
         schema = add_scan_stats_to_schema(schema, scan_stats);
 
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
-            .try_with_compression(Some(CompressionType::ZSTD))
+            .try_with_compression(Some(CompressionType::LZ4_FRAME))
             .map_err(|e| Status::internal(e.to_string()))?;
         let flight_data_stream = FlightDataEncoderBuilder::new()
             .with_schema(schema)
