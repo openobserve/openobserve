@@ -2662,6 +2662,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-functions-json"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00900606bdd73248f0a0bea254379ef06832f4958510581e752fedd17b33b8b4"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "datafusion-common",
+ "datafusion-execution",
+ "datafusion-expr",
+ "jiter",
+ "log",
+ "paste",
+]
+
+[[package]]
 name = "datafusion-functions-nested"
 version = "41.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4416,6 +4432,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
+name = "jiter"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02e23549143ef50eddffd46ba8cd0229b0a4500aef7518cf2eb0f41c9a09d22b"
+dependencies = [
+ "ahash 0.8.11",
+ "bitvec",
+ "lexical-parse-float",
+ "num-bigint",
+ "num-traits",
+ "smallvec",
+]
+
+[[package]]
 name = "jni"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5359,7 +5389,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.10.9"
+version = "0.11.0"
 dependencies = [
  "actix",
  "actix-cors",
@@ -5395,6 +5425,7 @@ dependencies = [
  "csv",
  "dashmap",
  "datafusion",
+ "datafusion-functions-json",
  "datafusion-proto",
  "enrichment",
  "env_logger 0.10.2",
