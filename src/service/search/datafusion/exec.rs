@@ -48,6 +48,7 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
         session_state::SessionStateBuilder,
     },
+    logical_expr::AggregateUDF,
     physical_plan::{collect, memory::MemoryExec},
     prelude::{Expr, SessionContext},
 };
@@ -101,6 +102,7 @@ pub async fn sql(
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // register empty table
     let empty_table = NewEmptyTable::new("tbl", schema.clone(), sort_by_timestamp_desc)
@@ -238,6 +240,7 @@ pub async fn merge_partitions(
 
     // register UDF
     register_udf(&mut ctx, org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Debug SQL
     let cfg = get_config();
@@ -371,6 +374,7 @@ pub async fn merge_partitions_cluster(
 
     // register UDF
     register_udf(&mut ctx, org_id).await;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Debug SQL
     let cfg = get_config();
@@ -811,6 +815,9 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::percentile_cont::PercentileCont::new(),
+    ));
 
     {
         let udf_list = get_all_transform(_org_id).await;
