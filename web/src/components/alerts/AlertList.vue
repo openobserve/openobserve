@@ -21,8 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex"
     style="height: calc(100vh - 57px)"
+    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-    <div v-if="!showAddAlertDialog" class="full-width">
+    <div v-if="!showAddAlertDialog" class="full-width alert-list-table">
       <q-table
         data-test="alert-list-table"
         ref="qTable"
@@ -130,17 +131,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
-                icon="content_copy"
-                :title="t('alerts.clone')"
-                class="q-ml-xs"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click.stop="duplicateAlert(props.row)"
-                data-test="alert-clone"
-              ></q-btn>
+              icon="content_copy"
+              :title="t('alerts.clone')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="duplicateAlert(props.row)"
+              data-test="alert-clone"
+            ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
               :icon="outlinedDelete"
@@ -164,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
           </q-td>
         </template>
+
         <template #top="scope">
           <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
@@ -231,76 +233,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
     <template>
-  <q-dialog class="q-pa-md "  v-model="showForm" persistent>
-    <q-card class="clone-alert-popup">
-      <div class="row items-center  no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center">
-        <div
-          data-test="add-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="showForm = false"
-        >
-          <q-icon name="arrow_back_ios_new" size="14px" />
-        </div>
-        <div class="text-h6" data-test="clone-alert-title">
-          {{ t("alerts.cloneTitle") }}
-        </div>
-      </div>
-    </div>
-      <q-card-section>
-        <q-form @submit="submitForm">
-          <q-input v-model="toBeCloneAlertName" label="Alert Name" />
-          <q-select
-            v-model="toBeClonestreamType"
-            label="Stream Type"
-            :options="streamTypes"
-            @update:model-value="updateStreams()"
-          />
-          <q-select
-            v-model="toBeClonestreamName"
-            :loading="isFetchingStreams"
-             :disable="!toBeClonestreamType"
-            label="Stream Name"
-            :options="streamNames"
-            @change="updateStreamName"
-            @filter="filterStreams"
-          />
-          <div class="flex justify-center q-mt-lg">
-              <q-btn
-                data-test="add-alert-cancel-btn"
-                v-close-popup="true"
-                class="q-mb-md text-bold"
-                :label="t('alerts.cancel')"
-                text-color="light-text"
-                padding="sm md"
-                no-caps
-              />
-              <q-btn
-                data-test="add-alert-submit-btn"
-                :label="t('alerts.save')"
-                class="q-mb-md text-bold no-border q-ml-md"
-                color="secondary"
-                padding="sm xl"
-                type="submit"
-                :disable="isSubmitting"
-                no-caps
-              />
+      <q-dialog class="q-pa-md" v-model="showForm" persistent>
+        <q-card class="clone-alert-popup">
+          <div class="row items-center no-wrap q-mx-md q-my-sm">
+            <div class="flex items-center">
+              <div
+                data-test="add-alert-back-btn"
+                class="flex justify-center items-center q-mr-md cursor-pointer"
+                style="
+                  border: 1.5px solid;
+                  border-radius: 50%;
+                  width: 22px;
+                  height: 22px;
+                "
+                title="Go Back"
+                @click="showForm = false"
+              >
+                <q-icon name="arrow_back_ios_new" size="14px" />
+              </div>
+              <div class="text-h6" data-test="clone-alert-title">
+                {{ t("alerts.cloneTitle") }}
+              </div>
             </div>
-          
-    
-        </q-form>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
-</template>
-
+          </div>
+          <q-card-section>
+            <q-form @submit="submitForm">
+              <q-input v-model="toBeCloneAlertName" label="Alert Name" />
+              <q-select
+                v-model="toBeClonestreamType"
+                label="Stream Type"
+                :options="streamTypes"
+                @update:model-value="updateStreams()"
+              />
+              <q-select
+                v-model="toBeClonestreamName"
+                :loading="isFetchingStreams"
+                :disable="!toBeClonestreamType"
+                label="Stream Name"
+                :options="streamNames"
+                @change="updateStreamName"
+                @filter="filterStreams"
+              />
+              <div class="flex justify-center q-mt-lg">
+                <q-btn
+                  data-test="add-alert-cancel-btn"
+                  v-close-popup="true"
+                  class="q-mb-md text-bold"
+                  :label="t('alerts.cancel')"
+                  text-color="light-text"
+                  padding="sm md"
+                  no-caps
+                />
+                <q-btn
+                  data-test="add-alert-submit-btn"
+                  :label="t('alerts.save')"
+                  class="q-mb-md text-bold no-border q-ml-md"
+                  color="secondary"
+                  padding="sm xl"
+                  type="submit"
+                  :disable="isSubmitting"
+                  no-caps
+                />
+              </div>
+            </q-form>
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+    </template>
   </div>
 </template>
 
@@ -346,7 +345,7 @@ export default defineComponent({
   components: {
     QTablePagination,
     AddAlert: defineAsyncComponent(
-      () => import("@/components/alerts/AddAlert.vue")
+      () => import("@/components/alerts/AddAlert.vue"),
     ),
     NoData,
     ConfirmDialog,
@@ -371,21 +370,21 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(220);
-    const showForm  = ref(false);
+    const showForm = ref(false);
     const indexOptions = ref([]);
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
-    const  isSubmitting = ref(false);
+    const isSubmitting = ref(false);
 
     const { getStreams } = useStreams();
 
-      const toBeCloneAlertName  = ref ("");
-      const toBeCloneUUID = ref("");
-      const toBeClonestreamType =  ref('');
-      const toBeClonestreamName =  ref('');
-      const streamTypes =  ref(['logs', 'metrics', 'traces']);
-      const streamNames  :  Ref<string[]> =  ref([]);
+    const toBeCloneAlertName = ref("");
+    const toBeCloneUUID = ref("");
+    const toBeClonestreamType = ref("");
+    const toBeClonestreamName = ref("");
+    const streamTypes = ref(["logs", "metrics", "traces"]);
+    const streamNames: Ref<string[]> = ref([]);
     const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
     const folders = ref([
       {
@@ -406,27 +405,6 @@ export default defineComponent({
         name: "name",
         field: "name",
         label: t("alerts.name"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "alert_type",
-        field: "alert_type",
-        label: t("alerts.alertType"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "stream_type",
-        field: "stream_type",
-        label: t("alerts.streamType"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "stream_name",
-        field: "stream_name",
-        label: t("alerts.stream_name"),
         align: "left",
         sortable: true,
       },
@@ -488,7 +466,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res) => {
           var counter = 1;
@@ -526,8 +504,12 @@ export default defineComponent({
               description: data.description,
               uuid: data.uuid,
               owner: data.owner,
-              last_triggered_at:convertUnixToQuasarFormat(data.last_triggered_at),
-              last_satisfied_at:convertUnixToQuasarFormat(data.last_satisfied_at),
+              last_triggered_at: convertUnixToQuasarFormat(
+                data.last_triggered_at,
+              ),
+              last_satisfied_at: convertUnixToQuasarFormat(
+                data.last_satisfied_at,
+              ),
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
@@ -569,7 +551,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showAddAlertDialog.value = false;
-      }
+      },
     );
     const getDestinations = () => {
       destinationService
@@ -584,7 +566,7 @@ export default defineComponent({
             type: "negative",
             message: "Error while fetching destinations.",
             timeout: 3000,
-          })
+          }),
         );
     };
 
@@ -601,7 +583,7 @@ export default defineComponent({
             type: "negative",
             message: "Error while fetching templates.",
             timeout: 3000,
-          })
+          }),
         );
     };
     const perPageOptions: any = [
@@ -626,35 +608,37 @@ export default defineComponent({
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
-    
-    function convertUnixToQuasarFormat(unixMicroseconds : any) {
-      if(!unixMicroseconds) return "";
-        const unixSeconds = unixMicroseconds / 1e6;
-        const dateToFormat = new Date(unixSeconds * 1000);
-        const formattedDate = dateToFormat.toISOString();
-        return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-}
+
+    function convertUnixToQuasarFormat(unixMicroseconds: any) {
+      if (!unixMicroseconds) return "";
+      const unixSeconds = unixMicroseconds / 1e6;
+      const dateToFormat = new Date(unixSeconds * 1000);
+      const formattedDate = dateToFormat.toISOString();
+      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    }
 
     const addAlert = () => {
       showAddAlertDialog.value = true;
     };
 
-    const duplicateAlert = (row : any) =>{
-      toBeCloneUUID.value = row.uuid
+    const duplicateAlert = (row: any) => {
+      toBeCloneUUID.value = row.uuid;
       toBeCloneAlertName.value = row.name;
       toBeClonestreamName.value = "";
       toBeClonestreamType.value = "";
-      
+
       showForm.value = true;
-    }
-    const submitForm = async () =>{
-      const alertToBeCloned = alerts.value.find((alert) => alert.uuid === toBeCloneUUID.value) as Alert;
+    };
+    const submitForm = async () => {
+      const alertToBeCloned = alerts.value.find(
+        (alert) => alert.uuid === toBeCloneUUID.value,
+      ) as Alert;
 
       const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
 
       if (!alertToBeCloned) {
         $q.notify({
@@ -664,7 +648,7 @@ export default defineComponent({
         });
         return;
       }
-      if(!toBeClonestreamType.value){
+      if (!toBeClonestreamType.value) {
         $q.notify({
           type: "negative",
           message: "Please select stream type ",
@@ -672,7 +656,7 @@ export default defineComponent({
         });
         return;
       }
-      if(!toBeClonestreamName.value){
+      if (!toBeClonestreamName.value) {
         $q.notify({
           type: "negative",
           message: "Please select stream name",
@@ -682,22 +666,24 @@ export default defineComponent({
       }
       isSubmitting.value = true;
 
-        alertToBeCloned.name = toBeCloneAlertName.value;
-        alertToBeCloned.stream_name = toBeClonestreamName.value;
-        alertToBeCloned.stream_type = toBeClonestreamType.value;
-        
-      try{
-        alertsService.create(
+      alertToBeCloned.name = toBeCloneAlertName.value;
+      alertToBeCloned.stream_name = toBeClonestreamName.value;
+      alertToBeCloned.stream_type = toBeClonestreamType.value;
+
+      try {
+        alertsService
+          .create(
             store.state.selectedOrganization.identifier,
             alertToBeCloned.stream_name,
             alertToBeCloned.stream_type,
             alertToBeCloned,
-          ).then((res) => {
+          )
+          .then((res) => {
             dismiss();
             if (res.data.code == 200) {
               $q.notify({
                 type: "positive",
-                message:  "Alert Cloned Successfully",
+                message: "Alert Cloned Successfully",
                 timeout: 2000,
               });
               showForm.value = false;
@@ -716,27 +702,24 @@ export default defineComponent({
               type: "negative",
               message: e.response.data.message,
               timeout: 2000,
-            }); 
-          }).finally(() => {
-            isSubmitting.value = false;
+            });
           })
-
-      }
-      catch(e : any) {
+          .finally(() => {
+            isSubmitting.value = false;
+          });
+      } catch (e: any) {
         showForm.value = true;
         isSubmitting.value = false;
-      $q.notify({
-              type: "negative",
-              message: e.data.message,
-              timeout: 2000,
-            });
+        $q.notify({
+          type: "negative",
+          message: e.data.message,
+          timeout: 2000,
+        });
       }
-
-
-    }
+    };
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
-        (alert: any) => alert.uuid === props.row?.uuid
+        (alert: any) => alert.uuid === props.row?.uuid,
       ) as Alert;
       let action;
       if (!props.row) {
@@ -790,7 +773,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           selectedDelete.value.stream_name,
           selectedDelete.value.name,
-          selectedDelete.value.stream_type
+          selectedDelete.value.stream_type,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -845,9 +828,9 @@ export default defineComponent({
       });
       return filteredOptions;
     };
-    const updateStreamName = (selectedOption : any)=> {
-    toBeClonestreamName.value = selectedOption;
-  }
+    const updateStreamName = (selectedOption: any) => {
+      toBeClonestreamName.value = selectedOption;
+    };
     const updateStreams = (resetStream = true) => {
       if (resetStream) toBeClonestreamName.value = "";
       if (streams.value[toBeClonestreamType.value]) {
@@ -865,7 +848,7 @@ export default defineComponent({
       if (!toBeClonestreamType) return Promise.resolve();
 
       isFetchingStreams.value = true;
-      return getStreams (toBeClonestreamType.value, false)
+      return getStreams(toBeClonestreamType.value, false)
         .then((res: any) => {
           streams.value[toBeClonestreamType.value] = res.list;
           schemaList.value = res.list;
@@ -879,14 +862,13 @@ export default defineComponent({
         .finally(() => (isFetchingStreams.value = false));
     };
     const filterStreams = (val: string, update: any) => {
-      streamNames.value = filterColumns(indexOptions.value, val, update)
-
+      streamNames.value = filterColumns(indexOptions.value, val, update);
     };
 
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
       const alert: Alert = alerts.value.find(
-        (alert) => alert.uuid === row.uuid
+        (alert) => alert.uuid === row.uuid,
       ) as Alert;
       alertsService
         .toggleState(
@@ -894,7 +876,7 @@ export default defineComponent({
           alert.stream_name,
           alert.name,
           !alert?.enabled,
-          alert.stream_type
+          alert.stream_type,
         )
         .then(() => {
           alert.enabled = !alert.enabled;
@@ -999,7 +981,31 @@ export default defineComponent({
   }
 }
 
+.alert-list-table {
+  th:last-child,
+  td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: #ffffff;
+    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+  }
+}
 
+.dark-theme {
+  th:last-child,
+  td:last-child {
+    background: var(--q-dark);
+    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+  }
+}
+
+.light-theme {
+  th:last-child,
+  td:last-child {
+    background: #ffffff;
+  }
+}
 .alerts-tabs {
   .q-tabs {
     &--vertical {
@@ -1027,7 +1033,7 @@ export default defineComponent({
     }
   }
 }
-.clone-alert-popup{
+.clone-alert-popup {
   width: 400px;
 }
 </style>
