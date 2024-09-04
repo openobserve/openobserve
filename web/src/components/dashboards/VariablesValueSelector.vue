@@ -30,11 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         item.isVariableLoadingPending +
         index
       "
-      class="q-mr-lg q-mt-xs"
       :data-test="`dashboard-variable-${item}-selector`"
     >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
+          class="q-mr-lg q-mt-xs"
+          v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -42,6 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'constant'">
         <q-input
+          v-show="!item.hideOnDashboard"
+          class="q-mr-lg q-mt-xs"
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
@@ -54,6 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'textbox'">
         <q-input
+          v-show="!item.hideOnDashboard"
+          class="q-mr-lg q-mt-xs"
           style="max-width: 150px !important"
           debounce="1000"
           v-model="item.value"
@@ -66,13 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector
+          v-show="!item.hideOnDashboard"
+          class="q-mr-lg q-mt-xs"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
-        <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
+        <VariableAdHocValueSelector
+          class="q-mr-lg q-mt-xs"
+          v-model="item.value"
+          :variableItem="item"
+        />
       </div>
     </div>
   </div>
@@ -291,6 +302,130 @@ export default defineComponent({
       // load all variables
       loadAllVariablesData();
     };
+    const handleQueryValuesLogic = (
+      currentVariable: any,
+      oldVariableSelectedValues: any[],
+    ) => {
+      // Pre-calculate the options values array
+      const optionsValues =
+        currentVariable.options.map((option: any) => option.value) ?? [];
+
+      // if multi select
+      if (currentVariable.multiSelect) {
+        // old selected values
+        const selectedValues = currentVariable.options
+          .filter((option: any) =>
+            oldVariableSelectedValues.includes(option.value),
+          )
+          .map((option: any) => option.value);
+
+        // if selected values exist, select the values
+        if (selectedValues.length > 0) {
+          currentVariable.value = selectedValues;
+        } else {
+          //here, multiselect and old values will be not exist
+
+          switch (currentVariable?.selectAllValueForMultiSelect) {
+            case "custom":
+              currentVariable.value = optionsValues.filter((value: any) =>
+                currentVariable?.customMultiSelectValue.includes(value),
+              );
+              break;
+            case "all":
+              currentVariable.value = optionsValues;
+              break;
+            default:
+              currentVariable.value = [currentVariable.options[0].value];
+          }
+        }
+      } else {
+        // here, multi select is false
+
+        // old selected value
+        const oldValue = currentVariable.options.find(
+          (option: any) => option.value === oldVariableSelectedValues[0],
+        )?.value;
+
+        // if old value exist, select the old value
+        if (oldValue) {
+          currentVariable.value = oldValue;
+        } else if (currentVariable.options.length > 0) {
+          // here, multi select is false and old value not exist
+
+          if (currentVariable.selectAllValueForMultiSelect === "custom") {
+            const customValue = currentVariable.options.find(
+              (variableOption: any) =>
+                variableOption.value ===
+                currentVariable.customMultiSelectValue[0],
+            );
+
+            // customValue can be undefined or default value
+            currentVariable.value =
+              customValue?.value ?? currentVariable.options[0].value;
+          } else {
+            currentVariable.value = currentVariable.options[0].value;
+          }
+        } else {
+          currentVariable.value = null;
+        }
+      }
+    };
+
+    const handleCustomVariablesLogic = (
+      currentVariable: any,
+      oldVariableSelectedValues: any[],
+    ) => {
+      // Pre-calculate the selected options values array
+      const selectedOptionsValues =
+        currentVariable.options
+          .filter((option: any) => option.selected)
+          .map((option: any) => option.value) ?? [];
+
+      // if multi select
+      if (currentVariable.multiSelect) {
+        // old selected values
+        const selectedValues = currentVariable.options
+          .filter((option: any) =>
+            oldVariableSelectedValues.includes(option.value),
+          )
+          .map((option: any) => option.value);
+
+        // if old selected values exist, select the values
+        if (selectedValues.length > 0) {
+          currentVariable.value = selectedValues;
+        } else {
+          // here, multiselect is true and old values will be not exist
+
+          // if custom value is not defined, select the first option
+          currentVariable.value =
+            selectedOptionsValues.length > 0
+              ? selectedOptionsValues
+              : [currentVariable.options[0].value];
+        }
+      } else {
+        // here, multi select is false
+
+        // old selected value
+        const oldValue = currentVariable.options.find(
+          (option: any) => option.value === oldVariableSelectedValues[0],
+        )?.value;
+
+        // if old value exist, select the old value
+        if (oldValue) {
+          currentVariable.value = oldValue;
+        } else if (currentVariable.options.length > 0) {
+          // here, multi select is false and old value not exist
+
+          // if custom value is not defined, select the first option
+          currentVariable.value =
+            selectedOptionsValues.length > 0
+              ? selectedOptionsValues[0]
+              : currentVariable.options[0].value;
+        } else {
+          currentVariable.value = null;
+        }
+      }
+    };
 
     // get single variable data based on index
     const loadSingleVariableDataByIndex = async (variableIndex: number) => {
@@ -459,25 +594,16 @@ export default defineComponent({
                   oldVariablesData[currentVariable.name] !== undefined ||
                   oldVariablesData[currentVariable.name] !== null
                 ) {
-                  if (currentVariable.multiSelect) {
-                    const selectedValues = currentVariable.options
-                      .filter((option: any) =>
-                        oldVariableSelectedValues.includes(option.value),
-                      )
-                      .map((option: any) => option.value);
-                    currentVariable.value =
-                      selectedValues.length > 0
-                        ? selectedValues
-                        : [currentVariable.options[0].value]; // If no option is available, set as the first value
+                  if (currentVariable.type === "custom") {
+                    handleCustomVariablesLogic(
+                      currentVariable,
+                      oldVariableSelectedValues,
+                    );
                   } else {
-                    currentVariable.value = currentVariable.options.some(
-                      (option: any) =>
-                        option.value === oldVariablesData[currentVariable.name],
-                    )
-                      ? oldVariablesData[currentVariable.name]
-                      : currentVariable.options.length
-                        ? currentVariable.options[0].value
-                        : null;
+                    handleQueryValuesLogic(
+                      currentVariable,
+                      oldVariableSelectedValues,
+                    );
                   }
                 } else {
                   currentVariable.value = currentVariable.options.length
@@ -530,30 +656,17 @@ export default defineComponent({
             }
 
             // If multiSelect is true, set the value as an array containing old value and selected value
-            if (currentVariable.multiSelect) {
-              const selectedValues = currentVariable.options
-                .filter((option: any) =>
-                  oldVariableSelectedValues.includes(option.value),
-                )
-                .map((option: any) => option.value);
-              currentVariable.value =
-                // If no option is available, set as the first value or if old value exists, set the old value
-                selectedValues.length > 0
-                  ? selectedValues
-                  : [currentVariable.options[0].value] ||
-                    oldVariableSelectedValues;
+            if (currentVariable.type === "custom") {
+              handleCustomVariablesLogic(
+                currentVariable,
+                oldVariableSelectedValues,
+              );
             } else {
-              // If multiSelect is false, set the value as a single value from options which is selected
-              currentVariable.value =
-                currentVariable.options.find(
-                  (option: any) =>
-                    option.value === oldVariableSelectedValues[0],
-                )?.value ??
-                (currentVariable.options.length > 0
-                  ? currentVariable.options[0].value
-                  : null);
+              handleQueryValuesLogic(
+                currentVariable,
+                oldVariableSelectedValues,
+              );
             }
-
             resolve(true);
             break;
           }
