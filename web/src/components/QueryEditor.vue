@@ -125,7 +125,7 @@ export default defineComponent({
       });
     };
 
-    const setupEditor = () => {
+    const setupEditor = async () => {
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -142,12 +142,22 @@ export default defineComponent({
 
       registerAutoCompleteProvider();
 
-      const editorElement = document.getElementById(props.editorId);
+      let editorElement = document.getElementById(props.editorId);
+      let retryCount = 0;
+      const maxRetries = 5;
+
+      // Retry mechanism to ensure the editor element is found
+      while (!editorElement && retryCount < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for 100ms
+        editorElement = document.getElementById(props.editorId);
+        retryCount++;
+      }
 
       if (!editorElement) {
-        console.error("Query Editor element not found");
+        console.error("Query Editor element not found after retries");
         return;
       }
+
       if (editorElement && editorElement?.hasChildNodes()) return;
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
@@ -262,7 +272,11 @@ export default defineComponent({
     onActivated(async () => {
       provider.value?.dispose();
       registerAutoCompleteProvider();
-      editorObj?.layout();
+
+      if (!editorObj) {
+        setupEditor();
+        editorObj?.layout();
+      }
     });
 
     onDeactivated(() => {
