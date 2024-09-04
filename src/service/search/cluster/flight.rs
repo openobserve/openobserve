@@ -201,17 +201,16 @@ pub async fn search(
     // 5. partition file list
     let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
 
-    // TODO: how to do this
-    // #[cfg(feature = "enterprise")]
-    // super::super::SEARCH_SERVER
-    //     .add_file_stats(
-    //         trace_id,
-    //         scan_stats.files,
-    //         scan_stats.records,
-    //         scan_stats.original_size,
-    //         scan_stats.compressed_size,
-    //     )
-    //     .await;
+    #[cfg(feature = "enterprise")]
+    super::super::SEARCH_SERVER
+        .add_file_stats(
+            trace_id,
+            _scan_stats.files,
+            _scan_stats.records,
+            _scan_stats.original_size,
+            _scan_stats.compressed_size,
+        )
+        .await;
 
     // 6. construct physical plan
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;

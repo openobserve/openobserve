@@ -69,7 +69,7 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
 
-    let use_inverted_index = is_use_inverted_index(&sql, &req.inverted_index_type, "parquet");
+    let (use_inverted_index, _) = is_use_inverted_index(&sql, &req.inverted_index_type, "parquet");
     req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
