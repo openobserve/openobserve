@@ -275,7 +275,7 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams , getStream} = useStreams();
+    const { getStreams } = useStreams();
 
     const filteredTracesStreamOptions = ref([]);
 
@@ -432,7 +432,7 @@ export default {
     };
 
   const filteredTabs = computed(() => {
-    console.log(tabs,"tabs")
+
         return tabs.filter(tab => {
           if (props.value._o2_id == undefined || searchAggData.hasAggregation || searchObj.data.stream.selectedStream.length > 1) {
           return false;
