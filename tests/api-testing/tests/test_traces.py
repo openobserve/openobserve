@@ -204,4 +204,4 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
     resp_get_trace = session.get(get_query_url)
     new_count = len(resp_get_trace.json()["hits"])
 
-    assert (original_count + 1 == new_count), f"Expected count of traces to increase by 1."
+    assert (original_count + 1 == new_count), "Expected count of traces to increase by 1."
