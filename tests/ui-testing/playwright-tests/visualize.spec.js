@@ -385,18 +385,14 @@ test.describe(" visualize UI testcases", () => {
     try {
       await expect(
         page.locator(
-          '[data-test="dashboard-filter-item-kubernetes_container_hash"]'
+          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
         )
       ).toBeVisible();
     } catch (e) {
       exceptionBefore = e;
     }
 
-    await page
-      .locator(
-        '[data-test="dashboard-filter-item-kubernetes_container_hash-remove"]'
-      )
-      .click();
+    await page.locator('[data-test="dashboard-add-condition-remove"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
@@ -406,7 +402,7 @@ test.describe(" visualize UI testcases", () => {
     try {
       await expect(
         page.locator(
-          '[data-test="dashboard-filter-item-kubernetes_container_hash"]'
+          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
         )
       ).toBeVisible();
     } catch (e) {

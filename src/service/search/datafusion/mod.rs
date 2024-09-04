@@ -21,6 +21,7 @@ pub mod file_type;
 pub mod optimizer;
 pub mod storage;
 pub mod table_provider;
+pub mod udaf;
 pub mod udf;
 
 #[derive(PartialEq, Debug)]

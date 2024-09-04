@@ -460,7 +460,9 @@ pub async fn remote_write(
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in stream_trigger_map {
-        evaluate_trigger(entry).await;
+        if let Some(entry) = entry {
+            evaluate_trigger(entry).await;
+        }
     }
 
     metrics::HTTP_RESPONSE_TIME
@@ -645,6 +647,7 @@ pub(crate) async fn get_series(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -789,6 +792,7 @@ pub(crate) async fn get_label_values(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

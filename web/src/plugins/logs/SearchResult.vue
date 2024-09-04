@@ -331,14 +331,17 @@ export default defineComponent({
       }
     },
     closeColumn(col: any) {
+      let selectedFields = this.reorderSelectedFields();
+
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.id);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name,
-      );
+      const SFIndex = selectedFields.indexOf(col.name);
 
-      this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
+      selectedFields.splice(SFIndex, 1);
+
+      this.searchObj.data.stream.selectedFields = selectedFields;
+
       this.searchObj.organizationIdetifier =
         this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
@@ -377,6 +380,7 @@ export default defineComponent({
       extractFTSFields,
       refreshPartitionPagination,
       filterHitsColumns,
+      reorderSelectedFields,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -564,6 +568,7 @@ export default defineComponent({
       getTableWidth,
       scrollTableToTop,
       getColumns,
+      reorderSelectedFields,
     };
   },
   computed: {

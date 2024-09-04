@@ -11,7 +11,7 @@ dependencies = [
  "actix-macros",
  "actix-rt",
  "actix_derive",
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "bytes",
  "crossbeam-channel",
  "futures-core",
@@ -33,7 +33,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f7b0a21988c1bf877cf4759ef5ddaac04c1c9fe808c9142ecb78ba97d97a28a"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "bytes",
  "futures-core",
  "futures-sink",
@@ -71,7 +71,7 @@ dependencies = [
  "actix-utils",
  "ahash 0.8.11",
  "base64 0.22.1",
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "brotli 6.0.0",
  "bytes",
  "bytestring",
@@ -1336,9 +1336,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
+checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 dependencies = [
  "serde",
 ]
@@ -2064,6 +2064,7 @@ dependencies = [
  "async-recursion",
  "async-walkdir",
  "base64 0.21.7",
+ "bitflags 2.6.0",
  "bitvec",
  "byteorder",
  "bytes",
@@ -2074,6 +2075,7 @@ dependencies = [
  "datafusion",
  "dotenv_config",
  "dotenvy",
+ "fst",
  "futures",
  "get_if_addrs",
  "getrandom",
@@ -2097,7 +2099,7 @@ dependencies = [
  "segment",
  "serde",
  "serde_json",
- "sqlparser",
+ "sqlparser 0.50.0",
  "svix-ksuid",
  "sysinfo",
  "tokio",
@@ -2105,6 +2107,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "utoipa",
+ "zstd",
 ]
 
 [[package]]
@@ -2496,7 +2499,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2510,10 +2513,10 @@ dependencies = [
  "chrono",
  "dashmap",
  "datafusion-catalog",
- "datafusion-common",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-common-runtime",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-functions",
  "datafusion-functions-aggregate",
  "datafusion-functions-nested",
@@ -2521,7 +2524,6 @@ dependencies = [
  "datafusion-optimizer",
  "datafusion-physical-expr",
  "datafusion-physical-expr-common",
- "datafusion-physical-expr-functions-aggregate",
  "datafusion-physical-optimizer",
  "datafusion-physical-plan",
  "datafusion-sql",
@@ -2540,7 +2542,7 @@ dependencies = [
  "paste",
  "pin-project-lite",
  "rand",
- "sqlparser",
+ "sqlparser 0.50.0",
  "tempfile",
  "tokio",
  "tokio-util",
@@ -2553,20 +2555,40 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow-schema",
  "async-trait",
- "datafusion-common",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-physical-plan",
 ]
 
 [[package]]
 name = "datafusion-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44fdbc877e3e40dcf88cc8f283d9f5c8851f0a3aa07fee657b1b75ac1ad49b9c"
+dependencies = [
+ "ahash 0.8.11",
+ "arrow",
+ "arrow-array",
+ "arrow-buffer",
+ "arrow-schema",
+ "chrono",
+ "half",
+ "hashbrown 0.14.5",
+ "instant",
+ "libc",
+ "num_cpus",
+ "sqlparser 0.49.0",
+]
+
+[[package]]
+name = "datafusion-common"
+version = "41.0.0"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2582,27 +2604,50 @@ dependencies = [
  "object_store",
  "parquet",
  "paste",
- "sqlparser",
+ "sqlparser 0.50.0",
+ "tokio",
 ]
 
 [[package]]
 name = "datafusion-common-runtime"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
+ "log",
  "tokio",
 ]
 
 [[package]]
 name = "datafusion-execution"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "799e70968c815b611116951e3dd876aef04bf217da31b72eec01ee6a959336a1"
 dependencies = [
  "arrow",
  "chrono",
  "dashmap",
- "datafusion-common",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "datafusion-expr 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures",
+ "hashbrown 0.14.5",
+ "log",
+ "object_store",
+ "parking_lot",
+ "rand",
+ "tempfile",
+ "url",
+]
+
+[[package]]
+name = "datafusion-execution"
+version = "41.0.0"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+dependencies = [
+ "arrow",
+ "chrono",
+ "dashmap",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "futures",
  "hashbrown 0.14.5",
  "log",
@@ -2616,20 +2661,39 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c1841c409d9518c17971d15c9bae62e629eb937e6fb6c68cd32e9186f8b30d2"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
  "arrow-array",
  "arrow-buffer",
  "chrono",
- "datafusion-common",
+ "datafusion-common 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "paste",
+ "serde_json",
+ "sqlparser 0.49.0",
+ "strum 0.26.2",
+ "strum_macros 0.26.4",
+]
+
+[[package]]
+name = "datafusion-expr"
+version = "41.0.0"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+dependencies = [
+ "ahash 0.8.11",
+ "arrow",
+ "arrow-array",
+ "arrow-buffer",
+ "chrono",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-expr-common",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr-common",
  "paste",
  "serde_json",
- "sqlparser",
+ "sqlparser 0.50.0",
  "strum 0.26.2",
  "strum_macros 0.26.4",
 ]
@@ -2637,17 +2701,17 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
- "datafusion-common",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "paste",
 ]
 
 [[package]]
 name = "datafusion-functions"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
  "arrow-buffer",
@@ -2655,9 +2719,9 @@ dependencies = [
  "blake2",
  "blake3",
  "chrono",
- "datafusion-common",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "hashbrown 0.14.5",
  "hex",
  "itertools 0.13.0",
@@ -2673,51 +2737,68 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
  "arrow-schema",
- "datafusion-common",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr",
  "datafusion-physical-expr-common",
  "half",
  "log",
  "paste",
- "sqlparser",
+ "sqlparser 0.50.0",
 ]
 
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
- "datafusion-common",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-expr-common",
  "datafusion-physical-expr-common",
  "rand",
 ]
 
 [[package]]
+name = "datafusion-functions-json"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00900606bdd73248f0a0bea254379ef06832f4958510581e752fedd17b33b8b4"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "datafusion-common 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "datafusion-execution 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "datafusion-expr 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jiter",
+ "log",
+ "paste",
+]
+
+[[package]]
 name = "datafusion-functions-nested"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
  "arrow-array",
  "arrow-buffer",
  "arrow-ord",
  "arrow-schema",
- "datafusion-common",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-functions",
  "datafusion-functions-aggregate",
+ "datafusion-physical-expr-common",
  "itertools 0.13.0",
  "log",
  "paste",
@@ -2727,10 +2808,10 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
- "datafusion-common",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-physical-expr-common",
  "log",
 ]
@@ -2738,13 +2819,13 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
  "async-trait",
  "chrono",
- "datafusion-common",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-physical-expr",
  "hashbrown 0.14.5",
  "indexmap 2.2.6",
@@ -2757,7 +2838,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2768,9 +2849,9 @@ dependencies = [
  "arrow-string",
  "base64 0.22.1",
  "chrono",
- "datafusion-common",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-expr-common",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr-common",
@@ -2788,38 +2869,23 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
- "datafusion-common",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-expr-common",
  "hashbrown 0.14.5",
  "rand",
 ]
 
 [[package]]
-name = "datafusion-physical-expr-functions-aggregate"
-version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
-dependencies = [
- "ahash 0.8.11",
- "arrow",
- "datafusion-common",
- "datafusion-expr",
- "datafusion-expr-common",
- "datafusion-functions-aggregate-common",
- "datafusion-physical-expr-common",
- "rand",
-]
-
-[[package]]
 name = "datafusion-physical-optimizer"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
- "datafusion-common",
- "datafusion-execution",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-physical-expr",
  "datafusion-physical-plan",
  "itertools 0.13.0",
@@ -2828,7 +2894,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2838,15 +2904,14 @@ dependencies = [
  "arrow-schema",
  "async-trait",
  "chrono",
- "datafusion-common",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-common-runtime",
- "datafusion-execution",
- "datafusion-expr",
+ "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-functions-aggregate",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr",
  "datafusion-physical-expr-common",
- "datafusion-physical-expr-functions-aggregate",
  "futures",
  "half",
  "hashbrown 0.14.5",
@@ -2863,13 +2928,13 @@ dependencies = [
 [[package]]
 name = "datafusion-proto"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
  "chrono",
  "datafusion",
- "datafusion-common",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "datafusion-proto-common",
  "object_store",
  "prost 0.12.6",
@@ -2878,11 +2943,11 @@ dependencies = [
 [[package]]
 name = "datafusion-proto-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
  "chrono",
- "datafusion-common",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "object_store",
  "prost 0.12.6",
 ]
@@ -2890,16 +2955,16 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=c6d05da998376082218070edc08b20a489a56c84#c6d05da998376082218070edc08b20a489a56c84"
+source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
 dependencies = [
  "arrow",
  "arrow-array",
  "arrow-schema",
- "datafusion-common",
- "datafusion-expr",
+ "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
  "log",
  "regex",
- "sqlparser",
+ "sqlparser 0.50.0",
  "strum 0.26.2",
 ]
 
@@ -3446,6 +3511,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fst"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ab85b9b05e3978cc9a9cf8fea7f01b494e1a09ed3037e16ba39edc7a29eb61a"
+dependencies = [
+ "utf8-ranges",
 ]
 
 [[package]]
@@ -4471,6 +4545,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
+name = "jiter"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02e23549143ef50eddffd46ba8cd0229b0a4500aef7518cf2eb0f41c9a09d22b"
+dependencies = [
+ "ahash 0.8.11",
+ "bitvec",
+ "lexical-parse-float",
+ "num-bigint",
+ "num-traits",
+ "smallvec",
+]
+
+[[package]]
 name = "jni"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4727,7 +4815,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "libc",
 ]
 
@@ -5091,7 +5179,7 @@ version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "cfg-if 1.0.0",
  "cfg_aliases 0.1.1",
  "libc",
@@ -5306,7 +5394,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee638a5da3799329310ad4cfa62fbf045d5f56e3ef5ba4149e7452dcf89d5a8"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "block2",
  "libc",
  "objc2",
@@ -5414,7 +5502,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.10.9"
+version = "0.11.0"
 dependencies = [
  "actix",
  "actix-cors",
@@ -5451,6 +5539,8 @@ dependencies = [
  "csv",
  "dashmap",
  "datafusion",
+ "datafusion-functions-aggregate-common",
+ "datafusion-functions-json",
  "datafusion-proto",
  "enrichment",
  "env_logger 0.10.2",
@@ -5459,6 +5549,7 @@ dependencies = [
  "faststr",
  "flate2",
  "float-cmp",
+ "fst",
  "futures",
  "getrandom",
  "hashbrown 0.14.5",
@@ -5501,7 +5592,7 @@ dependencies = [
  "sha256",
  "snafu 0.7.5",
  "snap",
- "sqlparser",
+ "sqlparser 0.50.0",
  "strum 0.25.0",
  "sysinfo",
  "syslog_loose 0.18.0",
@@ -6140,7 +6231,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "731e0d9356b0c25f16f33b5be79b1c57b562f141ebfcdb0ad8ac2c13a24293b4"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "hex",
  "lazy_static",
  "procfs-core",
@@ -6153,7 +6244,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d3554923a69f4ce04c4a754260c338f505ce22642d3830e049a399fc2059a29"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "hex",
 ]
 
@@ -6498,7 +6589,7 @@ version = "11.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb9ee317cfe3fbd54b36a511efc1edd42e216903c9cd575e686dd68a2ba90d8d"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
 ]
 
 [[package]]
@@ -6536,7 +6627,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469052894dcb553421e483e4209ee581a45100d31b4018de03e5a7ad86374a7e"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
 ]
 
 [[package]]
@@ -6906,7 +6997,7 @@ version = "0.38.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70dc5ec042f7a43c4a73241207cecc9873a06d45debb38b329f8541d85c2730f"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -7037,7 +7128,7 @@ version = "14.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7803e8936da37efd9b6d4478277f4b2b9bb5cdb37a113e8d63222e58da647e63"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "cfg-if 1.0.0",
  "clipboard-win",
  "libc",
@@ -7111,7 +7202,7 @@ version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c627723fd09706bacdb5cf41499e95098555af3c3c29d014dc3c458ef6be11c0"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "core-foundation",
  "core-foundation-sys",
  "libc",
@@ -7525,6 +7616,16 @@ dependencies = [
 
 [[package]]
 name = "sqlparser"
+version = "0.49.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4a404d0e14905361b918cb8afdb73605e25c1d5029312bd9785142dcb3aa49e"
+dependencies = [
+ "log",
+ "sqlparser_derive",
+]
+
+[[package]]
+name = "sqlparser"
 version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2e5b515a2bd5168426033e9efbfd05500114833916f1d5c268f938b4ee130ac"
@@ -7648,7 +7749,7 @@ checksum = "1ed31390216d20e538e447a7a9b959e06ed9fc51c37b514b46eb758016ecd418"
 dependencies = [
  "atoi",
  "base64 0.21.7",
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "byteorder",
  "bytes",
  "chrono",
@@ -7691,7 +7792,7 @@ checksum = "7c824eb80b894f926f89a0b9da0c7f435d27cdd35b8c655b114e58223918577e"
 dependencies = [
  "atoi",
  "base64 0.21.7",
- "bitflags 2.5.0",
+ "bitflags 2.6.0",
  "byteorder",
  "chrono",
  "crc",
@@ -8769,6 +8870,12 @@ name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8232dd3cdaed5356e0f716d285e4b40b932ac434100fe9b7e0e8e935b9e6246"
+
+[[package]]
+name = "utf8-ranges"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcfc827f90e53a02eaef5e535ee14266c1d569214c6aa70133a624d8a3164ba"
 
 [[package]]
 name = "utf8-width"

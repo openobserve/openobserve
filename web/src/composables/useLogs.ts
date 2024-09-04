@@ -2928,12 +2928,19 @@ const useLogs = () => {
           ],
         );
       }
-      const selectedFields = (logFilterField && logFieldSelectedValue) || [];
+      let selectedFields = (logFilterField && logFieldSelectedValue) || [];
+
       if (
         searchObj.data.stream.selectedFields.length == 0 &&
         selectedFields.length > 0
       ) {
         return (searchObj.data.stream.selectedFields = selectedFields);
+      }
+
+      // As in saved view, we observed field getting duplicated in selectedFields
+      // So, we are removing duplicates before applying saved view
+      if (searchObj.data.stream.selectedFields?.length) {
+        selectedFields = [...new Set(searchObj.data.stream.selectedFields)];
       }
 
       const parsedSQL: any = fnParsedSQL();
@@ -2944,7 +2951,7 @@ const useLogs = () => {
       // If we don’t add timestamp and add timestamp to table it should show invalid date.
 
       if (
-        searchObj.data.stream.selectedFields.length == 0 ||
+        selectedFields.length == 0 ||
         !searchObj.data.queryResults?.hits?.length
       ) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
@@ -2955,9 +2962,7 @@ const useLogs = () => {
               store.state.zoConfig.timestamp_column,
             )) ||
           searchObj.meta.sqlMode == false ||
-          searchObj.data.stream.selectedFields.includes(
-            store.state.zoConfig.timestamp_column,
-          )
+          selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
           searchObj.data.resultGrid.columns.push({
             name: store.state.zoConfig.timestamp_column,
@@ -2988,7 +2993,7 @@ const useLogs = () => {
           });
         }
 
-        if (searchObj.data.stream.selectedFields.length == 0) {
+        if (selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
             name: "source",
             id: "source",
@@ -3007,9 +3012,7 @@ const useLogs = () => {
       } else {
         if (
           searchObj.data.hasSearchDataTimestampField ||
-          searchObj.data.stream.selectedFields.includes(
-            store.state.zoConfig.timestamp_column,
-          )
+          selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
           searchObj.data.resultGrid.columns.unshift({
             name: store.state.zoConfig.timestamp_column,
@@ -3056,7 +3059,7 @@ const useLogs = () => {
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
 
-        for (const field of searchObj.data.stream.selectedFields) {
+        for (const field of selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             let foundKey, foundValue;
 
@@ -3096,7 +3099,6 @@ const useLogs = () => {
       extractFTSFields();
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while updating grid columns");
       notificationMsg.value = "Error while updating table columns.";
     }
   };
@@ -4015,6 +4017,38 @@ const useLogs = () => {
       });
   };
 
+  const reorderArrayByReference = (arr1: string[], arr2: string[]) => {
+    arr1.sort((a, b) => {
+      const indexA = arr2.indexOf(a);
+      const indexB = arr2.indexOf(b);
+
+      // If an element is not found in arr1, keep it at the end
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+
+      return indexA - indexB;
+    });
+  };
+
+  const reorderSelectedFields = () => {
+    const selectedFields = [...searchObj.data.stream.selectedFields];
+
+    let colOrder =
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
+
+    if (!selectedFields.includes(store.state.zoConfig.timestamp_column)) {
+      colOrder = colOrder.filter(
+        (v: any) => v !== store.state.zoConfig.timestamp_column,
+      );
+    }
+
+    if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {
+      reorderArrayByReference(selectedFields, colOrder);
+    }
+
+    return selectedFields;
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -4051,6 +4085,7 @@ const useLogs = () => {
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
+    reorderSelectedFields,
   };
 };
 

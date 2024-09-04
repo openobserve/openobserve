@@ -54,6 +54,8 @@ pub struct Request {
     pub timeout: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub index_type: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -401,6 +403,7 @@ pub struct ScanStats {
     pub querier_memory_cached_files: i64,
     pub querier_disk_cached_files: i64,
     pub idx_scan_size: i64,
+    pub idx_took: i64,
 }
 
 impl ScanStats {
@@ -417,6 +420,7 @@ impl ScanStats {
         self.querier_memory_cached_files += other.querier_memory_cached_files;
         self.querier_disk_cached_files += other.querier_disk_cached_files;
         self.idx_scan_size += other.idx_scan_size;
+        self.idx_took += other.idx_took;
     }
 
     pub fn format_to_mb(&mut self) {
@@ -461,6 +465,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
             work_group: "".to_string(),
             user_id: None,
             search_event_type: req.search_type.map(|event| event.to_string()),
+            index_type: req.index_type.clone(),
         }
     }
 }
@@ -495,6 +500,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
+            idx_took: req.idx_took,
         }
     }
 }
@@ -510,6 +516,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
+            idx_took: req.idx_took,
         }
     }
 }
@@ -613,6 +620,8 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub index_type: String, // parquet(default) or fst
 }
 
 impl MultiStreamRequest {
@@ -639,6 +648,7 @@ impl MultiStreamRequest {
                 encoding: self.encoding,
                 timeout: self.timeout,
                 search_type: self.search_type,
+                index_type: self.index_type.clone(),
             });
         }
         res
@@ -723,6 +733,7 @@ mod tests {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            index_type: "".to_string(),
         };
 
         let rpc_req = cluster_rpc::SearchRequest::from(req.clone());

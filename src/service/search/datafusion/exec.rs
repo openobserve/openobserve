@@ -45,6 +45,7 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
         session_state::SessionStateBuilder,
     },
+    logical_expr::AggregateUDF,
     optimizer::OptimizerRule,
     prelude::{Expr, SessionContext},
 };
@@ -369,6 +370,9 @@ pub async fn register_udf(ctx: &SessionContext, _org_id: &str) {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::percentile_cont::PercentileCont::new(),
+    ));
 
     {
         let udf_list = get_all_transform(_org_id).await;
@@ -438,15 +442,12 @@ pub async fn create_parquet_table(
 
     if sorted_by_time {
         // specify sort columns for parquet file
-        listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
-            datafusion::logical_expr::SortExpr {
-                expr: Box::new(Expr::Column(Column::new_unqualified(
-                    cfg.common.column_timestamp.clone(),
-                ))),
+        listing_options =
+            listing_options.with_file_sort_order(vec![vec![datafusion::logical_expr::SortExpr {
+                expr: Expr::Column(Column::new_unqualified(cfg.common.column_timestamp.clone())),
                 asc: false,
                 nulls_first: false,
-            },
-        )]]);
+            }]]);
     }
 
     let schema_key = schema.hash_key();
