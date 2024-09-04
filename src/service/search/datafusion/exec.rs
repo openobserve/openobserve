@@ -348,7 +348,7 @@ pub async fn prepare_datafusion_context(
     }
 }
 
-fn register_udf(ctx: &mut SessionContext, org_id: &str) -> Result<()> {
+pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
     ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());

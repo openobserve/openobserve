@@ -64,7 +64,7 @@ pub async fn search(
         prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num).await?;
 
     // register UDF
-    register_udf(&ctx, &org_id).await;
+    register_udf(&ctx, &org_id)?;
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {

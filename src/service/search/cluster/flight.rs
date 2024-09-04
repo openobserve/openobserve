@@ -799,7 +799,7 @@ pub async fn generate_context(
     .await?;
 
     // register udf
-    register_udf(&ctx, &req.org_id).await;
+    register_udf(&ctx, &req.org_id)?;
 
     Ok(ctx)
 }

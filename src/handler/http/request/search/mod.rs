@@ -186,6 +186,7 @@ pub async fn search(
                 );
             }
         }
+    }
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
