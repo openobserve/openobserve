@@ -278,7 +278,7 @@ const useStreams = () => {
 
   function removeSchemaFields (streamData: any) {
 
-    if (streamData.schema && streamData.settings.store_original_data ) {
+    if (streamData.schema ) {
       if(streamData.schema[streamData.schema.length - 1].name === '_original') {
         streamData.schema.pop();
         return streamData;

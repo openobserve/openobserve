@@ -99,8 +99,10 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened' " class="q-pl-md">
+      <q-spinner v-if="loading" size="lg" color="primary" />
+
       <query-editor
-        v-model:query="nestedJson"
+        v-model:query="unflattendData"
         ref="queryEditorRef"
         :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
         class="monaco-editor"
@@ -237,6 +239,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
+import { useQuasar } from "quasar";
 
 
 export default {
@@ -272,7 +275,7 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams , getStream} = useStreams();
+    const { getStreams } = useStreams();
 
     const filteredTracesStreamOptions = ref([]);
 
@@ -283,8 +286,9 @@ export default {
     const previewId = ref("");
     const schemaToBeSearch = ref({});
 
-    const nestedJson = ref("");
-    const storeOriginalDataVar = ref(false);
+    const $q = useQuasar();
+    const unflattendData = ref(null);
+    const loading = ref(false);
 
     const tabs = [
       {
@@ -301,7 +305,7 @@ export default {
       emit(
         "copy",
         activeTab.value === "unflattened"
-          ? JSON.parse(nestedJson.value)
+          ? JSON.parse(unflattendData.value)
           : props.value,
       );    };
     const addSearchTerm = (value: string) => {
@@ -326,59 +330,58 @@ export default {
     });
 
     onMounted(async () => {
-      await updateStoreOriginalData();
-      nestedJson.value = JSON.stringify( {
-          "test":"this needs to be covered after fixing api"
-        })
     });
 
     watch (
       () => props.value,
     
       async () =>  {
-        await updateStoreOriginalData();
-        const o2_id = BigInt(props.value._o2_id);
-        const {traceparent,traceId} = generateTraceContext();
+        if (!props.value._o2_id) {
+          return; 
+        }
 
-        nestedJson.value = JSON.stringify( {
-          "test":"this needs to be covered after fixing api"
-        })
-        // searchService
-        // .search(
-        //   {
-        //     org_identifier: searchObj.organizationIdetifier,
-        //     query: {
-        //       "query":{
-        //         "start_time":props.value._timestamp - 10 * 60 * 1000,
-        //         "sql":`SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _o2_id = ${o2_id} and _timestamp = ${props.value._timestamp}`,
-    
-        //       "end_time": props.value._timestamp + 10 * 60 * 1000,
-        //       'sql_mode':"full",
-        //       "size":1,
-        //       "from":0,
-        //       "quick_mode":false,
-        //       }
+        loading.value = true;
 
-        //     },
-        //     page_type: searchObj.data.stream.streamType,
-        //     traceparent,
-        //   },
-        //   "UI",
-        // ).then((res: any) => {
-        //   console.log(res,"res getting")
-        // }).catch((err: any) => {
-        //   console.log("err", err);
-        // })
-      
+        try {
+          const { traceparent, traceId } = generateTraceContext();
+
+          const res = await searchService.search(
+            {
+              org_identifier: searchObj.organizationIdetifier,
+              query: {
+                "query": {
+                  "start_time": props.value._timestamp - 10 * 60 * 1000,
+                  "sql": `SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                  "end_time": props.value._timestamp + 10 * 60 * 1000,
+                  "sql_mode": "full",
+                  "size": 1,
+                  "from": 0,
+                  "quick_mode": false,
+                }
+              },
+              page_type: searchObj.data.stream.streamType,
+              traceparent,
+            },
+            "UI"
+          );
+          unflattendData.value = res.data.hits[0]._original
+        } catch (err) {
+          loading.value = false
+          $q.notify({
+          message:
+            err.response?.data?.message || "Failed to get the Original data",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+        } finally {
+          loading.value = false; 
+        }
       },
+      { immediate: true, deep: true }
     );
 
-    
-//     watch(
-//   () => [searchObj.data.stream.selectedStream, searchObj.data.stream.streamType],
-//   async () => {
-//   }
-// );
+  
 
     const getTracesStreams = async () => {
       await getStreams("traces", false)
@@ -428,30 +431,18 @@ export default {
         queryEditorRef.value.formatDocument();
       }
     };
-    async function updateStoreOriginalData() {
-          try {
-            // Call getStream with the appropriate parameters
-            const streamData = await getStream(searchObj.data.stream.selectedStream, searchObj.data.stream.streamType, false);
 
-            schemaToBeSearch.value = streamData?.schema;
-          // Extract the store_original_data from the settings
-            const storeOriginalData = streamData?.settings?.store_original_data;
-
-            // Assign it to the desired variable (e.g., in a reactive property or state)
-            storeOriginalDataVar.value = storeOriginalData;
-          } catch (error) {
-            console.error('Error fetching stream data:', error);
-          }
-}
   const filteredTabs = computed(() => {
-    console.log(tabs,"tabs")
+
         return tabs.filter(tab => {
-          if (!storeOriginalDataVar.value && (tab.value === 'unflattened' || tab.value === 'flattened')) {
+          if (props.value._o2_id == undefined) {
           return false;
         }
           return true;
         });
       });
+
+
 
     return {
       t,
@@ -469,28 +460,33 @@ export default {
       streamSearchValue,
       activeTab,
       showViewTraceBtn,
-      nestedJson,
       handleTabChange,
-      storeOriginalDataVar,
       queryEditorRef,
       previewId,
+      loading,
+      unflattendData,
       schemaToBeSearch,
-      updateStoreOriginalData,
       filteredTabs,
     };
   },
 };
 </script>
 
+
 <style lang="scss" scoped>
+.monaco-editor{
+  --vscode-focusBorder: #515151 !important;
+}
 .log_json_content {
   white-space: pre-wrap;
   font-family: monospace;
   font-size: 12px;
 }
-.monaco-editor {
+.monaco-editor  {
+
   width: calc(100% - 16px) !important;
   height: calc(100vh - 250px) !important;
+
 
   &.expanded {
     height: 300px !important;
