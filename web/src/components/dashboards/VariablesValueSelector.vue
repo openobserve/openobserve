@@ -522,7 +522,7 @@ export default defineComponent({
 
                     queryContext = queryContext.replace(
                       `'$${variable.name}'`,
-                      `(${arrayValues})`,
+                      `${arrayValues}`,
                     );
                   } else {
                     queryContext = queryContext.replace(
