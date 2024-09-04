@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         minWidth: '100%',
         ...columnSizeVars,
         minHeight: totalSize + 'px',
-
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -583,6 +582,12 @@ const rowVirtualizerOptions = computed(() => {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
     estimateSize: () => 20,
+    overscan: 10,
+    measureElement:
+      typeof window !== "undefined" &&
+      navigator.userAgent.indexOf("Firefox") === -1
+        ? (element: any) => element?.getBoundingClientRect().height
+        : undefined,
   };
 });
 
