@@ -92,21 +92,25 @@ fn get_udf_vrl(
                 obj_str.push_str(&format!(
                     " .{} = \"{}\" \n",
                     in_params.get(j).unwrap(),
-                    col.value(i)
+                    col.value(i).replace("\"", "\\\"")
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Ok(res) = compile_vrl_function(&obj_str, &local_org_id) {
-                let registry = res.config.get_custom::<TableRegistry>().unwrap();
-                registry.finish_load();
-                let result = apply_vrl_fn(&mut runtime, res.program);
-                if result != json::Value::Null {
-                    res_data_vec.insert(i, json::get_string_value(&result));
-                } else {
+            match compile_vrl_function(&obj_str, &local_org_id) {
+                Ok(res) => {
+                    let registry = res.config.get_custom::<TableRegistry>().unwrap();
+                    registry.finish_load();
+                    let result = apply_vrl_fn(&mut runtime, res.program);
+                    if result != json::Value::Null {
+                        res_data_vec.insert(i, json::get_string_value(&result));
+                    } else {
+                        res_data_vec.insert(i, "".to_string());
+                    }
+                }
+                Err(e) => {
+                    log::error!("Error in vrl_transform UDF: {}", e);
                     res_data_vec.insert(i, "".to_string());
                 }
-            } else {
-                res_data_vec.insert(i, "".to_string());
             }
         }
         let result = StringArray::from(res_data_vec);
