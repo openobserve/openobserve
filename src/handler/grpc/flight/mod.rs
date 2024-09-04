@@ -36,10 +36,14 @@ use datafusion::{
     physical_plan::{displayable, execute_stream},
 };
 use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::TaskStatus;
 use prost::Message;
 use proto::cluster_rpc::FlightSearchRequest;
 use tonic::{Request, Response, Status, Streaming};
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::SEARCH_SERVER;
 use crate::service::search::{grpc::flight as grpcFlight, utlis::AsyncDefer};
 
 #[derive(Default)]
@@ -72,9 +76,24 @@ impl FlightService for FlightServiceImpl {
         log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
 
         #[cfg(feature = "enterprise")]
+        if req.is_super_cluster {
+            SEARCH_SERVER
+                .insert(
+                    req.trace_id.clone(),
+                    TaskStatus::new_follower(vec![], false),
+                )
+                .await;
+        }
+
+        #[cfg(feature = "enterprise")]
         let result = get_ctx_and_physical_plan(&req).await;
         #[cfg(not(feature = "enterprise"))]
         let result = get_ctx_and_physical_plan(&req).await;
+
+        #[cfg(feature = "enterprise")]
+        if req.is_super_cluster {
+            SEARCH_SERVER.remove(&req.trace_id, false).await;
+        }
 
         // 2. prepare dataufion context
         let (ctx, physical_plan, defer, scan_stats) = match result {

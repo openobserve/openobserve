@@ -81,9 +81,7 @@ pub async fn work_group_checking(
                 }
             }
         }
-        _ = async {
-            let _ = abort_receiver.await;
-        } => {
+        _ = abort_receiver => {
             metrics::QUERY_PENDING_NUMS
                 .with_label_values(&[&req.org_id])
                 .dec();

@@ -124,7 +124,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 trace_id.clone(),
-                TaskStatus::new(
+                TaskStatus::new_leader(
                     vec![],
                     true,
                     user_id.clone(),
