@@ -348,7 +348,7 @@ pub async fn prepare_datafusion_context(
     }
 }
 
-pub async fn register_udf(ctx: &SessionContext, _org_id: &str) {
+fn register_udf(ctx: &mut SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
     ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
@@ -374,12 +374,12 @@ pub async fn register_udf(ctx: &SessionContext, _org_id: &str) {
         super::udaf::percentile_cont::PercentileCont::new(),
     ));
 
-    {
-        let udf_list = get_all_transform(_org_id).await;
-        for udf in udf_list {
-            ctx.register_udf(udf.clone());
-        }
+    let udf_list = get_all_transform(org_id)?;
+    for udf in udf_list {
+        ctx.register_udf(udf.clone());
     }
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

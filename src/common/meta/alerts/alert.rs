@@ -95,3 +95,9 @@ impl Default for Alert {
         }
     }
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct AlertListFilter {
+    pub enabled: Option<bool>,
+    pub owner: Option<String>,
+}

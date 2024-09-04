@@ -162,46 +162,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </td>
         </tr>
-      </thead>
-      <tr
-        data-test="log-search-result-function-error"
-        v-if="functionErrorMsg != ''"
-      >
-        <td
-          :colspan="columnOrder.length"
-          class="text-bold"
-          style="opacity: 0.6"
+        <tr
+          data-test="log-search-result-function-error"
+          v-if="functionErrorMsg != ''"
         >
-          <div class="text-subtitle2 text-weight-bold bg-warning">
-            <q-btn
-              :icon="
-                expandedRowIndices.includes(-1)
-                  ? 'expand_more'
-                  : 'chevron_right'
+          <td
+            :colspan="columnOrder.length"
+            class="text-bold"
+            style="opacity: 0.6"
+          >
+            <div
+              class="text-subtitle2 text-weight-bold q-pl-sm"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-bg-yellow-600'
+                  : 'tw-bg-amber-300'
               "
-              dense
-              size="xs"
-              flat
-              class="q-mr-xs"
-              data-test="table-row-expand-menu"
-              @click.self.stop="expandRow(-1)"
-            ></q-btn
-            ><b>
-              <q-icon name="warning" size="15px"></q-icon>
-              {{ t("search.functionErrorLabel") }}</b
             >
-          </div>
-        </td>
-      </tr>
-      <tr v-if="expandedRowIndices.includes(-1)">
-        <td
-          :colspan="columnOrder.length"
-          class="bg-warning"
-          style="opacity: 0.7"
-        >
-          <pre>{{ functionErrorMsg }}</pre>
-        </td>
-      </tr>
+              <q-btn
+                :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
+                dense
+                size="xs"
+                flat
+                class="q-mr-xs"
+                data-test="table-row-expand-menu"
+                @click.capture.stop="expandFunctionError"
+              ></q-btn
+              ><b>
+                <q-icon name="warning" size="15px"></q-icon>
+                {{ t("search.functionErrorLabel") }}</b
+              >
+            </div>
+          </td>
+        </tr>
+        <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
+          <td
+            :colspan="columnOrder.length"
+            style="opacity: 0.7"
+            class="q-px-sm"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-bg-yellow-600'
+                : 'tw-bg-amber-300'
+            "
+          >
+            <pre>{{ functionErrorMsg }}</pre>
+          </td>
+        </tr>
+      </thead>
       <tbody
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
@@ -347,6 +355,7 @@ import {
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
+  isFunction,
 } from "@tanstack/vue-table";
 import JsonPreview from "./JsonPreview.vue";
 import { useStore } from "vuex";
@@ -434,6 +443,8 @@ const tableRowSize = ref(0);
 const columnOrder = ref<any>([]);
 
 const tableRows = ref(props.rows);
+
+const isFunctionErrorOpen = ref(false);
 
 watch(
   () => props.columns,
@@ -652,6 +663,7 @@ const expandRow = async (index: number) => {
     isCollapseOperation = true;
   } else {
     expandedRowIndices.value.push(index);
+
     tableRows.value.splice(index + 1, 0, {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
@@ -692,6 +704,10 @@ const handleDataRowClick = (row: any, index: number) => {
   if (actualIndex !== -1) {
     emits("click:dataRow", row, actualIndex);
   }
+};
+
+const expandFunctionError = () => {
+  isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
 };
 
 defineExpose({

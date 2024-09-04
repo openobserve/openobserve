@@ -707,6 +707,11 @@ const useLogs = () => {
             )
           : cloneDeep(searchObj.data.datetime);
 
+      if (searchObj.data.datetime.type === "relative") {
+        searchObj.data.datetime.startTime = timestamps.startTime;
+        searchObj.data.datetime.endTime = timestamps.endTime;
+      }
+
       if (
         timestamps.startTime != "Invalid Date" &&
         timestamps.endTime != "Invalid Date"

@@ -150,6 +150,8 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         use crate::common::{
             infra::config::USERS,
             utils::auth::{is_root_user, AuthExtractor},
@@ -160,6 +162,7 @@ pub async fn get_latest_traces(
                 .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
                 .unwrap()
                 .clone();
+            let stream_type_str = StreamType::Traces.to_string();
 
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
@@ -167,7 +170,13 @@ pub async fn get_latest_traces(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("{}:{}", StreamType::Traces, stream_name),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str.as_str())
+                                .map_or(stream_type_str.as_str(), |model| model.key),
+                            stream_name
+                        ),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),
