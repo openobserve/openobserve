@@ -194,7 +194,7 @@ pub async fn search_multi(
                                 OFGA_MODELS
                                     .get(stream_type_str.as_str())
                                     .map_or(stream_type_str.as_str(), |model| model.key),
-                                resp.stream_name
+                                stream_name
                             ),
                             org_id: org_id.clone(),
                             bypass_check: false,

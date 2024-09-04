@@ -145,13 +145,14 @@ pub async fn search(
     );
 
     // check inverted index
-    let cfg = get_config();
-    let inverted_index_type =
-        if req.index_type.is_none() || req.index_type.as_ref().unwrap().is_empty() {
-            cfg.common.inverted_index_search_format.clone()
-        } else {
-            req.index_type.as_ref().unwrap().to_string()
-        };
+    let cfg = config::get_config();
+    let inverted_index_type = if req.inverted_index_type.is_none()
+        || req.inverted_index_type.as_ref().unwrap().is_empty()
+    {
+        cfg.common.inverted_index_search_format.clone()
+    } else {
+        req.inverted_index_type.as_ref().unwrap().to_string()
+    };
     let use_inverted_index = req.use_inverted_index
         && (inverted_index_type == "parquet" || inverted_index_type == "both");
     log::info!(
