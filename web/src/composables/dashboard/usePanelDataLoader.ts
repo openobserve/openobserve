@@ -418,9 +418,6 @@ export const usePanelDataLoader = (
           console.log("Adding traceId", traceId);
 
           try {
-            // trace context
-            const { traceparent } = generateTraceContext();
-
             // partition api call
             const res = await queryService.partition({
               org_identifier: store.state.selectedOrganization.identifier,
@@ -476,62 +473,68 @@ export const usePanelDataLoader = (
               if (abortControllerRef?.signal?.aborted) {
                 break;
               }
-              const searchRes = await queryService.search(
-                {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  query: {
+
+              const { traceparent: searchTraceparent, traceId: searchTraceId } =
+                generateTraceContext();
+
+              addTraceId(searchTraceId);
+
+              try {
+                const searchRes = await queryService.search(
+                  {
+                    org_identifier: store.state.selectedOrganization.identifier,
                     query: {
-                      sql: await changeHistogramInterval(
-                        query,
-                        histogramInterval,
-                      ),
-                      query_fn: it.vrlFunctionQuery
-                        ? b64EncodeUnicode(it.vrlFunctionQuery)
-                        : null,
-                      sql_mode: "full",
-                      start_time: partition[0],
-                      end_time: partition[1],
-                      size: -1,
+                      query: {
+                        sql: await changeHistogramInterval(
+                          query,
+                          histogramInterval,
+                        ),
+                        query_fn: it.vrlFunctionQuery
+                          ? b64EncodeUnicode(it.vrlFunctionQuery)
+                          : null,
+                        sql_mode: "full",
+                        start_time: partition[0],
+                        end_time: partition[1],
+                        size: -1,
+                      },
                     },
+                    page_type: pageType,
+                    traceparent: searchTraceparent,
                   },
-                  page_type: pageType,
-                  traceparent,
-                },
-                searchType.value ?? "Dashboards",
-              );
+                  searchType.value ?? "Dashboards",
+                );
+                // remove past error detail
+                state.errorDetail = "";
 
-              // remove past error detail
-              state.errorDetail = "";
+                // if there is an function error and which not related to stream range, throw error
+                if (
+                  searchRes.data.function_error &&
+                  searchRes.data.is_partial != true
+                ) {
+                  // abort on unmount
+                  if (abortControllerRef) {
+                    // this will stop partition api call
+                    abortControllerRef?.abort();
+                  }
 
-              // if there is an function error and which not related to stream range, throw error
-              if (
-                searchRes.data.function_error &&
-                searchRes.data.is_partial != true
-              ) {
-                // abort on unmount
-                if (abortControllerRef) {
-                  // this will stop partition api call
-                  abortControllerRef?.abort();
+                  // throw error
+                  throw new Error(
+                    `Function error: ${searchRes.data.function_error}`,
+                  );
                 }
 
-                // throw error
-                throw new Error(
-                  `Function error: ${searchRes.data.function_error}`,
-                );
-              }
+                // if the query is aborted or the response is partial, break the loop
+                if (abortControllerRef?.signal?.aborted) {
+                  break;
+                }
 
-              // if the query is aborted or the response is partial, break the loop
-              if (abortControllerRef?.signal?.aborted) {
-                break;
-              }
+                state.data[currentQueryIndex] = [
+                  ...searchRes.data.hits,
+                  ...(state.data[currentQueryIndex] ?? []),
+                ];
 
-              state.data[currentQueryIndex] = [
-                ...searchRes.data.hits,
-                ...(state.data[currentQueryIndex] ?? []),
-              ];
-
-              // update result metadata
-              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+                // update result metadata
+                state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
               if (searchRes.data.is_partial == true) {
                 // set the new start time as the start time of query
@@ -544,47 +547,51 @@ export const usePanelDataLoader = (
                 break;
               }
 
-              if (max_query_range != 0) {
-                // calculate the current partition time range
-                // convert timerange from milliseconds to hours
-                const timeRange = (partition[1] - partition[0]) / 3600000000;
+                if (max_query_range != 0) {
+                  // calculate the current partition time range
+                  // convert timerange from milliseconds to hours
+                  const timeRange = (partition[1] - partition[0]) / 3600000000;
 
-                // get result cache ratio(it will be from 0 to 100)
-                const resultCacheRatio = searchRes.data.result_cache_ratio ?? 0;
+                  // get result cache ratio(it will be from 0 to 100)
+                  const resultCacheRatio =
+                    searchRes.data.result_cache_ratio ?? 0;
 
-                // calculate the remaining query range
-                // remaining query range = remaining query range - queried time range for the current partition
-                // queried time range = time range * ((100 - result cache ratio) / 100)
+                  // calculate the remaining query range
+                  // remaining query range = remaining query range - queried time range for the current partition
+                  // queried time range = time range * ((100 - result cache ratio) / 100)
 
-                const queriedTimeRange =
-                  timeRange * ((100 - resultCacheRatio) / 100);
+                  const queriedTimeRange =
+                    timeRange * ((100 - resultCacheRatio) / 100);
 
-                remainingQueryRange = remainingQueryRange - queriedTimeRange;
+                  remainingQueryRange = remainingQueryRange - queriedTimeRange;
 
-                // if the remaining query range is less than 0, break the loop
-                // we exceeded the max query range
-                if (remainingQueryRange < 0) {
-                  // set that is_partial to true if it is not last partition which we need to call
-                  if (i != 0) {
-                    // set that is_partial to true
-                    state.resultMetaData[currentQueryIndex].is_partial = true;
-                    // set function error
-                    state.resultMetaData[currentQueryIndex].function_error =
-                      `Query duration is modified due to query range restriction of ${max_query_range} hours`;
-                    // set the new start time and end time
-                    state.resultMetaData[currentQueryIndex].new_end_time =
-                      endISOTimestamp;
+                  // if the remaining query range is less than 0, break the loop
+                  // we exceeded the max query range
+                  if (remainingQueryRange < 0) {
+                    // set that is_partial to true if it is not last partition which we need to call
+                    if (i != 0) {
+                      // set that is_partial to true
+                      state.resultMetaData[currentQueryIndex].is_partial = true;
+                      // set function error
+                      state.resultMetaData[currentQueryIndex].function_error =
+                        `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                      // set the new start time and end time
+                      state.resultMetaData[currentQueryIndex].new_end_time =
+                        endISOTimestamp;
 
-                    // set the new start time as the start time of query
-                    state.resultMetaData[currentQueryIndex].new_start_time =
-                      partition[0];
+                      // set the new start time as the start time of query
+                      state.resultMetaData[currentQueryIndex].new_start_time =
+                        partition[0];
 
                     // need to break the loop, save the cache
                     saveCurrentStateToCache();
 
-                    break;
+                      break;
+                    }
                   }
                 }
+              } finally {
+                removeTraceId(searchTraceId);
               }
 
               if (i == 0) {

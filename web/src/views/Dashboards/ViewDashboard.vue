@@ -537,14 +537,17 @@ export default defineComponent({
         console.error("No trace IDs to cancel");
         return;
       }
+      const tracesIds = [...traceIdRef.value];
       queryService
         .delete_running_queries(
           store.state.selectedOrganization.identifier,
-          traceIdRef.value
+          traceIdRef.value,
         )
         .then((res) => {
           console.log("cancelQuery response:", res);
           const isCancelled = res.data.some((item: any) => item.is_success);
+          console.log("cancelQuery isCancelled:-----------", isCancelled);
+
           console.log("isCancelled:", isCancelled);
 
           $q.notify({
@@ -569,6 +572,9 @@ export default defineComponent({
         })
         .finally(() => {
           console.log("cancelQuery finally");
+          traceIdRef.value = traceIdRef.value.filter(
+            (id: any) => !tracesIds.includes(id),
+          );
         });
     };
 
