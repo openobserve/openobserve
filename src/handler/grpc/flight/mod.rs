@@ -249,9 +249,10 @@ impl Stream for FlightSenderStream {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
                 log::info!(
-                    "[trace_id {}] send record batch, num_rows: {}",
+                    "[trace_id {}] send record batch, num_rows: {}, size: {}",
                     self.trace_id,
-                    batch.num_rows()
+                    batch.num_rows(),
+                    batch.get_array_memory_size()
                 );
                 Poll::Ready(Some(Ok(batch)))
             }

@@ -293,17 +293,34 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
-    Ok(Box::pin(FlightStream::new(schema, stream)))
+    Ok(Box::pin(FlightStream::new(
+        req.trace_id.clone(),
+        partition,
+        schema,
+        stream,
+    )))
 }
 
 struct FlightStream {
+    trace_id: String,
+    partition: usize,
     schema: SchemaRef,
     stream: Streaming<FlightData>,
 }
 
 impl FlightStream {
-    fn new(schema: SchemaRef, stream: Streaming<FlightData>) -> Self {
-        Self { schema, stream }
+    fn new(
+        trace_id: String,
+        partition: usize,
+        schema: SchemaRef,
+        stream: Streaming<FlightData>,
+    ) -> Self {
+        Self {
+            trace_id,
+            partition,
+            schema,
+            stream,
+        }
     }
 }
 
@@ -323,6 +340,13 @@ impl Stream for FlightStream {
                     self.schema.clone(),
                     &dictionaries_by_field,
                 )?;
+                log::info!(
+                    "[trace_id {}] remote_scan get record batch: partition: {}, num_rows: {}, size: {}",
+                    self.trace_id,
+                    self.partition,
+                    record_batch.num_rows(),
+                    record_batch.get_array_memory_size()
+                );
                 Poll::Ready(Some(Ok(record_batch)))
             }
             Poll::Ready(None) => Poll::Ready(None),
