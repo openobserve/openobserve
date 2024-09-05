@@ -33,6 +33,7 @@ use config::{
 };
 use datafusion::{
     common::tree_node::TreeNode,
+    error::DataFusionError,
     physical_plan::{displayable, visit_execution_plan, ExecutionPlan},
     prelude::SessionContext,
 };
@@ -304,8 +305,13 @@ pub async fn search(
             .await;
         let mut visit = ScanStatsVisitor::new();
         let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-        log::info!("[trace_id {trace_id_move}] flight->leader: datafusion collect done");
-        ret.map(|data| (data, visit.scan_stats))
+        if let Err(e) = ret {
+            log::error!("[trace_id {trace_id_move}] flight->leader: datafusion collect error: {e}");
+            Err(e)
+        } else {
+            log::info!("[trace_id {trace_id_move}] flight->leader: datafusion collect done");
+            ret.map(|data| (data, visit.scan_stats))
+        }
     });
     tokio::pin!(query_task);
 
@@ -316,14 +322,14 @@ pub async fn search(
                 Ok(ret) => Ok(ret),
                 Err(err) => {
                     log::error!("[trace_id {trace_id}] flight->leader: datafusion execute error: {}", err);
-                    Err(datafusion::error::DataFusionError::Execution(err.to_string()))
+                    Err(DataFusionError::Execution(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] flight->leader: search timeout");
-            Err(datafusion::error::DataFusionError::ResourcesExhausted("flight->leader: search timeout".to_string()))
+            Err(DataFusionError::ResourcesExhausted("flight->leader: search timeout".to_string()))
         },
         _ = async {
             #[cfg(feature = "enterprise")]
@@ -333,7 +339,7 @@ pub async fn search(
         } => {
             query_task.abort();
             log::info!("[trace_id {trace_id}] flight->leader: search canceled");
-            Err(datafusion::error::DataFusionError::ResourcesExhausted("flight->leader: search canceled".to_string()))
+            Err(DataFusionError::ResourcesExhausted("flight->leader: search canceled".to_string()))
         }
     };
 

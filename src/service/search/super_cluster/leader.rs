@@ -19,7 +19,7 @@ use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{get_config, meta::search::ScanStats};
 use datafusion::{
-    common::tree_node::TreeNode,
+    common::{tree_node::TreeNode, DataFusionError},
     physical_plan::{displayable, visit_execution_plan},
 };
 use hashbrown::HashMap;
@@ -200,8 +200,15 @@ pub async fn search(
             .await;
         let mut visit = ScanStatsVisitor::new();
         let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-        log::info!("[trace_id {trace_id_move}] super cluster leader: datafusion collect done");
-        ret.map(|data| (data, visit.scan_stats))
+        if let Err(e) = ret {
+            log::error!(
+                "[trace_id {trace_id_move}] super cluster leader: datafusion collect error: {e}"
+            );
+            Err(e)
+        } else {
+            log::info!("[trace_id {trace_id_move}] super cluster leader: datafusion collect done");
+            ret.map(|data| (data, visit.scan_stats))
+        }
     });
     tokio::pin!(query_task);
 
@@ -211,19 +218,19 @@ pub async fn search(
                 Ok(ret) => Ok(ret),
                 Err(err) => {
                     log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
-                    Err(datafusion::error::DataFusionError::Execution(err.to_string()))
+                    Err(DataFusionError::Execution(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] super cluster leader: search timeout");
-            Err(datafusion::error::DataFusionError::ResourcesExhausted("super cluster leader: search timeout".to_string()))
+            Err(DataFusionError::ResourcesExhausted("super cluster leader: search timeout".to_string()))
         },
         _ = abort_receiver => {
             query_task.abort();
             log::info!("[trace_id {trace_id}] super cluster leader: search canceled");
-            Err(datafusion::error::DataFusionError::ResourcesExhausted("super cluster leader: search canceled".to_string()))
+            Err(DataFusionError::ResourcesExhausted("super cluster leader: search canceled".to_string()))
         }
     };
 
