@@ -373,7 +373,7 @@ fn merge_response(
             }
             resp.hits.extend(res.hits.clone());
             resp.histogram_interval = res.histogram_interval;
-            if !resp.function_error.is_empty() {
+            if !res.function_error.is_empty() {
                 fn_error = res.function_error.clone();
             }
         }
