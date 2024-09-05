@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-drag"
         />
         <div :title="props.data.title" class="panelHeader">
-          {{ props.data.title }} 
+          {{ props.data.title }}
         </div>
         <q-space />
         <q-icon
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="1px"
           @click="
             PanleSchemaRendererRef?.tableRendererRef?.downloadTableAsCSV(
-              props.data.title
+              props.data.title,
             )
           "
           title="Download as a CSV"
@@ -110,7 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-            <span class="lastRefreshedAtIcon">🕑</span><RelativeTime :timestamp="lastTriggeredAt" fullTimePrefix="Last Refreshed At: "/>
+          <span class="lastRefreshedAtIcon">🕑</span
+          ><RelativeTime
+            :timestamp="lastTriggeredAt"
+            fullTimePrefix="Last Refreshed At: "
+          />
         </span>
         <q-btn
           icon="refresh"
@@ -240,7 +244,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, defineAsyncComponent, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  defineAsyncComponent,
+  watch,
+} from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -286,7 +296,7 @@ export default defineComponent({
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
-    RelativeTime
+    RelativeTime,
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -305,9 +315,15 @@ export default defineComponent({
 
     const maxQueryRange: any = ref([]);
 
-    watch(() => [props.selectedTimeDate], () => {
-      console.log('panelcontiner: panelcache: selected date time updated', JSON.stringify(props.selectedTimeDate, null, 2))
-    })
+    watch(
+      () => [props.selectedTimeDate],
+      () => {
+        console.log(
+          "panelcontiner: panelcache: selected date time updated",
+          JSON.stringify(props.selectedTimeDate, null, 2),
+        );
+      },
+    );
 
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
@@ -321,7 +337,7 @@ export default defineComponent({
             query.function_error,
             query.new_start_time,
             query.new_end_time,
-            store.state.timezone
+            store.state.timezone,
           );
           combinedWarnings.push(combinedMessage);
         }
@@ -330,7 +346,7 @@ export default defineComponent({
     };
 
     // to store and show when the panel was last loaded
-    const lastTriggeredAt = ref(null)
+    const lastTriggeredAt = ref(null);
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
@@ -352,7 +368,7 @@ export default defineComponent({
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
         const vars = it?.variables?.filter(
-          (it: any) => it.type === "dynamicVariable"
+          (it: any) => it.type === "dynamicVariable",
         );
         return vars?.length == adhocVariables?.length;
       });
@@ -367,6 +383,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/add_panel",
         query: {
+          ...route.query,
           dashboard: String(route.query.dashboard),
           panelId: data.id,
           folder: route.query.folder ?? "default",
@@ -398,7 +415,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? data.panels[0]?.tabId
+          route.query.tab ?? data.panels[0]?.tabId,
         );
 
         // Show a success notification.
@@ -408,6 +425,7 @@ export default defineComponent({
         router.push({
           path: "/dashboards/add_panel",
           query: {
+            ...route.query,
             dashboard: String(route.query.dashboard),
             panelId: panelId,
             folder: route.query.folder ?? "default",
@@ -433,7 +451,7 @@ export default defineComponent({
 
     const onRefreshPanel = () => {
       emit("refreshPanelRequest", props.data.id);
-    }
+    };
 
     return {
       props,
@@ -456,7 +474,7 @@ export default defineComponent({
       PanleSchemaRendererRef,
       confirmMovePanelDialog,
       movePanelDialog,
-      onRefreshPanel
+      onRefreshPanel,
     };
   },
   methods: {
