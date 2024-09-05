@@ -856,7 +856,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                 let stream_type = parts[1].to_string();
                 job_status
                     .entry(org)
-                    .or_insert_with(stdHashMap::new)
+                    .or_default()
                     .entry(stream_type)
                     .and_modify(|e| *e = counts)
                     .or_insert(counts);
