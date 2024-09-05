@@ -36,7 +36,7 @@ use crate::{
     common::{
         meta::{
             alerts::{
-                alert::Alert,
+                alert::{Alert, AlertListFilter},
                 destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 FrequencyType, Operator, QueryType,
             },
@@ -243,9 +243,12 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
     permitted: Option<Vec<String>>,
+    filter: AlertListFilter,
 ) -> Result<Vec<Alert>, anyhow::Error> {
     match db::alerts::alert::list(org_id, stream_type, stream_name).await {
         Ok(alerts) => {
+            let owner = filter.owner;
+            let enabled = filter.enabled;
             let mut result = Vec::new();
             for alert in alerts {
                 if permitted.is_none()
@@ -258,6 +261,12 @@ pub async fn list(
                         .unwrap()
                         .contains(&format!("alert:_all_{}", org_id))
                 {
+                    if owner.is_some() && !owner.eq(&alert.owner) {
+                        continue;
+                    }
+                    if enabled.is_some() && enabled.unwrap() != alert.enabled {
+                        continue;
+                    }
                     result.push(alert);
                 }
             }

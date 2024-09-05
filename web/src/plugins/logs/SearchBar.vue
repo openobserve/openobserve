@@ -920,6 +920,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 const defaultValue: any = () => {
   return {
@@ -934,9 +935,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
-    ),
+    QueryEditor,
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
@@ -1155,10 +1154,10 @@ export default defineComponent({
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex =
-        queryEditorRef.value.getCursorIndex();
+        queryEditorRef?.value?.getCursorIndex();
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open =
-        queryEditorRef.value.triggerAutoComplete;
+        queryEditorRef?.value?.triggerAutoComplete;
       getSuggestions();
     };
 
@@ -2350,7 +2349,7 @@ export default defineComponent({
         searchObj.data.query = "";
       }
       searchObj.data.editorValue = "";
-      queryEditorRef.value.setValue(searchObj.data.query);
+      queryEditorRef.value?.setValue(searchObj.data.query);
       if (store.state.zoConfig.query_on_stream_selection == false) {
         handleRunQueryFn();
       }
@@ -2952,7 +2951,7 @@ export default defineComponent({
   }
 
   .query-editor-container {
-    height: calc(100% - 30px) !important;
+    height: calc(100% - 35px) !important;
   }
 
   .logs-auto-refresh-interval {
