@@ -334,6 +334,7 @@ fn merge_response(
     if cache_responses.is_empty() && search_response.is_empty() {
         return config::meta::search::Response::default();
     }
+    let mut fn_error = String::new();
 
     let mut cache_response = if cache_responses.is_empty() {
         config::meta::search::Response::default()
@@ -350,6 +351,9 @@ fn merge_response(
             }
             resp.hits.extend(res.hits.clone());
             resp.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
         }
         resp.took = cache_took;
         resp
@@ -369,7 +373,11 @@ fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
         }
+        cache_response.function_error = fn_error;
         return cache_response;
     }
     let cache_hits_len = cache_response.hits.len();
@@ -401,6 +409,9 @@ fn merge_response(
             res_took.total += took_details.total;
             res_took.nodes.append(&mut took_details.nodes);
         }
+        if !res.function_error.is_empty() {
+            fn_error = res.function_error.clone();
+        }
 
         cache_response.hits.extend(res.hits.clone());
     }
@@ -426,6 +437,9 @@ fn merge_response(
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
+    if !fn_error.is_empty() {
+        cache_response.function_error = fn_error;
+    }
     cache_response
 }
 
