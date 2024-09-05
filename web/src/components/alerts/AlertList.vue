@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="q-pa-none flex"
+    class="q-pa-none flex alert-list-page"
     style="height: calc(100vh - 57px)"
+    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
     <div v-if="!showAddAlertDialog" class="full-width alert-list-table">
       <q-table
@@ -973,6 +974,22 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.alert-list-page {
+  &.dark-theme {
+    th:last-child,
+    td:last-child {
+      background: var(--q-dark);
+      box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+    }
+  }
+  &.light-theme {
+    th:last-child,
+    td:last-child {
+      background: #ffffff;
+    }
+  }
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
@@ -990,6 +1007,7 @@ export default defineComponent({
     box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
   }
 }
+
 .alerts-tabs {
   .q-tabs {
     &--vertical {
