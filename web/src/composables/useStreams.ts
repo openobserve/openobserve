@@ -283,7 +283,10 @@ const useStreams = () => {
         streamData.schema.pop();
         return streamData;
       }
-      streamData.schema = streamData.schema.filter((item: any) => item.name !== '_original');
+      
+      streamData.schema = streamData.schema.filter((item: any) => {
+        return item.name !== '_original' && item.name !== '_o2_id';
+      });
     }
     return streamData
   }
