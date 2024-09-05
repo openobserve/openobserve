@@ -339,14 +339,19 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         let user_id = req.headers().get("user_id").unwrap();
         if let Some(s_type) = &stream_type {
-            if !s_type.eq(&StreamType::EnrichmentTables) && !s_type.eq(&StreamType::Metadata) {
+            if !s_type.eq(&StreamType::Metadata) {
+                let stream_type_str = s_type.to_string();
                 match crate::handler::http::auth::validator::list_objects_for_user(
                     &org_id,
                     user_id.to_str().unwrap(),
                     "GET",
-                    &s_type.to_string(),
+                    OFGA_MODELS
+                        .get(stream_type_str.as_str())
+                        .map_or(stream_type_str.as_str(), |model| model.key),
                 )
                 .await
                 {
