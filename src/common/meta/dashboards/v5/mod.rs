@@ -160,7 +160,6 @@ pub enum AggregationFunc {
 pub enum PanelFilter {
     #[serde(rename = "condition")]
     Condition(FilterCondition),
-    
     #[serde(rename = "group")]
     Group(GroupType),
 }
@@ -322,6 +321,12 @@ pub struct VariableList {
     pub options: Option<Vec<CustomFieldsOption>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub multi_select: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hide_on_dashboard: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub select_all_value_for_multi_select: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_multi_select_value: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -347,6 +352,8 @@ pub struct Filters {
 pub struct CustomFieldsOption {
     pub label: String,
     pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

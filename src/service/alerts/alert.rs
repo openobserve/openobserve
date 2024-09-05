@@ -36,7 +36,7 @@ use crate::{
     common::{
         meta::{
             alerts::{
-                alert::Alert,
+                alert::{Alert, AlertListFilter},
                 destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 FrequencyType, Operator, QueryType,
             },
@@ -243,9 +243,12 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
     permitted: Option<Vec<String>>,
+    filter: AlertListFilter,
 ) -> Result<Vec<Alert>, anyhow::Error> {
     match db::alerts::alert::list(org_id, stream_type, stream_name).await {
         Ok(alerts) => {
+            let owner = filter.owner;
+            let enabled = filter.enabled;
             let mut result = Vec::new();
             for alert in alerts {
                 if permitted.is_none()
@@ -258,6 +261,12 @@ pub async fn list(
                         .unwrap()
                         .contains(&format!("alert:_all_{}", org_id))
                 {
+                    if owner.is_some() && !owner.eq(&alert.owner) {
+                        continue;
+                    }
+                    if enabled.is_some() && enabled.unwrap() != alert.enabled {
+                        continue;
+                    }
                     result.push(alert);
                 }
             }
@@ -455,12 +464,20 @@ pub async fn send_http_notification(
     }
 
     let resp = req.body(msg.clone()).send().await?;
-    if !resp.status().is_success() {
+    let resp_status = resp.status();
+    let resp_body = resp.text().await?;
+    log::debug!(
+        "Alert sent to destination {} with status: {}, body: {:?}",
+        dest.url,
+        resp_status,
+        resp_body,
+    );
+    if !resp_status.is_success() {
         log::error!("Alert body: {}", msg);
         return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {:?}",
-            resp.status(),
-            resp.bytes().await
+            "sent error status: {}, err: {}",
+            resp_status,
+            resp_body
         ));
     }
 

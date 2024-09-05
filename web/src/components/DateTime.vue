@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         self="top left"
         no-route-dismiss
         @before-show="onBeforeShow"
+        @before-hide="onBeforeHide"
       >
         <div class="flex justify-evenly q-py-sm">
           <q-btn
@@ -320,6 +321,7 @@ import {
   watch,
   nextTick,
   onActivated,
+  onBeforeUnmount,
 } from "vue";
 import {
   getImageURL,
@@ -500,13 +502,9 @@ export default defineComponent({
 
         selectedType.value = props.defaultType;
 
-        // if type is absolute
-        if (selectedType.value == "absolute") {
-          setAbsoluteTime(startTime, endTime);
-        } else {
-          // else type is relative
-          setRelativeTime(props.defaultRelativeTime);
-        }
+        setAbsoluteTime(startTime, endTime);
+
+        setRelativeTime(props.defaultRelativeTime);
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
@@ -535,60 +533,6 @@ export default defineComponent({
       },
       { deep: true },
     );
-
-    watch(
-      () => {
-        router.currentRoute.value.query?.from;
-      },
-      () => {
-        if (
-          router.currentRoute.value.query.hasOwnProperty("from") &&
-          router.currentRoute.value.query.hasOwnProperty("to")
-        ) {
-          selectedType.value = "absolute";
-          selectedTime.value.startTime = timestampToTimezoneDate(
-            router.currentRoute.value.query?.from / 1000,
-            store.state.timezone,
-            "HH:mm",
-          );
-          selectedTime.value.endTime = timestampToTimezoneDate(
-            router.currentRoute.value.query?.to / 1000,
-            store.state.timezone,
-            "HH:mm",
-          );
-          selectedDate.value.from = timestampToTimezoneDate(
-            router.currentRoute.value.query?.from / 1000,
-            store.state.timezone,
-            "yyyy/MM/dd",
-          );
-          selectedDate.value.to = timestampToTimezoneDate(
-            router.currentRoute.value.query?.to / 1000,
-            store.state.timezone,
-            "yyyy/MM/dd",
-          );
-          saveDate("absolute");
-        }
-      },
-      { deep: true },
-    );
-
-    // watch(
-    //   () => props.defaultAbsoluteTime,
-    //   (value) => {
-    //     console.log("defaultAbsoluteTime", value);
-    //     if (
-    //       (value.startTime !== datePayload.value.startTime ||
-    //         value.endTime !== datePayload.value.endTime) &&
-    //       store.state.savedViewFlag == false
-    //     ) {
-    //       selectedType.value = props.defaultType;
-    //       setAbsoluteTime(value.startTime, value.endTime);
-    //     }
-    //   },
-    //   {
-    //     deep: true,
-    //   }
-    // );
 
     const setRelativeDate = (period, value) => {
       selectedType.value = "relative";
@@ -629,19 +573,28 @@ export default defineComponent({
         if (periodValue) {
           relativeValue.value = parseInt(periodValue);
         }
-
-        selectedType.value = "relative";
       }
     };
 
     const resetTime = (startTime, endTime) => {
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
-        selectedDate.value.from = dateString;
-        selectedDate.value.to = dateString;
+
+        if (!selectedDate.value.from) selectedDate.value.from = dateString;
+
+        if (!selectedDate.value.to) selectedDate.value.to = dateString;
+
         if (!startTime) selectedTime.value.startTime = "00:00";
 
-        if (!endTime) selectedTime.value.endTime = "23:59";
+        if (!endTime) {
+          const endDateTime = convertUnixTime(new Date().getTime() * 1000);
+
+          // If the selected date is today, set the end time to the current time
+          if (selectedDate.value.to === endDateTime.date) {
+            selectedTime.value.endTime = endDateTime.time;
+          } else selectedTime.value.endTime = "23:59";
+        }
+
         return;
       }
       return;
@@ -729,6 +682,11 @@ export default defineComponent({
 
     const onBeforeShow = () => {
       // if (props.modelValue) selectedDate.value = cloneDeep(props.modelValue);
+    };
+
+    const onBeforeHide = () => {
+      if (selectedType.value === "absolute")
+        resetTime(selectedTime.value.startTime, selectedTime.value.endTime);
     };
 
     const getPeriodLabel = computed(() => {
@@ -828,6 +786,7 @@ export default defineComponent({
 
       if (dateobj.type === "relative") {
         setRelativeTime(dateobj.relativeTimePeriod);
+        selectedType.value = "relative";
       } else {
         if (
           dateobj.hasOwnProperty("selectedDate") &&
@@ -1030,6 +989,7 @@ export default defineComponent({
       relativePeriodsMaxValue,
       relativePeriodsSelect,
       computeRelativePeriod,
+      onBeforeHide,
     };
   },
   computed: {

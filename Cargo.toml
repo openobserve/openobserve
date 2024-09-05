@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.10.9"
+version = "0.11.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -85,6 +85,7 @@ csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
+datafusion-functions-json = "0.41.0"
 arrow.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
@@ -120,7 +121,7 @@ opentelemetry-otlp = { version = "0.15", features = [
 ] }
 opentelemetry-proto = { version = "0.5", features = [
   "gen-tonic",
-  "serde",
+  "with-serde",
   "logs",
   "metrics",
   "trace",

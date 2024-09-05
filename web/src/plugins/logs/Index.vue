@@ -287,13 +287,12 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
+import SearchBar from "@/plugins/logs/SearchBar.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
-    SearchBar: defineAsyncComponent(
-      () => import("@/plugins/logs/SearchBar.vue"),
-    ),
+    SearchBar,
     IndexList: defineAsyncComponent(
       () => import("@/plugins/logs/IndexList.vue"),
     ),
@@ -1344,7 +1343,7 @@ $navbarHeight: 64px;
 
   .thirdlevel {
     .field-list-collapse-btn {
-      z-index: 9;
+      z-index: 99;
       position: absolute;
       top: 5px;
       font-size: 12px !important;
