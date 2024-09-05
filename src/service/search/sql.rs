@@ -146,11 +146,7 @@ impl Sql {
 
         // Hack select for _timestamp & _o2_id, add both to select clause if needed
         let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-        if !is_aggregate
-            && meta.group_by.is_empty()
-            && meta.order_by.is_empty()
-            && !origin_sql.contains('*')
-        {
+        if !is_aggregate && meta.group_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
 
@@ -165,6 +161,8 @@ impl Sql {
                 } else {
                     (false, !cap_str.contains(&cfg.common.column_timestamp))
                 };
+            // if order by is not empty, we don't need to add timestamp column
+            let need_timestamp_col = need_timestamp_col && meta.order_by.is_empty();
 
             let replacement = match (need_o2_id_col, need_timestamp_col) {
                 (true, true) => format!(
