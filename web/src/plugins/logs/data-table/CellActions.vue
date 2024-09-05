@@ -61,7 +61,7 @@ const store = useStore();
 const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable"]);
 
 const copyLogToClipboard = (value: any) => {
-  emit("copy", value);
+  emit("copy", value, false);
 };
 const addSearchTerm = (value: string) => {
   emit("addSearchTerm", value);
