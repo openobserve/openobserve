@@ -18,7 +18,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 };
 use tonic::{Response, Status};
 
-use crate::service::traces::handle_trace_request;
+use crate::service::traces::{handle_trace_request, RequestType};
 
 #[derive(Default)]
 pub struct TraceServer;
@@ -54,7 +54,7 @@ impl TraceService for TraceServer {
         let resp = handle_trace_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
-            true,
+            RequestType::Grpc,
             in_stream_name,
         )
         .await;

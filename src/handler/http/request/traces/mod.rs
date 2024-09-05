@@ -27,7 +27,7 @@ use crate::{
         utils::http::get_or_create_trace_id,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{search as SearchService, traces::otlp_http},
+    service::{search as SearchService, traces},
 };
 
 /// TracesIngest
@@ -74,9 +74,9 @@ async fn handle_req(
         .get(&get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        otlp_http::traces_proto(&org_id, body, in_stream_name).await
+        traces::traces_proto(&org_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        otlp_http::traces_json(&org_id, body, in_stream_name).await
+        traces::traces_json(&org_id, body, in_stream_name).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(

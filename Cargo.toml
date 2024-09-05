@@ -123,7 +123,7 @@ opentelemetry-otlp = { version = "0.15", features = [
 ] }
 opentelemetry-proto = { version = "0.5", features = [
   "gen-tonic",
-  "serde",
+  "with-serde",
   "logs",
   "metrics",
   "trace",
