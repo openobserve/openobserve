@@ -247,8 +247,18 @@ impl Stream for FlightSenderStream {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Some(Ok(batch))) => {
+                log::info!(
+                    "[trace_id {}] send record batch, num_rows: {}",
+                    self.trace_id,
+                    batch.num_rows()
+                );
+                Poll::Ready(Some(Ok(batch)))
+            }
+            Poll::Ready(None) => {
+                log::info!("[trace_id {}] flight->search: stream end", self.trace_id);
+                Poll::Ready(None)
+            }
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(FlightError::Tonic(
                 Status::internal(e.to_string()),
