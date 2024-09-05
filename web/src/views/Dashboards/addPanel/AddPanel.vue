@@ -186,6 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :selectedTimeDate="dashboardPanelData.meta.dateTime"
                         @variablesData="variablesDataUpdated"
+                        :initialVariableValues="initialVariableValues"
                       />
 
                       <div
@@ -205,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Your chart is not up to date
                         </div>
                         <div>
-                          Chart Configuration / Variables  has been updated, but
+                          Chart Configuration / Variables has been updated, but
                           the chart was not updated automatically. Click on the
                           "Apply" button to run the query again
                         </div>
@@ -407,6 +408,17 @@ export default defineComponent({
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
 
+    // ======= [START] default variable values
+
+    const initialVariableValues: any = { value: {} };
+    Object.keys(route.query).forEach((key) => {
+      if (key.startsWith("var-")) {
+        const newKey = key.slice(4);
+        initialVariableValues.value[newKey] = route.query[key];
+      }
+    });
+    // ======= [END] default variable values
+
     const metaData = ref(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
@@ -423,14 +435,40 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
 
+      // change route query params based on current variables values
+      const variableObj: any = {};
+      data.values.forEach((variable: any) => {
+        if (variable.type === "dynamic_filters") {
+          const filters = (variable.value || []).filter(
+            (item: any) => item.name && item.operator && item.value,
+          );
+          const encodedFilters = filters.map((item: any) => ({
+            name: item.name,
+            operator: item.operator,
+            value: item.value,
+          }));
+          variableObj[`var-${variable.name}`] = encodeURIComponent(
+            JSON.stringify(encodedFilters),
+          );
+        } else {
+          variableObj[`var-${variable.name}`] = variable.value;
+        }
+      });
+      router.replace({
+        query: {
+          ...route.query,
+          ...variableObj,
+        },
+      });
+
       // when this is called 1st time, we need to set the data for the updated variables data as well
       // from the second time, it will only be updated after the apply button is clicked
       if (
-        !updatedVariablesData?.values?.length    // Previous value of variables is empty
-        && variablesData?.values?.length > 0       // new values of variables is NOT empty
+        !updatedVariablesData?.values?.length && // Previous value of variables is empty
+        variablesData?.values?.length > 0 // new values of variables is NOT empty
       ) {
-          // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
-          Object.assign(updatedVariablesData, variablesData);
+        // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+        Object.assign(updatedVariablesData, variablesData);
       }
     };
 
@@ -585,7 +623,7 @@ export default defineComponent({
       //compare chartdata and dashboardpaneldata and variables data as well
       return (
         !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData) 
+        !isEqual(variablesData, updatedVariablesData)
       );
     });
 
@@ -643,7 +681,10 @@ export default defineComponent({
       }
 
       // Also update variables data
-      Object.assign(updatedVariablesData, JSON.parse(JSON.stringify(variablesData)));
+      Object.assign(
+        updatedVariablesData,
+        JSON.parse(JSON.stringify(variablesData)),
+      );
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -665,6 +706,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/view",
         query: {
+          ...route.query,
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
@@ -1080,6 +1122,7 @@ export default defineComponent({
       showTutorial,
       updateVrlFunctionFieldList,
       queryParams: route.query,
+      initialVariableValues,
     };
   },
   methods: {
