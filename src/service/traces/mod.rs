@@ -64,6 +64,9 @@ const REF_TYPE: &str = "reference.ref_type";
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
+// ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
+const SPAN_ID_BYTES_COUNT: usize = 8;
+const TRACE_ID_BYTES_COUNT: usize = 16;
 
 pub enum RequestType {
     Grpc,
@@ -188,14 +191,14 @@ pub async fn handle_trace_request(
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
-                if span.span_id.len() != 8 {
+                if span.span_id.len() != SPAN_ID_BYTES_COUNT {
                     log::info!("skipping span with invalid span id");
                     partial_success.rejected_spans += 1;
                     continue;
                 }
                 let span_id: String =
                     SpanId::from_bytes(span.span_id.try_into().unwrap()).to_string();
-                if span.trace_id.len() != 16 {
+                if span.trace_id.len() != TRACE_ID_BYTES_COUNT {
                     log::info!("skipping span with invalid trace id");
                     partial_success.rejected_spans += 1;
                     continue;
@@ -203,7 +206,9 @@ pub async fn handle_trace_request(
                 let trace_id: String =
                     TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
                 let mut span_ref = HashMap::new();
-                if !span.parent_span_id.is_empty() && span.parent_span_id.len() == 8 {
+                if !span.parent_span_id.is_empty()
+                    && span.parent_span_id.len() == SPAN_ID_BYTES_COUNT
+                {
                     span_ref.insert(PARENT_TRACE_ID.to_string(), trace_id.clone());
                     span_ref.insert(
                         PARENT_SPAN_ID.to_string(),
@@ -241,13 +246,13 @@ pub async fn handle_trace_request(
                     for link_att in link.attributes {
                         link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
                     }
-                    if link.span_id.len() != 8 {
+                    if link.span_id.len() != SPAN_ID_BYTES_COUNT {
                         log::info!("skipping link with invalid span id");
                         continue;
                     }
                     let span_id: String =
                         SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
-                    if link.trace_id.len() != 16 {
+                    if link.trace_id.len() != TRACE_ID_BYTES_COUNT {
                         log::info!("skipping link with invalid trace id");
                         continue;
                     }
