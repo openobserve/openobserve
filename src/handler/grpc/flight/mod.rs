@@ -136,10 +136,11 @@ impl FlightService for FlightServiceImpl {
         schema = add_scan_stats_to_schema(schema, scan_stats);
 
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
-            .try_with_compression(Some(CompressionType::LZ4_FRAME))
+            .try_with_compression(Some(CompressionType::ZSTD))
             .map_err(|e| Status::internal(e.to_string()))?;
         let flight_data_stream = FlightDataEncoderBuilder::new()
             .with_schema(schema)
+            .with_max_flight_data_size(33554432) // 32MB
             .with_options(write_options)
             .build(FlightSenderStream::new(
                 req.trace_id.to_string(),
@@ -247,15 +248,7 @@ impl Stream for FlightSenderStream {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => {
-                log::info!(
-                    "[trace_id {}] send record batch, num_rows: {}, size: {}",
-                    self.trace_id,
-                    batch.num_rows(),
-                    batch.get_array_memory_size()
-                );
-                Poll::Ready(Some(Ok(batch)))
-            }
+            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
             Poll::Ready(None) => {
                 log::info!("[trace_id {}] flight->search: stream end", self.trace_id);
                 Poll::Ready(None)

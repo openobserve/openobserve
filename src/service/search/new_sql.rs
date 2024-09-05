@@ -190,17 +190,7 @@ impl std::fmt::Display for NewSql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            r#"sql: {}
-time_range: {:?}
-stream: {}/{:?}/{:?}
-match_items: {:?}
-equal_items: {:?}
-aliases: {:?}
-limit: {}  offset: {}
-group_by: {:?}
-order_by: {:?}
-histogram_interval: {:?}
-sorted_by_time: {}"#,
+            "sql: {}, time_range: {:?}, stream: {}/{:?}/{:?}, match_items: {:?}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}",
             self.sql,
             self.time_range,
             self.org_id,

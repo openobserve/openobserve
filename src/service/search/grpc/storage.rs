@@ -123,7 +123,7 @@ pub async fn search(
     let use_inverted_index =
         query.use_inverted_index && (inverted_index_type == "fst" || inverted_index_type == "both");
     log::info!(
-        "[trace_id {}] flight->search: use_inverted_index {} with fst format",
+        "[trace_id {}] flight->search: use_inverted_index with fst format {}",
         query.trace_id,
         use_inverted_index
     );

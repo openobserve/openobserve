@@ -486,7 +486,7 @@ pub async fn get_file_list_from_inverted_index(
     let use_inverted_index =
         use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
     log::info!(
-        "[trace_id {trace_id}] flight->leader: use_inverted_index {} with parquet format",
+        "[trace_id {trace_id}] flight->leader: use_inverted_index with parquet format {}",
         use_inverted_index
     );
 
