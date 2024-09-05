@@ -139,7 +139,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                                         program: program.program.clone(),
                                         fields: program.fields.clone(),
                                     },
-                                    &json::Value::Object(hit.clone()),
+                                    &json::Value::Object(hit),
                                     &sql.org_id,
                                     &sql.stream_name,
                                 );
