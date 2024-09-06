@@ -227,8 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
-                          :dashboard-id="queryParams.dashboard"
-                          :folder-id="queryParams.folder"
+                          :dashboard-id="queryParams?.dashboard"
+                          :folder-id="queryParams?.folder"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="variablesData"
                           :width="6"
@@ -1195,7 +1195,7 @@ export default defineComponent({
       onDataZoom,
       showTutorial,
       updateVrlFunctionFieldList,
-      queryParams: route.query,
+      queryParams: route.query as any,
       initialVariableValues,
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,

@@ -217,10 +217,12 @@ export default defineComponent({
     },
     dashboardId: {
       default: "",
+      required: false,
       type: String,
     },
     folderId: {
       default: "",
+      required: false,
       type: String,
     },
   },
