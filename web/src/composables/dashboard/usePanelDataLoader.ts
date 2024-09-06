@@ -603,20 +603,9 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value],
+    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
     async () => {
-      log("PanelSchema Wather:panelcache: called");
-      log("PanelSchema Wather: called");
-      loadData(); // Loading the data
-    },
-  );
-
-  watch(
-    // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [selectedTimeObj?.value],
-    async () => {
-      log("Time Wather:panelcache: called");
-      log("Time Wather: called");
+      log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
     },
   );
@@ -1246,35 +1235,9 @@ export const usePanelDataLoader = (
     }
   });
 
-  // when state changes and data is loaded, save it to cache
-  watch(
-    state,
-    () => {
-      // log("usePanelDataLoader: panelcache: state changed");
-      if (state.loading == false) {
-        // log("usePanelDataLoader: panelcache: updating cache");
-        // savePanelCache(getCacheKey(), { ...toRaw(state) });
-      }
-    },
-    { deep: true },
-  );
-
   onMounted(async () => {
-    // check if we have a cache available
-    const cache = getPanelCache();
-    if (!cache) {
-      // cache is not there, we need to load the data
-      loadData(); // Loading the data
-      return;
-    }
-
-    // const isRestoredFromCache = restoreFromCache();
-
-    // // If cache was there, but cache wasn't restored due to outdated, then load the data
-    // if (!isRestoredFromCache) {
-    //   log("PanelSchema/Time Initial: should load the data");
+    log("PanelSchema/Time Initial: should load the data");
     loadData(); // Loading the data
-    // }
   });
 
   const restoreFromCache: () => boolean = () => {
