@@ -217,7 +217,7 @@ pub async fn search(
                     );
                     e.to_string();
                 });
-            log::info!("[trace_id {trace_id_move}] release work_group in flight follow search",);
+            log::info!("[trace_id {trace_id_move}] release work_group in flight follow search");
         }
     });
 
@@ -276,7 +276,7 @@ async fn get_file_list_from_inverted_index(
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let index_terms = filter_index_fields(&equal_terms, &index_fields);
 
-    log::info!("[trace_id {trace_id}] super cluster follower leader: use_inverted_index true",);
+    log::info!("[trace_id {trace_id}] super cluster follower leader: use_inverted_index true");
 
     // construct SearchQuery for inverted index search
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));

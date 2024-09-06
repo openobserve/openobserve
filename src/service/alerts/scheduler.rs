@@ -331,7 +331,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     )
     .await
     {
-        log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+        log::error!("Failed to update alert: {alert_name} after trigger: {e}");
     }
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;

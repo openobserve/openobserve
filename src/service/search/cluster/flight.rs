@@ -176,7 +176,7 @@ pub async fn search(
             #[cfg(not(feature = "enterprise"))]
             let _ = dist_lock::unlock(&locker).await.map_err(|e| {
                 log::error!(
-                    "[trace_id {trace_id_move}] release work group in flight search error: {e}",
+                    "[trace_id {trace_id_move}] release lock in flight search error: {e}",
                 );
                 Error::Message(e.to_string())
             });
@@ -193,9 +193,9 @@ pub async fn search(
                     e.to_string();
                 });
             #[cfg(not(feature = "enterprise"))]
-            log::info!("[trace_id {trace_id_move}] release lock in flight search",);
+            log::info!("[trace_id {trace_id_move}] release lock in flight search");
             #[cfg(feature = "enterprise")]
-            log::info!("[trace_id {trace_id_move}] release work group in flight search",);
+            log::info!("[trace_id {trace_id_move}] release work group in flight search");
         }
     });
 
