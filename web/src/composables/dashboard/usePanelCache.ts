@@ -14,6 +14,13 @@
  */
 const cache: any = {};
 
+declare global {
+  interface Window {
+    _removeCache: () => void;
+    _getCache: () => any;
+  }
+}
+
 window._removeCache = () => {
   // empty the cache object by removing all keys
   // as we can not reassign const
