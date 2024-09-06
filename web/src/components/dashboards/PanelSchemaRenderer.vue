@@ -216,11 +216,11 @@ export default defineComponent({
       type: String || null,
     },
     dashboardId: {
-      default: '',
+      default: "",
       type: String,
     },
     folderId: {
-      default: '',
+      default: "",
       type: String,
     },
   },
@@ -255,17 +255,23 @@ export default defineComponent({
       folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData, lastTriggeredAt } =
-      usePanelDataLoader(
-        panelSchema,
-        selectedTimeObj,
-        variablesData,
-        chartPanelRef,
-        forceLoad,
-        searchType,
-        dashboardId,
-        folderId,
-      );
+    let {
+      data,
+      loading,
+      errorDetail,
+      metadata,
+      resultMetaData,
+      lastTriggeredAt,
+    } = usePanelDataLoader(
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      chartPanelRef,
+      forceLoad,
+      searchType,
+      dashboardId,
+      folderId,
+    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -299,7 +305,6 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
-        console.log('data updated', JSON.parse(JSON.stringify(data.value)));
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes

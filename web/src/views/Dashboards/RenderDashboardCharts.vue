@@ -232,16 +232,6 @@ export default defineComponent({
       emit("onMovePanel", panelId, newTabId);
     };
 
-    watch(
-      () => props.currentTimeObj,
-      () => {
-        console.log(
-          "Render dashboard component: panelcache: currentTimeObj changed",
-          JSON.parse(JSON.stringify(props.currentTimeObj)),
-        );
-      },
-    );
-
     // variables data
     const variablesData = reactive({});
 

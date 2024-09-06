@@ -315,16 +315,6 @@ export default defineComponent({
 
     const maxQueryRange: any = ref([]);
 
-    watch(
-      () => [props.selectedTimeDate],
-      () => {
-        console.log(
-          "panelcontiner: panelcache: selected date time updated",
-          JSON.stringify(props.selectedTimeDate, null, 2),
-        );
-      },
-    );
-
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {

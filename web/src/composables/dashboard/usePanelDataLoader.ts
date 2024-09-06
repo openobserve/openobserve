@@ -59,11 +59,10 @@ export const usePanelDataLoader = (
   folderId: any,
 ) => {
   const log = (...args: any[]) => {
-    if (true) {
-      console.log(panelSchema?.value?.title + ": ", ...args);
-    }
+    // if (true) {
+    //   console.log(panelSchema?.value?.title + ": ", ...args);
+    // }
   };
-
   let runCount = 0;
 
   /**
@@ -78,11 +77,6 @@ export const usePanelDataLoader = (
     dashboardId: toRaw(dashboardId?.value),
     folderId: toRaw(folderId?.value),
   });
-
-  console.log(
-    "usepaneldataloader: panelcache: ",
-    JSON.parse(JSON.stringify(panelSchema?.value)),
-  );
 
   const { getPanelCache, savePanelCache } = usePanelCache(
     folderId?.value,
@@ -126,16 +120,6 @@ export const usePanelDataLoader = (
       )
     : [];
 
-  // console.log(
-  //   "variablesData.value currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value))
-  // );
-
-  // console.log(
-  //   "variablesData.value.values currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value.values))
-  // );
-
   let currentDynamicVariablesData = variablesData.value?.values
     ? JSON.parse(
         JSON.stringify(
@@ -148,7 +132,6 @@ export const usePanelDataLoader = (
       )
     : [];
   // let currentAdHocVariablesData: any = null;
-  // console.log("currentAdHocVariablesData", currentDynamicVariablesData);
 
   const store = useStore();
 
@@ -327,7 +310,6 @@ export const usePanelDataLoader = (
               endISOTimestamp,
               panelSchema.value.queryType,
             );
-            // console.log("Calling queryPromises", query1);
 
             const { query: query2, metadata: metadata2 } =
               await applyDynamicVariables(query1, panelSchema.value.queryType);
@@ -341,7 +323,6 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
-            // console.log("Calling metrics_query_range API");
             return queryService
               .metrics_query_range({
                 org_identifier: store.state.selectedOrganization.identifier,
@@ -370,7 +351,6 @@ export const usePanelDataLoader = (
           queries: queryResults.map((it: any) => it?.metadata),
         };
 
-        console.log("panelCache: savePanelCache: saving panel data");
         savePanelCache(getCacheKey(), { ...toRaw(state) });
       } else {
         // copy of current abortController
@@ -791,20 +771,13 @@ export const usePanelDataLoader = (
 
   const applyDynamicVariables = async (query: any, queryType: any) => {
     const metadata: any[] = [];
-    // console.log(
-    //   "variablesDataaaa currentAdHocVariablesData",
-    //   JSON.stringify(variablesData.value, null, 2)
-    // );
-
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
       .flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
-    // console.log("adHocVariables", adHocVariables);
 
     if (!adHocVariables?.length) {
-      // console.log("No adhoc variables found");
       return { query, metadata };
     }
 
@@ -817,7 +790,7 @@ export const usePanelDataLoader = (
           value: variable.value,
           operator: variable.operator,
         });
-        // console.log(`Adding label to PromQL query: ${variable.name}`);
+
         query = addLabelToPromQlQuery(
           query,
           variable.name,
@@ -843,7 +816,6 @@ export const usePanelDataLoader = (
           operator: variable.operator,
         });
       });
-      // console.log("Adding labels to SQL query");
       query = await addLabelsToSQlQuery(query, applicableAdHocVariables);
     }
 
@@ -1325,22 +1297,6 @@ export const usePanelDataLoader = (
       "panelSchema.htmlContent",
       "panelSchema.markdownContent",
     ];
-
-    console.log(
-      "usePanelDataLoader: panelcache: comparing cache key 1",
-      JSON.parse(JSON.stringify(getCacheKey() || {})),
-    );
-    console.log(
-      "usePanelDataLoader: panelcache: comparing tempPanelCacheKey",
-      JSON.parse(JSON.stringify(tempPanelCacheKey || {})),
-    );
-    console.log(
-      "usePanelDataLoader: panelcache: comparision: equal?",
-      isEqual(
-        omit(getCacheKey(), keysToIgnore),
-        omit(tempPanelCacheKey, keysToIgnore),
-      ),
-    );
 
     // check if it is stale or not
     if (

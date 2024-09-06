@@ -36,19 +36,8 @@ export const usePanelCache = (
   panelId: string,
 ) => {
   if (!(folderId && dashboardId && panelId)) {
-    console.log(
-      "PanelCache: Missing folderId, dashboardId or panelId",
-      folderId,
-      dashboardId,
-      panelId,
-    );
     const savePanelCache = (data: any) => {
       // do nothing
-      console.log("panelCache: savePanelCache: doing nothing");
-      console.log(
-        "panelCache: savePanelCache: cache",
-        JSON.parse(JSON.stringify(cache)),
-      );
     };
 
     const getPanelCache = () => {
@@ -61,13 +50,6 @@ export const usePanelCache = (
     };
   }
 
-  console.log(
-    "PanelCache: folderId, dashboardId, panelId",
-    folderId,
-    dashboardId,
-    panelId,
-  );
-
   // create nested paths as required
   const createNestedPathsIfRequired = () => {
     // check if cache is there or not
@@ -77,17 +59,14 @@ export const usePanelCache = (
 
     // create nested paths as required
     if (!cache[folderId]) {
-      console.log("PanelCache: creating folderId", folderId);
       cache[folderId] = {};
     }
 
     if (!cache[folderId][dashboardId]) {
-      console.log("PanelCache: creating dashboardId", dashboardId);
       cache[folderId][dashboardId] = {};
     }
 
     if (!cache[folderId][dashboardId][panelId]) {
-      console.log("PanelCache: creating panelId", panelId);
       cache[folderId][dashboardId][panelId] = {};
     }
   };
@@ -99,11 +78,6 @@ export const usePanelCache = (
       key: JSON.parse(JSON.stringify(key)), // deep copy key,
       value: JSON.parse(JSON.stringify(data)), // deep copy data
     };
-    console.log("panelCache: savePanelCache: updated cache");
-    console.log(
-      "panelCache: savePanelCache: cache",
-      JSON.parse(JSON.stringify(cache)),
-    );
   };
 
   const getPanelCache = () => {

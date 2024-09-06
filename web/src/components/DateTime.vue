@@ -648,7 +648,6 @@ export default defineComponent({
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";
       if (store.state.savedViewFlag == false) {
-        console.log('datetime: panelcache:: savedate: emit on:date-change', date)
         emit("on:date-change", date);
       }
     };
