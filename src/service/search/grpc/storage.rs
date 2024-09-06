@@ -514,15 +514,18 @@ async fn filter_file_list_by_inverted_index(
     let full_text_terms = Arc::new(
         sql.fts_terms
             .iter()
-            .map(|term| {
-                let tokens = split_token(
-                    term,
-                    &config::get_config().common.inverted_index_split_chars,
-                );
-                tokens
-                    .into_iter()
-                    .max_by_key(|t| t.len())
-                    .unwrap_or_default()
+            .filter_map(|t| {
+                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+                // If tokens empty return None so that full_text_terms will not have empty strings
+                if tokens.is_empty() {
+                    return None;
+                }
+                Some(
+                    tokens
+                        .into_iter()
+                        .max_by_key(|key| key.len())
+                        .unwrap_or_default(),
+                )
             })
             .collect_vec(),
     );
