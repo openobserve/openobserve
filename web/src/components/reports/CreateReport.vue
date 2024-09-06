@@ -107,8 +107,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-toggle
               data-test="report-cached-toggle-btn"
               v-model="isCachedReport"
-              :label="t('reports.cached')"
+              :label="t('reports.cachedReport')"
             />
+            <q-icon
+              name="info_outline"
+              class="cursor-pointer q-ml-sm"
+              size="16px"
+            >
+              <q-tooltip
+                v-model="showInfoTooltip"
+                anchor="center end"
+                self="center left"
+                class="tw-text-[12px]"
+              >
+                Note: Cached reports are stored for quick access to dashboards;
+                sharing is disabled for these reports.</q-tooltip
+              >
+            </q-icon>
           </div>
 
           <q-stepper
@@ -839,6 +854,8 @@ const { t } = useI18n();
 const router = useRouter();
 
 const isCachedReport = ref(false);
+
+const showInfoTooltip = ref(false);
 
 const originalReportData: Ref<string> = ref("");
 

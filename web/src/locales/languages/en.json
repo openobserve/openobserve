@@ -904,8 +904,10 @@
     "lastTriggeredAt": "Last Triggered At",
     "createdAt": "Created At",
     "tab": "Tab",
-    "cached": "Cached Report",
-    "destination": "Destination"
+    "cached": "Cached",
+    "cachedReport": "Cached Report",
+    "destination": "Destination",
+    "scheduled": "Scheduled"
   },
   "queries": {
     "runningQueries": "Running Queries",

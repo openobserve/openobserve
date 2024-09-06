@@ -267,6 +267,7 @@ import useNotifications from "@/composables/useNotifications";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
 import { convertUnixToQuasarFormat } from "@/utils/date";
+import destination from "@/services/alert_destination.js";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -302,7 +303,7 @@ export default defineComponent({
       moment = momentModule.default;
     };
 
-    const scheduledReports = reactive([]);
+    let scheduledReports = reactive([]);
     const isLoadingReports = ref(false);
 
     const dashboardId = computed(() => route.query.dashboard);
@@ -761,7 +762,6 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           currentDashboardData.data?.folderId,
           currentDashboardData.data?.dashboardId,
-          true,
         )
         .then((response) => {
           response.data.forEach((report, index) => {
@@ -778,6 +778,7 @@ export default defineComponent({
                 new Date(report.createdAt).getTime() * 1000,
               ),
               orgId: report.orgId,
+              isCached: !report.destinations.length,
             });
           });
         })

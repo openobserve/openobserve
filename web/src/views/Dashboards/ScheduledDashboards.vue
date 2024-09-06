@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="scheduled-dashboards">
     <q-table
       data-test="alert-list-table"
       ref="tableRef"
@@ -33,31 +33,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </template>
       <template #top="scope">
-        <div class="q-table__title" data-test="alerts-list-title">
-          {{ t("dashboard.scheduledDashboards") }}
+        <div class="tw-flex tw-justify-between tw-w-full">
+          <div class="q-table__title" data-test="alerts-list-title">
+            {{ t("dashboard.scheduledDashboards") }}
+          </div>
+
+          <div class="tw-flex tw-items-center">
+            <app-tabs
+              class="q-mr-md"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="filterReports"
+            />
+
+            <q-input
+              data-test="alert-list-search-input"
+              v-model="filterQuery"
+              borderless
+              filled
+              dense
+              class="q-ml-auto q-mb-xs no-border"
+              :placeholder="t('reports.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+
+            <q-btn
+              data-test="alert-list-add-alert-btn"
+              class="q-ml-md q-mb-xs text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              :label="t(`dashboard.newReport`)"
+              @click="createNewReport"
+            />
+          </div>
         </div>
-        <q-input
-          data-test="alert-list-search-input"
-          v-model="filterQuery"
-          borderless
-          filled
-          dense
-          class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('reports.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
-          </template>
-        </q-input>
-        <q-btn
-          data-test="alert-list-add-alert-btn"
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t(`dashboard.newReport`)"
-          @click="createNewReport"
-        />
 
         <QTablePagination
           :scope="scope"
@@ -84,10 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { QTable, QTableProps } from "quasar";
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
 
 const props = defineProps({
   reports: {
@@ -114,11 +129,50 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-const scheduledReports = reactive(props.reports || []);
+let scheduledReports = ref<ScheduledDashboardReport[]>(
+  props.reports as ScheduledDashboardReport[],
+);
 
 const tableRef = ref<InstanceType<typeof QTable> | null>();
 
 const router = useRouter();
+
+const activeTab = ref("shared");
+
+const tabs = reactive([
+  {
+    label: t("reports.scheduled"),
+    value: "shared",
+  },
+  {
+    label: t("reports.cached"),
+    value: "cached",
+  },
+]);
+
+watch(
+  () => props.reports,
+  () => {
+    filterReports();
+  },
+  {
+    deep: true,
+  },
+);
+
+const filterReports = () => {
+  // filter reports based on the selected tab
+  // If reports are cached, show only cached reports
+  if (activeTab.value === "cached") {
+    scheduledReports.value = (
+      props.reports as ScheduledDashboardReport[]
+    ).filter((report) => report.isCached);
+  } else {
+    scheduledReports.value = (
+      props.reports as ScheduledDashboardReport[]
+    ).filter((report) => !report.isCached);
+  }
+};
 
 const columns: any = reactive<QTableProps["columns"]>([
   {
@@ -225,4 +279,30 @@ const openReport = (event: any, row: any, index: number) => {
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss">
+.scheduled-dashboards {
+  height: fit-content;
+
+  .rum-tabs {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .rum-tab {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
+}
+</style>
