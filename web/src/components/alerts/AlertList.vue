@@ -862,7 +862,6 @@ export default defineComponent({
   };
 
     const closeDialog = () => {
-      console.log("this is working")
      showHistoryDialog.value  = false;
       router.push({
         name: "alertList",
