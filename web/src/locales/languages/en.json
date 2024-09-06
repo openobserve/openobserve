@@ -825,6 +825,7 @@
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
     "cloneTitle": "Clone Alert",
+    "historyTitle": "Alert History",
     "start": "start",
     "pause": "Pause",
     "groupBy": "Group by",
@@ -835,6 +836,7 @@
     "lastSatisfied": "Last Satisfied At",
     "owner": "Owner",
     "title": "Title",
+    "history": "History",
     "createFunction": "Create Function",
     "newFunctionAssociationMsg": "Note: The function will be created, after which you will be redirected to the previous form to associate the newly created function with the pipeline."
   },
