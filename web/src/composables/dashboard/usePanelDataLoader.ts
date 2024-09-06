@@ -294,20 +294,22 @@ export const usePanelDataLoader = (
         return;
       }
 
-
       if (runCount == 0) {
-        log('loadData: panelcache: run count is 0');
+        log("loadData: panelcache: run count is 0");
         // restore from the cache and return
         const isRestoredFromCache = restoreFromCache();
-        log('loadData: panelcache: isRestoredFromCache', isRestoredFromCache);
+        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
-          log('loadData: panelcache: restored from cache');
+          log("loadData: panelcache: restored from cache");
           runCount++;
           return;
         }
       }
 
-      log("loadData: panelcache: no cache restored, continue firing, runCount ", runCount);
+      log(
+        "loadData: panelcache: no cache restored, continue firing, runCount ",
+        runCount,
+      );
 
       runCount++;
 
@@ -531,6 +533,10 @@ export const usePanelDataLoader = (
                 // set the new start time as the start time of query
                 state.resultMetaData[currentQueryIndex].new_end_time =
                   endISOTimestamp;
+
+                // need to break the loop, save the cache
+                savePanelCache(getCacheKey(), { ...toRaw(state) });
+
                 break;
               }
 
@@ -568,9 +574,18 @@ export const usePanelDataLoader = (
                     // set the new start time as the start time of query
                     state.resultMetaData[currentQueryIndex].new_start_time =
                       partition[0];
+
+                    // need to break the loop, save the cache
+                    savePanelCache(getCacheKey(), { ...toRaw(state) });
+
                     break;
                   }
                 }
+              }
+
+              if (i == 0) {
+                // if it is last partition, cache the result
+                savePanelCache(getCacheKey(), { ...toRaw(state) });
               }
             }
           } catch (error) {
@@ -589,7 +604,6 @@ export const usePanelDataLoader = (
         }
 
         state.loading = false;
-        savePanelCache(getCacheKey(), { ...toRaw(state) });
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
@@ -1286,21 +1300,20 @@ export const usePanelDataLoader = (
     // // If cache was there, but cache wasn't restored due to outdated, then load the data
     // if (!isRestoredFromCache) {
     //   log("PanelSchema/Time Initial: should load the data");
-      loadData(); // Loading the data
+    loadData(); // Loading the data
     // }
   });
 
   const restoreFromCache: () => boolean = () => {
-    const cache =  getPanelCache();
+    const cache = getPanelCache();
 
     if (!cache) {
-      log('usePanelDataLoader: panelcache: cache is not there');
+      log("usePanelDataLoader: panelcache: cache is not there");
       // cache is not there, we need to load the data
       return false;
     }
     // now we have a cache
-    const { key: tempPanelCacheKey, value: tempPanelCacheValue } =
-      cache;
+    const { key: tempPanelCacheKey, value: tempPanelCacheValue } = cache;
     log("usePanelDataLoader: panelcache: tempPanelCache", tempPanelCacheValue);
 
     let isRestoredFromCache = false;
@@ -1310,7 +1323,7 @@ export const usePanelDataLoader = (
       "panelSchema.layout",
       "panelSchema.htmlContent",
       "panelSchema.markdownContent",
-    ]
+    ];
 
     console.log(
       "usePanelDataLoader: panelcache: comparing cache key 1",
@@ -1322,16 +1335,20 @@ export const usePanelDataLoader = (
     );
     console.log(
       "usePanelDataLoader: panelcache: comparision: equal?",
-      isEqual(omit(getCacheKey(), keysToIgnore), omit(tempPanelCacheKey, keysToIgnore)),
+      isEqual(
+        omit(getCacheKey(), keysToIgnore),
+        omit(tempPanelCacheKey, keysToIgnore),
+      ),
     );
-
-   
 
     // check if it is stale or not
     if (
       tempPanelCacheValue &&
       Object.keys(tempPanelCacheValue).length > 0 &&
-      isEqual(omit(getCacheKey(), keysToIgnore), omit(tempPanelCacheKey, keysToIgnore))
+      isEqual(
+        omit(getCacheKey(), keysToIgnore),
+        omit(tempPanelCacheKey, keysToIgnore),
+      )
     ) {
       // const cache = getPanelCache();
       state.data = tempPanelCacheValue.data;
