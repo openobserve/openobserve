@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-dashboards">
+  <div class="scheduled-dashboards tw-bg-white">
     <q-table
       data-test="alert-list-table"
       ref="tableRef"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filterQuery"
       :filter-method="filterData"
       style="width: 100%"
-      class="tw-h-full q-px-md"
+      class="q-px-md"
       @row-click="openReport"
     >
       <template #no-data>
@@ -103,6 +103,7 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
+import NoData from "@/components/shared/grid/NoData.vue";
 
 const props = defineProps({
   reports: {
@@ -137,16 +138,16 @@ const tableRef = ref<InstanceType<typeof QTable> | null>();
 
 const router = useRouter();
 
-const activeTab = ref("shared");
+const activeTab = ref("cached");
 
 const tabs = reactive([
   {
-    label: t("reports.scheduled"),
-    value: "shared",
-  },
-  {
     label: t("reports.cached"),
     value: "cached",
+  },
+  {
+    label: t("reports.scheduled"),
+    value: "shared",
   },
 ]);
 

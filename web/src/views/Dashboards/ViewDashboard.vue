@@ -166,24 +166,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t("dashboard.fullscreen")
               }}</q-tooltip></q-btn
             >
-            <q-btn-dropdown
+            <q-btn
               outline
-              no-caps
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
-              icon="more_vert"
-              dropdown-icon="none"
-              class="q-px-sm q-ml-sm more-options-dropdown-icon"
+              no-caps
+              :icon="outlinedDescription"
+              @click="openScheduledReports"
+              data-test="view-dashboard-scheduled-reports"
+              ><q-tooltip>
+                {{ t("dashboard.scheduledDashboards") }}
+              </q-tooltip></q-btn
             >
-              <q-list>
-                <q-item clickable v-close-popup @click="openScheduledReports">
-                  <q-item-section>
-                    <q-item-label>{{
-                      t("dashboard.scheduledReports")
-                    }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-btn-dropdown>
           </div>
         </div>
         <q-separator></q-separator>
@@ -268,6 +262,7 @@ import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import destination from "@/services/alert_destination.js";
+import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -893,6 +888,7 @@ export default defineComponent({
       dashboardId,
       folderId,
       tabId,
+      outlinedDescription,
     };
   },
 });
