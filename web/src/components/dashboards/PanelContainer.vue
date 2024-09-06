@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
-        <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+        <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
           <span class="lastRefreshedAtIcon">🕑</span
           ><RelativeTime
             :timestamp="lastTriggeredAt"
@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <q-btn
+          v-if="!viewOnly"
           icon="refresh"
           flat
           size="sm"
