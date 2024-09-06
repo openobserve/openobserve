@@ -300,6 +300,7 @@ export const usePanelDataLoader = (
         const isRestoredFromCache = restoreFromCache();
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
+          state.loading = false;
           log("loadData: panelcache: restored from cache");
           runCount++;
           return;
