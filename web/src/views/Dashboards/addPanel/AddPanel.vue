@@ -1213,6 +1213,7 @@ export default defineComponent({
     // [START] cancel running queries
 
     const cancelQuery = () => {
+      window.dispatchEvent(new Event("cancelQuery"));
       if (searchRequestTraceIds.value.length === 0) {
         console.error("No trace IDs to cancel");
         return;

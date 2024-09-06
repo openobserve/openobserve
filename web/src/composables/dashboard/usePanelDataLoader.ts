@@ -235,6 +235,41 @@ export const usePanelDataLoader = (
     });
   };
 
+  const callWithAbortController = async <T>(
+    fn: () => Promise<T>,
+    signal: AbortSignal,
+  ): Promise<T> => {
+    console.log("callWithAbortController: entering...");
+
+    return new Promise<T>((resolve, reject) => {
+      console.log("callWithAbortController: waiting for the timeout...");
+
+      const result = fn();
+
+      const onAbort = () => {
+        console.log("callWithAbortController: aborting...");
+        reject(new Error(processApiError(error, "Operation aborted")));
+      };
+
+      signal.addEventListener("abort", onAbort);
+
+      result
+        .then((res) => {
+          signal.removeEventListener("abort", onAbort);
+          resolve(res);
+        })
+        .catch((error) => {
+          console.log(
+            "====================================================error",
+            error,
+          );
+
+          signal.removeEventListener("abort", onAbort);
+          reject(error);
+        });
+    });
+  };
+
   const loadData = async () => {
     try {
       log("loadData: entering...");
@@ -247,7 +282,11 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
+      window.addEventListener("cancelQuery", () => {
+        console.log("callWithAbortController cancelQuery=====-=-=-=--==----=");
 
+        abortController?.abort();
+      });
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -341,22 +380,32 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
+            const { traceparent, traceId } = generateTraceContext();
+            console.log("traceparent", traceparent);
 
-            return queryService
-              .metrics_query_range({
-                org_identifier: store.state.selectedOrganization.identifier,
-                query: query,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-              })
-              .then((res) => {
-                state.errorDetail = "";
-                return { result: res.data.data, metadata: metadata };
-              })
-              .catch((error) => {
-                processApiError(error, "promql");
-                return { result: null, metadata: metadata };
-              });
+            addTraceId(traceId);
+
+            try {
+              const res = await callWithAbortController(
+                () =>
+                  queryService.metrics_query_range({
+                    org_identifier: store.state.selectedOrganization.identifier,
+                    query: query,
+                    start_time: startISOTimestamp,
+                    end_time: endISOTimestamp,
+                    traceparent,
+                  }),
+                abortController.signal,
+              );
+
+              state.errorDetail = "";
+              return { result: res.data.data, metadata: metadata };
+            } catch (error) {
+              processApiError(error, "promql");
+              return { result: null, metadata: metadata };
+            } finally {
+              removeTraceId(traceId);
+            }
           },
         );
 
@@ -419,21 +468,25 @@ export const usePanelDataLoader = (
 
           try {
             // partition api call
-            const res = await queryService.partition({
-              org_identifier: store.state.selectedOrganization.identifier,
-              query: {
-                sql: query,
-                query_fn: it.vrlFunctionQuery
-                  ? b64EncodeUnicode(it.vrlFunctionQuery)
-                  : null,
-                sql_mode: "full",
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                size: -1,
-              },
-              page_type: pageType,
-              traceparent,
-            });
+            const res = await callWithAbortController(
+              async () =>
+                queryService.partition({
+                  org_identifier: store.state.selectedOrganization.identifier,
+                  query: {
+                    sql: query,
+                    query_fn: it.vrlFunctionQuery
+                      ? b64EncodeUnicode(it.vrlFunctionQuery)
+                      : null,
+                    sql_mode: "full",
+                    start_time: startISOTimestamp,
+                    end_time: endISOTimestamp,
+                    size: -1,
+                  },
+                  page_type: pageType,
+                  traceparent,
+                }),
+              abortControllerRef.signal,
+            );
 
             // if aborted, return
             if (abortControllerRef?.signal?.aborted) {
@@ -476,32 +529,36 @@ export const usePanelDataLoader = (
 
               const { traceparent: searchTraceparent, traceId: searchTraceId } =
                 generateTraceContext();
-
               addTraceId(searchTraceId);
 
               try {
-                const searchRes = await queryService.search(
-                  {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                    query: {
-                      query: {
-                        sql: await changeHistogramInterval(
-                          query,
-                          histogramInterval,
-                        ),
-                        query_fn: it.vrlFunctionQuery
-                          ? b64EncodeUnicode(it.vrlFunctionQuery)
-                          : null,
-                        sql_mode: "full",
-                        start_time: partition[0],
-                        end_time: partition[1],
-                        size: -1,
+                const searchRes = await callWithAbortController(
+                  async () =>
+                    queryService.search(
+                      {
+                        org_identifier:
+                          store.state.selectedOrganization.identifier,
+                        query: {
+                          query: {
+                            sql: await changeHistogramInterval(
+                              query,
+                              histogramInterval,
+                            ),
+                            query_fn: it.vrlFunctionQuery
+                              ? b64EncodeUnicode(it.vrlFunctionQuery)
+                              : null,
+                            sql_mode: "full",
+                            start_time: partition[0],
+                            end_time: partition[1],
+                            size: -1,
+                          },
+                        },
+                        page_type: pageType,
+                        traceparent: searchTraceparent,
                       },
-                    },
-                    page_type: pageType,
-                    traceparent: searchTraceparent,
-                  },
-                  searchType.value ?? "Dashboards",
+                      searchType.value ?? "Dashboards",
+                    ),
+                  abortControllerRef.signal,
                 );
                 // remove past error detail
                 state.errorDetail = "";
@@ -600,6 +657,8 @@ export const usePanelDataLoader = (
               }
             }
           } catch (error) {
+            console.log("Error in callWithAbortController:", error);
+
             // Process API error for "sql"
             processApiError(error, "sql");
             return { result: null, metadata: metadata };
@@ -864,8 +923,10 @@ export const usePanelDataLoader = (
         break;
       }
       case "sql": {
+        console.log("SQL error", error);
+
         const errorDetailValue =
-          error.response?.data.error_detail ||
+          error?.response?.data.error_detail ||
           error.response?.data.message ||
           error.message;
         const trimmedErrorMessage =
@@ -1297,6 +1358,13 @@ export const usePanelDataLoader = (
     if (observer) {
       observer.disconnect();
     }
+
+    // remove cancelquery event
+    window.removeEventListener("cancelQuery", () => {
+      console.log("PanelSchema/Time Initial: cancelQuery event triggered");
+
+      abortController.abort();
+    });
   });
   console.log("PanelSchema/Time Initial: end of setup", { ...toRefs(state) });
 

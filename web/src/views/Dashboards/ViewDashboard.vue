@@ -531,6 +531,7 @@ export default defineComponent({
     // [START] cancel running queries
 
     const cancelQuery = () => {
+      window.dispatchEvent(new Event("cancelQuery"));
       console.log("cancelQuery called");
       console.log("Current state of searchRequestTraceIds:", traceIdRef.value);
       if (traceIdRef?.value?.length === 0) {
