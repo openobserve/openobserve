@@ -101,6 +101,10 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
+  const saveCurrentStateToCache = () => {
+    savePanelCache(getCacheKey(), { ...toRaw(state) });
+  };
+
   // currently dependent variables data
   let currentDependentVariablesData = variablesData.value?.values
     ? JSON.parse(
@@ -351,7 +355,7 @@ export const usePanelDataLoader = (
           queries: queryResults.map((it: any) => it?.metadata),
         };
 
-        savePanelCache(getCacheKey(), { ...toRaw(state) });
+        saveCurrentStateToCache();
       } else {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
@@ -516,7 +520,7 @@ export const usePanelDataLoader = (
                   endISOTimestamp;
 
                 // need to break the loop, save the cache
-                savePanelCache(getCacheKey(), { ...toRaw(state) });
+                saveCurrentStateToCache();
 
                 break;
               }
@@ -557,7 +561,7 @@ export const usePanelDataLoader = (
                       partition[0];
 
                     // need to break the loop, save the cache
-                    savePanelCache(getCacheKey(), { ...toRaw(state) });
+                    saveCurrentStateToCache();
 
                     break;
                   }
@@ -566,7 +570,7 @@ export const usePanelDataLoader = (
 
               if (i == 0) {
                 // if it is last partition, cache the result
-                savePanelCache(getCacheKey(), { ...toRaw(state) });
+                saveCurrentStateToCache();
               }
             }
           } catch (error) {
