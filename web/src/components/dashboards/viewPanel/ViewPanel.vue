@@ -80,6 +80,15 @@
                 data-test="dashboard-viewpanel-variables-value-selector"
               />
               <div style="flex: 1; overflow: hidden">
+                <div class="tw-flex tw-justify-end tw-mr-2">
+                  <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+                    <span class="lastRefreshedAtIcon">🕑</span
+                    ><RelativeTime
+                      :timestamp="lastTriggeredAt"
+                      fullTimePrefix="Last Refreshed At: "
+                    />
+                  </span>
+                </div>
                 <PanelSchemaRenderer
                   v-if="chartData"
                   :key="dashboardPanelData.data.type"
@@ -93,6 +102,7 @@
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
+                  @last-triggered-at-update="handleLastTriggeredAtUpdate"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
                 />
               </div>
@@ -130,6 +140,7 @@ import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { onActivated } from "vue";
@@ -147,6 +158,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     AutoRefreshInterval,
     HistogramIntervalDropDown,
+    RelativeTime,
   },
   props: {
     panelId: {
@@ -184,7 +196,7 @@ export default defineComponent({
     let parser: any;
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -218,6 +230,12 @@ export default defineComponent({
 
     // array of histogram fields
     let histogramFields: any = ref([]);
+
+    // to store and show when the panel was last loaded
+    const lastTriggeredAt = ref(null);
+    const handleLastTriggeredAtUpdate = (data: any) => {
+      lastTriggeredAt.value = data;
+    };
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -256,7 +274,7 @@ export default defineComponent({
                 if (!histogramInterval.value.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
-                    1
+                    1,
                   );
                 }
 
@@ -289,7 +307,7 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      }
+      },
     );
 
     const onDataZoom = (event: any) => {
@@ -326,11 +344,11 @@ export default defineComponent({
           route.query.dashboard,
           props.panelId,
           route.query.folder,
-          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId
+          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId,
         );
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData))
+          JSON.parse(JSON.stringify(panelData)),
         );
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -343,8 +361,8 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram"
-                )
+                  (f: any) => f.aggregationFunction == "histogram",
+                ),
               )
               .filter((field: any) => field != undefined);
 
@@ -388,9 +406,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default"
-          )
-        )
+            route.query.folder ?? "default",
+          ),
+        ),
       );
       currentDashboardData.data = data;
 
@@ -431,7 +449,7 @@ export default defineComponent({
       props?.initialVariableValues?.values?.forEach((variable: any) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value
+            (item: any) => item.name && item.operator && item.value,
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -439,7 +457,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters)
+            JSON.stringify(encodedFilters),
           );
         } else {
           variableObj[`${variable.name}`] = variable.value;
@@ -475,6 +493,8 @@ export default defineComponent({
       onDataZoom,
       getInitialVariablesData,
       onUpdateInitialVariableValues,
+      lastTriggeredAt,
+      handleLastTriggeredAtUpdate,
     };
   },
 });
