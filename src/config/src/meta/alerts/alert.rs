@@ -114,4 +114,5 @@ pub struct AlertHistoryFilter {
     pub limit: i64,
     pub offset: i64,
     pub period: i64,
+    pub track_total_hits: bool,
 }
