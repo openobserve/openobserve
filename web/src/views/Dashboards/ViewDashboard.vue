@@ -177,12 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
-        :currentTimeObj="currentTimeObj"
+        :folderId="route.query.folder"
+        :currentTimeObj="currentTimeObjPerPanel"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
+        @refreshPanelRequest="refreshPanelRequest"
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
@@ -276,8 +278,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-        ? "absolute"
-        : "relative",
+          ? "absolute"
+          : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
@@ -336,7 +338,7 @@ export default defineComponent({
       data.values.forEach((variable) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value
+            (item: any) => item.name && item.operator && item.value,
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -344,7 +346,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters)
+            JSON.stringify(encodedFilters),
           );
         } else {
           variableObj[`var-${variable.name}`] = variable.value;
@@ -383,7 +385,7 @@ export default defineComponent({
     const setTimeString = () => {
       if (!moment()) return;
       timeString.value = ` ${moment(
-        currentTimeObj.value?.start_time?.getTime() / 1000
+        currentTimeObj.value?.start_time?.getTime() / 1000,
       )
         .tz(store.state.timezone)
         .format("YYYY/MM/DD HH:mm")}
@@ -399,12 +401,12 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
 
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
-        (tab: any) => tab.tabId === route.query.tab
+        (tab: any) => tab.tabId === route.query.tab,
       );
 
       selectedTabId.value = selectedTab
@@ -464,6 +466,13 @@ export default defineComponent({
         currentTimeObj.value = {
           start_time: new Date(date.startTime),
           end_time: new Date(date.endTime),
+        };
+
+        currentTimeObjPerPanel.value = {
+          __global: {
+            start_time: new Date(date.startTime),
+            end_time: new Date(date.endTime),
+          },
         };
 
         setTimeString();
@@ -604,7 +613,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+          route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
 
@@ -627,7 +636,7 @@ export default defineComponent({
           panelId,
           route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          newTabId
+          newTabId,
         );
         await loadDashboard();
 
@@ -650,7 +659,7 @@ export default defineComponent({
         urlSearchParams.delete("period");
         urlSearchParams.set(
           "from",
-          currentTimeObj?.value?.start_time?.getTime()
+          currentTimeObj?.value?.start_time?.getTime(),
         );
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
@@ -708,6 +717,25 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
+    const currentTimeObjPerPanel = ref({});
+
+    const refreshPanelRequest = (panelId) => {
+      // when the date changes from the picker, update the current time object for the dashboard
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+
+        currentTimeObjPerPanel.value = {
+          ...currentTimeObjPerPanel.value,
+          [panelId]: {
+            start_time: new Date(date.startTime),
+            end_time: new Date(date.endTime),
+          },
+        };
+
+        setTimeString();
+      }
+    };
+
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -718,10 +746,12 @@ export default defineComponent({
       t,
       getDashboard,
       store,
+      route,
       // date variables
       dateTimePicker,
       selectedDate,
       currentTimeObj,
+      currentTimeObjPerPanel,
       refreshInterval,
       // ----------------
       refreshData,
@@ -731,6 +761,7 @@ export default defineComponent({
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,
+      refreshPanelRequest,
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,
