@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <grid-layout
         ref="gridLayoutRef"
         v-if="panels.length > 0"
-        :layout="getDashboardLayout(panels)"
+        :layout.sync="getDashboardLayout(panels)"
         :col-num="48"
         :row-height="30"
         :is-draggable="!viewOnly"
@@ -80,7 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="item"
               :dashboardId="dashboardData.dashboardId"
               :folderId="folderId"
-              :selectedTimeDate="currentTimeObj[item.id] || currentTimeObj['__global'] || {}"
+              :selectedTimeDate="
+                currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+              "
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
@@ -215,9 +217,9 @@ export default defineComponent({
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
-        ? props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === selectedTabId.value
-          )?.panels ?? []
+        ? (props.dashboardData?.tabs?.find(
+            (it: any) => it.tabId === selectedTabId.value,
+          )?.panels ?? [])
         : [];
     });
     const { showPositiveNotification, showErrorNotification } =
@@ -230,9 +232,15 @@ export default defineComponent({
       emit("onMovePanel", panelId, newTabId);
     };
 
-    watch(() => props.currentTimeObj, () => {
-      console.log('Render dashboard component: panelcache: currentTimeObj changed', JSON.parse(JSON.stringify(props.currentTimeObj)))
-    })
+    watch(
+      () => props.currentTimeObj,
+      () => {
+        console.log(
+          "Render dashboard component: panelcache: currentTimeObj changed",
+          JSON.parse(JSON.stringify(props.currentTimeObj)),
+        );
+      },
+    );
 
     // variables data
     const variablesData = reactive({});
@@ -248,17 +256,17 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState
+      variablesAndPanelsDataLoadingState,
     );
 
     //computed property based on panels and variables loading state
     const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
       // Get values of variablesData and panels
       const variablesDataValues = Object.values(
-        variablesAndPanelsDataLoadingState.variablesData
+        variablesAndPanelsDataLoadingState.variablesData,
       );
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
 
       // Check if every value in both variablesData and panels is false
@@ -309,7 +317,7 @@ export default defineComponent({
                 ...obj,
                 [item.name]: item.isLoading,
               }),
-              {}
+              {},
             );
         }
       } catch (error) {
@@ -332,7 +340,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -353,7 +361,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           props.dashboardData.dashboardId,
           props.dashboardData,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
         );
 
         showPositiveNotification("Dashboard updated successfully");
@@ -390,8 +398,7 @@ export default defineComponent({
 
     const getDashboardLayout: any = (panels: any) => {
       //map on each panels and return array of layouts
-      // TODO: This deep copying object breaks drag and drop
-      return panels?.map((item: any) => JSON.parse(JSON.stringify(item.layout))) || [];
+      return panels?.map((item: any) => item.layout) || [];
     };
 
     const getPanelLayout = (panelData, position) => {
@@ -458,7 +465,7 @@ export default defineComponent({
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
-        ...args
+        ...args,
       );
     };
 
