@@ -213,6 +213,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <div class="col" style="flex: 1">
+                        <div class="tw-flex tw-justify-end tw-mr-2">
+                          <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+                            <span class="lastRefreshedAtIcon">🕑</span
+                            ><RelativeTime
+                              :timestamp="lastTriggeredAt"
+                              fullTimePrefix="Last Refreshed At: "
+                            />
+                          </span>
+                        </div>
                         <PanelSchemaRenderer
                           v-if="chartData"
                           @metadata-update="metaDataValue"
@@ -227,6 +236,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @updated:data-zoom="onDataZoom"
                           @updated:vrlFunctionFieldList="
                             updateVrlFunctionFieldList
+                          "
+                          @last-triggered-at-update="
+                            handleLastTriggeredAtUpdate
                           "
                           searchType="Dashboards"
                         />
@@ -337,6 +349,7 @@ import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
@@ -372,6 +385,7 @@ export default defineComponent({
     ConfigPanel,
     VariablesValueSelector,
     PanelSchemaRenderer,
+    RelativeTime,
     DashboardQueryEditor: defineAsyncComponent(
       () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
@@ -404,6 +418,12 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+
+    // to store and show when the panel was last loaded
+    const lastTriggeredAt = ref(null);
+    const handleLastTriggeredAtUpdate = (data: any) => {
+      lastTriggeredAt.value = data;
+    };
 
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
@@ -458,6 +478,7 @@ export default defineComponent({
         query: {
           ...route.query,
           ...variableObj,
+          ...getQueryParamsForDuration(selectedDate.value),
         },
       });
 
@@ -555,6 +576,20 @@ export default defineComponent({
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
 
+    /**
+     * Retrieves the selected date from the query parameters.
+     */
+    const getSelectedDateFromQueryParams = (params: any) => ({
+      valueType: params.period
+        ? "relative"
+        : params.from && params.to
+          ? "absolute"
+          : "relative",
+      startTime: params.from ? params.from : null,
+      endTime: params.to ? params.to : null,
+      relativeTimePeriod: params.period ? params.period : "15m",
+    });
+
     // const getDashboard = () => {
     //   return currentDashboard.dashboardId;
     // };
@@ -584,21 +619,33 @@ export default defineComponent({
         variablesData.values = [];
       }
 
-      // get default time for dashboard
-      // if dashboard has relative time settings
-      if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
-        selectedDate.value = {
-          valueType: "relative",
-          relativeTimePeriod:
-            data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
-        };
+      // check if route has time realated query params
+      // if not, take dashboard default time settings
+      if (!((route.query.from && route.query.to) || route.query.period)) {
+        // if dashboard has relative time settings
+        if (
+          (currentDashboardData.data?.defaultDatetimeDuration?.type ??
+            "relative") === "relative"
+        ) {
+          selectedDate.value = {
+            valueType: "relative",
+            relativeTimePeriod:
+              currentDashboardData.data?.defaultDatetimeDuration
+                ?.relativeTimePeriod ?? "15m",
+          };
+        } else {
+          // else, dashboard will have absolute time settings
+          selectedDate.value = {
+            valueType: "absolute",
+            startTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.startTime,
+            endTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.endTime,
+          };
+        }
       } else {
-        // else, dashboard will have absolute time settings
-        selectedDate.value = {
-          valueType: "absolute",
-          startTime: data?.defaultDatetimeDuration?.startTime,
-          endTime: data?.defaultDatetimeDuration?.endTime,
-        };
+        // take route time related query params
+        selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
     };
 
@@ -694,14 +741,41 @@ export default defineComponent({
       // console.timeEnd("runQuery");
     };
 
+    const getQueryParamsForDuration = (data: any) => {
+      try {
+        if (data?.relativeTimePeriod) {
+          return {
+            period: data?.relativeTimePeriod ?? "15m",
+          };
+        } else {
+          return {
+            from: data.startTime,
+            to: data.endTime,
+          };
+        }
+      } catch (error) {
+        return {
+          period: "15m",
+        };
+      }
+    };
+
     const updateDateTime = (value: object) => {
       if (selectedDate.value) {
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(selectedDate.value.startTime),
           end_time: new Date(selectedDate.value.endTime),
         };
+
+        return router.replace({
+          query: {
+            ...route.query,
+            ...getQueryParamsForDuration(selectedDate.value),
+          },
+        });
       }
     };
+
     const goBack = () => {
       return router.push({
         path: "/dashboards/view",
@@ -1123,6 +1197,8 @@ export default defineComponent({
       updateVrlFunctionFieldList,
       queryParams: route.query,
       initialVariableValues,
+      lastTriggeredAt,
+      handleLastTriggeredAtUpdate,
     };
   },
   methods: {
