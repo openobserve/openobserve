@@ -1002,6 +1002,8 @@ pub struct Compact {
         help = "Clean the jobs which are finished more than this time"
     )]
     pub job_clean_wait_time: i64,
+    #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
+    pub pending_jobs_metric_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1429,6 +1431,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 60;
+    }
+    if cfg.compact.pending_jobs_metric_interval == 0 {
+        cfg.compact.pending_jobs_metric_interval = 300;
     }
     // check compact_step_secs, min value is 600s
     if cfg.compact.step_secs == 0 {
