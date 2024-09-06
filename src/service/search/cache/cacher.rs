@@ -677,13 +677,13 @@ fn calculate_deltas_multi(
     }
 
     // remove all deltas that are within the cache duration
-    deltas.retain(|d| d.delta_start_time >= new_start_time);
+    // deltas.retain(|d| d.delta_start_time >= new_start_time);
 
     deltas.sort(); // Sort the deltas to bring duplicates together
     deltas.dedup(); // Remove consecutive duplicates
 
     // update the start time to the new start time
-    let updated_start_time = if new_start_time < start_time {
+    let _updated_start_time = if new_start_time < start_time {
         log::info!(
             "found cache of duration : {:?} microseconds, updated_start_time: {:?}",
             cache_duration,
@@ -694,5 +694,5 @@ fn calculate_deltas_multi(
         None
     };
 
-    (deltas, updated_start_time, cache_duration)
+    (deltas, None, cache_duration)
 }
