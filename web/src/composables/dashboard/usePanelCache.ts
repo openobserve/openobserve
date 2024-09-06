@@ -16,12 +16,12 @@ const cache: any = {};
 
 declare global {
   interface Window {
-    _removeCache: () => void;
-    _getCache: () => any;
+    _o2_removeDashboardCache: () => void;
+    _o2_getDashboardCache: () => any;
   }
 }
 
-window._removeCache = () => {
+window._o2_removeDashboardCache = () => {
   // empty the cache object by removing all keys
   // as we can not reassign const
   Object.keys(cache).forEach((key) => {
@@ -29,7 +29,7 @@ window._removeCache = () => {
   });
 };
 
-window._getCache = () => {
+window._o2_getDashboardCache = () => {
   // empty the cache object by removing all keys
   // as we can not reassign const
   return JSON.parse(JSON.stringify(cache));
