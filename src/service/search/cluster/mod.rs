@@ -510,6 +510,7 @@ pub async fn search(
             Ok(res) => match res {
                 Ok(res) => {
                     succeed += 1;
+                    dbg!(res.1.idx_took);
                     results.push(res);
                 }
                 Err(err) => {
@@ -604,6 +605,7 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
+    dbg!(scan_stats.idx_took);
     scan_stats.idx_scan_size = idx_scan_size as i64;
     scan_stats.original_size += idx_scan_size as i64;
     Ok((merge_batches, scan_stats, took_wait, is_partial, idx_took))
