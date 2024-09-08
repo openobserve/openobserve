@@ -126,11 +126,10 @@ pub async fn search(
         && sql.use_inverted_index
         && (sql.inverted_index_type == "fst" || sql.inverted_index_type == "both")
         && (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty());
-    let mut scan_stats = ScanStats::new();
+    let mut idx_took = 0i64;
     if use_inverted_index {
-        let idx_took =
-            filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
-        scan_stats.idx_took = idx_took as i64;
+        idx_took = filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type)
+            .await? as i64;
         log::info!(
             "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
             &sql.org_id,
@@ -141,6 +140,7 @@ pub async fn search(
         );
     }
 
+    let mut scan_stats = ScanStats::new();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
@@ -277,6 +277,7 @@ pub async fn search(
         tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
+    scan_stats.idx_took = idx_took;
     Ok((tables, scan_stats, target_partitions))
 }
 
@@ -645,8 +646,7 @@ async fn inverted_index_search_in_file(
         Ok(bytes) => bytes,
     };
 
-    let mut index_reader =
-        create_index_reader_from_puffin_bytes(compressed_index_blob.to_vec()).await?;
+    let mut index_reader = create_index_reader_from_puffin_bytes(compressed_index_blob).await?;
     let file_meta = index_reader.metadata().await?;
 
     let mut res = BitVec::new();
