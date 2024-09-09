@@ -896,11 +896,3 @@ export default defineComponent({
   height: 30px;
 }
 </style>
-
-<style lang="scss">
-.more-options-dropdown-icon {
-  .q-btn-dropdown__arrow {
-    display: none;
-  }
-}
-</style>
