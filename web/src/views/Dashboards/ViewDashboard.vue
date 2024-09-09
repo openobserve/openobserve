@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
-              :disable="disable"
+              :disable="!disable"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"

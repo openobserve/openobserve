@@ -55,7 +55,7 @@ export default defineComponent({
     },
     disable: {
       required: false,
-      default: true,
+      default: false,
     },
   },
   emits: ["update:modelValue"],
