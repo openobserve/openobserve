@@ -328,6 +328,9 @@ export const usePanelDataLoader = (
 
       state.loading = true;
 
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
         // Iterate through each query in the panel schema
@@ -352,9 +355,6 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
-            const { traceparent, traceId } = generateTraceContext();
-
-            addTraceId(traceId);
 
             try {
               const res = await callWithAbortController(
@@ -430,9 +430,6 @@ export const usePanelDataLoader = (
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
           };
-          const { traceparent, traceId } = generateTraceContext();
-
-          addTraceId(traceId);
 
           try {
             // partition api call
@@ -495,10 +492,6 @@ export const usePanelDataLoader = (
                 break;
               }
 
-              const { traceparent: searchTraceparent, traceId: searchTraceId } =
-                generateTraceContext();
-              addTraceId(searchTraceId);
-
               try {
                 const searchRes = await callWithAbortController(
                   async () =>
@@ -522,7 +515,7 @@ export const usePanelDataLoader = (
                           },
                         },
                         page_type: pageType,
-                        traceparent: searchTraceparent,
+                        traceparent,
                       },
                       searchType.value ?? "Dashboards",
                     ),
@@ -616,7 +609,7 @@ export const usePanelDataLoader = (
                   }
                 }
               } finally {
-                removeTraceId(searchTraceId);
+                removeTraceId(traceId);
               }
 
               if (i == 0) {
