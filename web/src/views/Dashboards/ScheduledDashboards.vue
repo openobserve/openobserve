@@ -269,7 +269,7 @@ const createNewReport = () => {
   });
 };
 
-const openReport = (event: any, row: any, index: number) => {
+const openReport = (event: any, row: any) => {
   router.push({
     name: "createReport",
     query: {

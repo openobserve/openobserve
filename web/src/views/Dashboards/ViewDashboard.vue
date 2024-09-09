@@ -777,6 +777,10 @@ export default defineComponent({
             });
           });
         })
+        .catch((error) => {
+          showErrorNotification(error?.message || "Failed to fetch reports");
+          isLoadingReports.value = false;
+        })
         .finally(() => {
           isLoadingReports.value = false;
         });

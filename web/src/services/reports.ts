@@ -32,9 +32,11 @@ const reports = {
   ) => {
     let query = "";
 
-    if (folder_id) query += `folder_id=${folder_id}`;
-    if (dashboard_id) query += `&dashboard_id=${dashboard_id}`;
-    if (cache) query += `&cache=${cache}`;
+    const params = [];
+    if (folder_id) params.push(`folder_id=${folder_id}`);
+    if (dashboard_id) params.push(`dashboard_id=${dashboard_id}`);
+    if (cache) params.push(`cache=${cache}`);
+    query = params.join("&");
 
     return http().get(`/api/${org_identifier}/reports?${query}`);
   },
