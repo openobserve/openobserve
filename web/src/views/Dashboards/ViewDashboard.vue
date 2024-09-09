@@ -550,16 +550,15 @@ export default defineComponent({
           console.log("cancelQuery isCancelled:-----------", isCancelled);
 
           console.log("isCancelled:", isCancelled);
-
-          $q.notify({
-            message: isCancelled
-              ? "Running query cancelled successfully"
-              : "Query execution was completed before cancellation.",
-            color: "positive",
-            position: "bottom",
-            timeout: 1500,
-          });
-          console.log("isCancelled:", isCancelled);
+          if (isCancelled) {
+            $q.notify({
+              message: "Running query cancelled successfully",
+              color: "positive",
+              position: "bottom",
+              timeout: 3000,
+            });
+            console.log("isCancelled:", isCancelled);
+          }
         })
         .catch((error) => {
           console.error("cancelQuery error:", error);

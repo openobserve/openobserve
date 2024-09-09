@@ -1226,14 +1226,15 @@ export default defineComponent({
         .then((res) => {
           const isCancelled = res.data.some((item: any) => item.is_success);
 
-          $q.notify({
-            message: isCancelled
-              ? "Running query cancelled successfully"
-              : "Query execution was completed before cancellation.",
-            color: "positive",
-            position: "bottom",
-            timeout: 1500,
-          });
+          if (isCancelled) {
+            $q.notify({
+              message: "Running query cancelled successfully",
+              color: "positive",
+              position: "bottom",
+              timeout: 3000,
+            });
+            console.log("isCancelled:", isCancelled);
+          }
         })
         .catch((error) => {
           console.error("cancelQuery error:", error);
