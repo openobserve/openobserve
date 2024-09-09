@@ -231,7 +231,7 @@ export const usePanelDataLoader = (
       const result = fn();
 
       signal.addEventListener("abort", () => {
-        reject(new Error("Query cancelled"));
+        reject();
       });
 
       result
@@ -873,7 +873,7 @@ export const usePanelDataLoader = (
   const processApiError = async (error: any, type: any) => {
     switch (type) {
       case "promql": {
-        const errorDetailValue = error.response?.data?.error || error.message;
+        const errorDetailValue = error.response?.data?.error || error?.message;
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
@@ -884,8 +884,8 @@ export const usePanelDataLoader = (
       case "sql": {
         const errorDetailValue =
           error?.response?.data.error_detail ||
-          error.response?.data.message ||
-          error.message;
+          error?.response?.data.message ||
+          error?.message;
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."

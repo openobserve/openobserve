@@ -36,7 +36,7 @@ const useCancelQuery = () => {
         const isCancelled = res.data.some((item: any) => item.is_success);
 
         if (isCancelled) {
-          showPositiveNotification("Running query cancelled successfully", {
+          showPositiveNotification("Running query canceled successfully", {
             timeout: 3000,
           });
         }
