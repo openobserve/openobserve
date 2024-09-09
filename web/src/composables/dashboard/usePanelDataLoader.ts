@@ -125,16 +125,6 @@ export const usePanelDataLoader = (
       )
     : [];
 
-  // console.log(
-  //   "variablesData.value currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value))
-  // );
-
-  // console.log(
-  //   "variablesData.value.values currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value.values))
-  // );
-
   let currentDynamicVariablesData = variablesData?.value?.values
     ? JSON.parse(
         JSON.stringify(
@@ -216,8 +206,6 @@ export const usePanelDataLoader = (
         () => variablesData.value?.values,
         () => {
           if (ifPanelVariablesCompletedLoading()) {
-            console.log("---------------------");
-
             log(
               "waitForTheVariablesToLoad: variables are loaded (inside watch)",
             );
@@ -239,15 +227,10 @@ export const usePanelDataLoader = (
     fn: () => Promise<T>,
     signal: AbortSignal,
   ): Promise<T> => {
-    console.log("callWithAbortController: entering...");
-
     return new Promise<T>((resolve, reject) => {
-      console.log("callWithAbortController: waiting for the timeout...");
-
       const result = fn();
 
       signal.addEventListener("abort", () => {
-        console.log("callWithAbortController: aborting...");
         reject(new Error("Query cancelled"));
       });
 
@@ -256,11 +239,6 @@ export const usePanelDataLoader = (
           resolve(res);
         })
         .catch((error) => {
-          console.log(
-            "====================================================error",
-            error,
-          );
-
           reject(error);
         });
     });
@@ -279,8 +257,6 @@ export const usePanelDataLoader = (
       // Create a new AbortController for the new operation
       abortController = new AbortController();
       window.addEventListener("cancelQuery", () => {
-        console.log("callWithAbortController cancelQuery=====-=-=-=--==----=");
-
         abortController?.abort();
       });
       // Checking if there are queries to execute
@@ -377,7 +353,6 @@ export const usePanelDataLoader = (
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
             const { traceparent, traceId } = generateTraceContext();
-            console.log("traceparent", traceparent);
 
             addTraceId(traceId);
 
@@ -456,10 +431,8 @@ export const usePanelDataLoader = (
             variables: [...(metadata1 || []), ...(metadata2 || [])],
           };
           const { traceparent, traceId } = generateTraceContext();
-          console.log("traceparent", traceparent);
 
           addTraceId(traceId);
-          console.log("Adding traceId", traceId);
 
           try {
             // partition api call
@@ -652,8 +625,6 @@ export const usePanelDataLoader = (
               }
             }
           } catch (error) {
-            console.log("Error in callWithAbortController:", error);
-
             // Process API error for "sql"
             processApiError(error, "sql");
             return { result: null, metadata: metadata };
@@ -672,11 +643,6 @@ export const usePanelDataLoader = (
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
-
-        // console.log(
-        //   "Final searchRequestTraceIds before calling cancelQuery:",
-        //   state.searchRequestTraceIds
-        // );
       }
     } catch (error: any) {
       if (
@@ -918,8 +884,6 @@ export const usePanelDataLoader = (
         break;
       }
       case "sql": {
-        console.log("SQL error", error);
-
         const errorDetailValue =
           error?.response?.data.error_detail ||
           error.response?.data.message ||
@@ -937,31 +901,16 @@ export const usePanelDataLoader = (
   };
 
   const addTraceId = (traceId: string) => {
-    console.log("addTraceId called with traceId:", traceId);
     if (state.searchRequestTraceIds.includes(traceId)) {
-      console.log("traceId already exists", traceId);
       return;
     }
-    console.log("Adding traceId", traceId);
-    // const arr = state.searchRequestTraceIds || [];
-    // arr.push(traceId);
-    // state.searchRequestTraceIds = arr;
+
     state.searchRequestTraceIds = [...state.searchRequestTraceIds, traceId];
-    // state.searchRequestTraceIds.push(traceId);
-    console.log(
-      "Updated searchRequestTraceIds after add",
-      state.searchRequestTraceIds,
-    );
   };
 
   const removeTraceId = (traceId: string) => {
-    console.log("removeTraceId called with traceId:", traceId);
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
       (id: any) => id !== traceId,
-    );
-    console.log(
-      "Updated searchRequestTraceIds after remove",
-      state.searchRequestTraceIds,
     );
   };
 
@@ -1356,12 +1305,9 @@ export const usePanelDataLoader = (
 
     // remove cancelquery event
     window.removeEventListener("cancelQuery", () => {
-      console.log("PanelSchema/Time Initial: cancelQuery event triggered");
-
       abortController.abort();
     });
   });
-  console.log("PanelSchema/Time Initial: end of setup", { ...toRefs(state) });
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");

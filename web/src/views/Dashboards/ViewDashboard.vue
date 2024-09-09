@@ -322,7 +322,6 @@ export default defineComponent({
 
     const traceIdRef = ref(null);
     const searchRequestTraceIds = (data) => {
-      console.log("searchRequestTraceIds====", data);
       traceIdRef.value = data;
     };
 
@@ -536,8 +535,6 @@ export default defineComponent({
 
     const cancelQuery = () => {
       window.dispatchEvent(new Event("cancelQuery"));
-      console.log("cancelQuery called");
-      console.log("Current state of searchRequestTraceIds:", traceIdRef.value);
       if (traceIdRef?.value?.length === 0) {
         console.error("No trace IDs to cancel");
         return;
@@ -549,11 +546,8 @@ export default defineComponent({
           traceIdRef.value,
         )
         .then((res) => {
-          console.log("cancelQuery response:", res);
           const isCancelled = res.data.some((item: any) => item.is_success);
-          console.log("cancelQuery isCancelled:-----------", isCancelled);
 
-          console.log("isCancelled:", isCancelled);
           if (isCancelled) {
             $q.notify({
               message: "Running query cancelled successfully",
@@ -561,11 +555,9 @@ export default defineComponent({
               position: "bottom",
               timeout: 3000,
             });
-            console.log("isCancelled:", isCancelled);
           }
         })
         .catch((error) => {
-          console.error("cancelQuery error:", error);
           $q.notify({
             message:
               error.response?.data?.message || "Failed to cancel running query",
@@ -575,7 +567,6 @@ export default defineComponent({
           });
         })
         .finally(() => {
-          console.log("cancelQuery finally");
           traceIdRef.value = traceIdRef.value.filter(
             (id: any) => !tracesIds.includes(id),
           );

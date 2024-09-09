@@ -1233,11 +1233,9 @@ export default defineComponent({
               position: "bottom",
               timeout: 3000,
             });
-            console.log("isCancelled:", isCancelled);
           }
         })
         .catch((error) => {
-          console.error("cancelQuery error:", error);
           $q.notify({
             message:
               error.response?.data?.message || "Failed to cancel running query",
@@ -1245,9 +1243,6 @@ export default defineComponent({
             position: "bottom",
             timeout: 1500,
           });
-        })
-        .finally(() => {
-          console.log("cancelQuery finally");
         });
     };
 

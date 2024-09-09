@@ -254,11 +254,6 @@ export default defineComponent({
 
     //computed property based on panels and variables loading state
     const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
-      // console.log(
-      //   "variablesAndPanelsDataLoadingState",
-      //   variablesAndPanelsDataLoadingState
-      // );
-
       // Get values of variablesData and panels
       const variablesDataValues = Object.values(
         variablesAndPanelsDataLoadingState.variablesData,
@@ -271,10 +266,6 @@ export default defineComponent({
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
         panelsValues.every((value) => value === false);
-      // console.log(
-      //   "isAllVariablesAndPanelsDataLoaded",
-      //   isAllVariablesAndPanelsDataLoaded
-      // );
 
       return isAllVariablesAndPanelsDataLoaded;
     });
@@ -284,15 +275,9 @@ export default defineComponent({
     });
 
     const currentQueryTraceIds = computed(() => {
-      console.log(
-        "variablesAndPanelsDataLoadingState",
-        variablesAndPanelsDataLoadingState
-      );
-
       const traceIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
       );
-      console.log("traceIds", traceIds);
 
       if (traceIds.length > 0) {
         return traceIds?.flat();
@@ -301,7 +286,6 @@ export default defineComponent({
     });
 
     watch(currentQueryTraceIds, () => {
-      console.log("currentQueryTraceIds", currentQueryTraceIds.value);
       emit("searchRequestTraceIds", currentQueryTraceIds.value);
     });
 
