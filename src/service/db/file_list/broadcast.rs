@@ -152,7 +152,7 @@ async fn send_to_node(
         // connect to the node
         let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
-            .expect("parse internal grpc token faile");
+            .expect("parse internal grpc token failed");
         let channel = match get_cached_channel(&node.grpc_addr).await {
             Ok(v) => v,
             Err(e) => {

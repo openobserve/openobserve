@@ -119,7 +119,7 @@ pub async fn check_cache(
             } else {
                 sql.time_range
             };
-        handle_historgram(origin_sql, q_time_range);
+        handle_histogram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; //in microseconds
     }
@@ -589,7 +589,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_historgram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
+fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
     let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
     let attrs = caps
         .get(1)

@@ -162,7 +162,7 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
-        in_req.index_type.optinal(),
+        in_req.index_type.optional(),
     );
 
     let span = tracing::span::Span::current();
@@ -886,7 +886,7 @@ fn generate_search_schema_diff(
     schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, Error> {
-    // cacluate the diff between latest schema and group schema
+    // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {

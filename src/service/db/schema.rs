@@ -273,11 +273,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let key_cloumns = ev.key.split('/').collect::<Vec<&str>>();
-                let (ev_key, ev_start_dt) = if key_cloumns.len() > 5 {
+                let key_columns = ev.key.split('/').collect::<Vec<&str>>();
+                let (ev_key, ev_start_dt) = if key_columns.len() > 5 {
                     (
-                        key_cloumns[..5].join("/"),
-                        key_cloumns[5].parse::<i64>().unwrap_or(0),
+                        key_columns[..5].join("/"),
+                        key_columns[5].parse::<i64>().unwrap_or(0),
                     )
                 } else {
                     (ev.key.to_string(), ev.start_dt.unwrap_or_default())

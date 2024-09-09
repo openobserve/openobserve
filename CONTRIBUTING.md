@@ -136,7 +136,7 @@ We check for following in CI pipeline for any pull requests.
    - Run `cargo llvm-cov --lcov --output-path lcov.info` to generate report and use [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) with VS code for visualizing code coverage.
    - You can also generate html report by using `cargo llvm-cov --html` to generate html report in target/debug/llvm-cov/html/index.html
 1. Linting in Javascript for GUI
-   - We run eslint for javascript anf any linting failures will result in build failures.
+   - We run eslint for javascript and any linting failures will result in build failures.
    - You can test for linting failures by running `./eslint.sh` in web folder.
 
 ## How to contribute code

@@ -309,7 +309,7 @@ fn generate_schema_fields(
 }
 
 /// visit a sql to get all columns
-/// TODO: handle subquery without (table.field_name) perfix
+/// TODO: handle subquery without (table.field_name) prefix
 struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
     columns_alias: HashSet<(String, String)>,

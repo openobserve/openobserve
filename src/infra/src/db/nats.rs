@@ -774,7 +774,7 @@ impl Locker {
         if let Some(err) = last_err {
             if err.contains("key already exists") {
                 Err(Error::Message(format!(
-                    "nats lock for key: {}, accquire timeout in {timeout}s",
+                    "nats lock for key: {}, acquire timeout in {timeout}s",
                     self.key
                 )))
             } else {
