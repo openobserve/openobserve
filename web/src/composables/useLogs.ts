@@ -1380,8 +1380,8 @@ const useLogs = () => {
                   Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
                 0,
               );
-            // partitionDetail.partitionTotal[currentPage] =
-            //   searchObj.data.queryResults.total;
+            partitionDetail.partitionTotal[0] =
+              searchObj.data.queryResults.total;
           }
         } else {
           searchObj.data.queryResults.total =
@@ -1710,28 +1710,17 @@ const useLogs = () => {
               }
 
               await generateHistogramSkeleton();
-              let index = 0;
-              for (const partition  of partitions) {
+
+              for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
-    
-                const previousTotal = searchObj.data.queryResults.partitionDetail.partitionTotal
-                .slice(0, index) // Get all elements before the current index
-                .reduce((acc : any, val : any) => acc + val, 0); // Sum them
-              
-              // Subtract the previous total from queryResults.total
-              const result = searchObj.data.queryResults.total - previousTotal;
-              
-              // Assign the result to the current index in partitionTotal
-              searchObj.data.queryResults.partitionDetail.partitionTotal[index] = result;               
-               if (partitions.length > 1) {
-                  // setTimeout(async () => {
+                if (partitions.length > 1) {
+                  setTimeout(async () => {
                     await generateHistogramData();
                     refreshPartitionPagination(true);
-                  // }, 100);
+                  }, 100);
                 }
-                index++;
               }
               searchObj.loadingHistogram = false;
             }
@@ -1759,7 +1748,7 @@ const useLogs = () => {
           if (
             queryReq.query.from == 0 &&
             searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag && !searchObj.meta.showHistogram
+            !aggFlag
           ) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
