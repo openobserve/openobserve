@@ -369,7 +369,6 @@ import { isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import queryService from "@/services/search";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 
 const ConfigPanel = defineAsyncComponent(() => {
@@ -420,7 +419,8 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -441,7 +441,6 @@ export default defineComponent({
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
-    const $q = useQuasar();
 
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
@@ -1227,22 +1226,16 @@ export default defineComponent({
           const isCancelled = res.data.some((item: any) => item.is_success);
 
           if (isCancelled) {
-            $q.notify({
-              message: "Running query cancelled successfully",
-              color: "positive",
-              position: "bottom",
+            showPositiveNotification("Running query cancelled successfully", {
               timeout: 3000,
             });
           }
         })
         .catch((error) => {
-          $q.notify({
-            message:
-              error.response?.data?.message || "Failed to cancel running query",
-            color: "negative",
-            position: "bottom",
-            timeout: 1500,
-          });
+          showErrorNotification(
+            error.response?.data?.message || "Failed to cancel running query",
+            { timeout: 3000 },
+          );
         });
     };
 

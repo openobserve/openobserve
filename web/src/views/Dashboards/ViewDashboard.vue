@@ -306,7 +306,6 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const quasar = useQuasar();
-    const $q = useQuasar();
     const currentDashboardData = reactive({
       data: {},
     });
@@ -549,22 +548,18 @@ export default defineComponent({
           const isCancelled = res.data.some((item: any) => item.is_success);
 
           if (isCancelled) {
-            $q.notify({
-              message: "Running query cancelled successfully",
-              color: "positive",
-              position: "bottom",
+            showPositiveNotification("Running query cancelled successfully", {
               timeout: 3000,
             });
           }
         })
         .catch((error) => {
-          $q.notify({
-            message:
-              error.response?.data?.message || "Failed to cancel running query",
-            color: "negative",
-            position: "bottom",
-            timeout: 1500,
-          });
+          showErrorNotification(
+            error.response?.data?.message || "Failed to cancel running query",
+            {
+              timeout: 1500,
+            },
+          );
         })
         .finally(() => {
           traceIdRef.value = traceIdRef.value.filter(
@@ -927,7 +922,6 @@ export default defineComponent({
       // getPanelsValues,
       searchRequestTraceIds,
       disable,
-      // cancelAllApiCalls,
       cancelQuery,
       handleEmittedData,
       config,
