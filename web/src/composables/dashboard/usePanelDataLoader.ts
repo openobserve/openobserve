@@ -246,16 +246,13 @@ export const usePanelDataLoader = (
 
       const result = fn();
 
-      const onAbort = () => {
+      signal.addEventListener("abort", () => {
         console.log("callWithAbortController: aborting...");
-        reject(new Error(processApiError(error, "Operation aborted")));
-      };
-
-      signal.addEventListener("abort", onAbort);
+        reject(new Error("Query cancelled"));
+      });
 
       result
         .then((res) => {
-          signal.removeEventListener("abort", onAbort);
           resolve(res);
         })
         .catch((error) => {
@@ -264,7 +261,6 @@ export const usePanelDataLoader = (
             error,
           );
 
-          signal.removeEventListener("abort", onAbort);
           reject(error);
         });
     });
@@ -393,7 +389,6 @@ export const usePanelDataLoader = (
                     query: query,
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
-                    traceparent,
                   }),
                 abortController.signal,
               );
@@ -593,16 +588,16 @@ export const usePanelDataLoader = (
                 // update result metadata
                 state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
-              if (searchRes.data.is_partial == true) {
-                // set the new start time as the start time of query
-                state.resultMetaData[currentQueryIndex].new_end_time =
-                  endISOTimestamp;
+                if (searchRes.data.is_partial == true) {
+                  // set the new start time as the start time of query
+                  state.resultMetaData[currentQueryIndex].new_end_time =
+                    endISOTimestamp;
 
-                // need to break the loop, save the cache
-                saveCurrentStateToCache();
+                  // need to break the loop, save the cache
+                  saveCurrentStateToCache();
 
-                break;
-              }
+                  break;
+                }
 
                 if (max_query_range != 0) {
                   // calculate the current partition time range
@@ -640,8 +635,8 @@ export const usePanelDataLoader = (
                       state.resultMetaData[currentQueryIndex].new_start_time =
                         partition[0];
 
-                    // need to break the loop, save the cache
-                    saveCurrentStateToCache();
+                      // need to break the loop, save the cache
+                      saveCurrentStateToCache();
 
                       break;
                     }
