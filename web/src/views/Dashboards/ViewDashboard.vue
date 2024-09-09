@@ -166,6 +166,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t("dashboard.fullscreen")
               }}</q-tooltip></q-btn
             >
+            <q-btn
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              :icon="outlinedDescription"
+              @click="openScheduledReports"
+              data-test="view-dashboard-scheduled-reports"
+              ><q-tooltip>
+                {{ t("dashboard.scheduledDashboards") }}
+              </q-tooltip></q-btn
+            >
           </div>
         </div>
         <q-separator></q-separator>
@@ -197,6 +209,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
       >
         <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
+
+      <q-dialog
+        v-model="showScheduledReportsDialog"
+        position="right"
+        full-height
+        maximized
+      >
+        <ScheduledDashboards
+          :reports="scheduledReports"
+          :loading="isLoadingReports"
+          :folderId="folderId"
+          :dashboardId="dashboardId"
+          :tabId="tabId"
+        />
       </q-dialog>
     </div>
   </q-page>
@@ -231,6 +258,10 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
+import ScheduledDashboards from "./ScheduledDashboards.vue";
+import reports from "@/services/reports";
+import destination from "@/services/alert_destination.js";
+import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -245,6 +276,7 @@ export default defineComponent({
     ExportDashboard,
     DashboardSettings,
     RenderDashboardCharts,
+    ScheduledDashboards,
   },
   setup() {
     const { t } = useI18n();
@@ -255,6 +287,7 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+    const showScheduledReportsDialog = ref(false);
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
     let moment: any = () => {};
@@ -263,6 +296,15 @@ export default defineComponent({
       const momentModule: any = await import("moment-timezone");
       moment = momentModule.default;
     };
+
+    const scheduledReports = ref([]);
+    const isLoadingReports = ref(false);
+
+    const dashboardId = computed(() => route.query.dashboard);
+
+    const folderId = computed(() => route.query.folder);
+
+    const tabId = computed(() => route.query.tab);
 
     onBeforeMount(async () => {
       await importMoment();
@@ -705,6 +747,28 @@ export default defineComponent({
       }
     };
 
+    const openScheduledReports = () => {
+      showScheduledReportsDialog.value = true;
+      scheduledReports.value.length = 0;
+      isLoadingReports.value = true;
+      reports
+        .list(
+          store.state.selectedOrganization.identifier,
+          currentDashboardData.data?.folderId,
+          currentDashboardData.data?.dashboardId,
+        )
+        .then((response) => {
+          scheduledReports.value = response.data;
+        })
+        .catch((error) => {
+          showErrorNotification(error?.message || "Failed to fetch reports");
+          isLoadingReports.value = false;
+        })
+        .finally(() => {
+          isLoadingReports.value = false;
+        });
+    };
+
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });
@@ -773,6 +837,14 @@ export default defineComponent({
       timeString,
       searchType,
       quasar,
+      openScheduledReports,
+      showScheduledReportsDialog,
+      isLoadingReports,
+      scheduledReports,
+      dashboardId,
+      folderId,
+      tabId,
+      outlinedDescription,
     };
   },
 });
