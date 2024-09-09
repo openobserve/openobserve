@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
-              :disableDateTimeRefresh="disableDateTimeRefresh"
+              :disable="disable"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
             <q-btn
-              v-if="config.isEnterprise == 'true' && !disableDateTimeRefresh"
+              v-if="config.isEnterprise == 'true' && !disable"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="refresh"
               @click="refreshData"
-              :disable="!disableDateTimeRefresh"
+              :disable="!disable"
               data-test="dashboard-refresh-btn"
             >
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
@@ -314,10 +314,10 @@ export default defineComponent({
     const { cancelQuery } = usePanelDataLoader();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
-    const disableDateTimeRefresh = ref(false);
+    const disable = ref(false);
 
     const handleEmittedData = (panelsValues) => {
-      disableDateTimeRefresh.value = panelsValues;
+      disable.value = panelsValues;
     };
 
     const traceIdRef = ref(null);
@@ -926,7 +926,7 @@ export default defineComponent({
       outlinedDescription,
       // getPanelsValues,
       searchRequestTraceIds,
-      disableDateTimeRefresh,
+      disable,
       // cancelAllApiCalls,
       cancelQuery,
       handleEmittedData,

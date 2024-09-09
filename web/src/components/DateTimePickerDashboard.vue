@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :default-relative-time="modelValue.relativeTimePeriod"
     @on:date-change="updateDateTime"
     :initialTimezone="initialTimezone"
-    :disableDateTimeRefresh="disableDateTimeRefresh"
+    :disable="disable"
   >
   </date-time>
 </template>
@@ -53,7 +53,7 @@ export default defineComponent({
       required: false,
       default: null,
     },
-    disableDateTimeRefresh: {
+    disable: {
       required: false,
       default: false,
     },
