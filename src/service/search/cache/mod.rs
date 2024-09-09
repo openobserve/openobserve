@@ -118,7 +118,6 @@ pub async fn search(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
-            max_query_range,
         )
         .await
     } else {
@@ -264,21 +263,6 @@ pub async fn search(
 
     if is_aggregate && c_resp.histogram_interval > -1 {
         res.histogram_interval = Some(c_resp.histogram_interval);
-    }
-
-    // get stream settings
-    let mut range_error = "".to_string();
-
-    if orig_start_time != req.query.start_time {
-        range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours ",
-            max_query_range
-        );
-        res.set_partial(true);
-    }
-
-    if !range_error.is_empty() {
-        res.function_error = format!("{}. {}", res.function_error, range_error);
     }
 
     let req_stats = RequestStats {

@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="no-border q-py-xs"
             color="secondary"
             no-caps
-            size="md"
+            size="sm"
             @click="saveDate(null)"
             v-close-popup
           >
@@ -509,7 +509,7 @@ export default defineComponent({
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
 
-        if (props.autoApply) saveDate(props.defaultType);
+        saveDate(props.defaultType);
       } catch (e) {
         console.log(e);
       }
@@ -1047,6 +1047,7 @@ export default defineComponent({
 .date-time-dialog {
   width: 341px;
   z-index: 10001;
+  max-height: 600px;
 
   .tab-button {
     &.q-btn {

@@ -215,12 +215,23 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
+    dashboardId: {
+      default: "",
+      required: false,
+      type: String,
+    },
+    folderId: {
+      default: "",
+      required: false,
+      type: String,
+    },
   },
   emits: [
     "updated:data-zoom",
     "error",
     "metadata-update",
     "result-metadata-update",
+    "last-triggered-at-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
   ],
@@ -242,17 +253,27 @@ export default defineComponent({
       variablesData,
       forceLoad,
       searchType,
+      dashboardId,
+      folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } =
-      usePanelDataLoader(
-        panelSchema,
-        selectedTimeObj,
-        variablesData,
-        chartPanelRef,
-        forceLoad,
-        searchType,
-      );
+    let {
+      data,
+      loading,
+      errorDetail,
+      metadata,
+      resultMetaData,
+      lastTriggeredAt,
+    } = usePanelDataLoader(
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      chartPanelRef,
+      forceLoad,
+      searchType,
+      dashboardId,
+      folderId,
+    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -287,7 +308,7 @@ export default defineComponent({
       [data, store?.state],
       async () => {
         // emit vrl function field list
-        if (data.value.length && data.value[0] && data.value[0].length) {
+        if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
           const maxAttributesIndex = data.value[0].reduce(
             (
@@ -362,6 +383,10 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    watch(lastTriggeredAt, () => {
+      emit("last-triggered-at-update", lastTriggeredAt.value);
+    });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
@@ -439,7 +464,7 @@ export default defineComponent({
       // Check if the queryType is 'promql'
       else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
-        return data.value.length &&
+        return data.value?.length &&
           data.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
