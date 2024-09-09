@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          :disable="disable"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -1217,6 +1218,15 @@ export default defineComponent({
       cancelQuery();
     };
 
+    const disable = ref(false);
+
+    watch(variablesAndPanelsDataLoadingState, () => {
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels,
+      );
+      disable.value = panelsValues.some((item: any) => item === true);
+    });
+
     // [END] cancel running queries
     return {
       t,
@@ -1257,6 +1267,7 @@ export default defineComponent({
       handleLastTriggeredAtUpdate,
       searchRequestTraceIds,
       cancelAddPanelQuery,
+      disable,
       config,
     };
   },
