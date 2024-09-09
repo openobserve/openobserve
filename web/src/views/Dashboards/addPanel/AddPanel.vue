@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
             class="q-ml-md text-bold no-border"
-            data-test="dashboard-apply"
+            data-test="dashboard-cancel"
             padding="sm lg"
             color="negative"
             no-caps

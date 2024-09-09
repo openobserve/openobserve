@@ -97,30 +97,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
-            <q-btn-group class="dashboard-icons q-ml-sm hideOnPrintMode">
-              <q-btn
-                size="sm"
-                no-caps
-                icon="refresh"
-                @click="refreshData"
-                data-test="dashboard-refresh-btn"
-                :disable="!disableDateTimeRefresh"
-                style="width: 80%"
-              >
-                <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                v-if="config.isEnterprise == 'true'"
-                size="sm"
-                no-caps
-                icon="cancel"
-                @click="cancelQuery"
-                data-test="dashboard-cancel-btn"
-                style="width: 20%"
-              >
-                <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
-              </q-btn>
-            </q-btn-group>
+            <q-btn
+              v-if="config.isEnterprise == 'true' && !disableDateTimeRefresh"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="cancel"
+              @click="cancelQuery"
+              data-test="dashboard-cancel-btn"
+              color="negative"
+            >
+              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-else
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="refresh"
+              @click="refreshData"
+              :disable="!disableDateTimeRefresh"
+              data-test="dashboard-refresh-btn"
+            >
+              <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
+            </q-btn>
+
             <ExportDashboard
               v-if="!isFullscreen"
               class="hideOnPrintMode"
