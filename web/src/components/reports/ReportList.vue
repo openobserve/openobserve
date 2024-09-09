@@ -244,7 +244,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.owner"),
     align: "center",
     sortable: true,
-    },
+  },
   {
     name: "description",
     field: "description",
@@ -258,7 +258,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.lastTriggered"),
     align: "left",
     sortable: true,
-    },
+  },
   {
     name: "actions",
     field: "actions",
@@ -306,12 +306,13 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   reportListTableRef.value?.setPagination(pagination.value);
 };
-function convertUnixToQuasarFormat(unixMicroseconds : any) {
-  if(!unixMicroseconds) return "";
-    const unixSeconds = unixMicroseconds / 1e6;
-    const dateToFormat = new Date(unixSeconds * 1000);
-    const formattedDate = dateToFormat.toISOString();
-    return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+
+function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 }
 
 const filterData = (rows: any, terms: any) => {
@@ -335,7 +336,7 @@ const toggleReportState = (report: any) => {
     .toggleReportState(
       store.state.selectedOrganization.identifier,
       report.name,
-      !report.enabled
+      !report.enabled,
     )
     .then(() => {
       report.enabled = !report.enabled;
@@ -384,12 +385,12 @@ const deleteReport = (report: any) => {
   reports
     .deleteReport(
       store.state.selectedOrganization.identifier,
-      deleteDialog.value.data
+      deleteDialog.value.data,
     )
     .then(() => {
       // Find the index of the row that matches the condition
       const deleteIndex = reportsTableRows.value.findIndex(
-        (row: any) => row.name === deleteDialog.value.data
+        (row: any) => row.name === deleteDialog.value.data,
       );
 
       // Check if a matching row was found
