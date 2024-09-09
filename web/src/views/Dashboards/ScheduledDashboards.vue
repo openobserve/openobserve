@@ -104,7 +104,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { convertUnixToQuasarFormat, convertUnixTime } from "@/utils/date";
+import { convertUnixToQuasarFormat } from "@/utils/date";
 
 const props = defineProps({
   reports: {
