@@ -620,7 +620,10 @@ export default defineComponent({
       () => router.currentRoute.value.query.action,
       (action) => {
         console.log(action,"action")
-        if (!action) showAddAlertDialog.value = false;
+        if (!action) {
+          showAddAlertDialog.value = false;
+          showHistoryDialog.value = false;
+        }
       },
 
     );
@@ -1117,7 +1120,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
