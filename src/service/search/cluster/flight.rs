@@ -175,9 +175,7 @@ pub async fn search(
             // search done, release lock
             #[cfg(not(feature = "enterprise"))]
             let _ = dist_lock::unlock(&locker).await.map_err(|e| {
-                log::error!(
-                    "[trace_id {trace_id_move}] release lock in flight search error: {e}",
-                );
+                log::error!("[trace_id {trace_id_move}] release lock in flight search error: {e}");
                 Error::Message(e.to_string())
             });
             #[cfg(feature = "enterprise")]
