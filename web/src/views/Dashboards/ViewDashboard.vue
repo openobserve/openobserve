@@ -284,6 +284,7 @@ import destination from "@/services/alert_destination.js";
 import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 import config from "@/aws-exports";
 import queryService from "../../services/search";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -317,11 +318,6 @@ export default defineComponent({
 
     const handleEmittedData = (panelsValues) => {
       disable.value = panelsValues;
-    };
-
-    const traceIdRef = ref(null);
-    const searchRequestTraceIds = (data) => {
-      traceIdRef.value = data;
     };
 
     let moment: any = () => {};
@@ -532,42 +528,7 @@ export default defineComponent({
 
     // [START] cancel running queries
 
-    const cancelQuery = () => {
-      window.dispatchEvent(new Event("cancelQuery"));
-      if (traceIdRef?.value?.length === 0) {
-        console.error("No trace IDs to cancel");
-        return;
-      }
-      const tracesIds = [...traceIdRef.value];
-      queryService
-        .delete_running_queries(
-          store.state.selectedOrganization.identifier,
-          traceIdRef.value,
-        )
-        .then((res) => {
-          const isCancelled = res.data.some((item: any) => item.is_success);
-
-          if (isCancelled) {
-            showPositiveNotification("Running query cancelled successfully", {
-              timeout: 3000,
-            });
-          }
-        })
-        .catch((error) => {
-          showErrorNotification(
-            error.response?.data?.message || "Failed to cancel running query",
-            {
-              timeout: 1500,
-            },
-          );
-        })
-        .finally(() => {
-          traceIdRef.value = traceIdRef.value.filter(
-            (id: any) => !tracesIds.includes(id),
-          );
-        });
-    };
-
+    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
     // [END] cancel running queries
 
     const openSettingsDialog = () => {
@@ -923,6 +884,8 @@ export default defineComponent({
       searchRequestTraceIds,
       disable,
       cancelQuery,
+      traceIdRef,
+      searchRequestTraceIds,
       handleEmittedData,
       config,
     };

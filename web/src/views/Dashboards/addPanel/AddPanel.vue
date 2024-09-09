@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="negative"
             no-caps
             :label="t('panel.cancel')"
-            @click="cancelQuery"
+            @click="cancelAddPanelQuery"
           />
           <q-btn
             v-else
@@ -368,8 +368,8 @@ import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
-import queryService from "@/services/search";
 import config from "@/aws-exports";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -1188,6 +1188,8 @@ export default defineComponent({
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    // [START] cancel running queries
+
     //reactive object for loading state of variablesData and panels
     const variablesAndPanelsDataLoadingState = reactive({
       variablesData: {},
@@ -1208,37 +1210,14 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
+    const { traceIdRef, cancelQuery } = useCancelQuery();
 
-    // [START] cancel running queries
-
-    const cancelQuery = () => {
-      window.dispatchEvent(new Event("cancelQuery"));
-      if (searchRequestTraceIds.value.length === 0) {
-        console.error("No trace IDs to cancel");
-        return;
-      }
-      queryService
-        .delete_running_queries(
-          store.state.selectedOrganization.identifier,
-          searchRequestTraceIds.value,
-        )
-        .then((res) => {
-          const isCancelled = res.data.some((item: any) => item.is_success);
-
-          if (isCancelled) {
-            showPositiveNotification("Running query cancelled successfully", {
-              timeout: 3000,
-            });
-          }
-        })
-        .catch((error) => {
-          showErrorNotification(
-            error.response?.data?.message || "Failed to cancel running query",
-            { timeout: 3000 },
-          );
-        });
+    const cancelAddPanelQuery = () => {
+      traceIdRef.value = searchRequestTraceIds.value;
+      cancelQuery();
     };
 
+    // [END] cancel running queries
     return {
       t,
       updateDateTime,
@@ -1277,7 +1256,7 @@ export default defineComponent({
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,
       searchRequestTraceIds,
-      cancelQuery,
+      cancelAddPanelQuery,
       config,
     };
   },
