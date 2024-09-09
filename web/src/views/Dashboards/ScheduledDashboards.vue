@@ -175,7 +175,7 @@ const filterReports = () => {
   }
 };
 
-const columns: any = reactive<QTableProps["columns"]>([
+const columns: any = [
   {
     name: "#",
     label: "#",
@@ -224,7 +224,7 @@ const columns: any = reactive<QTableProps["columns"]>([
     align: "left",
     sortable: false,
   },
-]);
+];
 
 const pagination: any = reactive({
   rowsPerPage: 20,

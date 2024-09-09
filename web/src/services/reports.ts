@@ -25,9 +25,9 @@ import http from "./http";
 
 const reports = {
   list: (
-    org_identifier: string,
-    folder_id: string,
-    dashboard_id: string,
+    org_identifier: string = "",
+    folder_id: string = "",
+    dashboard_id: string = "",
     cache: boolean = false,
   ) => {
     let query = "";
