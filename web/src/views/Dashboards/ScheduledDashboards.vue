@@ -338,18 +338,18 @@ const getTimeRangeValue = (dateTime: any) => {
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .scheduled-dashboards {
   height: fit-content;
 
-  .rum-tabs {
+  :deep(.rum-tabs) {
     border: 1px solid #eaeaea;
     height: fit-content;
     border-radius: 4px;
     overflow: hidden;
   }
 
-  .rum-tab {
+  :deep(.rum-tab) {
     width: fit-content !important;
     padding: 4px 12px !important;
     border: none !important;

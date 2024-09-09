@@ -849,12 +849,10 @@ export default defineComponent({
     }
   }
 }
-</style>
 
-<style lang="scss">
 .dashboards-list-page {
-  .q-table th,
-  .q-table td {
+  :deep(.q-table th),
+  :deep(.q-table td) {
     padding: 0px 16px;
     height: 32px;
   }
