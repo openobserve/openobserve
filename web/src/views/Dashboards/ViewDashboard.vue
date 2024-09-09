@@ -260,7 +260,6 @@ import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
-import { convertUnixToQuasarFormat } from "@/utils/date";
 import destination from "@/services/alert_destination.js";
 import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 
@@ -298,7 +297,7 @@ export default defineComponent({
       moment = momentModule.default;
     };
 
-    let scheduledReports = reactive([]);
+    const scheduledReports = ref([]);
     const isLoadingReports = ref(false);
 
     const dashboardId = computed(() => route.query.dashboard);
@@ -750,7 +749,7 @@ export default defineComponent({
 
     const openScheduledReports = () => {
       showScheduledReportsDialog.value = true;
-      scheduledReports.length = 0;
+      scheduledReports.value.length = 0;
       isLoadingReports.value = true;
       reports
         .list(
@@ -759,23 +758,7 @@ export default defineComponent({
           currentDashboardData.data?.dashboardId,
         )
         .then((response) => {
-          response.data.forEach((report, index) => {
-            scheduledReports.push({
-              "#": index + 1,
-              name: report.name,
-              tab: report.dashboards?.[0]?.tabs?.[0],
-              time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
-              frequency: getFrequencyValue(report.frequency),
-              last_triggered_at: convertUnixToQuasarFormat(
-                report.lastTriggeredAt,
-              ),
-              created_at: convertUnixToQuasarFormat(
-                new Date(report.createdAt).getTime() * 1000,
-              ),
-              orgId: report.orgId,
-              isCached: !report.destinations.length,
-            });
-          });
+          scheduledReports.value = response.data;
         })
         .catch((error) => {
           showErrorNotification(error?.message || "Failed to fetch reports");
@@ -814,37 +797,6 @@ export default defineComponent({
         };
 
         setTimeString();
-      }
-    };
-
-    const getFrequencyValue = (frequency: any) => {
-      if (frequency.type === "cron") {
-        return `Cron ${frequency.cron}`;
-      } else {
-        switch (frequency.type) {
-          case "once":
-            return `Once`;
-          case "hours":
-            return `Every ${frequency.interval} ${frequency.interval > 1 ? "hours" : "hour"}`;
-          case "weeks":
-            return `Every ${frequency.interval} ${frequency.interval > 1 ? "weeks" : "week"}`;
-          case "months":
-            return `Every ${frequency.interval} ${frequency.interval > 1 ? "months" : "month"}`;
-          case "days":
-            return `Every ${frequency.interval} ${frequency.interval > 1 ? "days" : "day"}`;
-          default:
-            return "";
-        }
-      }
-    };
-
-    const getTimeRangeValue = (dateTime: any) => {
-      if (dateTime.type === "relative") {
-        return `Past ${dateTime.period}`;
-      } else {
-        const startDateTime = convertUnixTime(startTime);
-        const endDateTime = convertUnixTime(endTime);
-        return `${startDateTime.date} ${startDateTime.time} - ${endDateTime.date} ${endDateTime.time}`;
       }
     };
 

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-table
       data-test="alert-list-table"
       ref="tableRef"
-      :rows="scheduledReports"
+      :rows="formattedReports"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { QTable, QTableProps } from "quasar";
+import { QTable } from "quasar";
 import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -104,6 +104,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
 import NoData from "@/components/shared/grid/NoData.vue";
+import { convertUnixToQuasarFormat, convertUnixTime } from "@/utils/date";
 
 const props = defineProps({
   reports: {
@@ -130,9 +131,11 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-let scheduledReports = ref<ScheduledDashboardReport[]>(
+const scheduledReports = ref<ScheduledDashboardReport[]>(
   props.reports as ScheduledDashboardReport[],
 );
+
+const formattedReports = ref<ScheduledDashboardReport[]>([]);
 
 const tableRef = ref<InstanceType<typeof QTable> | null>();
 
@@ -154,25 +157,49 @@ const tabs = reactive([
 watch(
   () => props.reports,
   () => {
-    filterReports();
+    formatReports();
   },
   {
     deep: true,
   },
 );
 
+const formatReports = () => {
+  props.reports.forEach((report: any, index) => {
+    scheduledReports.value.push({
+      "#": index + 1,
+      name: report.name,
+      tab: report.dashboards?.[0]?.tabs?.[0],
+      time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
+      frequency: getFrequencyValue(report.frequency),
+      last_triggered_at: convertUnixToQuasarFormat(report.lastTriggeredAt),
+      created_at: convertUnixToQuasarFormat(
+        new Date(report.createdAt).getTime() * 1000,
+      ),
+      orgId: report.orgId,
+      isCached: !report.destinations.length,
+    });
+  });
+
+  filterReports();
+
+  console.log(scheduledReports.value);
+};
+
 const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
   if (activeTab.value === "cached") {
-    scheduledReports.value = (
-      props.reports as ScheduledDashboardReport[]
+    formattedReports.value = (
+      scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => report.isCached);
   } else {
-    scheduledReports.value = (
-      props.reports as ScheduledDashboardReport[]
+    formattedReports.value = (
+      scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => !report.isCached);
   }
+
+  console.log(scheduledReports.value);
 };
 
 const columns: any = [
@@ -277,6 +304,37 @@ const openReport = (event: any, row: any) => {
       org_identifier: row.orgId,
     },
   });
+};
+
+const getFrequencyValue = (frequency: any) => {
+  if (frequency.type === "cron") {
+    return `Cron ${frequency.cron}`;
+  } else {
+    switch (frequency.type) {
+      case "once":
+        return `Once`;
+      case "hours":
+        return `Every ${frequency.interval} ${frequency.interval > 1 ? "hours" : "hour"}`;
+      case "weeks":
+        return `Every ${frequency.interval} ${frequency.interval > 1 ? "weeks" : "week"}`;
+      case "months":
+        return `Every ${frequency.interval} ${frequency.interval > 1 ? "months" : "month"}`;
+      case "days":
+        return `Every ${frequency.interval} ${frequency.interval > 1 ? "days" : "day"}`;
+      default:
+        return "";
+    }
+  }
+};
+
+const getTimeRangeValue = (dateTime: any) => {
+  if (dateTime.type === "relative") {
+    return `Past ${dateTime.period}`;
+  } else {
+    const startDateTime = convertUnixToQuasarFormat(dateTime.from);
+    const endDateTime = convertUnixToQuasarFormat(dateTime.to);
+    return `${startDateTime} - ${endDateTime}`;
+  }
 };
 </script>
 
