@@ -709,7 +709,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "contains",
-        help = "Search through full text fields with either 'contains' or 'prefix' match."
+        help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
     )]
     pub full_text_search_type: String,
     #[env_config(

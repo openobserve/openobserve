@@ -653,13 +653,22 @@ async fn inverted_index_search_in_file(
 
     if let Some(column_index_meta) = &file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
         // TODO: Add Eq and check performance
-        let matched_bv = if cfg.common.full_text_search_type == "prefix" {
-            let mut searcher = PrefixSearch::new(fts_terms.as_ref(), column_index_meta).await;
-            searcher.search(&mut index_reader).await
-        } else {
-            let mut searcher = SubstringSearch::new(fts_terms.as_ref(), column_index_meta).await;
-            searcher.search(&mut index_reader).await
+        let matched_bv = match cfg.common.full_text_search_type.as_str() {
+            "eq" => {
+                let mut searcher = ExactSearch::new(fts_terms.as_ref(), column_index_meta);
+                searcher.search(&mut index_reader).await
+            }
+            "contains" => {
+                let mut searcher = SubstringSearch::new(fts_terms.as_ref(), column_index_meta);
+                searcher.search(&mut index_reader).await
+            }
+            // Default to prefix search
+            _ => {
+                let mut searcher = PrefixSearch::new(fts_terms.as_ref(), column_index_meta);
+                searcher.search(&mut index_reader).await
+            }
         };
+
         match matched_bv {
             Ok(bitmap) => {
                 if res.len() < bitmap.len() {

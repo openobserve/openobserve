@@ -1024,12 +1024,11 @@ async fn get_file_list_by_inverted_index(
 
     let fts_condition = terms
         .iter()
-        .map(|x| {
-            if cfg.common.full_text_search_type == "prefix" {
-                format!("term LIKE '{x}%'")
-            } else {
-                format!("term LIKE '%{x}%'")
-            }
+        .map(|x| match cfg.common.full_text_search_type.as_str() {
+            "contains" => format!("term LIKE '%{x}%'"),
+            "eq" => format!("term LIKE '{x}'"),
+            // Default to "prefix"
+            _ => format!("term LIKE '{x}%'"),
         })
         .collect::<Vec<_>>()
         .join(" OR ");

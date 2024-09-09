@@ -17,7 +17,7 @@ pub struct SubstringSearch<'b> {
 }
 
 impl<'b> SubstringSearch<'b> {
-    pub async fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
+    pub fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
         SubstringSearch {
             terms: terms.to_owned(),
             meta,
@@ -48,7 +48,7 @@ pub struct PrefixSearch<'b> {
 }
 
 impl<'b> PrefixSearch<'b> {
-    pub async fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
+    pub fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
         PrefixSearch {
             terms: terms.to_owned(),
             meta,
