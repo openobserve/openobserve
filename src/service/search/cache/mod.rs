@@ -100,11 +100,6 @@ pub async fn search(
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
 
-    let settings = infra::schema::get_settings(org_id, &stream_name, stream_type).await;
-    let max_query_range = settings.map_or(0, |s| s.max_query_range);
-
-    let orig_start_time = req.query.start_time;
-
     let mut file_path = format!(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
