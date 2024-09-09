@@ -1383,7 +1383,6 @@ const useLogs = () => {
             // partitionDetail.partitionTotal[currentPage] =
             //   searchObj.data.queryResults.total;
           }
-          console.log( partitionDetail.partitionTotal,"total")
         } else {
           searchObj.data.queryResults.total =
             partitionDetail.partitionTotal.reduce(
