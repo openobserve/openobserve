@@ -332,9 +332,6 @@ export const usePanelDataLoader = (
 
       state.loading = true;
 
-      const { traceparent, traceId } = generateTraceContext();
-      addTraceId(traceId);
-
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
         // Iterate through each query in the panel schema
@@ -359,7 +356,8 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
-
+            const { traceparent, traceId } = generateTraceContext();
+            addTraceId(traceId);
             try {
               const res = await callWithAbortController(
                 () =>
@@ -434,7 +432,8 @@ export const usePanelDataLoader = (
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
           };
-
+          const { traceparent, traceId } = generateTraceContext();
+          addTraceId(traceId);
           try {
             // partition api call
             const res = await callWithAbortController(
@@ -495,6 +494,8 @@ export const usePanelDataLoader = (
               if (abortControllerRef?.signal?.aborted) {
                 break;
               }
+              const { traceparent, traceId } = generateTraceContext();
+              addTraceId(traceId);
 
               try {
                 const searchRes = await callWithAbortController(
