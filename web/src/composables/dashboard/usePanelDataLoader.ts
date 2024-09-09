@@ -244,6 +244,12 @@ export const usePanelDataLoader = (
     });
   };
 
+  const cancelQueryAbort = () => {
+    if (abortController) {
+      abortController?.abort();
+    }
+  };
+
   const loadData = async () => {
     try {
       log("loadData: entering...");
@@ -256,9 +262,7 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
-      window.addEventListener("cancelQuery", () => {
-        abortController?.abort();
-      });
+      window.addEventListener("cancelQuery", cancelQueryAbort);
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -1297,9 +1301,7 @@ export const usePanelDataLoader = (
     }
 
     // remove cancelquery event
-    window.removeEventListener("cancelQuery", () => {
-      abortController.abort();
-    });
+    window.removeEventListener("cancelQuery", cancelQueryAbort);
   });
 
   onMounted(async () => {
