@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Note: During execution of pipeline, routes will get executed before
         functions
       </div>
-      <ChartRenderer
+      <!-- <ChartRenderer
         data-test="pipeline-editor-pipeline-chart"
         :data="plotChart"
         render-type="svg"
@@ -110,7 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseout="onMouseOut"
         @drop="onNodeDrop"
         @dragover="onNodeDragOver"
-      />
+      /> -->
+      After this
+      <PipelineFlow />
 
       <!-- <div ref="nodeActions" id="node-actions" class="node-actions absolute">
       <q-icon name="delete" class="q-mr-xs cursor-pointer" />
@@ -119,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
-  <q-dialog v-model="dialog.show" position="right" full-height maximized>
+  <q-dialog v-model="dialog.show" position="right"
+full-height maximized>
     <div class="stream-routing-dialog-container full-height">
       <StreamRouting
         v-if="dialog.name === 'streamRouting'"
@@ -182,6 +185,38 @@ const conditionImage = getImageURL("images/pipeline/condition.svg");
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
+
+const PipelineFlow = defineAsyncComponent(
+  () => import("@/plugins/pipelines/PipelineFlow.vue"),
+);
+
+// const nodesData = [
+//   {
+//     id: "1",
+//     type: "custom",
+//     position: { x: 100, y: 100 },
+//     data: { label: "Node 1" },
+//   },
+//   {
+//     id: "2",
+//     type: "custom",
+//     position: { x: 300, y: 100 },
+//     data: { label: "Node 2" },
+//   },
+// ];
+// const edgesData = [{ id: "e1", source: "1", target: "2" }];
+
+// const nodes = ref([
+//   { id: '1', type: 'input', label: 'Node 1', position: { x: 250, y: 5 } },
+//   { id: '2', label: 'Node 2', position: { x: 100, y: 100 } },
+//   { id: '3', label: 'Node 3', position: { x: 400, y: 100 } },
+//   { id: '4', label: 'Node 4', position: { x: 400, y: 200 } },
+// ])
+  
+// const edges = ref([
+//   { id: 'e1-2', source: '1', target: '2', animated: true },
+//   { id: 'e1-3', source: '1', target: '3' },
+// ])
 
 interface Routing {
   [key: string]: RouteCondition[];
