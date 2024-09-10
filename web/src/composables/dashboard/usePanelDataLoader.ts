@@ -20,7 +20,7 @@ import {
   toRefs,
   onMounted,
   onUnmounted,
-  inject,
+  toRaw,
 } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
@@ -35,7 +35,13 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode, generateTraceContext, escapeSingleQuotes } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  generateTraceContext,
+  escapeSingleQuotes,
+} from "@/utils/zincutils";
+import { usePanelCache } from "./usePanelCache";
+import { isEqual, omit } from "lodash-es";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -49,12 +55,34 @@ export const usePanelDataLoader = (
   chartPanelRef: any,
   forceLoad: any,
   searchType: any,
+  dashboardId: any,
+  folderId: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
     //   console.log(panelSchema?.value?.title + ": ", ...args);
     // }
   };
+  let runCount = 0;
+
+  /**
+   * Calculate cache key for panel
+   * @returns cache key
+   */
+  const getCacheKey = () => ({
+    panelSchema: toRaw(panelSchema.value),
+    variablesData: toRaw(variablesData.value),
+    forceLoad: toRaw(forceLoad.value),
+    // searchType: toRaw(searchType.value),
+    dashboardId: toRaw(dashboardId?.value),
+    folderId: toRaw(folderId?.value),
+  });
+
+  const { getPanelCache, savePanelCache } = usePanelCache(
+    folderId?.value,
+    dashboardId?.value,
+    panelSchema.value.id,
+  );
 
   const state = reactive({
     data: [] as any,
@@ -64,6 +92,7 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     resultMetaData: [] as any,
+    lastTriggeredAt: null as any,
   });
 
   // observer for checking if panel is visible on the screen
@@ -71,6 +100,10 @@ export const usePanelDataLoader = (
 
   // is panel currently visible or not
   const isVisible: any = ref(false);
+
+  const saveCurrentStateToCache = () => {
+    savePanelCache(getCacheKey(), { ...toRaw(state) });
+  };
 
   // currently dependent variables data
   let currentDependentVariablesData = variablesData.value?.values
@@ -91,16 +124,6 @@ export const usePanelDataLoader = (
       )
     : [];
 
-  // console.log(
-  //   "variablesData.value currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value))
-  // );
-
-  // console.log(
-  //   "variablesData.value.values currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value.values))
-  // );
-
   let currentDynamicVariablesData = variablesData.value?.values
     ? JSON.parse(
         JSON.stringify(
@@ -113,7 +136,6 @@ export const usePanelDataLoader = (
       )
     : [];
   // let currentAdHocVariablesData: any = null;
-  // console.log("currentAdHocVariablesData", currentDynamicVariablesData);
 
   const store = useStore();
 
@@ -230,6 +252,8 @@ export const usePanelDataLoader = (
 
       log("loadData: now waiting for the panel to become visible");
 
+      state.lastTriggeredAt = new Date().getTime();
+
       // Wait for isVisible to become true
       await waitForThePanelToBecomeVisible(abortController.signal);
 
@@ -257,6 +281,26 @@ export const usePanelDataLoader = (
         return;
       }
 
+      if (runCount == 0) {
+        log("loadData: panelcache: run count is 0");
+        // restore from the cache and return
+        const isRestoredFromCache = restoreFromCache();
+        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
+        if (isRestoredFromCache) {
+          state.loading = false;
+          log("loadData: panelcache: restored from cache");
+          runCount++;
+          return;
+        }
+      }
+
+      log(
+        "loadData: panelcache: no cache restored, continue firing, runCount ",
+        runCount,
+      );
+
+      runCount++;
+
       state.loading = true;
 
       // Check if the query type is "promql"
@@ -270,7 +314,6 @@ export const usePanelDataLoader = (
               endISOTimestamp,
               panelSchema.value.queryType,
             );
-            // console.log("Calling queryPromises", query1);
 
             const { query: query2, metadata: metadata2 } =
               await applyDynamicVariables(query1, panelSchema.value.queryType);
@@ -284,7 +327,6 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
-            // console.log("Calling metrics_query_range API");
             return queryService
               .metrics_query_range({
                 org_identifier: store.state.selectedOrganization.identifier,
@@ -312,6 +354,8 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: queryResults.map((it: any) => it?.metadata),
         };
+
+        saveCurrentStateToCache();
       } else {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
@@ -330,7 +374,10 @@ export const usePanelDataLoader = (
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
         // Handle each query sequentially
-        for (const it of panelSchema.value.queries) {
+        for (const [
+          panelQueryIndex,
+          it,
+        ] of panelSchema.value.queries.entries()) {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -471,6 +518,10 @@ export const usePanelDataLoader = (
                 // set the new start time as the start time of query
                 state.resultMetaData[currentQueryIndex].new_end_time =
                   endISOTimestamp;
+
+                // need to break the loop, save the cache
+                saveCurrentStateToCache();
+
                 break;
               }
 
@@ -508,9 +559,18 @@ export const usePanelDataLoader = (
                     // set the new start time as the start time of query
                     state.resultMetaData[currentQueryIndex].new_start_time =
                       partition[0];
+
+                    // need to break the loop, save the cache
+                    saveCurrentStateToCache();
+
                     break;
                   }
                 }
+              }
+
+              if (i == 0) {
+                // if it is last partition, cache the result
+                saveCurrentStateToCache();
               }
             }
           } catch (error) {
@@ -704,20 +764,13 @@ export const usePanelDataLoader = (
 
   const applyDynamicVariables = async (query: any, queryType: any) => {
     const metadata: any[] = [];
-    // console.log(
-    //   "variablesDataaaa currentAdHocVariablesData",
-    //   JSON.stringify(variablesData.value, null, 2)
-    // );
-
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
       .flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
-    // console.log("adHocVariables", adHocVariables);
 
     if (!adHocVariables?.length) {
-      // console.log("No adhoc variables found");
       return { query, metadata };
     }
 
@@ -730,7 +783,7 @@ export const usePanelDataLoader = (
           value: variable.value,
           operator: variable.operator,
         });
-        // console.log(`Adding label to PromQL query: ${variable.name}`);
+
         query = addLabelToPromQlQuery(
           query,
           variable.name,
@@ -756,7 +809,6 @@ export const usePanelDataLoader = (
           operator: variable.operator,
         });
       });
-      // console.log("Adding labels to SQL query");
       query = await addLabelsToSQlQuery(query, applicableAdHocVariables);
     }
 
@@ -1187,8 +1239,57 @@ export const usePanelDataLoader = (
     }
   });
 
-  log("PanelSchema/Time Initial: should load the data");
-  loadData(); // Loading the data
+  onMounted(async () => {
+    log("PanelSchema/Time Initial: should load the data");
+    loadData(); // Loading the data
+  });
+
+  const restoreFromCache: () => boolean = () => {
+    const cache = getPanelCache();
+
+    if (!cache) {
+      log("usePanelDataLoader: panelcache: cache is not there");
+      // cache is not there, we need to load the data
+      return false;
+    }
+    // now we have a cache
+    const { key: tempPanelCacheKey, value: tempPanelCacheValue } = cache;
+    log("usePanelDataLoader: panelcache: tempPanelCache", tempPanelCacheValue);
+
+    let isRestoredFromCache = false;
+
+    const keysToIgnore = [
+      "panelSchema.version",
+      "panelSchema.layout",
+      "panelSchema.htmlContent",
+      "panelSchema.markdownContent",
+    ];
+
+    // check if it is stale or not
+    if (
+      tempPanelCacheValue &&
+      Object.keys(tempPanelCacheValue).length > 0 &&
+      isEqual(
+        omit(getCacheKey(), keysToIgnore),
+        omit(tempPanelCacheKey, keysToIgnore),
+      )
+    ) {
+      // const cache = getPanelCache();
+      state.data = tempPanelCacheValue.data;
+      state.loading = tempPanelCacheValue.loading;
+      state.errorDetail = tempPanelCacheValue.errorDetail;
+      state.metadata = tempPanelCacheValue.metadata;
+      state.resultMetaData = tempPanelCacheValue.resultMetaData;
+      state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
+
+      // set that the cache is restored
+      isRestoredFromCache = true;
+
+      log("usePanelDataLoader: panelcache: panel data loaded from cache");
+    }
+
+    return isRestoredFromCache;
+  };
 
   return {
     ...toRefs(state),
