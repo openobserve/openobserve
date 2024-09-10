@@ -206,28 +206,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <div
                         v-if="isOutDated"
-                        :style="{
-                          borderColor: '#c3920d',
-                          borderWidth: '1px',
-                          borderStyle: 'solid',
-                          backgroundColor:
-                            store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
-                          padding: '1%',
-                          margin: '1%',
-                          borderRadius: '5px',
-                        }"
+                        class="tw-p-2"
                       >
-                        <div style="font-weight: 700">
-                          Your chart is not up to date
-                        </div>
-                        <div>
-                          Chart Configuration / Variables has been updated, but
-                          the chart was not updated automatically. Click on the
-                          "Apply" button to run the query again
+                        <div
+                          :style="{
+                            borderColor: '#c3920d',
+                            borderWidth: '1px',
+                            borderStyle: 'solid',
+                            backgroundColor:
+                              store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
+                            padding: '1%',
+                            borderRadius: '5px',
+                          }"
+                        >
+                          <div style="font-weight: 700">
+                            Your chart is not up to date
+                          </div>
+                          <div>
+                            Chart Configuration / Variables has been updated, but
+                            the chart was not updated automatically. Click on the
+                            "Apply" button to run the query again
+                          </div>
                         </div>
                       </div>
-
-                      <div class="col" style="flex: 1">
                         <div class="tw-flex tw-justify-end tw-mr-2">
                           <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                             <span class="lastRefreshedAtIcon">🕑</span
@@ -237,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </span>
                         </div>
+                      <div class="col" style="flex: 1">
                         <PanelSchemaRenderer
                           v-if="chartData"
                           @metadata-update="metaDataValue"
