@@ -93,6 +93,7 @@ export const usePanelDataLoader = (
     },
     resultMetaData: [] as any,
     lastTriggeredAt: null as any,
+    isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
   });
 
@@ -103,7 +104,14 @@ export const usePanelDataLoader = (
   const isVisible: any = ref(false);
 
   const saveCurrentStateToCache = () => {
-    savePanelCache(getCacheKey(), { ...toRaw(state) });
+    savePanelCache(
+      getCacheKey(),
+      { ...toRaw(state) },
+      {
+        start_time: selectedTimeObj?.value?.start_time?.getTime(),
+        end_time: selectedTimeObj?.value?.end_time?.getTime(),
+      },
+    );
   };
 
   // currently dependent variables data
@@ -344,6 +352,7 @@ export const usePanelDataLoader = (
       runCount++;
 
       state.loading = true;
+      state.isCachedDataDifferWithCurrentTimeRange = false;
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
@@ -1363,6 +1372,15 @@ export const usePanelDataLoader = (
 
       // set that the cache is restored
       isRestoredFromCache = true;
+
+      // if selected time range is not matched with the cache time range
+      if (
+        selectedTimeObj?.value?.end_time -
+          selectedTimeObj?.value?.start_time !==
+        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
+      ) {
+        state.isCachedDataDifferWithCurrentTimeRange = true;
+      }
 
       log("usePanelDataLoader: panelcache: panel data loaded from cache");
     }
