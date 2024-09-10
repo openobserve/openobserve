@@ -174,10 +174,14 @@ pub async fn search(
         async move {
             // search done, release lock
             #[cfg(not(feature = "enterprise"))]
-            let _ = dist_lock::unlock(&locker).await.map_err(|e| {
-                log::error!("[trace_id {trace_id_move}] release lock in flight search error: {e}");
-                Error::Message(e.to_string())
-            });
+            let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[trace_id {trace_id_move}] release lock in flight search error: {e}"
+                    );
+                    Error::Message(e.to_string())
+                });
             #[cfg(feature = "enterprise")]
             let _ = work_group
                 .as_ref()
@@ -340,6 +344,9 @@ pub async fn search(
             Err(DataFusionError::ResourcesExhausted("flight->leader: search canceled".to_string()))
         }
     };
+
+    // release source
+    drop(_defer);
 
     // 9. get data from datafusion
     let (data, mut scan_stats): (Vec<RecordBatch>, ScanStats) = match task {
@@ -553,7 +560,7 @@ pub async fn check_work_group(
             .iter()
             .map(|node| node.uuid.to_string())
             .collect::<HashSet<_>>();
-        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
+        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64, Some(node_ids))
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
@@ -609,7 +616,7 @@ pub async fn check_work_group(
             .iter()
             .map(|node| node.uuid.to_string())
             .collect::<HashSet<_>>();
-        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
+        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64, Some(node_ids))
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
@@ -637,12 +644,12 @@ pub async fn check_work_group(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&req.org_id])
             .dec();
-        dist_lock::unlock(&locker).await?;
+        dist_lock::unlock_with_trace_id(trace_id, &locker).await?;
         return Err(Error::Message(e.to_string()));
     }
 
     // 6. unlock the queue in no enterprise version,
-    if let Err(e) = dist_lock::unlock(&locker).await {
+    if let Err(e) = dist_lock::unlock_with_trace_id(trace_id, &locker).await {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&req.org_id])
             .dec();

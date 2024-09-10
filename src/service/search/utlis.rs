@@ -19,7 +19,7 @@ use config::meta::search::ScanStats;
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use tokio::sync::Mutex;
 
-use super::datafusion::distributed_plan::remote_scan::RemoteScanExec;
+use super::{datafusion::distributed_plan::remote_scan::RemoteScanExec, DATAFUSION_RUNTIME};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -42,7 +42,7 @@ impl AsyncDefer {
 impl Drop for AsyncDefer {
     fn drop(&mut self) {
         if let Some(cleanup) = self.cleanup.take() {
-            tokio::spawn(async move {
+            DATAFUSION_RUNTIME.spawn(async move {
                 let mut cleanup = cleanup.lock().await;
                 cleanup.as_mut().await;
             });

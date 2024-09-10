@@ -60,7 +60,7 @@ pub async fn work_group_checking(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&req.org_id])
             .dec();
-        dist_lock::unlock(locker).await?;
+        dist_lock::unlock_with_trace_id(trace_id, locker).await?;
         log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
             "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
@@ -76,7 +76,7 @@ pub async fn work_group_checking(
                     metrics::QUERY_PENDING_NUMS
                         .with_label_values(&[&req.org_id])
                         .dec();
-                    dist_lock::unlock(locker).await?;
+                    dist_lock::unlock_with_trace_id(trace_id, locker).await?;
                     return Err(e);
                 }
             }
@@ -85,7 +85,7 @@ pub async fn work_group_checking(
             metrics::QUERY_PENDING_NUMS
                 .with_label_values(&[&req.org_id])
                 .dec();
-            dist_lock::unlock(locker).await?;
+            dist_lock::unlock_with_trace_id(trace_id, locker).await?;
             log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
         }
