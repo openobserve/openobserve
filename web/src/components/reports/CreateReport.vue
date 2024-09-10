@@ -949,8 +949,8 @@ const frequency = ref({
   cron: "",
 });
 
-onBeforeMount(() => {
-  getDashboaordFolders();
+onBeforeMount(async () => {
+  await getDashboaordFolders();
 
   isEditingReport.value = !!router.currentRoute.value.query?.name;
 
@@ -1002,7 +1002,7 @@ const isValidName = computed(() => {
   return roleNameRegex.test(formData.value.name);
 });
 
-const setInitialReportData = () => {
+const setInitialReportData = async () => {
   const queryParams = router.currentRoute.value.query;
 
   if (queryParams.type === "cached") {
@@ -1021,16 +1021,22 @@ const setInitialReportData = () => {
   }
 
   if (queryParams.tabId) {
-    formData.value.dashboards[0].tabs = [queryParams.tabId as string];
+    formData.value.dashboards[0].tabs = queryParams.tabId as string;
   }
 };
 
-const onFolderSelection = (id: string) => {
+const onFolderSelection = async (id: string) => {
   formData.value.dashboards.forEach((dashboard: any) => {
     dashboard.dashboard = "";
     dashboard.tabs = "";
   });
-  setDashboardOptions(id);
+
+  try {
+    await setDashboardOptions(id);
+    return true;
+  } catch (err) {
+    return false;
+  }
 };
 
 const setDashboardOptions = (id: string) => {
@@ -1067,11 +1073,12 @@ const setDashboardOptions = (id: string) => {
                 version: dashboard.version,
               });
               options.value["dashboards"] = [...dashboardOptions.value];
-              resolve(true);
             },
           );
+
+        resolve(true);
       })
-      .catch((err) => resolve(false))
+      .catch((err) => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1177,21 +1184,25 @@ const removeDashboardVariable = (variable: any) => {
 };
 
 const getDashboaordFolders = () => {
-  isFetchingFolders.value = true;
-  dashboardService
-    .list_Folders(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      res.data.list.forEach((folder: { name: string; folderId: string }) => {
-        folderOptions.value.push({
-          label: folder.name,
-          value: folder.folderId,
+  return new Promise((resolve, reject) => {
+    isFetchingFolders.value = true;
+    dashboardService
+      .list_Folders(store.state.selectedOrganization.identifier)
+      .then((res) => {
+        res.data.list.forEach((folder: { name: string; folderId: string }) => {
+          folderOptions.value.push({
+            label: folder.name,
+            value: folder.folderId,
+          });
+          options.value["folders"] = [...folderOptions.value];
         });
-        options.value["folders"] = [...folderOptions.value];
+        resolve(true);
+      })
+      .catch((err) => reject(true))
+      .finally(() => {
+        isFetchingFolders.value = false;
       });
-    })
-    .finally(() => {
-      isFetchingFolders.value = false;
-    });
+  });
 };
 
 /**
@@ -1458,10 +1469,23 @@ const filterOptions = (options: any[], val: String, update: Function) => {
 };
 
 const setupEditingReport = async (report: any) => {
-  formData.value = report;
-
-  // This is unitil we support multiple dashboards and tabs
-  formData.value.dashboards[0].tabs = report.dashboards[0].tabs[0];
+  formData.value = {
+    ...JSON.parse(JSON.stringify(report)),
+    dashboards: [
+      {
+        folder: "",
+        dashboard: "",
+        tabs: "" as string | string[],
+        variables: [] as { key: string; value: string; id: string }[],
+        timerange: {
+          type: "relative",
+          period: "30m",
+          from: 0,
+          to: 0,
+        },
+      },
+    ],
+  };
 
   // set date, time and timezone in scheduling
   const date = new Date(report.start / 1000);
@@ -1507,9 +1531,57 @@ const setupEditingReport = async (report: any) => {
     frequency.value.type = report.frequency.type;
   }
 
-  await setDashboardOptions(formData.value.dashboards[0].folder);
+  await setDashboardOptions(report.dashboards[0].folder);
+
+  // Check if folder is present in the options and set the folder
+  if (
+    folderOptions.value.some(
+      (folder) => folder.value === report.dashboards[0].folder,
+    )
+  ) {
+    formData.value.dashboards[0].folder = report.dashboards[0].folder;
+  } else {
+    formData.value.dashboards[0].folder = "";
+    q.notify({
+      type: "negative",
+      message: "Selected folder has been deleted!",
+      timeout: 4000,
+    });
+  }
+
+  // Check if dashboard is present in the options and set the dashboard
+  if (
+    dashboardOptions.value.some(
+      (dashboard) => dashboard.value === report.dashboards[0].dashboard,
+    )
+  ) {
+    formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
+  } else {
+    formData.value.dashboards[0].dashboard = "";
+    q.notify({
+      type: "negative",
+      message: "Selected dashboard has been deleted!",
+      timeout: 4000,
+    });
+  }
 
   setDashboardTabOptions(formData.value.dashboards[0].dashboard);
+
+  // Check if tab is present in the options and set the tab
+  const tab = dashboardTabOptions.value.filter(
+    (tab) => tab.value === report.dashboards[0].tabs[0],
+  )[0];
+
+  if (tab) {
+    formData.value.dashboards[0].tabs = tab.value;
+  } else {
+    q.notify({
+      type: "negative",
+      message: "Selected dashboard tab has been deleted!",
+      timeout: 4000,
+    });
+    formData.value.dashboards[0].tabs = "";
+  }
 };
 
 const openCancelDialog = () => {
