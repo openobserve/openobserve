@@ -163,6 +163,7 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
+import { onUnmounted } from "vue";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -313,6 +314,21 @@ export default defineComponent({
     });
     // ======= [END] dashboard PrintMode =======
 
+    // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
+    // As some panels were getting true cancel button and datetime picker were not getting updated
+    onUnmounted(() => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: [],
+        };
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: false,
+        };
+      }
+    }),
+    
     watch(
       [data, store?.state],
       async () => {
