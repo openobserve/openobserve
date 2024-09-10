@@ -425,31 +425,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template v-else>
-                  <div
-                    class="q-mt-md"
-                    style="
-                      border: 1px solid #d7d7d7;
-                      width: fit-content;
-                      border-radius: 2px;
-                    "
-                  >
-                    <template v-for="visual in timeTabs" :key="visual.value">
-                      <q-btn
-                        :data-test="`add-report-schedule-${visual.value}-btn`"
-                        :color="
-                          visual.value === selectedTimeTab ? 'primary' : ''
-                        "
-                        :flat="visual.value === selectedTimeTab ? false : true"
-                        dense
-                        no-caps
-                        size="12px"
-                        class="q-px-md visual-selection-btn"
-                        style="padding-top: 4px; padding-bottom: 4px"
-                        @click="selectedTimeTab = visual.value"
+                  <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
+                    <div
+                      class="tw-flex tw-justify-center tw-align-center"
+                      style="
+                        border: 1px solid #d7d7d7;
+                        width: fit-content;
+                        border-radius: 2px;
+                      "
+                    >
+                      <template v-for="visual in timeTabs" :key="visual.value">
+                        <q-btn
+                          :data-test="`add-report-schedule-${visual.value}-btn`"
+                          :color="
+                            visual.value === selectedTimeTab ? 'primary' : ''
+                          "
+                          :flat="
+                            visual.value === selectedTimeTab ? false : true
+                          "
+                          dense
+                          no-caps
+                          size="12px"
+                          class="q-px-md visual-selection-btn"
+                          style="padding-top: 4px; padding-bottom: 4px"
+                          @click="selectedTimeTab = visual.value"
+                        >
+                          {{ visual.label }}</q-btn
+                        >
+                      </template>
+                    </div>
+                    <q-icon
+                      name="info_outline"
+                      class="cursor-pointer q-ml-sm"
+                      size="16px"
+                    >
+                      <q-tooltip
+                        anchor="center end"
+                        self="center left"
+                        class="tw-text-[12px]"
                       >
-                        {{ visual.label }}</q-btn
-                      >
-                    </template>
+                        "Schedule Now" will schedule the report using the
+                        current date, time, and timezone.<br />
+                        In "Schedule Later" you can customize the date, time,
+                        and timezone.
+                      </q-tooltip>
+                    </q-icon>
                   </div>
 
                   <div
@@ -503,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     data-test="add-report-schedule-send-later-section"
-                    v-if="selectedTimeTab === 'sendLater'"
+                    v-if="selectedTimeTab === 'scheduleLater'"
                     class="flex items-center justify-start q-mt-md"
                   >
                     <div
@@ -876,12 +896,12 @@ const dialog = ref({
 
 const timeTabs = [
   {
-    label: "Send now",
-    value: "sendNow",
+    label: "Schedule now",
+    value: "scheduleNow",
   },
   {
-    label: "Send later",
-    value: "sendLater",
+    label: "Schedule later",
+    value: "scheduleLater",
   },
 ];
 
@@ -916,7 +936,7 @@ const frequencyTabs = [
   },
 ];
 
-const selectedTimeTab = ref("sendLater");
+const selectedTimeTab = ref("scheduleNow");
 
 const store = useStore();
 
@@ -1241,7 +1261,10 @@ const convertDateToTimestamp = (
 
 const saveReport = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  if (selectedTimeTab.value === "sendNow" || frequency.value.type === "cron") {
+  if (
+    selectedTimeTab.value === "scheduleNow" ||
+    frequency.value.type === "cron"
+  ) {
     const now = new Date();
 
     // Get the day, month, and year from the date object
@@ -1507,8 +1530,8 @@ const setupEditingReport = async (report: any) => {
 
   scheduling.value.timezone = report.timezone;
 
-  // set selectedTimeTab to sendLater
-  selectedTimeTab.value = "sendLater";
+  // set selectedTimeTab to scheduleLater
+  selectedTimeTab.value = "scheduleLater";
 
   emails.value = report.destinations
     .map((destination: { email: string }) => destination.email)
