@@ -311,14 +311,8 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const { cancelQuery } = usePanelDataLoader();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
-    const disable = ref(false);
-
-    const handleEmittedData = (panelsValues) => {
-      disable.value = panelsValues;
-    };
 
     let moment: any = () => {};
 
@@ -528,7 +522,14 @@ export default defineComponent({
 
     // [START] cancel running queries
 
+    const disable = ref(false);
+
+    const handleEmittedData = (panelsValues) => {
+      disable.value = panelsValues;
+    };
+
     const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
+
     // [END] cancel running queries
 
     const openSettingsDialog = () => {
@@ -880,7 +881,6 @@ export default defineComponent({
       folderId,
       tabId,
       outlinedDescription,
-      // getPanelsValues,
       searchRequestTraceIds,
       disable,
       cancelQuery,
