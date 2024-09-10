@@ -203,8 +203,6 @@ const filterReports = () => {
       scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => !report.isCached);
   }
-
-  console.log(scheduledReports.value);
 };
 
 const columns: any = [
