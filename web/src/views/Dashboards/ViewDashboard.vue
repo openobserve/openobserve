@@ -243,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :folderId="folderId"
           :dashboardId="dashboardId"
           :tabId="tabId"
+          :tabs="currentDashboardData?.data?.tabs || []"
         />
       </q-dialog>
     </div>

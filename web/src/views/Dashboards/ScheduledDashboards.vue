@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-flex tw-items-center">
             <app-tabs
               class="q-mr-md"
-              :tabs="tabs"
+              :tabs="reportTypeTabs"
               v-model:active-tab="activeTab"
               @update:active-tab="filterReports"
             />
@@ -130,6 +130,10 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  tabs: {
+    type: Array,
+    required: true,
+  },
 });
 
 const { t } = useI18n();
@@ -148,7 +152,7 @@ const activeTab = ref("cached");
 
 const store = useStore();
 
-const tabs = reactive([
+const reportTypeTabs = reactive([
   {
     label: t("reports.cached"),
     value: "cached",
@@ -176,10 +180,13 @@ const formatReports = () => {
     scheduledReports.value.push({
       "#": index + 1,
       name: report.name,
-      tab: report.dashboards?.[0]?.tabs?.[0],
+      tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
       time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
       frequency: getFrequencyValue(report.frequency),
-      last_triggered_at: convertUnixToQuasarFormat(report.lastTriggeredAt),
+      last_triggered_at:
+        report.lastTriggeredAt.toString().length === 13
+          ? convertUnixToQuasarFormat(report.lastTriggeredAt * 1000)
+          : convertUnixToQuasarFormat(report.lastTriggeredAt),
       created_at: convertUnixToQuasarFormat(
         new Date(report.createdAt).getTime() * 1000,
       ),
@@ -189,6 +196,11 @@ const formatReports = () => {
   });
 
   filterReports();
+};
+
+const getTabName = (tabId: string) => {
+  const tab = props.tabs.find((tab: any) => tab.tabId === tabId) as any;
+  return tab?.name;
 };
 
 const filterReports = () => {
