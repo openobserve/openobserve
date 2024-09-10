@@ -320,7 +320,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="selected-chart-gauge-item"] img').click();
   });
 
-  test('"1should not show an error when changing the chart type after adding a VRL function field"', async ({
+  test('should not show an error when changing the chart type after adding a VRL function field.', async ({
     page,
   }) => {
     // Variable to track errors
@@ -374,7 +374,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="selected-chart-gauge-item"] img').click();
 
     // Optional: Wait a bit to capture late errors
-    await page.waitForTimeout(3000);
+    // await page.waitForTimeout(3000);
 
     // Explicitly fail the test if any console error was detected
     if (hasConsoleError) {

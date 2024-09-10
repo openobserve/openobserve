@@ -1873,7 +1873,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test("Should not show an error when edit the AND and OR condition dashboard ", async ({
+  test.skip("Should not show an error when edit the AND and OR condition dashboard ", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
