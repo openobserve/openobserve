@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, ops::Bound, sync::Arc, time::Duration};
+use std::{cmp::min, collections::HashMap, ops::Bound, sync::Arc, time::Duration};
 
 use config::{
     cluster::*,
@@ -115,6 +115,43 @@ pub async fn get_node_from_consistent_hash(
         return Some(uuid.clone());
     }
     None
+}
+
+pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>>> {
+    let mut map = HashMap::new();
+    let r = QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await;
+    let mut node_map = HashMap::new();
+    for (k, v) in r.iter() {
+        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
+        entry.push(*k);
+    }
+    drop(r);
+    map.insert("querier_interactive".to_string(), node_map);
+    let r = QUERIER_BACKGROUND_CONSISTENT_HASH.read().await;
+    let mut node_map = HashMap::new();
+    for (k, v) in r.iter() {
+        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
+        entry.push(*k);
+    }
+    drop(r);
+    map.insert("querier_background".to_string(), node_map);
+    let r = COMPACTOR_CONSISTENT_HASH.read().await;
+    let mut node_map = HashMap::new();
+    for (k, v) in r.iter() {
+        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
+        entry.push(*k);
+    }
+    drop(r);
+    map.insert("compactor".to_string(), node_map);
+    let r = FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await;
+    let mut node_map = HashMap::new();
+    for (k, v) in r.iter() {
+        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
+        entry.push(*k);
+    }
+    drop(r);
+    map.insert("flatten_compactor".to_string(), node_map);
+    map
 }
 
 #[inline]
