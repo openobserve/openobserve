@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          :disable="disable"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -82,16 +83,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="savePanelData.execute()"
           :loading="savePanelData.isLoading.value"
         />
-        <q-btn
+        <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          class="q-ml-md text-bold no-border"
-          data-test="dashboard-apply"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t('panel.apply')"
-          @click="runQuery"
-        />
+        >
+          <q-btn
+            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+            class="q-ml-md text-bold no-border"
+            data-test="dashboard-cancel"
+            padding="sm lg"
+            color="negative"
+            no-caps
+            :label="t('panel.cancel')"
+            @click="cancelAddPanelQuery"
+          />
+          <q-btn
+            v-else
+            class="q-ml-md text-bold no-border"
+            data-test="dashboard-apply"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t('panel.apply')"
+            @click="runQuery"
+          />
+        </template>
       </div>
     </div>
     <q-separator></q-separator>
@@ -354,6 +369,8 @@ import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import config from "@/aws-exports";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -403,7 +420,8 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -1171,6 +1189,45 @@ export default defineComponent({
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    // [START] cancel running queries
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    const searchRequestTraceIds = computed(() => {
+      const searchIds = Object.values(
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+      ).filter((item: any) => item.length > 0);
+
+      return searchIds.flat() as string[];
+    });
+    const { traceIdRef, cancelQuery } = useCancelQuery();
+
+    const cancelAddPanelQuery = () => {
+      traceIdRef.value = searchRequestTraceIds.value;
+      cancelQuery();
+    };
+
+    const disable = ref(false);
+
+    watch(variablesAndPanelsDataLoadingState, () => {
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels,
+      );
+      disable.value = panelsValues.some((item: any) => item === true);
+    });
+
+    // [END] cancel running queries
     return {
       t,
       updateDateTime,
@@ -1208,6 +1265,10 @@ export default defineComponent({
       initialVariableValues,
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,
+      searchRequestTraceIds,
+      cancelAddPanelQuery,
+      disable,
+      config,
     };
   },
   methods: {

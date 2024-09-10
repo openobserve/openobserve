@@ -168,6 +168,8 @@ export default defineComponent({
     "refreshPanelRequest",
     "refresh",
     "onMovePanel",
+    "panelsValues",
+    "searchRequestTraceIds",
   ],
   props: {
     viewOnly: {},
@@ -241,6 +243,7 @@ export default defineComponent({
     const variablesAndPanelsDataLoadingState = reactive({
       variablesData: {},
       panels: {},
+      searchRequestTraceIds: {},
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
@@ -263,7 +266,27 @@ export default defineComponent({
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
         panelsValues.every((value) => value === false);
+
       return isAllVariablesAndPanelsDataLoaded;
+    });
+
+    watch(isDashboardVariablesAndPanelsDataLoaded, () => {
+      emit("panelsValues", isDashboardVariablesAndPanelsDataLoaded.value);
+    });
+
+    const currentQueryTraceIds = computed(() => {
+      const traceIds = Object.values(
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+      );
+
+      if (traceIds.length > 0) {
+        return traceIds?.flat();
+      }
+      return [];
+    });
+
+    watch(currentQueryTraceIds, () => {
+      emit("searchRequestTraceIds", currentQueryTraceIds.value);
     });
 
     // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
@@ -487,6 +510,7 @@ export default defineComponent({
       variablesValueSelectorRef,
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
+      currentQueryTraceIds,
     };
   },
   methods: {

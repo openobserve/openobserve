@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon-right="arrow_drop_down"
       class="date-time-button"
       :class="selectedType + 'type'"
+      :disable="disable"
     >
       <q-menu
         id="date-time-menu"
@@ -357,6 +358,10 @@ export default defineComponent({
     initialTimezone: {
       required: false,
       default: null,
+    },
+    disable: {
+      type: Boolean,
+      default: false,
     },
     queryRangeRestrictionMsg: {
       type: String,
