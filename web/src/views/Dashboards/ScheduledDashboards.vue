@@ -33,7 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="openReport"
     >
       <template #no-data>
-        <NoData />
+        <template v-if="loading">
+          <div
+            class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+          >
+            <q-spinner-hourglass color="primary" size="lg" />
+          </div>
+        </template>
+
+        <template>
+          <NoData />
+        </template>
       </template>
       <template #top="scope">
         <div class="tw-flex tw-justify-between tw-w-full">
