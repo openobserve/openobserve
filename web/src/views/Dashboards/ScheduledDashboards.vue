@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-dashboards tw-bg-white">
+  <div
+    class="scheduled-dashboards"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  >
     <q-table
       data-test="alert-list-table"
       ref="scheduledDashboardTableRef"
@@ -104,6 +107,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
+import { useStore } from "vuex";
 
 const props = defineProps({
   reports: {
@@ -141,6 +145,8 @@ const scheduledDashboardTableRef = ref<InstanceType<typeof QTable> | null>();
 const router = useRouter();
 
 const activeTab = ref("cached");
+
+const store = useStore();
 
 const tabs = reactive([
   {
@@ -337,6 +343,29 @@ const getTimeRangeValue = (dateTime: any) => {
 </script>
 
 <style lang="scss" scoped>
+.dark-mode {
+  background-color: $dark-page;
+
+  &.scheduled-dashboards {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+}
+
 .scheduled-dashboards {
   height: fit-content;
 
