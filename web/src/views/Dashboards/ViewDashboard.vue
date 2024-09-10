@@ -790,8 +790,8 @@ export default defineComponent({
       reports
         .list(
           store.state.selectedOrganization.identifier,
-          folderId,
-          dashboardId,
+          folderId.value,
+          dashboardId.value,
         )
         .then((response) => {
           scheduledReports.value = response.data;

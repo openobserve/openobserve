@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="report-list-page"
     class="q-pa-none flex"
     style="height: calc(100vh - 57px)"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
   >
     <div class="full-width">
       <q-table
@@ -104,31 +105,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top="scope">
-          <div class="q-table__title" data-test="report-list-title">
-            {{ t("reports.header") }}
+          <div class="tw-flex tw-justify-between tw-w-full">
+            <div class="q-table__title" data-test="report-list-title">
+              {{ t("reports.header") }}
+            </div>
+
+            <div class="tw-flex tw-items-center report-list-tabs">
+              <app-tabs
+                class="q-mr-md"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="filterReports"
+              />
+              <q-input
+                data-test="report-list-search-input"
+                v-model="filterQuery"
+                borderless
+                filled
+                dense
+                class="q-ml-auto q-mb-xs no-border"
+                :placeholder="t('reports.search')"
+              >
+                <template #prepend>
+                  <q-icon name="search" class="cursor-pointer" />
+                </template>
+              </q-input>
+              <q-btn
+                data-test="report-list-add-report-btn"
+                class="q-ml-md q-mb-xs text-bold no-border"
+                padding="sm lg"
+                color="secondary"
+                no-caps
+                :label="t(`reports.add`)"
+                @click="createNewReport"
+              />
+            </div>
           </div>
-          <q-input
-            data-test="report-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('reports.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-btn
-            data-test="report-list-add-report-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`reports.add`)"
-            @click="createNewReport"
-          />
 
           <QTablePagination
             :scope="scope"
@@ -163,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount } from "vue";
+import { ref, onBeforeMount, reactive } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -179,8 +191,9 @@ import { useQuasar, date, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
+import AppTabs from "@/components/common/AppTabs.vue";
 
-const reportsTableRows = ref([]);
+const reportsTableRows: Ref<any[]> = ref([]);
 
 const { t } = useI18n();
 
@@ -195,6 +208,19 @@ const editingReport: any = ref(null);
 const q = useQuasar();
 
 const isLoadingReports = ref(false);
+
+const activeTab = ref("shared");
+
+const tabs = reactive([
+  {
+    label: t("reports.scheduled"),
+    value: "shared",
+  },
+  {
+    label: t("reports.cached"),
+    value: "cached",
+  },
+]);
 
 const perPageOptions: any = [
   { label: "5", value: 5 },
@@ -223,6 +249,8 @@ const deleteDialog = ref({
 });
 
 const reportListTableRef: Ref<any> = ref(null);
+
+const staticReportsList: Ref<any[]> = ref([]);
 
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -287,6 +315,10 @@ onBeforeMount(() => {
         lastTriggeredAt: convertUnixToQuasarFormat(report.lastTriggeredAt),
       }));
       resultTotal.value = reportsTableRows.value.length;
+      staticReportsList.value = JSON.parse(
+        JSON.stringify(reportsTableRows.value),
+      );
+      filterReports();
     })
     .catch((err) => {
       q.notify({
@@ -423,6 +455,80 @@ const deleteReport = (report: any) => {
 const createNewReport = () => {
   router.push({ name: "createReport" });
 };
+
+const filterReports = () => {
+  // filter reports based on the selected tab
+  // If reports are cached, show only cached reports
+  if (activeTab.value === "cached") {
+    reportsTableRows.value = (staticReportsList.value as any).filter(
+      (report: any) => !report.destinations.length,
+    );
+  } else {
+    reportsTableRows.value = (staticReportsList.value as any).filter(
+      (report: any) => report.destinations.length,
+    );
+  }
+
+  reportsTableRows.value = reportsTableRows.value.map(
+    (report: any, index: number) => {
+      return {
+        ...report,
+        "#": index + 1,
+      };
+    },
+  ) as any[];
+
+  resultTotal.value = reportsTableRows.value.length;
+};
 </script>
 
-<style scoped></style>
+<style lang="scss" scoped>
+.dark-mode {
+  background-color: $dark-page;
+
+  .report-list-tabs {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+}
+
+.report-list-tabs {
+  height: fit-content;
+
+  :deep(.rum-tabs) {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
+}
+</style>
