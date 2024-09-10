@@ -39,6 +39,7 @@ mod nats;
 
 const HEALTH_CHECK_FAILED_TIMES: usize = 3;
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
+const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
@@ -63,7 +64,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}", node.name, i);
+        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.insert(hash, node.name.clone());
     }
@@ -82,7 +83,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role, group: O
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}", node.name, i);
+        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
     }
