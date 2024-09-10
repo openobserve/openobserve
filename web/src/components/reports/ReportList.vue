@@ -250,7 +250,7 @@ const deleteDialog = ref({
 
 const reportListTableRef: Ref<any> = ref(null);
 
-const staticReportsList = ref([]);
+const staticReportsList: Ref<any> = ref([]);
 
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -461,11 +461,11 @@ const filterReports = () => {
   // If reports are cached, show only cached reports
   if (activeTab.value === "cached") {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report) => !report.destinations.length,
+      (report: any) => !report.destinations.length,
     );
   } else {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report) => report.destinations.length,
+      (report: any) => report.destinations.length,
     );
   }
 
