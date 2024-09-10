@@ -233,6 +233,7 @@ export default defineComponent({
     "metadata-update",
     "result-metadata-update",
     "last-triggered-at-update",
+    "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
   ],
@@ -265,6 +266,7 @@ export default defineComponent({
       metadata,
       resultMetaData,
       lastTriggeredAt,
+      isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
     } = usePanelDataLoader(
       panelSchema,
@@ -411,6 +413,13 @@ export default defineComponent({
 
     watch(lastTriggeredAt, () => {
       emit("last-triggered-at-update", lastTriggeredAt.value);
+    });
+
+    watch(isCachedDataDifferWithCurrentTimeRange, () => {
+      emit(
+        "is-cached-data-differ-with-current-time-range-update",
+        isCachedDataDifferWithCurrentTimeRange.value,
+      );
     });
 
     const handleNoData = (panelType: any) => {
