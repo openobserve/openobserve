@@ -193,7 +193,7 @@ import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-const reportsTableRows = ref([]);
+const reportsTableRows: Ref<any[]> = ref([]);
 
 const { t } = useI18n();
 
@@ -250,7 +250,7 @@ const deleteDialog = ref({
 
 const reportListTableRef: Ref<any> = ref(null);
 
-const staticReportsList: Ref<any> = ref([]);
+const staticReportsList: Ref<any[]> = ref([]);
 
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -476,7 +476,7 @@ const filterReports = () => {
         "#": index + 1,
       };
     },
-  );
+  ) as any[];
 
   resultTotal.value = reportsTableRows.value.length;
 };
