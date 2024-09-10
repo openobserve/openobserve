@@ -428,6 +428,9 @@ export default defineComponent({
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
 
+    // this is used to again assign query params on discard or save
+    let routeQueryParamsOnMount: any = {};
+
     // ======= [START] default variable values
 
     const initialVariableValues: any = { value: {} };
@@ -519,6 +522,9 @@ export default defineComponent({
     });
 
     onMounted(async () => {
+      // assign the route query params
+      routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
+
       errorData.errors = [];
 
       // console.time("onMounted");
@@ -743,31 +749,33 @@ export default defineComponent({
 
     const getQueryParamsForDuration = (data: any) => {
       try {
-        if (data?.relativeTimePeriod) {
+        if (data.valueType === "relative") {
           return {
-            period: data?.relativeTimePeriod ?? "15m",
+            period: data.relativeTimePeriod ?? "15m",
           };
-        } else {
+        } else if (data.valueType === "absolute") {
           return {
             from: data.startTime,
             to: data.endTime,
+            period: null,
           };
         }
+        return {};
       } catch (error) {
-        return {
-          period: "15m",
-        };
+        return {};
       }
     };
 
     const updateDateTime = (value: object) => {
-      if (selectedDate.value) {
+      if (selectedDate.value && dateTimePickerRef?.value) {
+        const date = dateTimePickerRef.value?.getConsumableDateTime();
+
         dashboardPanelData.meta.dateTime = {
-          start_time: new Date(selectedDate.value.startTime),
-          end_time: new Date(selectedDate.value.endTime),
+          start_time: new Date(date.startTime),
+          end_time: new Date(date.endTime),
         };
 
-        return router.replace({
+        router.replace({
           query: {
             ...route.query,
             ...getQueryParamsForDuration(selectedDate.value),
@@ -780,7 +788,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/view",
         query: {
-          ...route.query,
+          ...routeQueryParamsOnMount,
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
@@ -926,6 +934,7 @@ export default defineComponent({
         return router.push({
           path: "/dashboards/view",
           query: {
+            ...routeQueryParamsOnMount,
             org_identifier: store.state.selectedOrganization.identifier,
             dashboard: dashId,
             folder: route.query.folder ?? "default",
