@@ -582,6 +582,7 @@ async fn generate_report(
 
     if let Err(e) = page.find_element("main").await {
         browser.close().await?;
+        browser.wait().await?;
         handle.await?;
         return Err(anyhow::anyhow!(
             "[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}"
@@ -589,6 +590,7 @@ async fn generate_report(
     }
     if let Err(e) = page.find_element("div.displayDiv").await {
         browser.close().await?;
+        browser.wait().await?;
         handle.await?;
         return Err(anyhow::anyhow!(
             "[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: {e}"
@@ -609,6 +611,7 @@ async fn generate_report(
     };
 
     browser.close().await?;
+    browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
     Ok((pdf_data, email_dashb_url))
