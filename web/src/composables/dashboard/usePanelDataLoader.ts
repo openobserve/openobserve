@@ -223,6 +223,16 @@ export const usePanelDataLoader = (
     });
   };
 
+  /**
+   * Call a function with an AbortController, and propagate the abort
+   * signal to the function. This allows the function to be cancelled
+   * when the AbortController is aborted.
+   *
+   * @param fn The function to call
+   * @param signal The AbortSignal to use
+   * @returns A promise that resolves with the result of the function, or
+   * rejects with an error if the function is cancelled or throws an error
+   */
   const callWithAbortController = async <T>(
     fn: () => Promise<T>,
     signal: AbortSignal,
@@ -230,10 +240,13 @@ export const usePanelDataLoader = (
     return new Promise<T>((resolve, reject) => {
       const result = fn();
 
+      // Listen to the abort signal and reject the promise if it is
+      // received
       signal.addEventListener("abort", () => {
-        reject();
+        reject(new Error("Aborted waiting for loading"));
       });
 
+      // Handle the result of the function
       result
         .then((res) => {
           resolve(res);

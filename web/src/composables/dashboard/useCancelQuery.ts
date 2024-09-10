@@ -3,16 +3,33 @@ import useNotifications from "@/composables/useNotifications";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 
+/**
+ * Provides a composable to cancel running queries.
+ *
+ * @returns {{
+ *   traceIdRef: Ref<any[]>,
+ *   searchRequestTraceIds: (data: any) => void,
+ *   cancelQuery: () => void,
+ * }}
+ */
 const useCancelQuery = () => {
   const { showPositiveNotification, showErrorNotification } =
     useNotifications();
   const traceIdRef: any = ref([]);
   const store = useStore();
 
+  /**
+   * Sets the trace IDs of the running queries to cancel.
+   *
+   * @param {any} data trace IDs of the running queries
+   */
   const searchRequestTraceIds = (data: any) => {
     traceIdRef.value = Array.isArray(data) ? data : [data];
   };
 
+  /**
+   * Cancels the running queries with trace IDs in `traceIdRef.value`.
+   */
   const cancelQuery = () => {
     window.dispatchEvent(new Event("cancelQuery"));
 
@@ -61,5 +78,6 @@ const useCancelQuery = () => {
     cancelQuery,
   };
 };
+
 
 export default useCancelQuery;
