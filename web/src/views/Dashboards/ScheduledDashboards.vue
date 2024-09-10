@@ -204,7 +204,14 @@ const filterReports = () => {
     ).filter((report) => !report.isCached);
   }
 
-  console.log(scheduledReports.value);
+  formattedReports.value = formattedReports.value.map(
+    (report: any, index: number) => {
+      return {
+        ...report,
+        "#": index + 1,
+      };
+    },
+  );
 };
 
 const columns: any = [
