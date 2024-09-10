@@ -477,6 +477,8 @@ const filterReports = () => {
       };
     },
   );
+
+  resultTotal.value = reportsTableRows.value.length;
 };
 </script>
 
