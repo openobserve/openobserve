@@ -243,7 +243,7 @@ export const usePanelDataLoader = (
       // Listen to the abort signal and reject the promise if it is
       // received
       signal.addEventListener("abort", () => {
-        reject(new Error("Aborted waiting for loading"));
+        reject();
       });
 
       // Handle the result of the function
