@@ -63,9 +63,9 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}{}", node.uuid, i);
+        let key = format!("{}:{}", node.name, i);
         let hash = h.sum64(&key);
-        nodes.insert(hash, node.uuid.clone());
+        nodes.insert(hash, node.name.clone());
     }
 }
 
@@ -82,7 +82,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role, group: O
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}{}", node.uuid, i);
+        let key = format!("{}:{}", node.name, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
     }
@@ -108,11 +108,11 @@ pub async fn get_node_from_consistent_hash(
     }
     let hash = config::utils::hash::gxhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
-    if let Some((_, uuid)) = iter.next() {
-        return Some(uuid.clone());
+    if let Some((_, name)) = iter.next() {
+        return Some(name.clone());
     }
-    if let Some((_, uuid)) = nodes.first_key_value() {
-        return Some(uuid.clone());
+    if let Some((_, name)) = nodes.first_key_value() {
+        return Some(name.clone());
     }
     None
 }
@@ -587,12 +587,12 @@ mod tests {
         let node = load_local_mode_node();
         for i in 0..10 {
             let node_q = Node {
-                uuid: format!("node-q-{i}").to_string(),
+                name: format!("node-q-{i}").to_string(),
                 role: [Role::Querier].to_vec(),
                 ..node.clone()
             };
             let node_c = Node {
-                uuid: format!("node-c-{i}").to_string(),
+                name: format!("node-c-{i}").to_string(),
                 role: [Role::Compactor].to_vec(),
                 ..node.clone()
             };
@@ -601,7 +601,7 @@ mod tests {
             add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor, None).await;
         }
 
-        for key in ["test", "test1", "test2", "test3"] {
+        for key in ["test", "test1", "test2", "test3", "test4", "test5", "test6"] {
             println!(
                 "{key}-q: {}",
                 get_node_from_consistent_hash(key, &Role::Querier, None)
@@ -616,36 +616,19 @@ mod tests {
             );
         }
 
-        // fnv hash
-        let _data = [
-            ["test", "node-q-8", "node-c-8"],
-            ["test1", "node-q-8", "node-c-8"],
-            ["test2", "node-q-8", "node-c-8"],
-            ["test3", "node-q-8", "node-c-8"],
-        ];
-        // murmur3 hash
-        let _data = [
-            ["test", "node-q-2", "node-c-3"],
-            ["test1", "node-q-5", "node-c-6"],
-            ["test2", "node-q-4", "node-c-2"],
-            ["test3", "node-q-0", "node-c-3"],
-        ];
-        // cityhash hash
-        let _data = [
-            ["test", "node-q-6", "node-c-7"],
-            ["test1", "node-q-5", "node-c-2"],
-            ["test2", "node-q-2", "node-c-4"],
-            ["test3", "node-q-2", "node-c-1"],
-        ];
         // gxhash hash
         let data = [
-            ["test", "node-q-8", "node-c-8"],
-            ["test1", "node-q-4", "node-c-1"],
-            ["test2", "node-q-0", "node-c-2"],
-            ["test3", "node-q-7", "node-c-3"],
+            ["test", "node-q-4", "node-c-7"],
+            ["test1", "node-q-3", "node-c-3"],
+            ["test2", "node-q-7", "node-c-2"],
+            ["test3", "node-q-7", "node-c-6"],
+            ["test4", "node-q-9", "node-c-3"],
+            ["test5", "node-q-5", "node-c-2"],
+            ["test6", "node-q-8", "node-c-3"],
         ];
 
-        remove_node_from_consistent_hash(&node, &Role::Querier, None).await;
+        remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+        remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         remove_node_from_consistent_hash(&node, &Role::Compactor, None).await;
         remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         for key in data {
