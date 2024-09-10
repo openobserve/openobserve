@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
-              :disable="!disable"
+              :disable="arePanelsLoading"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
             <q-btn
-              v-if="config.isEnterprise == 'true' && !disable"
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="refresh"
               @click="refreshData"
-              :disable="!disable"
+              :disable="arePanelsLoading"
               data-test="dashboard-refresh-btn"
             >
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
@@ -522,10 +522,10 @@ export default defineComponent({
 
     // [START] cancel running queries
 
-    const disable = ref(false);
+    const arePanelsLoading = ref(false);
 
-    const handleEmittedData = (panelsValues) => {
-      disable.value = panelsValues;
+    const handleEmittedData = (allPanelsLoaded) => {
+      arePanelsLoading.value = !allPanelsLoaded;
     };
 
     const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
@@ -882,7 +882,7 @@ export default defineComponent({
       tabId,
       outlinedDescription,
       searchRequestTraceIds,
-      disable,
+      arePanelsLoading,
       cancelQuery,
       traceIdRef,
       searchRequestTraceIds,
