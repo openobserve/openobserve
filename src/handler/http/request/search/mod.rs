@@ -1490,7 +1490,7 @@ pub async fn search_history(
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
-            tracing::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
+            log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
             Ok(HttpResponse::InternalServerError().json(
                 meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
