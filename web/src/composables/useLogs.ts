@@ -1373,15 +1373,7 @@ const useLogs = () => {
             searchObj.data.queryResults.hasOwnProperty("aggs") &&
             searchObj.data.queryResults.aggs != null
           ) {
-            searchObj.data.queryResults.total =
-              searchObj.data.queryResults.aggs.reduce(
-                (accumulator: number, currentValue: any) =>
-                  accumulator +
-                  Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-                0,
-              );
-            partitionDetail.partitionTotal[0] =
-              searchObj.data.queryResults.total;
+
           }
         } else {
           searchObj.data.queryResults.total =
@@ -2377,6 +2369,24 @@ const useLogs = () => {
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
               res.data.result_cache_ratio;
+            const currentStartTime = queryReq.query.start_time;
+            const currentEndTime = queryReq.query.end_time;
+            let totalHits = 0;
+            searchObj.data.queryResults.partitionDetail.partitions.map((item: any, index: any) => {
+              if(item[0] == currentStartTime && item[1] == currentEndTime){
+                totalHits = res.data.hits.reduce(
+                      (accumulator: number, currentValue: any) =>
+                        accumulator +
+                        Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+                      0,
+                    );
+
+                searchObj.data.queryResults.partitionDetail.partitionTotal[index] = totalHits;
+
+                return;
+              }
+      
+            });
 
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
