@@ -155,16 +155,6 @@ pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>
     map
 }
 
-#[inline]
-pub fn get_internal_grpc_token() -> String {
-    let cfg = get_config();
-    if cfg.grpc.internal_grpc_token.is_empty() {
-        get_instance_id()
-    } else {
-        cfg.grpc.internal_grpc_token.clone()
-    }
-}
-
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
     let cfg = get_config();
