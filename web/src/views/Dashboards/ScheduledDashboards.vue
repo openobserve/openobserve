@@ -40,8 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-spinner-hourglass color="primary" size="lg" />
           </div>
         </template>
-
-        <template>
+        <template v-else>
           <NoData />
         </template>
       </template>
@@ -233,6 +232,8 @@ const filterReports = () => {
       };
     },
   );
+
+  resultTotal.value = formattedReports.value.length;
 };
 
 const columns: any = [

@@ -785,9 +785,12 @@ export default defineComponent({
     };
 
     const openScheduledReports = () => {
+      if (isLoadingReports.value) return;
+
       showScheduledReportsDialog.value = true;
-      scheduledReports.value.length = 0;
+      scheduledReports.value = [];
       isLoadingReports.value = true;
+
       reports
         .list(
           store.state.selectedOrganization.identifier,
