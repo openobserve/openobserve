@@ -533,12 +533,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.breakdown.length == 0
+          ]?.fields?.breakdown?.length == 0
         "
         data-test="dashboard-config-top_results"
         ><template v-slot:label>
           <div class="row items-center all-pointer-events">
-            Show top n values
+            Show Top N values
             <div>
               <q-icon
                 class="q-ml-xs"
@@ -555,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <b>This is only applicable when breakdown field is available</b>
                 <br />
                 <br />
-                Specify the number of top N values to show when breakdown field
+                Specify the number of Top N values to show when breakdown field
                 is available.
               </q-tooltip>
             </div>
@@ -585,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.breakdown.length == 0
+            ].fields?.breakdown?.length == 0
           "
         />
 

@@ -17,8 +17,12 @@ use std::collections::HashSet;
 use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
+#[cfg(feature = "enterprise")]
+use config::meta::stream::StreamType;
 use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use promql_parser::parser;
 
 use crate::{
@@ -155,6 +159,7 @@ async fn query(
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !is_root_user(user_email) {
+            let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
                 let user: meta::user::User = USERS
                     .get(&format!("{org_id}/{}", user_email))
@@ -166,7 +171,13 @@ async fn query(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("{}:{}", "metrics", name),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(stream_type_str.as_str())
+                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                name
+                            ),
                             org_id: org_id.to_string(),
                             bypass_check: false,
                             parent_id: "".to_string(),
@@ -318,6 +329,7 @@ async fn query_range(
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !is_root_user(user_email) {
+            let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
                 let user: meta::user::User = USERS
                     .get(&format!("{org_id}/{}", user_email))
@@ -329,7 +341,13 @@ async fn query_range(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("{}:{}", "metrics", name),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(stream_type_str.as_str())
+                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                name
+                            ),
                             org_id: org_id.to_string(),
                             bypass_check: false,
                             parent_id: "".to_string(),
@@ -572,13 +590,20 @@ async fn series(
                 .get(&format!("{org_id}/{}", user_email))
                 .unwrap()
                 .clone();
+            let stream_type_str = StreamType::Metrics.to_string();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
                     user_email,
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("{}:{}", "metrics", metric_name),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str.as_str())
+                                .map_or(stream_type_str.as_str(), |model| model.key),
+                            metric_name
+                        ),
                         org_id: org_id.to_string(),
                         bypass_check: false,
                         parent_id: "".to_string(),

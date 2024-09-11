@@ -215,7 +215,7 @@ export const getConsumableRelativeTime = (period: string) => {
 
     const startTimeStamp = date.subtractFromDate(
       endTimeStamp,
-      JSON.parse(subtractObject)
+      JSON.parse(subtractObject),
     );
 
     return {
@@ -238,4 +238,17 @@ export const getRelativePeriod = (period: string) => {
 
 export const isInvalidDate = (date: any) => {
   return !(date && date instanceof Date && !isNaN(date.getTime()));
+};
+
+export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
+  try {
+    if (!unixMicroseconds) return "";
+    const unixSeconds = unixMicroseconds / 1e6;
+    const dateToFormat = new Date(unixSeconds * 1000);
+    const formattedDate = dateToFormat.toISOString();
+    return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  } catch (error) {
+    console.log("Error converting unix to quasar format");
+    return "";
+  }
 };

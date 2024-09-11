@@ -541,6 +541,7 @@
     "typeOfVariable": "Type of variable",
     "DefaultSize": "Default max record size(optional)",
     "multiSelect": "Allow multiple selection",
+    "hideOnDashboard": "Hide On Dashboard",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",
     "newFolderBtnLabel": "New Folder",
     "folderLabel": "Folders",
@@ -644,7 +645,10 @@
     "textbox": "Textbox",
     "ad-hoc-variable": "Dynamic variables",
     "newFolder": "New Folder",
-    "updateFolder": "Update Folder"
+    "updateFolder": "Update Folder",
+    "scheduledReports": "Scheduled Reports",
+    "newReport": "New Report",
+    "scheduledDashboards": "Scheduled Dashboards"
   },
   "panel": {
     "header": "Panel",
@@ -894,7 +898,16 @@
     "title": "Title",
     "description": "Description",
     "cron": "Cron Job",
-    "cronExpression": "Cron expression"
+    "cronExpression": "Cron expression",
+    "timeRange": "Time Range",
+    "frequency": "Frequency",
+    "lastTriggeredAt": "Last Triggered At",
+    "createdAt": "Created At",
+    "tab": "Tab",
+    "cached": "Cached",
+    "cachedReport": "Cached Report",
+    "destination": "Destination",
+    "scheduled": "Scheduled"
   },
   "queries": {
     "runningQueries": "Running Queries",

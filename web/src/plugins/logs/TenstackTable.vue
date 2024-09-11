@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-w-full tw-table-auto"
       :style="{
         minWidth: '100%',
-        minHeight: totalSize + 'px',
         ...columnSizeVars,
+        minHeight: totalSize + 'px',
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -32,7 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '100%',
       }"
     >
-      <thead class="tw-sticky tw-top-0 tw-z-50">
+      <thead
+        class="tw-sticky tw-top-0 tw-z-50"
+        style="max-height: 44px; height: 22px"
+      >
         <vue-draggable
           v-model="columnOrder"
           v-for="headerGroup in table.getHeaderGroups()"
@@ -162,46 +165,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </td>
         </tr>
-      </thead>
-      <tr
-        data-test="log-search-result-function-error"
-        v-if="functionErrorMsg != ''"
-      >
-        <td
-          :colspan="columnOrder.length"
-          class="text-bold"
-          style="opacity: 0.6"
+        <tr
+          data-test="log-search-result-function-error"
+          v-if="functionErrorMsg != ''"
         >
-          <div class="text-subtitle2 text-weight-bold bg-warning">
-            <q-btn
-              :icon="
-                expandedRowIndices.includes(-1)
-                  ? 'expand_more'
-                  : 'chevron_right'
+          <td
+            :colspan="columnOrder.length"
+            class="text-bold"
+            style="opacity: 0.6"
+          >
+            <div
+              class="text-subtitle2 text-weight-bold q-pl-sm"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-bg-yellow-600'
+                  : 'tw-bg-amber-300'
               "
-              dense
-              size="xs"
-              flat
-              class="q-mr-xs"
-              data-test="table-row-expand-menu"
-              @click.self.stop="expandRow(-1)"
-            ></q-btn
-            ><b>
-              <q-icon name="warning" size="15px"></q-icon>
-              {{ t("search.functionErrorLabel") }}</b
             >
-          </div>
-        </td>
-      </tr>
-      <tr v-if="expandedRowIndices.includes(-1)">
-        <td
-          :colspan="columnOrder.length"
-          class="bg-warning"
-          style="opacity: 0.7"
-        >
-          <pre>{{ functionErrorMsg }}</pre>
-        </td>
-      </tr>
+              <q-btn
+                :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
+                dense
+                size="xs"
+                flat
+                class="q-mr-xs"
+                data-test="table-row-expand-menu"
+                @click.capture.stop="expandFunctionError"
+              ></q-btn
+              ><b>
+                <q-icon name="warning" size="15px"></q-icon>
+                {{ t("search.functionErrorLabel") }}</b
+              >
+            </div>
+          </td>
+        </tr>
+        <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
+          <td
+            :colspan="columnOrder.length"
+            style="opacity: 0.7"
+            class="q-px-sm"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-bg-yellow-600'
+                : 'tw-bg-amber-300'
+            "
+          >
+            <pre>{{ functionErrorMsg }}</pre>
+          </td>
+        </tr>
+      </thead>
       <tbody
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
@@ -289,14 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'auto',
                   height: wrap ? '100%' : '20px',
                 }"
-                :class="[
-                  columnOrder.includes('source') && !wrap
-                    ? 'tw-table-cell'
-                    : 'tw-block',
-                  !wrap &&
-                    'tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap',
-                  wrap && ' tw-break-words',
-                ]"
+                :class="tableCellClass"
+                @mouseover="handleCellMouseOver(cell)"
+                @mouseleave="handleCellMouseLeave()"
               >
                 <q-btn
                   v-if="cellIndex == 0"
@@ -313,17 +319,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
                 ></q-btn>
 
-                <cell-actions
-                  v-if="
-                    (cell.column.columnDef.meta as any)?.closable &&
-                    (cell.row.original as any)[cell.column.id]
-                  "
-                  :column="cell.column"
-                  :row="cell.row.original as any"
-                  @copy="copyLogToClipboard"
-                  @add-search-term="addSearchTerm"
-                  @add-field-to-table="addFieldToTable"
-                />
+                <template
+                  v-if="activeCellActionId === `${cell.id}_${cell.column.id}`"
+                >
+                  <cell-actions
+                    v-if="
+                      (cell.column.columnDef.meta as any)?.closable &&
+                      (cell.row.original as any)[cell.column.id]
+                    "
+                    :column="cell.column"
+                    :row="cell.row.original as any"
+                    @copy="copyLogToClipboard"
+                    @add-search-term="addSearchTerm"
+                    @add-field-to-table="addFieldToTable"
+                  />
+                </template>
+
                 <FlexRender
                   :render="cell.column.columnDef.cell"
                   :props="cell.getContext()"
@@ -435,6 +446,10 @@ const columnOrder = ref<any>([]);
 
 const tableRows = ref(props.rows);
 
+const isFunctionErrorOpen = ref(false);
+
+const activeCellActionId = ref("");
+
 watch(
   () => props.columns,
   async (newVal) => {
@@ -474,6 +489,12 @@ watch(
     emits("update:columnOrder", columnOrder.value, props.columns);
   },
 );
+
+const tableCellClass = computed(() => [
+  hasDefaultSourceColumn.value && !props.wrap ? "tw-table-cell" : "tw-block",
+  !props.wrap && "tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap",
+  props.wrap && "tw-break-words",
+]);
 
 const table = useVueTable({
   get data() {
@@ -520,6 +541,10 @@ watch(columnSizeVars, (newColSizes) => {
 onMounted(() => {
   setExpandedRows();
 });
+
+const hasDefaultSourceColumn = computed(
+  () => props.defaultColumns && columnOrder.value.includes("source"),
+);
 
 const updateTableWidth = async () => {
   tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
@@ -568,7 +593,7 @@ const rowVirtualizerOptions = computed(() => {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
     estimateSize: () => 20,
-    overscan: 5,
+    overscan: 80,
     measureElement:
       typeof window !== "undefined" &&
       navigator.userAgent.indexOf("Firefox") === -1
@@ -591,8 +616,8 @@ const setExpandedRows = () => {
   });
 };
 
-const copyLogToClipboard = (value: any) => {
-  emits("copy", value, false);
+const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
+  emits("copy", value, copyAsJson);
 };
 const addSearchTerm = (value: string) => {
   emits("addSearchTerm", value);
@@ -652,6 +677,7 @@ const expandRow = async (index: number) => {
     isCollapseOperation = true;
   } else {
     expandedRowIndices.value.push(index);
+
     tableRows.value.splice(index + 1, 0, {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
@@ -692,6 +718,30 @@ const handleDataRowClick = (row: any, index: number) => {
   if (actualIndex !== -1) {
     emits("click:dataRow", row, actualIndex);
   }
+};
+
+const expandFunctionError = () => {
+  isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
+};
+// Specific function that updates the active cell action ID
+const updateActiveCell = (cell?: { id: string; column: { id: string } }) => {
+  if (!cell) {
+    activeCellActionId.value = "";
+  } else {
+    activeCellActionId.value = `${cell.id}_${cell.column.id}`;
+  }
+};
+
+// Debounced version of the function
+const debounceCellAction = debounce(updateActiveCell, 500);
+
+// Event handlers for mouse over and mouse leave
+const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {
+  debounceCellAction(cell);
+};
+
+const handleCellMouseLeave = () => {
+  activeCellActionId.value = "";
 };
 
 defineExpose({
@@ -783,13 +833,9 @@ td {
 }
 
 .table-cell {
-  .table-cell-actions {
-    visibility: hidden !important;
-  }
-
   &:hover {
     .table-cell-actions {
-      visibility: visible !important;
+      display: block !important;
     }
   }
 }

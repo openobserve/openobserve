@@ -256,7 +256,7 @@ export default {
     const nestedJson = ref("");
 
     const copyLogToClipboard = () => {
-      emit("copy", props.value);
+      emit("copy", props.value, true);
     };
     const addSearchTerm = (value: string) => {
       emit("addSearchTerm", value);

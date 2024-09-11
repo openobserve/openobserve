@@ -100,11 +100,6 @@ pub async fn search(
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
 
-    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
-    let max_query_range = settings.map_or(0, |s| s.max_query_range);
-
-    let orig_start_time = req.query.start_time;
-
     let mut file_path = format!(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
@@ -118,7 +113,6 @@ pub async fn search(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
-            max_query_range,
         )
         .await
     } else {
@@ -266,21 +260,6 @@ pub async fn search(
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
-    // get stream settings
-    let mut range_error = "".to_string();
-
-    if orig_start_time != req.query.start_time {
-        range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours ",
-            max_query_range
-        );
-        res.set_partial(true);
-    }
-
-    if !range_error.is_empty() {
-        res.function_error = format!("{}. {}", res.function_error, range_error);
-    }
-
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
         response_time: time,
@@ -356,6 +335,7 @@ fn merge_response(
     if cache_responses.is_empty() && search_response.is_empty() {
         return config::meta::search::Response::default();
     }
+    let mut fn_error = String::new();
 
     let mut cache_response = if cache_responses.is_empty() {
         config::meta::search::Response::default()
@@ -372,6 +352,9 @@ fn merge_response(
             }
             resp.hits.extend(res.hits.clone());
             resp.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
         }
         resp.took = cache_took;
         resp
@@ -391,7 +374,11 @@ fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
             cache_response.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
         }
+        cache_response.function_error = fn_error;
         return cache_response;
     }
     let cache_hits_len = cache_response.hits.len();
@@ -423,6 +410,9 @@ fn merge_response(
             res_took.total += took_details.total;
             res_took.nodes.append(&mut took_details.nodes);
         }
+        if !res.function_error.is_empty() {
+            fn_error = res.function_error.clone();
+        }
 
         cache_response.hits.extend(res.hits.clone());
     }
@@ -448,6 +438,9 @@ fn merge_response(
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
+    if !fn_error.is_empty() {
+        cache_response.function_error = fn_error;
+    }
     cache_response
 }
 

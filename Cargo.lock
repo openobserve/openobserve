@@ -5563,6 +5563,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8fddc9b68f5b80dae9d6f510b88e02396f006ad48cac349411fbecc80caae4"
 dependencies = [
+ "hex",
  "opentelemetry",
  "opentelemetry_sdk",
  "prost 0.12.6",
