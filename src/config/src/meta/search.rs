@@ -370,8 +370,8 @@ pub struct SearchPartitionResponse {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchHistoryRequest {
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub org_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_id: Option<String>,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub stream_type: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -867,8 +867,8 @@ mod search_history_utils {
             }
         }
 
-        pub fn with_org_id(mut self, org_id: &str) -> Self {
-            self.org_id = Some(org_id.to_string());
+        pub fn with_org_id(mut self, org_id: &Option<String>) -> Self {
+            self.org_id = org_id.to_owned();
             self
         }
 
@@ -940,7 +940,7 @@ mod search_history_utils {
         #[test]
         fn test_with_org_id() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_org_id("org123")
+                .with_org_id(&Some("org123".to_string()))
                 .build();
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND org_id = 'org123'");
         }
@@ -980,7 +980,7 @@ mod search_history_utils {
         #[test]
         fn test_combined_query() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_org_id("org123")
+                .with_org_id(&Some("org123".to_string()))
                 .with_stream_type("logs")
                 .with_stream_name("streamA")
                 .with_user_email("user123@gmail.com")
@@ -1000,7 +1000,7 @@ mod search_history_utils {
         #[test]
         fn test_partial_query() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_org_id("org123")
+                .with_org_id(&Some("org123".to_string()))
                 .with_user_email("user123@gmail.com")
                 .build();
 

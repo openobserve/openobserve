@@ -1410,10 +1410,12 @@ pub async fn search_history(
         .headers()
         .get("user_id")
         .map(|v| v.to_str().unwrap_or("").to_string());
-    let req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
+    let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    // restrict history only to path org_id
+    req.org_id = Some(org_id);
 
     let search_req = match req.to_request(&cfg.common.column_timestamp) {
         Ok(r) => r,
