@@ -1344,7 +1344,6 @@ pub async fn search_partition(
             "min_ts": 1632960000,
             "max_ts": 1633046400,
             "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
-            "user_email": "root@example.com",
             "size": 100
         })
     ),
@@ -1421,6 +1420,8 @@ pub async fn search_history(
     };
     // restrict history only to path org_id
     req.org_id = Some(org_id.clone());
+    // restrict history only to requested user_id
+    req.user_email = user_id.clone();
 
     // Search
     let stream_name = "usage";
@@ -1489,6 +1490,7 @@ pub async fn search_history(
             })
         }
     };
+
     search_res.hits = search_res.hits
         .into_iter()
         .filter_map(|hit| {
@@ -1547,5 +1549,6 @@ pub async fn search_history(
         started_at,
     )
         .await;
+
     Ok(HttpResponse::Ok().json(search_res))
 }

@@ -382,8 +382,8 @@ pub struct SearchHistoryRequest {
     pub max_ts: i64,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub user_email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_email: Option<String>,
     #[serde(default = "default_size")]
     pub size: i64
 }
@@ -887,8 +887,8 @@ mod search_history_utils {
             self
         }
 
-        pub fn with_user_email(mut self, email: &str) -> Self {
-            self.user_email = Some(email.to_string());
+        pub fn with_user_email(mut self, email: &Option<String>) -> Self {
+            self.user_email = email.to_owned();
             self
         }
 
@@ -965,7 +965,7 @@ mod search_history_utils {
         #[test]
         fn test_with_user_email() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_user_email("user123@gmail.com")
+                .with_user_email(&Some("user123@gmail.com".to_string()))
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'");
         }
@@ -984,7 +984,7 @@ mod search_history_utils {
                 .with_org_id(&Some("org123".to_string()))
                 .with_stream_type("logs")
                 .with_stream_name("streamA")
-                .with_user_email("user123@gmail.com")
+                .with_user_email(&Some("user123@gmail.com".to_string()))
                 .with_trace_id("trace123")
                 .build(SEARCH_STREAM_NAME);
 
@@ -1002,7 +1002,7 @@ mod search_history_utils {
         fn test_partial_query() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_org_id(&Some("org123".to_string()))
-                .with_user_email("user123@gmail.com")
+                .with_user_email(&Some("user123@gmail.com".to_string()))
                 .build(SEARCH_STREAM_NAME);
 
             let expected_query = "SELECT * FROM usage WHERE 1=1 \
