@@ -115,6 +115,8 @@ pub async fn save(
         Err(_) => {
             if !create {
                 return Err(anyhow::anyhow!("Report not found"));
+            } else {
+                report.last_triggered_at = None;
             }
         }
     }
