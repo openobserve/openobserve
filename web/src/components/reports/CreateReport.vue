@@ -862,7 +862,7 @@ const defaultReport = {
   password: "",
   timezone: "UTC",
   timezoneOffset: 0,
-  lastTriggeredAt: 0,
+  lastTriggeredAt: null,
   createdAt: "",
   updatedAt: "",
   owner: "",
