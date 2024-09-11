@@ -1504,19 +1504,14 @@ const filterOptions = (options: any[], val: String, update: Function) => {
 
 const setupEditingReport = async (report: any) => {
   formData.value = {
-    ...JSON.parse(JSON.stringify(report)),
+    ...report,
     dashboards: [
       {
         folder: "",
         dashboard: "",
         tabs: "" as string | string[],
-        variables: [] as { key: string; value: string; id: string }[],
-        timerange: {
-          type: "relative",
-          period: "30m",
-          from: 0,
-          to: 0,
-        },
+        variables: report.dashboards[0].variables,
+        timerange: report.dashboards[0].timerange,
       },
     ],
   };
