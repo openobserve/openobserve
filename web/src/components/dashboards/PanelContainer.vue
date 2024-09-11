@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-tooltip anchor="bottom right" self="top right">
             <div style="white-space: pre-wrap">
-              The data shown is cached and is differed from the selected time
+              The data shown is cached and is different from the selected time
               range.
             </div>
           </q-tooltip>
