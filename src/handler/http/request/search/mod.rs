@@ -1425,7 +1425,7 @@ pub async fn search_history(
 
     // Search
     let stream_name = "usage";
-    let search_req = match req.to_request(stream_name, &cfg.common.column_timestamp) {
+    let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
@@ -1467,7 +1467,7 @@ pub async fn search_history(
         &history_org_id,
         stream_type,
         user_id.clone(),
-        &search_req,
+        &search_query_req,
     )
         .instrument(http_span)
         .await;
@@ -1528,7 +1528,7 @@ pub async fn search_history(
         records: search_res.hits.len() as i64,
         response_time: time_taken,
         size: search_res.scan_size as f64,
-        request_body: Some(search_req.query.sql),
+        request_body: Some(search_query_req.query.sql),
         user_email: user_id,
         min_ts: Some(req.min_ts),
         max_ts: Some(req.max_ts),
@@ -1538,7 +1538,7 @@ pub async fn search_history(
         took_wait_in_queue,
         ..Default::default()
     };
-    let num_fn = search_req.query.query_fn.is_some() as u16;
+    let num_fn = search_query_req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
         &org_id,

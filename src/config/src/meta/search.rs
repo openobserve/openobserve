@@ -411,7 +411,7 @@ impl SearchHistoryRequest {
         Ok(query)
     }
 
-    pub fn to_request(&self, search_stream_name: &str, sort_by: &str) -> Result<Request, String> {
+    pub fn to_query_req(&self, search_stream_name: &str, sort_by: &str) -> Result<Request, String> {
         let sql = self.build_query(search_stream_name)?;
 
         let search_req = Request {
