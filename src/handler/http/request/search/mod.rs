@@ -1343,7 +1343,8 @@ pub async fn search_partition(
             "min_ts": 1632960000,
             "max_ts": 1633046400,
             "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
-            "user_email": "root@example.com"
+            "user_email": "root@example.com",
+            "size": 100
         })
     ),
     responses(
