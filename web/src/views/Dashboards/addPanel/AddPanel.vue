@@ -713,18 +713,8 @@ export default defineComponent({
       },
     );
 
-    watch(selectedDate, async () => {
+    watch(selectedDate, () => {
       // console.time("watch:selectedDate");
-
-      // Also update variables data
-      Object.assign(
-        updatedVariablesData,
-        JSON.parse(JSON.stringify(variablesData)),
-      );
-
-      await nextTick();
-      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-
       updateDateTime(selectedDate.value);
       // console.timeEnd("watch:selectedDate");
     });
