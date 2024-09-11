@@ -193,7 +193,9 @@ const formatReports = () => {
       tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
       time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
       frequency: getFrequencyValue(report.frequency),
-      last_triggered_at: convertUnixToQuasarFormat(report.lastTriggeredAt),
+      last_triggered_at: report.lastTriggeredAt
+        ? convertUnixToQuasarFormat(report.lastTriggeredAt)
+        : "-",
       created_at: convertUnixToQuasarFormat(
         new Date(report.createdAt).getTime() * 1000,
       ),
