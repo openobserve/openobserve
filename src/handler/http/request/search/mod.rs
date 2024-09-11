@@ -1404,7 +1404,7 @@ pub async fn search_history(
         .headers()
         .get("user_id")
         .map(|v| v.to_str().unwrap_or("").to_string());
-    let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
+    let req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
@@ -1425,7 +1425,7 @@ pub async fn search_history(
     });
 
     let default_sql = format!("SELECT * FROM \"{}\"", "usage");
-    let req = config::meta::search::Request {
+    let search_req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: default_sql.clone(),
             from: 0,
@@ -1454,7 +1454,7 @@ pub async fn search_history(
         &history_org_id,
         stream_type,
         user_id.clone(),
-        &req,
+        &search_req,
     )
         .instrument(http_span.clone())
         .await;
@@ -1468,13 +1468,13 @@ pub async fn search_history(
                             match serde_json::to_value(response) {
                                 Ok(json_value) => Some(json_value),
                                 Err(e) => {
-                                    tracing::error!("Serialization error for trace_id {}: {:?}", trace_id, e);
+                                    log::error!("[trace_id {}]Serialization error: {:?}", trace_id, e);
                                     None
                                 }
                             }
                         },
                         Err(e) => {
-                            tracing::error!("Deserialization error for trace_id {}: {:?}", trace_id, e);
+                            log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
                             None
                         }
                     }
@@ -1483,8 +1483,14 @@ pub async fn search_history(
             res.trace_id = trace_id;
             Ok(HttpResponse::Ok().json(res))
         }
-        Err(_) => {
-            Ok(HttpResponse::InternalServerError().into())
+        Err(err) => {
+            tracing::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
+            Ok(HttpResponse::InternalServerError().json(
+                meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                ),
+            ))
         }
     }
 }
