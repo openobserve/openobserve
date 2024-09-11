@@ -1339,6 +1339,7 @@ pub async fn search_partition(
         content_type = "application/json",
         example = json!({
             "stream_name": "default",
+            "stream_type": "logs",
             "min_ts": 1632960000,
             "max_ts": 1633046400,
             "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
