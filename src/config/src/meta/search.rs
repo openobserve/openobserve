@@ -861,39 +861,32 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self) -> String {
-            let mut query = String::from("SELECT * FROM usage");
-            let mut conditions = String::new(); // Store the conditions separately
+            let mut query = String::from("SELECT * FROM usage WHERE 1=1");
 
             if let Some(org_id) = self.org_id {
                 if !org_id.is_empty() {
-                    conditions.push_str(&format!(" AND org_id = '{}'", org_id));
+                    query.push_str(&format!(" AND org_id = '{}'", org_id));
                 }
             }
             if let Some(stream_type) = self.stream_type {
                 if !stream_type.is_empty() {
-                    conditions.push_str(&format!(" AND stream_type = '{}'", stream_type));
+                    query.push_str(&format!(" AND stream_type = '{}'", stream_type));
                 }
             }
             if let Some(stream_name) = self.stream_name {
                 if !stream_name.is_empty() {
-                    conditions.push_str(&format!(" AND stream_name = '{}'", stream_name));
+                    query.push_str(&format!(" AND stream_name = '{}'", stream_name));
                 }
             }
             if let Some(user_email) = self.user_email {
                 if !user_email.is_empty() {
-                    conditions.push_str(&format!(" AND user_email = '{}'", user_email));
+                    query.push_str(&format!(" AND user_email = '{}'", user_email));
                 }
             }
             if let Some(trace_id) = self.trace_id {
                 if !trace_id.is_empty() {
-                    conditions.push_str(&format!(" AND trace_id = '{}'", trace_id));
+                    query.push_str(&format!(" AND trace_id = '{}'", trace_id));
                 }
-            }
-
-            // If conditions were added, append them to the query
-            if !conditions.is_empty() {
-                query.push_str(" WHERE 1=1");
-                query.push_str(&conditions);
             }
 
             query
@@ -908,7 +901,7 @@ mod search_history_utils {
         #[test]
         fn test_empty_query() {
             let query = SearchHistoryQueryBuilder::new().build();
-            assert_eq!(query, "SELECT * FROM usage");
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1");
         }
 
         #[test]
