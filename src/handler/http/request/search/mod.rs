@@ -1338,7 +1338,6 @@ pub async fn search_partition(
         description = "Search history request parameters",
         content_type = "application/json",
         example = json!({
-            "org_id": "default",
             "stream_name": "default",
             "min_ts": 1632960000,
             "max_ts": 1633046400,
