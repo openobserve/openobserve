@@ -374,12 +374,37 @@ pub struct SearchHistoryRequest {
     pub org_id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub stream_name: String,
-    pub start_time: i64,
-    pub end_time: i64,
+    #[serde(rename = "start_time")]
+    pub min_ts: i64,
+    #[serde(rename = "end_time")]
+    pub max_ts: i64,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub user_email: String,
+}
+
+impl SearchHistoryRequest {
+    pub fn validate(&self) -> Result<bool, String> {
+        if self.min_ts >= self.max_ts {
+            return Err("start_time must be less than end_time".to_string());
+        }
+        Ok(true)
+    }
+
+    pub fn build_query(&self) -> Result<String, String> {
+        self.validate()?;
+
+        // Create the query
+        let query = search_history_utils::SearchHistoryQueryBuilder::new()
+            .with_org_id(&self.org_id)
+            .with_stream_name(&self.stream_name)
+            .with_trace_id(&self.trace_id)
+            .with_user_email(&self.user_email)
+            .build();
+
+        Ok(query)
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -786,5 +811,178 @@ mod tests {
 
         assert_eq!(rpc_req.query.as_ref().unwrap().sql, req.query.sql);
         assert_eq!(rpc_req.query.as_ref().unwrap().size, req.query.size as i32);
+    }
+}
+
+mod search_history_utils {
+    pub struct SearchHistoryQueryBuilder {
+        pub org_id: Option<String>,
+        pub stream_type: Option<String>,
+        pub stream_name: Option<String>,
+        pub user_email: Option<String>,
+        pub trace_id: Option<String>
+    }
+
+    impl SearchHistoryQueryBuilder {
+        pub fn new() -> Self {
+            Self {
+                org_id: None,
+                stream_type: None,
+                stream_name: None,
+                user_email: None,
+                trace_id: None,
+            }
+        }
+
+        pub fn with_org_id(mut self, org_id: &str) -> Self {
+            self.org_id = Some(org_id.to_string());
+            self
+        }
+
+        pub fn with_stream_type(mut self, stream_type: &str) -> Self {
+            self.stream_type = Some(stream_type.to_string());
+            self
+        }
+
+        pub fn with_stream_name(mut self, stream_name: &str) -> Self {
+            self.stream_name = Some(stream_name.to_string());
+            self
+        }
+
+        pub fn with_trace_id(mut self, trace_id: &str) -> Self {
+            self.trace_id = Some(trace_id.to_string());
+            self
+        }
+
+        pub fn with_user_email(mut self, email: &str) -> Self {
+            self.user_email = Some(email.to_string());
+            self
+        }
+
+        // Method to build the SQL query
+        pub fn build(self) -> String {
+            let mut query = String::from("SELECT * FROM usage");
+            let mut conditions = String::new(); // Store the conditions separately
+
+            if let Some(org_id) = self.org_id {
+                if !org_id.is_empty() {
+                    conditions.push_str(&format!(" AND org_id = '{}'", org_id));
+                }
+            }
+            if let Some(stream_type) = self.stream_type {
+                if !stream_type.is_empty() {
+                    conditions.push_str(&format!(" AND stream_type = '{}'", stream_type));
+                }
+            }
+            if let Some(stream_name) = self.stream_name {
+                if !stream_name.is_empty() {
+                    conditions.push_str(&format!(" AND stream_name = '{}'", stream_name));
+                }
+            }
+            if let Some(user_email) = self.user_email {
+                if !user_email.is_empty() {
+                    conditions.push_str(&format!(" AND user_email = '{}'", user_email));
+                }
+            }
+            if let Some(trace_id) = self.trace_id {
+                if !trace_id.is_empty() {
+                    conditions.push_str(&format!(" AND trace_id = '{}'", trace_id));
+                }
+            }
+
+            // If conditions were added, append them to the query
+            if !conditions.is_empty() {
+                query.push_str(" WHERE 1=1");
+                query.push_str(&conditions);
+            }
+
+            query
+        }
+    }
+
+
+    #[cfg(test)]
+    mod tests {
+        use super::SearchHistoryQueryBuilder;
+
+        #[test]
+        fn test_empty_query() {
+            let query = SearchHistoryQueryBuilder::new().build();
+            assert_eq!(query, "SELECT * FROM usage");
+        }
+
+        #[test]
+        fn test_with_org_id() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id("org123")
+                .build();
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND org_id = 'org123'");
+        }
+
+        #[test]
+        fn test_with_stream_type() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_type("logs")
+                .build();
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'");
+        }
+
+        #[test]
+        fn test_with_stream_name() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_name("streamA")
+                .build();
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'");
+        }
+
+        #[test]
+        fn test_with_user_email() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_user_email("user123@gmail.com")
+                .build();
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'");
+        }
+
+        #[test]
+        fn test_with_trace_id() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_trace_id("trace123")
+                .build();
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'");
+        }
+
+        #[test]
+        fn test_combined_query() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id("org123")
+                .with_stream_type("logs")
+                .with_stream_name("streamA")
+                .with_user_email("user123@gmail.com")
+                .with_trace_id("trace123")
+                .build();
+
+            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            AND org_id = 'org123' \
+            AND stream_type = 'logs' \
+            AND stream_name = 'streamA' \
+            AND user_email = 'user123@gmail.com' \
+            AND trace_id = 'trace123'";
+
+            assert_eq!(query, expected_query);
+        }
+
+        #[test]
+        fn test_partial_query() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id("org123")
+                .with_user_email("user123@gmail.com")
+                .build();
+
+            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            AND org_id = 'org123' \
+            AND user_email = 'user123@gmail.com'";
+
+            assert_eq!(query, expected_query);
+        }
     }
 }

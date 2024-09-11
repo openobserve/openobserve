@@ -1424,14 +1424,18 @@ pub async fn search_history(
         }
     });
 
-    let default_sql = format!("SELECT * FROM \"{}\"", "usage");
+    let sql = match req.build_query() {
+        Ok(search_query) => search_query,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e))
+    };
+
     let search_req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: default_sql.clone(),
+            sql,
             from: 0,
             size: history_size,
-            start_time: req.start_time,
-            end_time: req.end_time,
+            start_time: req.min_ts,
+            end_time: req.max_ts,
             sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
@@ -1468,7 +1472,7 @@ pub async fn search_history(
                             match serde_json::to_value(response) {
                                 Ok(json_value) => Some(json_value),
                                 Err(e) => {
-                                    log::error!("[trace_id {}]Serialization error: {:?}", trace_id, e);
+                                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
                                     None
                                 }
                             }
