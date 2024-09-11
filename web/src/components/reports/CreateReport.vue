@@ -1466,12 +1466,25 @@ const goToReports = () => {
 };
 
 const onFilterOptions = (type: string, val: String, update: Function) => {
-  const optionsMapping: { [key: string]: any[] } = {
-    folders: folderOptions.value,
-    dashboards: dashboardOptions.value,
-    tabs: dashboardTabOptions.value,
-  };
-  optionsMapping[type] = filterOptions(options.value[type] || [], val, update);
+  if (type === "folders") {
+    folderOptions.value = filterOptions(options.value[type] || [], val, update);
+  }
+
+  if (type === "dashboards") {
+    dashboardOptions.value = filterOptions(
+      options.value[type] || [],
+      val,
+      update,
+    );
+  }
+
+  if (type === "tabs") {
+    dashboardTabOptions.value = filterOptions(
+      dashboardTabOptions.value,
+      val,
+      update,
+    );
+  }
 };
 
 const filterOptions = (options: any[], val: String, update: Function) => {
