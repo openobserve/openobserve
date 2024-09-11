@@ -233,6 +233,8 @@ const filterReports = () => {
       };
     },
   );
+
+  resultTotal.value = formattedReports.value.length;
 };
 
 const columns: any = [
