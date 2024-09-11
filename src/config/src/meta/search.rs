@@ -396,7 +396,7 @@ impl SearchHistoryRequest {
         Ok(true)
     }
 
-    fn build_query(&self) -> Result<String, String> {
+    fn build_query(&self, search_stream_name: &str) -> Result<String, String> {
         self.validate()?;
 
         // Create the query
@@ -406,13 +406,13 @@ impl SearchHistoryRequest {
             .with_stream_name(&self.stream_name)
             .with_trace_id(&self.trace_id)
             .with_user_email(&self.user_email)
-            .build();
+            .build(search_stream_name);
 
         Ok(query)
     }
 
-    pub fn to_request(&self, sort_by: &str) -> Result<Request, String> {
-        let sql = self.build_query()?;
+    pub fn to_request(&self, search_stream_name: &str, sort_by: &str) -> Result<Request, String> {
+        let sql = self.build_query(search_stream_name)?;
 
         let search_req = Request {
             query: Query {
@@ -893,8 +893,8 @@ mod search_history_utils {
         }
 
         // Method to build the SQL query
-        pub fn build(self) -> String {
-            let mut query = String::from("SELECT * FROM usage WHERE 1=1");
+        pub fn build(self, search_stream_name: &str) -> String {
+            let mut query = format!("SELECT * FROM {} WHERE 1=1", search_stream_name);
 
             if let Some(org_id) = self.org_id {
                 if !org_id.is_empty() {
@@ -930,10 +930,11 @@ mod search_history_utils {
     #[cfg(test)]
     mod tests {
         use super::SearchHistoryQueryBuilder;
+        const SEARCH_STREAM_NAME: &str = "usage";
 
         #[test]
         fn test_empty_query() {
-            let query = SearchHistoryQueryBuilder::new().build();
+            let query = SearchHistoryQueryBuilder::new().build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1");
         }
 
@@ -941,7 +942,7 @@ mod search_history_utils {
         fn test_with_org_id() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_org_id(&Some("org123".to_string()))
-                .build();
+                .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND org_id = 'org123'");
         }
 
@@ -949,7 +950,7 @@ mod search_history_utils {
         fn test_with_stream_type() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_stream_type("logs")
-                .build();
+                .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'");
         }
 
@@ -957,7 +958,7 @@ mod search_history_utils {
         fn test_with_stream_name() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_stream_name("streamA")
-                .build();
+                .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'");
         }
 
@@ -965,7 +966,7 @@ mod search_history_utils {
         fn test_with_user_email() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_user_email("user123@gmail.com")
-                .build();
+                .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'");
         }
 
@@ -973,7 +974,7 @@ mod search_history_utils {
         fn test_with_trace_id() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_trace_id("trace123")
-                .build();
+                .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'");
         }
 
@@ -985,7 +986,7 @@ mod search_history_utils {
                 .with_stream_name("streamA")
                 .with_user_email("user123@gmail.com")
                 .with_trace_id("trace123")
-                .build();
+                .build(SEARCH_STREAM_NAME);
 
             let expected_query = "SELECT * FROM usage WHERE 1=1 \
             AND org_id = 'org123' \
@@ -1002,7 +1003,7 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_org_id(&Some("org123".to_string()))
                 .with_user_email("user123@gmail.com")
-                .build();
+                .build(SEARCH_STREAM_NAME);
 
             let expected_query = "SELECT * FROM usage WHERE 1=1 \
             AND org_id = 'org123' \

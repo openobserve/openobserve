@@ -1323,6 +1323,7 @@ pub async fn search_partition(
     }
 }
 
+/// Search History
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -1394,7 +1395,7 @@ pub async fn search_history(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let _start = std::time::Instant::now();
+    let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
@@ -1415,23 +1416,26 @@ pub async fn search_history(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
     // restrict history only to path org_id
-    req.org_id = Some(org_id);
+    req.org_id = Some(org_id.clone());
 
-    let search_req = match req.to_request(&cfg.common.column_timestamp) {
+    // Search
+    let stream_name = "usage";
+    let search_req = match req.to_request(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-
     let history_org_id = "_meta";
+    let stream_type = StreamType::Logs;
     let res = SearchService::search(
         &trace_id,
         &history_org_id,
-        StreamType::Logs,
+        stream_type,
         user_id.clone(),
         &search_req,
     )
         .instrument(http_span.clone())
         .await;
+
     match res {
         Ok(mut res) => {
             res.hits = res.hits
@@ -1455,16 +1459,23 @@ pub async fn search_history(
                 })
                 .collect::<Vec<_>>();
             res.trace_id = trace_id;
+            http_report_metrics(start, &org_id, stream_type, stream_name, "200", "_search_history");
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
+            http_report_metrics(start, &org_id, stream_type, stream_name, "500", "_search_history");
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
-            Ok(HttpResponse::InternalServerError().json(
-                meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                 ),
-            ))
+                _ => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    ),
+                )
+            })
         }
     }
 }
