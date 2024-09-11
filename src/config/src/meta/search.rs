@@ -369,6 +369,63 @@ pub struct SearchPartitionResponse {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SearchHistoryRequest {
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub org_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub stream_name: String,
+    pub start_time: i64,
+    pub end_time: i64,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub trace_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub user_email: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SearchHistoryHitResponse {
+    pub org_id: String,
+    pub stream_type: String,
+    pub stream_name: String,
+    pub user_email: String,
+    #[serde(rename = "start_time")]
+    pub min_ts: i64,
+    #[serde(rename = "end_time")]
+    pub max_ts: i64,
+    #[serde(rename = "sql")]
+    pub request_body: String,
+    #[serde(rename = "scan_size")]
+    pub size: f64,
+    #[serde(rename = "scan_records")]
+    pub num_records: i64,
+    #[serde(rename = "took")]
+    pub response_time: f64,
+    pub cached_ratio: i64,
+    pub trace_id: String,
+}
+
+impl TryFrom<json::Value> for SearchHistoryHitResponse {
+    type Error = String;
+
+    fn try_from(value: json::Value) -> Result<Self, Self::Error> {
+        Ok(SearchHistoryHitResponse {
+            org_id: value.get("org_id").and_then(|v| v.as_str()).ok_or("org_id missing".to_string())?.to_string(),
+            stream_type: value.get("stream_type").and_then(|v| v.as_str()).ok_or("stream_type missing".to_string())?.to_string(),
+            stream_name: value.get("stream_name").and_then(|v| v.as_str()).ok_or("stream_name missing".to_string())?.to_string(),
+            user_email: value.get("user_email").and_then(|v| v.as_str()).ok_or("user_email missing".to_string())?.to_string(),
+            min_ts: value.get("min_ts").and_then(|v| v.as_i64()).ok_or("min_ts missing".to_string())?,
+            max_ts: value.get("max_ts").and_then(|v| v.as_i64()).ok_or("max_ts missing".to_string())?,
+            request_body: value.get("request_body").and_then(|v| v.as_str()).ok_or("request_body".to_string())?.to_string(),
+            size: value.get("size").and_then(|v| v.as_f64()).ok_or("size missing".to_string())?,
+            num_records: value.get("num_records").and_then(|v| v.as_i64()).ok_or("num_records missing".to_string())?,
+            response_time: value.get("response_time").and_then(|v| v.as_f64()).ok_or("response_time missing".to_string())?,
+            cached_ratio: value.get("cached_ratio").and_then(|v| v.as_i64()).ok_or("cached_ratio missing".to_string())?,
+            trace_id: value.get("trace_id").and_then(|v| v.as_str()).ok_or("trace_id missing".to_string())?.to_string(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct QueryStatusResponse {
     pub status: Vec<QueryStatus>,
 }

@@ -31,7 +31,7 @@ use config::{
 };
 use infra::errors;
 use tracing::{Instrument, Span};
-
+use config::meta::search::SearchHistoryHitResponse;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -1319,6 +1319,172 @@ pub async fn search_partition(
                     err.to_string(),
                 )),
             })
+        }
+    }
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "SearchHistory",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("stream_type" = String, Query, description = "Type of the stream (e.g., logs)"),
+        ("size" = i64, Query, description = "Number of search history records to fetch"),
+        ("stream_name" = String, Query, description = "Name of the stream"),
+    ),
+    request_body(
+        content = SearchHistoryRequest,
+        description = "Search history request parameters",
+        content_type = "application/json"
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = SearchHistoryResponse, example = json ! ({
+            "took": 40,
+            "took_detail": {
+                "total": 0,
+                "idx_took": 0,
+                "wait_queue": 0,
+                "cluster_total": 40,
+                "cluster_wait_queue": 0
+            },
+            "hits": [
+                {
+                "cached_ratio": 0,
+                "end_time": 15,
+                "org_id": "default",
+                "scan_records": 1,
+                "scan_size": 7.0,
+                "sql": "SELECT COUNT(*) from \"default\"",
+                "start_time": 0,
+                "stream_name": "default",
+                "stream_type": "logs",
+                "took": 0.056222333,
+                "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
+                "user_email": "root@example.com"
+                },
+            ],
+            "total": 3,
+            "from": 0,
+            "size": 20,
+            "cached_ratio": 0,
+            "scan_size": 0,
+            "idx_scan_size": 0,
+            "scan_records": 3,
+            "trace_id": "2lsPBWjwZxUJ5ugvZ4jApESZEpk",
+            "is_partial": false,
+            "result_cache_ratio": 0
+        })),
+        (status = 400, description = "Bad Request - Invalid parameters or body", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/_search_history")]
+pub async fn search_history(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let _start = std::time::Instant::now();
+    let org_id = org_id.into_inner();
+    let cfg = get_config();
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/_search_history",
+            org_id = org_id.clone()
+        )
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .map(|v| v.to_str().unwrap_or("").to_string());
+    let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    let query = match web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) {
+        Ok(q) => q,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or(StreamType::Logs),
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+    let history_size = query.get("size").map_or(10, |v| {
+        match v.parse::<i64>() {
+            Ok(size) => size,
+            Err(_) => 10,
+        }
+    });
+
+    let default_sql = format!("SELECT * FROM \"{}\"", "usage");
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql: default_sql.clone(),
+            from: 0,
+            size: history_size,
+            start_time: req.start_time,
+            end_time: req.end_time,
+            sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: Vec::new(),
+        clusters: Vec::new(),
+        timeout: 0,
+        search_type: Some(SearchEventType::Other),
+        index_type: "".to_string(),
+    };
+
+    let history_org_id = "_meta";
+    let res = SearchService::search(
+        &trace_id,
+        &history_org_id,
+        stream_type,
+        user_id.clone(),
+        &req,
+    )
+        .instrument(http_span.clone())
+        .await;
+    match res {
+        Ok(mut res) => {
+            res.hits = res.hits
+                .into_iter()
+                .filter_map(|hit| {
+                    match SearchHistoryHitResponse::try_from(hit) {
+                        Ok(response) => {
+                            match serde_json::to_value(response) {
+                                Ok(json_value) => Some(json_value),
+                                Err(e) => {
+                                    tracing::error!("Serialization error for trace_id {}: {:?}", trace_id, e);
+                                    None
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            tracing::error!("Deserialization error for trace_id {}: {:?}", trace_id, e);
+                            None
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+            res.trace_id = trace_id;
+            Ok(HttpResponse::Ok().json(res))
+        }
+        Err(_) => {
+            Ok(HttpResponse::InternalServerError().into())
         }
     }
 }
