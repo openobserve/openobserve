@@ -1261,6 +1261,8 @@ const convertDateToTimestamp = (
 
 const saveReport = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
+  const reportPayload = JSON.parse(JSON.stringify(formData.value));
+
   if (
     selectedTimeTab.value === "scheduleNow" ||
     frequency.value.type === "cron"
@@ -1292,42 +1294,42 @@ const saveReport = async () => {
     scheduling.value.timezone,
   );
 
-  formData.value.start = convertedDateTime.timestamp;
+  reportPayload.start = convertedDateTime.timestamp;
 
-  formData.value.timezoneOffset = convertedDateTime.offset;
+  reportPayload.timezoneOffset = convertedDateTime.offset;
 
-  formData.value.orgId = store.state.selectedOrganization.identifier;
+  reportPayload.orgId = store.state.selectedOrganization.identifier;
 
-  formData.value.destinations = emails.value.split(/[,;]/).map((email) => ({
+  reportPayload.destinations = emails.value.split(/[,;]/).map((email) => ({
     email: email.trim(),
   }));
 
   if (frequency.value.type === "custom") {
-    formData.value.frequency.type = frequency.value.custom.period;
-    formData.value.frequency.interval = Number(frequency.value.custom.interval);
+    reportPayload.frequency.type = frequency.value.custom.period;
+    reportPayload.frequency.interval = Number(frequency.value.custom.interval);
   } else if (frequency.value.type === "cron") {
-    formData.value.frequency.type = frequency.value.type;
-    formData.value.frequency.cron =
+    reportPayload.frequency.type = frequency.value.type;
+    reportPayload.frequency.cron =
       frequency.value.cron.toString().trim() + " *";
   } else {
-    formData.value.frequency.type = frequency.value.type;
-    formData.value.frequency.interval = 1;
+    reportPayload.frequency.type = frequency.value.type;
+    reportPayload.frequency.interval = 1;
   }
 
-  formData.value.timezone = scheduling.value.timezone;
+  reportPayload.timezone = scheduling.value.timezone;
 
   if (isEditingReport.value) {
-    formData.value.updatedAt = new Date().toISOString();
-    formData.value.lastEditedBy = store.state.userInfo.email;
+    reportPayload.updatedAt = new Date().toISOString();
+    reportPayload.lastEditedBy = store.state.userInfo.email;
   } else {
-    formData.value.createdAt = new Date().toISOString();
-    formData.value.owner = store.state.userInfo.email;
-    formData.value.lastTriggeredAt = null;
-    formData.value.lastEditedBy = store.state.userInfo.email;
-    formData.value.updatedAt = new Date().toISOString();
+    reportPayload.createdAt = new Date().toISOString();
+    reportPayload.owner = store.state.userInfo.email;
+    reportPayload.lastTriggeredAt = null;
+    reportPayload.lastEditedBy = store.state.userInfo.email;
+    reportPayload.updatedAt = new Date().toISOString();
   }
 
-  if (isCachedReport.value) formData.value.destinations = [];
+  if (isCachedReport.value) reportPayload.destinations = [];
 
   // Check if all report input fields are valid
   try {
@@ -1341,9 +1343,9 @@ const saveReport = async () => {
   }
 
   // This is unitil we support multiple dashboards and tabs
-  if (formData.value.dashboards[0]?.tabs)
-    formData.value.dashboards[0].tabs = [
-      formData.value.dashboards[0].tabs as string,
+  if (reportPayload.dashboards[0]?.tabs)
+    reportPayload.dashboards[0].tabs = [
+      reportPayload.dashboards[0].tabs as string,
     ];
 
   const reportAction = isEditingReport.value
@@ -1356,7 +1358,7 @@ const saveReport = async () => {
     timeout: 2000,
   });
 
-  reportAction(store.state.selectedOrganization.identifier, formData.value)
+  reportAction(store.state.selectedOrganization.identifier, reportPayload)
     .then(() => {
       q.notify({
         type: "positive",
@@ -1379,10 +1381,6 @@ const saveReport = async () => {
       });
     })
     .finally(() => {
-      // TODO OK : Remove this after multi tab support in reports, this is a workaround
-      formData.value.dashboards[0].tabs =
-        formData.value?.dashboards[0]?.tabs[0];
-
       dismiss();
     });
 };
