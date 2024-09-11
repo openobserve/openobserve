@@ -617,6 +617,9 @@ export default defineComponent({
 
       // set it as a absolute time
       dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
+
+      // refresh dashboard
+      dateTimePicker.value.refresh();
     };
 
     // ------- work with query params ----------
