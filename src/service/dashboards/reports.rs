@@ -205,7 +205,7 @@ pub async fn list(
                         if report
                             .dashboards
                             .iter()
-                            .any(|x| x.dashboard.eq(dashboard_id))
+                            .any(|x| !x.dashboard.eq(dashboard_id))
                         {
                             should_include = false;
                         }
