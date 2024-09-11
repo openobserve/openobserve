@@ -1411,19 +1411,60 @@ pub async fn search_history(
         .headers()
         .get("user_id")
         .map(|v| v.to_str().unwrap_or("").to_string());
+
     let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
     // restrict history only to path org_id
     req.org_id = Some(org_id.clone());
+    // Del after testing ----
+    let now = Utc::now();
+    let start_time = now - Duration::minutes(15);
+    let end_time = now + Duration::minutes(15);
+    req.min_ts = start_time.timestamp_micros();
+    req.max_ts = end_time.timestamp_micros();
+    // -----------------------
 
     // Search
     let stream_name = "usage";
     let search_req = match req.to_request(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
+
+    // increment query queue
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
+
+    // handle search queue lock and timing
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !cfg.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+
+    log::info!(
+        "http search history API wait in queue took: {} ms",
+        took_wait
+    );
+
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
+
     let history_org_id = "_meta";
     let stream_type = StreamType::Logs;
     let res = SearchService::search(
