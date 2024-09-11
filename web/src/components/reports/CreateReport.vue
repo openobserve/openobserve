@@ -1322,7 +1322,7 @@ const saveReport = async () => {
   } else {
     formData.value.createdAt = new Date().toISOString();
     formData.value.owner = store.state.userInfo.email;
-    formData.value.lastTriggeredAt = new Date().getTime();
+    formData.value.lastTriggeredAt = new Date().getTime() * 1000;
     formData.value.lastEditedBy = store.state.userInfo.email;
     formData.value.updatedAt = new Date().toISOString();
   }
