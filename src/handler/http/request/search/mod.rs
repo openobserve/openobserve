@@ -1339,7 +1339,15 @@ pub async fn search_partition(
     request_body(
         content = SearchHistoryRequest,
         description = "Search history request parameters",
-        content_type = "application/json"
+        content_type = "application/json",
+        example = json!({
+            "org_id": "default",
+            "stream_name": "default",
+            "min_ts": 1632960000,
+            "max_ts": 1633046400,
+            "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
+            "user_email": "root@example.com"
+        })
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchHistoryResponse, example = json ! ({
