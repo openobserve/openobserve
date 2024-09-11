@@ -1396,6 +1396,7 @@ pub async fn search_history(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let org_id = org_id.into_inner();
     let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
@@ -1508,7 +1509,43 @@ pub async fn search_history(
             }
         })
         .collect::<Vec<_>>();
-    search_res.trace_id = trace_id;
+    search_res.trace_id = trace_id.clone();
+
+    // report http metrics
     http_report_metrics(start, &org_id, stream_type, stream_name, "200", "_search_history");
+
+    // prepare usage metrics
+    let time_taken = start.elapsed().as_secs_f64();
+    let took_wait_in_queue = if search_res.took_detail.is_some() {
+        let resp_took = search_res.took_detail.as_ref().unwrap();
+        Some(resp_took.cluster_wait_queue)
+    } else {
+        None
+    };
+    let req_stats = RequestStats {
+        records: search_res.hits.len() as i64,
+        response_time: time_taken,
+        size: search_res.scan_size as f64,
+        request_body: Some(search_req.query.sql),
+        user_email: user_id,
+        min_ts: Some(req.min_ts),
+        max_ts: Some(req.max_ts),
+        cached_ratio: Some(search_res.cached_ratio),
+        search_type: Some(SearchEventType::Other),
+        trace_id: Some(trace_id),
+        took_wait_in_queue,
+        ..Default::default()
+    };
+    let num_fn = search_req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        &org_id,
+        stream_name,
+        StreamType::Logs,
+        UsageType::SearchHistory,
+        num_fn,
+        started_at,
+    )
+        .await;
     Ok(HttpResponse::Ok().json(search_res))
 }
