@@ -373,6 +373,8 @@ pub struct SearchHistoryRequest {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub org_id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
+    pub stream_type: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub stream_name: String,
     #[serde(rename = "start_time")]
     pub min_ts: i64,
@@ -398,6 +400,7 @@ impl SearchHistoryRequest {
         // Create the query
         let query = search_history_utils::SearchHistoryQueryBuilder::new()
             .with_org_id(&self.org_id)
+            .with_stream_type(&self.stream_type)
             .with_stream_name(&self.stream_name)
             .with_trace_id(&self.trace_id)
             .with_user_email(&self.user_email)

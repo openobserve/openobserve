@@ -1332,9 +1332,7 @@ pub async fn search_partition(
     ),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
-        ("stream_type" = String, Query, description = "Type of the stream (e.g., logs)"),
         ("size" = i64, Query, description = "Number of search history records to fetch"),
-        ("stream_name" = String, Query, description = "Name of the stream"),
     ),
     request_body(
         content = SearchHistoryRequest,
@@ -1421,10 +1419,6 @@ pub async fn search_history(
         Ok(q) => q,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
     let history_size = query.get("size").map_or(10, |v| {
         match v.parse::<i64>() {
             Ok(size) => size,
@@ -1464,7 +1458,7 @@ pub async fn search_history(
     let res = SearchService::search(
         &trace_id,
         &history_org_id,
-        stream_type,
+        StreamType::Logs,
         user_id.clone(),
         &search_req,
     )
