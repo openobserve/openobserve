@@ -1420,13 +1420,6 @@ pub async fn search_history(
     };
     // restrict history only to path org_id
     req.org_id = Some(org_id.clone());
-    // Del after testing ----
-    let now = Utc::now();
-    let start_time = now - Duration::minutes(15);
-    let end_time = now + Duration::minutes(15);
-    req.min_ts = start_time.timestamp_micros();
-    req.max_ts = end_time.timestamp_micros();
-    // -----------------------
 
     // Search
     let stream_name = "usage";
@@ -1467,42 +1460,18 @@ pub async fn search_history(
 
     let history_org_id = "_meta";
     let stream_type = StreamType::Logs;
-    let res = SearchService::search(
+    let search_res = SearchService::search(
         &trace_id,
         &history_org_id,
         stream_type,
         user_id.clone(),
         &search_req,
     )
-        .instrument(http_span.clone())
+        .instrument(http_span)
         .await;
 
-    match res {
-        Ok(mut res) => {
-            res.hits = res.hits
-                .into_iter()
-                .filter_map(|hit| {
-                    match SearchHistoryHitResponse::try_from(hit) {
-                        Ok(response) => {
-                            match serde_json::to_value(response) {
-                                Ok(json_value) => Some(json_value),
-                                Err(e) => {
-                                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
-                                    None
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
-                            None
-                        }
-                    }
-                })
-                .collect::<Vec<_>>();
-            res.trace_id = trace_id;
-            http_report_metrics(start, &org_id, stream_type, stream_name, "200", "_search_history");
-            Ok(HttpResponse::Ok().json(res))
-        }
+    let mut search_res = match search_res {
+        Ok(res) => res,
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, stream_name, "500", "_search_history");
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
@@ -1518,5 +1487,28 @@ pub async fn search_history(
                 )
             })
         }
-    }
+    };
+    search_res.hits = search_res.hits
+        .into_iter()
+        .filter_map(|hit| {
+            match SearchHistoryHitResponse::try_from(hit) {
+                Ok(response) => {
+                    match serde_json::to_value(response) {
+                        Ok(json_value) => Some(json_value),
+                        Err(e) => {
+                            log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
+                            None
+                        }
+                    }
+                },
+                Err(e) => {
+                    log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                    None
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    search_res.trace_id = trace_id;
+    http_report_metrics(start, &org_id, stream_type, stream_name, "200", "_search_history");
+    Ok(HttpResponse::Ok().json(search_res))
 }
