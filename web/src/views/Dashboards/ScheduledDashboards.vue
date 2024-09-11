@@ -15,10 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-dashboards tw-bg-white">
+  <div
+    class="scheduled-dashboards"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  >
     <q-table
       data-test="alert-list-table"
-      ref="tableRef"
+      ref="scheduledDashboardTableRef"
       :rows="formattedReports"
       :columns="columns"
       row-key="id"
@@ -74,7 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('dashboard.scheduledDashboards')"
           :position="'top'"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
@@ -105,6 +107,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
+import { useStore } from "vuex";
 
 const props = defineProps({
   reports: {
@@ -137,11 +140,13 @@ const scheduledReports = ref<ScheduledDashboardReport[]>(
 
 const formattedReports = ref<ScheduledDashboardReport[]>([]);
 
-const tableRef = ref<InstanceType<typeof QTable> | null>();
+const scheduledDashboardTableRef = ref<InstanceType<typeof QTable> | null>();
 
 const router = useRouter();
 
 const activeTab = ref("cached");
+
+const store = useStore();
 
 const tabs = reactive([
   {
@@ -165,6 +170,8 @@ watch(
 );
 
 const formatReports = () => {
+  resultTotal.value = props.reports.length;
+
   props.reports.forEach((report: any, index) => {
     scheduledReports.value.push({
       "#": index + 1,
@@ -182,8 +189,6 @@ const formatReports = () => {
   });
 
   filterReports();
-
-  console.log(scheduledReports.value);
 };
 
 const filterReports = () => {
@@ -199,7 +204,14 @@ const filterReports = () => {
     ).filter((report) => !report.isCached);
   }
 
-  console.log(scheduledReports.value);
+  formattedReports.value = formattedReports.value.map(
+    (report: any, index: number) => {
+      return {
+        ...report,
+        "#": index + 1,
+      };
+    },
+  );
 };
 
 const columns: any = [
@@ -253,25 +265,24 @@ const columns: any = [
   },
 ];
 
-const pagination: any = reactive({
+const pagination: any = ref({
   rowsPerPage: 20,
 });
 
 const resultTotal = ref(0);
 
-const perPageOptions = ref([
+const perPageOptions: any = [
+  { label: "5", value: 5 },
   { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
   { label: "100", value: 100 },
-]);
-
-const selectedPerPage = ref(1);
+  { label: "All", value: 0 },
+];
 
 const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
   pagination.value.rowsPerPage = val.value;
-  tableRef.value?.setPagination(pagination.value);
+  scheduledDashboardTableRef.value?.setPagination(pagination.value);
 };
 
 const filterQuery = ref("");
@@ -314,13 +325,13 @@ const getFrequencyValue = (frequency: any) => {
       case "once":
         return `Once`;
       case "hours":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "hours" : "hour"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Hours" : "Hour"}`;
       case "weeks":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "weeks" : "week"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Weeks" : "Week"}`;
       case "months":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "months" : "month"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Months" : "Month"}`;
       case "days":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "days" : "day"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Days" : "Day"}`;
       default:
         return "";
     }
@@ -339,6 +350,29 @@ const getTimeRangeValue = (dateTime: any) => {
 </script>
 
 <style lang="scss" scoped>
+.dark-mode {
+  background-color: $dark-page;
+
+  &.scheduled-dashboards {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+}
+
 .scheduled-dashboards {
   height: fit-content;
 

@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
+              :disable="arePanelsLoading"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -98,16 +99,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
             <q-btn
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="cancel"
+              @click="cancelQuery"
+              data-test="dashboard-cancel-btn"
+              color="negative"
+            >
+              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-else
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="refresh"
               @click="refreshData"
+              :disable="arePanelsLoading"
               data-test="dashboard-refresh-btn"
             >
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
+
             <ExportDashboard
               v-if="!isFullscreen"
               class="hideOnPrintMode"
@@ -167,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip></q-btn
             >
             <q-btn
+              v-if="!isFullscreen"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -200,6 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
+        @panelsValues="handleEmittedData"
+        @searchRequestTraceIds="searchRequestTraceIds"
       />
 
       <q-dialog
@@ -262,6 +282,9 @@ import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
+import config from "@/aws-exports";
+import queryService from "../../services/search";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -290,6 +313,7 @@ export default defineComponent({
     const showScheduledReportsDialog = ref(false);
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+
     let moment: any = () => {};
 
     const importMoment = async () => {
@@ -495,6 +519,18 @@ export default defineComponent({
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
     };
+
+    // [START] cancel running queries
+
+    const arePanelsLoading = ref(false);
+
+    const handleEmittedData = (allPanelsLoaded) => {
+      arePanelsLoading.value = !allPanelsLoaded;
+    };
+
+    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
+
+    // [END] cancel running queries
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
@@ -754,8 +790,8 @@ export default defineComponent({
       reports
         .list(
           store.state.selectedOrganization.identifier,
-          currentDashboardData.data?.folderId,
-          currentDashboardData.data?.dashboardId,
+          folderId.value,
+          dashboardId.value,
         )
         .then((response) => {
           scheduledReports.value = response.data;
@@ -845,6 +881,13 @@ export default defineComponent({
       folderId,
       tabId,
       outlinedDescription,
+      searchRequestTraceIds,
+      arePanelsLoading,
+      cancelQuery,
+      traceIdRef,
+      searchRequestTraceIds,
+      handleEmittedData,
+      config,
     };
   },
 });

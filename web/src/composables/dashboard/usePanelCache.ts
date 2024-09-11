@@ -78,12 +78,13 @@ export const usePanelCache = (
     }
   };
 
-  const savePanelCache = (key: any, data: any) => {
+  const savePanelCache = (key: any, data: any, cacheTimeRange: any) => {
     createNestedPathsIfRequired();
 
     cache[folderId][dashboardId][panelId] = {
       key: JSON.parse(JSON.stringify(key)), // deep copy key,
       value: JSON.parse(JSON.stringify(data)), // deep copy data
+      cacheTimeRange: JSON.parse(JSON.stringify(cacheTimeRange)),
     };
   };
 
