@@ -384,6 +384,8 @@ pub struct SearchHistoryRequest {
     pub trace_id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub user_email: String,
+    #[serde(default = "default_size")]
+    pub size: i64
 }
 
 impl SearchHistoryRequest {
@@ -394,7 +396,7 @@ impl SearchHistoryRequest {
         Ok(true)
     }
 
-    pub fn build_query(&self) -> Result<String, String> {
+    fn build_query(&self) -> Result<String, String> {
         self.validate()?;
 
         // Create the query
@@ -407,6 +409,34 @@ impl SearchHistoryRequest {
             .build();
 
         Ok(query)
+    }
+
+    pub fn to_request(&self, sort_by: &str) -> Result<Request, String> {
+        let sql = self.build_query()?;
+
+        let search_req = Request {
+            query: Query {
+                sql,
+                from: 0,
+                size: self.size,
+                start_time: self.min_ts,
+                end_time: self.max_ts,
+                sort_by: Some(format!("{} DESC", sort_by)),
+                quick_mode: false,
+                query_type: "".to_string(),
+                track_total_hits: false,
+                uses_zo_fn: false,
+                query_fn: None,
+                skip_wal: false,
+            },
+            encoding: RequestEncoding::Empty,
+            regions: Vec::new(),
+            clusters: Vec::new(),
+            timeout: 0,
+            search_type: Some(SearchEventType::Other),
+            index_type: "".to_string(),
+        };
+        Ok(search_req)
     }
 }
 

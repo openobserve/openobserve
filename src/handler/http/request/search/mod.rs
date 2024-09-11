@@ -1332,7 +1332,6 @@ pub async fn search_partition(
     ),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
-        ("size" = i64, Query, description = "Number of search history records to fetch"),
     ),
     request_body(
         content = SearchHistoryRequest,
@@ -1415,43 +1414,9 @@ pub async fn search_history(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let query = match web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) {
-        Ok(q) => q,
+    let search_req = match req.to_request(&cfg.common.column_timestamp) {
+        Ok(r) => r,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
-    let history_size = query.get("size").map_or(10, |v| {
-        match v.parse::<i64>() {
-            Ok(size) => size,
-            Err(_) => 10,
-        }
-    });
-
-    let sql = match req.build_query() {
-        Ok(search_query) => search_query,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e))
-    };
-
-    let search_req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: history_size,
-            start_time: req.min_ts,
-            end_time: req.max_ts,
-            sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: Vec::new(),
-        clusters: Vec::new(),
-        timeout: 0,
-        search_type: Some(SearchEventType::Other),
-        index_type: "".to_string(),
     };
 
     let history_org_id = "_meta";
