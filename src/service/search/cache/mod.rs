@@ -477,7 +477,7 @@ async fn write_results(
         local_resp.hits.remove(remove_index);
     };
 
-    if local_resp.hits.is_empty() {
+    if local_resp.hits.is_empty() || local_resp.hits.len() < 2 {
         return;
     }
 
