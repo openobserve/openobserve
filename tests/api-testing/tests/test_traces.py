@@ -82,8 +82,8 @@ def valid_trace():
               }}]}
     ]}]}"""
 
-    json_str = json_str.replace("<start_time>","{:d}".format(start_time))
-    json_str = json_str.replace("<end_time>","{:d}".format(end_time))
+    json_str = json_str.replace("<start_time>","\"{:d}\"".format(start_time))
+    json_str = json_str.replace("<end_time>","\"{:d}\"".format(end_time))
     return json.loads(json_str)
 
 
@@ -109,8 +109,8 @@ def test_e2e_old_trace_ingestion(create_session, base_url):
     org_id = "default"
 
     trace = valid_trace()
-    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = 1724898237575000000
-    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["endTimeUnixNano"] = 1724898237576000000
+    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = "1724898237575000000"
+    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["endTimeUnixNano"] = "1724898237576000000"
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
     assert (
@@ -140,7 +140,7 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
     ), f"Invalid trace json response expected to contain missing field, but got {content}"
 
     trace = valid_trace()
-    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = "1724898237575000000"
+    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = 1724898237575000000
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
     assert (
@@ -149,7 +149,7 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
 
     content = resp_post_trace.json()
     assert (
-        "invalid type: string \"1724898237575000000\", expected u64" in content["message"]
+        "Invalid json: invalid type: integer `1724898237575000000`, expected a string" in content["message"]
     ), f"Invalid trace json response expected to contain incorrect field, but got {content}"
 
 
