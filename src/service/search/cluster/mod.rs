@@ -1024,7 +1024,7 @@ async fn get_file_list_by_inverted_index(
         .iter()
         .map(|x| match cfg.common.full_text_search_type.as_str() {
             "contains" => format!("term LIKE '%{x}%'"),
-            "eq" => format!("term LIKE '{x}'"),
+            "eq" => format!("term = '{x}'"),
             // Default to "prefix"
             _ => format!("term LIKE '{x}%'"),
         })
