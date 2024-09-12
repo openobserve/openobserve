@@ -737,7 +737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-select
                   data-test="add-report-schedule-start-timezone-select"
-                  v-model="timezone"
+                  v-model="triggerData.timezone"
                   :options="filteredTimezone"
                   @blur="
                     browserTimezone =
@@ -753,7 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   emit-value
                   fill-input
                   hide-selected
-                  :title="timezone"
+                  :title="triggerData.timezone"
                   :label="t('logStream.timezone') + ' *'"
                   :display-value="`Timezone: ${browserTimezone}`"
                   class="timezone-select showLabelOnTop q-ml-sm"
@@ -830,7 +830,6 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "vrlFunctionError",
-  "timezone",
 ]);
 
 const emits = defineEmits([
@@ -846,7 +845,6 @@ const emits = defineEmits([
   "update:promql_condition",
   "update:vrl_function",
   "update:showVrlFunction",
-  "update:timezone",
   "validate-sql",
 ]);
 
@@ -1004,15 +1002,6 @@ const isVrlFunctionEnabled = computed({
   set(value) {
     emits("update:showVrlFunction", value);
     updateFunctionVisibility(value);
-  },
-});
-
-const timezone = computed({
-  get() {
-    return props.timezone;
-  },
-  set(value) {
-    emits("update:timezone", value);
   },
 });
 

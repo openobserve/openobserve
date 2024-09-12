@@ -201,7 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
-                v-model:timezone="formData.timezone"
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
@@ -508,6 +507,7 @@ const defaultValue: any = () => {
       threshold: 3,
       silence: 10,
       frequency_type: "minutes",
+      timezone: "UTC",
     },
     destinations: [],
     context_attributes: {},
@@ -518,7 +518,6 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
-    timezone: "UTC",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -1266,18 +1265,16 @@ export default defineComponent({
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
 
-      if (!this.formData.timezone) {
+      if (!this.formData.trigger_condition?.timezone) {
         if (this.formData.tz_offset === 0) {
-          this.formData.timezone = "UTC";
+          this.formData.trigger_condition.timezone = "UTC";
         } else {
           this.getTimezonesByOffset(this.formData.tz_offset).then(
             (res: any) => {
-              this.formData.timezone = res[0];
+              this.formData.trigger_condition.timezone = res[0];
             },
           );
         }
-
-        console.log("Timezone", this.formData.timezone);
       }
 
       if (this.formData.query_condition.vrl_function) {
@@ -1373,7 +1370,7 @@ export default defineComponent({
         const convertedDateTime = this.convertDateToTimestamp(
           date,
           time,
-          this.formData.timezone,
+          this.formData.trigger_condition.timezone,
         );
 
         alert(convertedDateTime.timestamp + " : " + convertedDateTime.offset);
