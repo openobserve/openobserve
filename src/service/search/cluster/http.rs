@@ -226,7 +226,11 @@ pub async fn search(
             / scan_stats.querier_files as f64) as usize,
     );
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
-    result.set_idx_took(idx_took);
+    result.set_idx_took(if idx_took > 0 {
+        idx_took
+    } else {
+        scan_stats.idx_took as usize
+    });
 
     if query_type == "table" {
         result.response_type = "table".to_string();
