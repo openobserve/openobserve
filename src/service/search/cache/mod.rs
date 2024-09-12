@@ -505,8 +505,8 @@ async fn write_results(
 
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        req_query_start_time,
         cache_start_time,
+        cache_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
