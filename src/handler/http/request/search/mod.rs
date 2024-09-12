@@ -21,8 +21,8 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        sql::resolve_stream_names,
         search::{SearchEventType, SearchHistoryHitResponse},
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
