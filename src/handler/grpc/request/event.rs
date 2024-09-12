@@ -28,7 +28,7 @@ use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::cluster::get_node_from_consistent_hash;
+use crate::{common::infra::cluster::get_node_from_consistent_hash, handler::grpc::MetadataMap};
 
 pub struct Eventer;
 
@@ -39,9 +39,8 @@ impl Event for Eventer {
         req: Request<FileList>,
     ) -> Result<Response<EmptyResponse>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
-        });
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();

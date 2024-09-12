@@ -25,15 +25,16 @@ use proto::cluster_rpc::{
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+use crate::handler::grpc::MetadataMap;
+
 pub struct Filelister;
 
 #[tonic::async_trait]
 impl Filelist for Filelister {
     async fn max_id(&self, req: Request<EmptyRequest>) -> Result<Response<MaxIdResponse>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
-        });
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         tracing::Span::current().set_parent(parent_cx);
 
         let max_id = infra_file_list::get_max_pk_value()
@@ -57,9 +58,8 @@ impl Filelist for Filelister {
         req: Request<FileListQueryRequest>,
     ) -> Result<Response<FileList>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
-        });
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         tracing::Span::current().set_parent(parent_cx);
 
         let req: &FileListQueryRequest = req.get_ref();

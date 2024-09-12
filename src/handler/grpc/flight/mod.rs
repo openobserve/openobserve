@@ -41,10 +41,14 @@ use o2_enterprise::enterprise::search::TaskStatus;
 use prost::Message;
 use proto::cluster_rpc::FlightSearchRequest;
 use tonic::{Request, Response, Status, Streaming};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
-use crate::service::search::{grpc::flight as grpcFlight, utlis::AsyncDefer};
+use crate::{
+    handler::grpc::MetadataMap,
+    service::search::{grpc::flight as grpcFlight, utlis::AsyncDefer},
+};
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -66,6 +70,11 @@ impl FlightService for FlightServiceImpl {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let _start = std::time::Instant::now();
         let cfg = config::get_config();
+
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx);
 
         // 1. decode ticket to RemoteExecNode
         let ticket = request.into_inner();

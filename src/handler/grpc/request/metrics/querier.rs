@@ -36,7 +36,7 @@ use crate::{
             metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
             MetricsWalFileRequest, MetricsWalFileResponse,
         },
-        request::MetadataMap,
+        MetadataMap,
     },
     service::{promql::search as SearchService, search::match_source},
 };
