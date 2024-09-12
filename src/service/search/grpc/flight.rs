@@ -45,7 +45,7 @@ use crate::service::{
     },
 };
 
-#[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
+#[tracing::instrument(name = "service:search:flight:do_get::search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {

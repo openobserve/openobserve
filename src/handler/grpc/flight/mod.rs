@@ -59,6 +59,7 @@ impl FlightService for FlightServiceImpl {
     type ListActionsStream = BoxStream<'static, Result<ActionType, Status>>;
     type DoExchangeStream = BoxStream<'static, Result<FlightData, Status>>;
 
+    #[tracing::instrument(name = "service:search:flight::do_get", skip_all)]
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -278,18 +279,17 @@ impl Drop for FlightSenderStream {
     }
 }
 
+type PlanResult = (
+    datafusion::prelude::SessionContext,
+    Arc<dyn datafusion::physical_plan::ExecutionPlan>,
+    Option<AsyncDefer>,
+    ScanStats,
+);
+
 #[cfg(feature = "enterprise")]
 async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
-) -> Result<
-    (
-        datafusion::prelude::SessionContext,
-        Arc<dyn datafusion::physical_plan::ExecutionPlan>,
-        Option<AsyncDefer>,
-        ScanStats,
-    ),
-    infra::errors::Error,
-> {
+) -> Result<PlanResult, infra::errors::Error> {
     if req.is_super_cluster {
         let (ctx, physical_plan, defer, scan_stats) =
             crate::service::search::super_cluster::follower::search(req).await?;
@@ -301,17 +301,10 @@ async fn get_ctx_and_physical_plan(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[tracing::instrument(name = "service:search:flight::enter", skip_all)]
 async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
-) -> Result<
-    (
-        datafusion::prelude::SessionContext,
-        Arc<dyn datafusion::physical_plan::ExecutionPlan>,
-        Option<AsyncDefer>,
-        ScanStats,
-    ),
-    infra::errors::Error,
-> {
+) -> Result<PlanResult, infra::errors::Error> {
     let (ctx, physical_plan, scan_stats) = grpcFlight::search(req).await?;
     Ok((ctx, physical_plan, None, scan_stats))
 }

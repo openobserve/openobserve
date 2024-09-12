@@ -46,6 +46,7 @@ use regex::Regex;
 use tokio::runtime::Runtime;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
@@ -93,6 +94,7 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+#[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -160,9 +162,11 @@ pub async fn search(
         in_req.index_type.optinal(),
     );
 
-    let handle = tokio::task::spawn(async move {
-        cluster::http::search(request, query, req_regions, req_clusters).await
-    });
+    let span = tracing::span::Span::current();
+    let handle = tokio::task::spawn(
+        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+            .instrument(span),
+    );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => Err(e),

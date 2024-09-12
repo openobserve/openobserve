@@ -47,9 +47,10 @@ use tonic::{
     transport::Channel,
     Streaming,
 };
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
-use crate::service::search::request::Request;
+use crate::service::search::{request::Request, MetadataMap};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -190,6 +191,7 @@ impl ExecutionPlan for RemoteScanExec {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "remote_scan", skip_all)]
 async fn get_remote_batch(
     input: Arc<dyn ExecutionPlan>,
     partition: usize,
@@ -231,7 +233,7 @@ async fn get_remote_batch(
         .encode(&mut buf)
         .map_err(|e| datafusion::common::DataFusionError::Internal(format!("{e:?}")))?;
 
-    let request = tonic::Request::new(Ticket {
+    let mut request = tonic::Request::new(Ticket {
         ticket: buf.clone().into(),
     });
 
@@ -240,6 +242,13 @@ async fn get_remote_batch(
         .org_id
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid org_id".to_string()))?;
+
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &tracing::Span::current().context(),
+            &mut MetadataMap(request.metadata_mut()),
+        )
+    });
 
     let org_header_key: MetadataKey<_> = cfg
         .grpc

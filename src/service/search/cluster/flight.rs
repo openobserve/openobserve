@@ -80,7 +80,7 @@ pub async fn search(
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] flight->leader: start {}", sql);
+    log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -111,7 +111,7 @@ pub async fn search(
     let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->leader: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, num: {}, took: {} ms",
         sql.time_range,
         file_list_vec.len(),
         file_list_took,
@@ -284,11 +284,11 @@ pub async fn search(
         .is_err()
     {
         log::info!(
-            "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+            "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
         );
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] flight->leader: search canceled before call flight->search"
+                "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
             )),
         ));
     }
@@ -308,10 +308,10 @@ pub async fn search(
         let mut visit = ScanStatsVisitor::new();
         let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
         if let Err(e) = ret {
-            log::error!("[trace_id {trace_id_move}] flight->leader: datafusion collect error: {e}");
+            log::error!("[trace_id {trace_id_move}] flight->search: datafusion collect error: {e}");
             Err(e)
         } else {
-            log::info!("[trace_id {trace_id_move}] flight->leader: datafusion collect done");
+            log::info!("[trace_id {trace_id_move}] flight->search: datafusion collect done");
             ret.map(|data| (data, visit.scan_stats))
         }
     });
@@ -323,15 +323,15 @@ pub async fn search(
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
-                    log::error!("[trace_id {trace_id}] flight->leader: datafusion execute error: {}", err);
+                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {}", err);
                     Err(DataFusionError::Execution(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
-            log::error!("[trace_id {trace_id}] flight->leader: search timeout");
-            Err(DataFusionError::ResourcesExhausted("flight->leader: search timeout".to_string()))
+            log::error!("[trace_id {trace_id}] flight->search: search timeout");
+            Err(DataFusionError::ResourcesExhausted("flight->search: search timeout".to_string()))
         },
         _ = async {
             #[cfg(feature = "enterprise")]
@@ -340,8 +340,8 @@ pub async fn search(
             futures::future::pending::<()>().await;
         } => {
             query_task.abort();
-            log::info!("[trace_id {trace_id}] flight->leader: search canceled");
-            Err(DataFusionError::ResourcesExhausted("flight->leader: search canceled".to_string()))
+            log::info!("[trace_id {trace_id}] flight->search: search canceled");
+            Err(DataFusionError::ResourcesExhausted("flight->search: search canceled".to_string()))
         }
     };
 
@@ -355,7 +355,7 @@ pub async fn search(
         Err(err) => Err(Error::Message(err.to_string())),
     }?;
 
-    log::info!("[trace_id {trace_id}] flight->leader: search finished");
+    log::info!("[trace_id {trace_id}] flight->search: search finished");
 
     scan_stats.format_to_mb();
     Ok((data, scan_stats, took_wait, false, idx_took))
@@ -369,7 +369,7 @@ pub async fn get_online_querier_nodes(
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
-            log::error!("[trace_id {trace_id}] flight->leader: no querier node online");
+            log::error!("[trace_id {trace_id}] flight->search: no querier node online");
             return Err(Error::Message("no querier node online".to_string()));
         }
     };
@@ -387,6 +387,7 @@ pub async fn get_online_querier_nodes(
     Ok(nodes)
 }
 
+#[tracing::instrument(name = "service:search:cluster:flight:get_file_lists", skip_all)]
 pub async fn get_file_lists(
     stream_names: &[String],
     schemas: &HashMap<String, Arc<SchemaCache>>,
@@ -420,7 +421,7 @@ pub async fn get_file_lists(
     Ok(file_lists)
 }
 
-#[tracing::instrument(name = "service:search:cluster:flight:get_file_list", skip_all, fields(org_id = org_id, stream_name = stream_name))]
+#[tracing::instrument(name = "service:search:cluster:flight:get_file_list", skip_all)]
 pub(crate) async fn get_file_list(
     stream_name: &str,
     org_id: &str,
@@ -472,6 +473,10 @@ pub(crate) async fn get_file_list(
     files
 }
 
+#[tracing::instrument(
+    name = "service:search:cluster:flight:get_file_list_from_inverted_index",
+    skip_all
+)]
 pub async fn get_file_list_from_inverted_index(
     trace_id: &str,
     req: &Request,
@@ -491,7 +496,7 @@ pub async fn get_file_list_from_inverted_index(
     let use_inverted_index =
         use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
     log::info!(
-        "[trace_id {trace_id}] flight->leader: use_inverted_index with parquet format {}",
+        "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
         use_inverted_index
     );
 
@@ -516,7 +521,7 @@ pub async fn get_file_list_from_inverted_index(
         )
         .await?;
         log::info!(
-            "[trace_id {trace_id}] flight->leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+            "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
             sql.time_range,
             stream_file_list.len(),
             idx_scan_size,
@@ -542,6 +547,7 @@ pub async fn get_file_list_from_inverted_index(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[tracing::instrument(name = "service:search:cluster:flight:check_work_group", skip_all)]
 pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
@@ -580,6 +586,7 @@ pub async fn check_work_group(
 }
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:search:cluster:flight:check_work_group", skip_all)]
 pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
@@ -671,6 +678,7 @@ pub async fn check_work_group(
     Ok((took_wait, work_group_str, work_group))
 }
 
+#[tracing::instrument(name = "service:search:cluster:flight:partition_file_lists", skip_all)]
 pub async fn partition_file_lists(
     file_lists: HashMap<String, Vec<FileKey>>,
     nodes: &[Node],

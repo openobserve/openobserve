@@ -115,11 +115,12 @@ pub async fn search(
 
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
         Span::none()
     };
+
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     let user_id = in_req
         .headers()

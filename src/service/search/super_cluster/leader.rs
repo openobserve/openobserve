@@ -52,7 +52,7 @@ pub async fn search(
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let _start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] flight->leader: start {}", sql);
+    log::info!("[trace_id {trace_id}] super cluster leader: start {}", sql);
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -177,11 +177,11 @@ pub async fn search(
         .is_err()
     {
         log::info!(
-            "[trace_id {trace_id}] super cluster leader: search canceled before call flight->search"
+            "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
         );
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] super cluster leader: search canceled before call flight->search"
+                "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
             )),
         ));
     }
