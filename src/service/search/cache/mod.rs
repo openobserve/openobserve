@@ -198,15 +198,10 @@ pub async fn search(
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
 
-        let delta_len = c_resp.deltas.len();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
             let org_id = org_id.to_string();
-            let trace_id = if delta_len <= 1 {
-                trace_id.to_string()
-            } else {
-                format!("{}-{}", trace_id, i)
-            };
+            let trace_id = format!("{}-{}", trace_id, i);
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
