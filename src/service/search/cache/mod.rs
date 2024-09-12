@@ -477,6 +477,10 @@ async fn write_results(
         local_resp.hits.remove(remove_index);
     };
 
+    if local_resp.hits.is_empty() {
+        return;
+    }
+
     let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
     let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
 
