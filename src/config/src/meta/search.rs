@@ -427,7 +427,7 @@ impl ScanStats {
         self.querier_memory_cached_files += other.querier_memory_cached_files;
         self.querier_disk_cached_files += other.querier_disk_cached_files;
         self.idx_scan_size += other.idx_scan_size;
-        self.idx_took += other.idx_took;
+        self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
     }
 
     pub fn format_to_mb(&mut self) {
