@@ -228,6 +228,16 @@ async fn get_remote_batch(
         index_type: req.inverted_index_type.clone(),
     };
 
+    // TODO: how to add response
+    // TODO: how to add spend time on each node
+    log::info!(
+        "[trace_id {}] flight->search: request node: {}, is_querier: {}, files: {}",
+        req.trace_id,
+        &node.get_grpc_addr(),
+        file_list.is_empty(),
+        file_list.len()
+    );
+
     let mut buf: Vec<u8> = Vec::new();
     request
         .encode(&mut buf)
@@ -266,7 +276,7 @@ async fn get_remote_batch(
         .await
         .map_err(|err| {
             log::error!(
-                "[trace_id {}] search->grpc: node: {}, connect err: {:?}",
+                "[trace_id {}] flight->search: node: {}, connect err: {:?}",
                 req.trace_id.clone(),
                 &node.get_grpc_addr(),
                 err
