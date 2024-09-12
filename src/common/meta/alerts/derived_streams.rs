@@ -46,6 +46,8 @@ pub struct DerivedStreamMeta {
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 impl Default for DerivedStreamMeta {
@@ -61,6 +63,7 @@ impl Default for DerivedStreamMeta {
             description: "".to_string(),
             enabled: true,
             tz_offset: 0, // UTC
+            timezone: None,
         }
     }
 }

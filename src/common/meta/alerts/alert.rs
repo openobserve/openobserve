@@ -50,6 +50,8 @@ pub struct Alert {
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
     #[serde(default)]
     pub last_triggered_at: Option<i64>,
     #[serde(default)]
@@ -87,6 +89,7 @@ impl Default for Alert {
             description: "".to_string(),
             enabled: false,
             tz_offset: 0, // UTC
+            timezone: None,
             last_triggered_at: None,
             owner: None,
             updated_at: None,
