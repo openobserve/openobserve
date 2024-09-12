@@ -300,7 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   placeholder="Select column"
                   fill-input
                   :input-debounce="400"
-                  @filter="filterColumns"
+                  @filter="
+                    (val: string, update: any) => filterFields(val, update)
+                  "
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   style="width: 200px"
                   @update:model-value="updateTrigger"
@@ -638,10 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
         <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
-          >
+          <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-cron-input"
               style="width: 87px; margin-left: 0 !important"
@@ -701,17 +700,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
-          >
+        <div style="min-height: 78px">
+          <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"
               :style="
                 triggerData.frequency_type == 'minutes'
                   ? 'width: 87px; margin-left: 0 !important'
-                  : 'width: 180px !important'
+                  : 'width: fit-content !important'
               "
               class="silence-notification-input"
             >
@@ -726,15 +722,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="background: none"
                 @update:model-value="updateTrigger"
               />
-              <q-input
-                data-test="scheduled-alert-cron-input-field"
-                v-else
-                v-model="triggerData.cron"
-                dense
-                filled
-                style="background: none"
-                @update:model-value="updateTrigger"
-              />
+              <div v-else class="tw-flex tw-items-center o2-input">
+                <q-input
+                  data-test="scheduled-alert-cron-input-field"
+                  v-model="triggerData.cron"
+                  dense
+                  filled
+                  :label="t('reports.cron') + ' *'"
+                  style="background: none; width: 180px"
+                  class="showLabelOnTop"
+                  stack-label
+                  outlined
+                  @update:model-value="updateTrigger"
+                />
+                <q-select
+                  data-test="add-report-schedule-start-timezone-select"
+                  v-model="timezone"
+                  :options="filteredTimezone"
+                  @blur="
+                    browserTimezone =
+                      browserTimezone == ''
+                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                        : browserTimezone
+                  "
+                  use-input
+                  @filter="timezoneFilterFn"
+                  input-debounce="0"
+                  dense
+                  filled
+                  emit-value
+                  fill-input
+                  hide-selected
+                  :title="timezone"
+                  :label="t('logStream.timezone') + ' *'"
+                  :display-value="`Timezone: ${browserTimezone}`"
+                  class="timezone-select showLabelOnTop q-ml-sm"
+                  stack-label
+                  outlined
+                  style="width: 220px"
+                />
+              </div>
             </div>
             <div
               v-if="triggerData.frequency_type == 'minutes'"
@@ -753,7 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="scheduled-alert-frequency-error-text"
-            v-if="
+            v-show="
               (!Number(triggerData.frequency) &&
                 triggerData.frequency_type == 'minutes') ||
               (triggerData.frequency_type == 'cron' && triggerData.cron == '')
@@ -778,7 +805,7 @@ import {
   outlinedInfo,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
@@ -803,6 +830,7 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "vrlFunctionError",
+  "timezone",
 ]);
 
 const emits = defineEmits([
@@ -818,6 +846,7 @@ const emits = defineEmits([
   "update:promql_condition",
   "update:vrl_function",
   "update:showVrlFunction",
+  "update:timezone",
   "validate-sql",
 ]);
 
@@ -862,6 +891,8 @@ const filteredFields = ref(props.columns);
 
 const fnEditorRef = ref<any>(null);
 
+const filteredTimezone: any = ref([]);
+
 const getNumericColumns = computed(() => {
   if (
     _isAggregationEnabled.value &&
@@ -884,6 +915,29 @@ const addField = () => {
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
 const selectedFunction = ref("");
+
+const currentTimezone =
+  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const browserTimezone = ref(currentTimezone);
+
+// @ts-ignore
+let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
+  return tz;
+});
+
+filteredTimezone.value = [...timezoneOptions];
+
+const browserTime =
+  "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+// Add the UTC option
+timezoneOptions.unshift("UTC");
+timezoneOptions.unshift(browserTime);
+
+const timezoneFilterFn = (val: string, update: Function) => {
+  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
+};
 
 const removeField = (field: any) => {
   emits("field:remove", field);
@@ -953,6 +1007,15 @@ const isVrlFunctionEnabled = computed({
   },
 });
 
+const timezone = computed({
+  get() {
+    return props.timezone;
+  },
+  set(value) {
+    emits("update:timezone", value);
+  },
+});
+
 const updateFunctionVisibility = (isEnabled: boolean) => {
   if (!isEnabled) {
     vrlFunctionContent.value = null;
@@ -1009,18 +1072,36 @@ const updateAggregation = () => {
   emits("input:update", "aggregation", aggregationData.value);
 };
 
-const filterColumns = (val: string, update: Function) => {
+const filterFields = (val: string, update: Function) => {
+  filteredFields.value = filterColumns(props.columns, val, update);
+};
+
+const filterColumns = (options: string[], val: string, update: Function) => {
+  let filteredOptions: any[] = [];
+
   if (val === "") {
     update(() => {
-      filteredFields.value = [...props.columns];
+      filteredOptions = [...options];
     });
   }
+
+  console.log("options", options);
+
   update(() => {
     const value = val.toLowerCase();
-    filteredFields.value = props.columns.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
-    );
+    filteredOptions = options.filter((column: any) => {
+      // Check if type of column is object or string and then filter
+      if (typeof column === "object") {
+        return column.value.toLowerCase().indexOf(value) > -1;
+      }
+
+      if (typeof column === "string") {
+        return column.toLowerCase().indexOf(value) > -1;
+      }
+    });
   });
+
+  return filteredOptions;
 };
 
 const filterNumericColumns = (val: string, update: Function) => {

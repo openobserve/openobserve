@@ -201,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
+                v-model:timezone="formData.timezone"
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
@@ -457,6 +458,7 @@ import {
   b64EncodeUnicode,
   b64DecodeUnicode,
   isValidResourceName,
+  getTimezonesByOffset,
 } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
@@ -465,6 +467,7 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import { convertDateToTimestamp } from "@/utils/date";
 
 const defaultValue: any = () => {
   return {
@@ -515,6 +518,7 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
+    timezone: "UTC",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -947,7 +951,6 @@ export default defineComponent({
       }
     };
     const getParser = (sqlQuery: string) => {
-      
       try {
         // As default is a reserved keyword in sql-parser, we are replacing it with default1
         const regex = /\bdefault\b/g;
@@ -1239,6 +1242,8 @@ export default defineComponent({
       sqlQueryErrorMsg,
       vrlFunctionError,
       updateFunctionVisibility,
+      convertDateToTimestamp,
+      getTimezonesByOffset,
     };
   },
 
@@ -1260,6 +1265,20 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+
+      if (!this.formData.timezone) {
+        if (this.formData.tz_offset === 0) {
+          this.formData.timezone = "UTC";
+        } else {
+          this.getTimezonesByOffset(this.formData.tz_offset).then(
+            (res: any) => {
+              this.formData.timezone = res[0];
+            },
+          );
+        }
+
+        console.log("Timezone", this.formData.timezone);
+      }
 
       if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
@@ -1334,7 +1353,32 @@ export default defineComponent({
         this.formData.is_real_time == "false" &&
         this.formData.trigger_condition.frequency_type == "cron"
       ) {
-        this.formData.tz_offset = this.getTimezoneOffset();
+        const now = new Date();
+
+        // Get the day, month, and year from the date object
+        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+        const year = now.getFullYear();
+
+        // Combine them in the DD-MM-YYYY format
+        const date = `${day}-${month}-${year}`;
+
+        // Get the hours and minutes, ensuring they are formatted with two digits
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+
+        // Combine them in the HH:MM format
+        const time = `${hours}:${minutes}`;
+
+        const convertedDateTime = this.convertDateToTimestamp(
+          date,
+          time,
+          this.formData.timezone,
+        );
+
+        alert(convertedDateTime.timestamp + " : " + convertedDateTime.offset);
+
+        this.formData.tz_offset = convertedDateTime.offset;
       }
 
       this.addAlertForm.validate().then(async (valid: any) => {
