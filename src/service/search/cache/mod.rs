@@ -466,8 +466,19 @@ async fn write_results(
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+    let mut local_resp = res.clone();
+    let remove_index = if is_descending {
+        local_resp.hits.len() - 1
+    } else {
+        0
+    };
+
+    if !local_resp.hits.is_empty() {
+        local_resp.hits.remove(remove_index);
+    };
+
+    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
+    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
 
     let smallest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
     let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
@@ -485,15 +496,22 @@ async fn write_results(
     } else {
         req_query_end_time
     };
+
+    let cache_start_time = if smallest_ts > 0 && smallest_ts > req_query_start_time {
+        smallest_ts
+    } else {
+        req_query_start_time
+    };
+
     let file_name = format!(
         "{}_{}_{}_{}.json",
         req_query_start_time,
-        cache_end_time,
+        cache_start_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
 
-    let res_cache = json::to_string(&res).unwrap();
+    let res_cache = json::to_string(&local_resp).unwrap();
     let query_key = file_path.replace('/', "_");
     let trace_id = trace_id.to_string();
     tokio::spawn(async move {
@@ -512,7 +530,7 @@ async fn write_results(
                 w.entry(query_key)
                     .or_insert_with(Vec::new)
                     .push(ResultCacheMeta {
-                        start_time: req_query_start_time,
+                        start_time: cache_start_time,
                         end_time: cache_end_time,
                         is_aggregate,
                         is_descending,
