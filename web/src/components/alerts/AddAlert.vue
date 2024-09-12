@@ -883,7 +883,7 @@ export default defineComponent({
 
       if (!isAggregationEnabled.value) {
         query +=
-          ` COUNT(*) as zo_sql_val FROM ${formData.value.stream_name} ` +
+          ` COUNT(*) as zo_sql_val FROM \"${formData.value.stream_name}\" ` +
           whereClause +
           " GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
       } else {
@@ -919,18 +919,18 @@ export default defineComponent({
         if (isAggValid) {
           if (percentileFunctions[aggFn]) {
             query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
+              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
               whereClause +
               ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
           } else {
             query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
+              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
               whereClause +
               ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
           }
         } else {
           query +=
-            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
+            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
             whereClause +
             ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
         }
@@ -947,6 +947,7 @@ export default defineComponent({
       }
     };
     const getParser = (sqlQuery: string) => {
+      
       try {
         // As default is a reserved keyword in sql-parser, we are replacing it with default1
         const regex = /\bdefault\b/g;
