@@ -20,11 +20,8 @@ use datafusion::{
         Column, Result,
     },
     error::DataFusionError,
-    logical_expr::{
-        expr::ScalarFunction, expr_rewriter::rewrite_preserving_name, utils::disjunction, Expr,
-        Like, LogicalPlan,
-    },
-    optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    logical_expr::{expr::ScalarFunction, utils::disjunction, Expr, Like, LogicalPlan},
+    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
     scalar::ScalarValue,
 };
 
@@ -75,9 +72,12 @@ impl OptimizerRule for RewriteMatch {
                     let mut expr_rewriter = MatchToFullTextMatch {
                         fields: self.fields.clone(),
                     };
+                    let name_preserver = NamePreserver::new(&plan);
                     plan.map_expressions(|expr| {
-                        let new_expr = rewrite_preserving_name(expr, &mut expr_rewriter)?;
-                        Ok(Transformed::yes(new_expr))
+                        let original_name = name_preserver.save(&expr);
+                        expr.rewrite(&mut expr_rewriter).map(|transformed| {
+                            transformed.update_data(|e| original_name.restore(e))
+                        })
                     })
                 } else {
                     Ok(Transformed::no(plan))

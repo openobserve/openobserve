@@ -47,14 +47,14 @@ use openobserve::{
     job, router,
     service::{db, metadata, search::SEARCH_SERVER, usage},
 };
-use opentelemetry::KeyValue;
+use opentelemetry::{global, trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
-use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
 use proto::cluster_rpc::{
     event_server::EventServer, filelist_server::FilelistServer, ingest_server::IngestServer,
     metrics_server::MetricsServer, query_cache_server::QueryCacheServer,
@@ -70,6 +70,7 @@ use tonic::{
     metadata::{MetadataKey, MetadataMap, MetadataValue},
 };
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 
 #[cfg(feature = "mimalloc")]
@@ -776,11 +777,13 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         })
     };
     let tracer = tracer
-        .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", cfg.common.node_role.to_string()),
-            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-            KeyValue::new("service.version", VERSION),
-        ])))
+        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
+            Resource::new(vec![
+                KeyValue::new("service.name", cfg.common.node_role.to_string()),
+                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+                KeyValue::new("service.version", VERSION),
+            ]),
+        ))
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     let layer = if cfg.log.json_format {
@@ -792,10 +795,13 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         tracing_subscriber::fmt::layer().with_ansi(false).boxed()
     };
 
+    global::set_tracer_provider(tracer.clone());
     Registry::default()
         .with(tracing_subscriber::EnvFilter::new(&cfg.log.level))
         .with(layer)
-        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .with(OpenTelemetryLayer::new(
+            tracer.tracer("tracing-otel-subscriber"),
+        ))
         .init();
     Ok(())
 }

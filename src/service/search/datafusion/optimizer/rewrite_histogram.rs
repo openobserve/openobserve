@@ -26,11 +26,8 @@ use datafusion::{
         date_bin::DateBinFunc,
         to_timestamp::{ToTimestampFunc, ToTimestampMicrosFunc},
     },
-    logical_expr::{
-        cast, expr::ScalarFunction, expr_rewriter::rewrite_preserving_name, Expr, LogicalPlan,
-        ScalarUDF,
-    },
-    optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    logical_expr::{cast, expr::ScalarFunction, Expr, LogicalPlan, ScalarUDF},
+    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
     scalar::ScalarValue,
 };
 
@@ -86,9 +83,11 @@ impl OptimizerRule for RewriteHistogram {
                 end_time: self.end_time,
             };
 
+            let name_preserver = NamePreserver::new(&plan);
             plan.map_expressions(|expr| {
-                let new_expr = rewrite_preserving_name(expr, &mut expr_rewriter)?;
-                Ok(Transformed::yes(new_expr))
+                let original_name = name_preserver.save(&expr);
+                expr.rewrite(&mut expr_rewriter)
+                    .map(|transformed| transformed.update_data(|e| original_name.restore(e)))
             })
         } else {
             Ok(Transformed::no(plan))

@@ -373,7 +373,7 @@ dependencies = [
  "actix-http",
  "actix-web",
  "futures-util",
- "opentelemetry",
+ "opentelemetry 0.22.0",
  "opentelemetry-semantic-conventions",
  "serde",
 ]
@@ -662,19 +662,40 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05048a8932648b63f21c37d88b552ccc8a65afb6dfe9fc9f30ce79174c2e7a85"
 dependencies = [
- "arrow-arith",
- "arrow-array",
- "arrow-buffer",
- "arrow-cast",
- "arrow-csv",
- "arrow-data",
- "arrow-ipc",
- "arrow-json",
- "arrow-ord",
- "arrow-row",
- "arrow-schema",
- "arrow-select",
- "arrow-string",
+ "arrow-arith 52.2.0",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-cast 52.2.0",
+ "arrow-csv 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-ipc 52.2.0",
+ "arrow-json 52.2.0",
+ "arrow-ord 52.2.0",
+ "arrow-row 52.2.0",
+ "arrow-schema 52.2.0",
+ "arrow-select 52.2.0",
+ "arrow-string 52.2.0",
+]
+
+[[package]]
+name = "arrow"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45aef0d9cf9a039bf6cd1acc451b137aca819977b0928dece52bd92811b640ba"
+dependencies = [
+ "arrow-arith 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-cast 53.0.0",
+ "arrow-csv 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-ipc 53.0.0",
+ "arrow-json 53.0.0",
+ "arrow-ord 53.0.0",
+ "arrow-row 53.0.0",
+ "arrow-schema 53.0.0",
+ "arrow-select 53.0.0",
+ "arrow-string 53.0.0",
 ]
 
 [[package]]
@@ -683,10 +704,25 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d8a57966e43bfe9a3277984a14c24ec617ad874e4c0e1d2a1b083a39cfbf22c"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "chrono",
+ "half",
+ "num",
+]
+
+[[package]]
+name = "arrow-arith"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03675e42d1560790f3524800e41403b40d0da1c793fe9528929fde06d8c7649a"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "chrono",
  "half",
  "num",
@@ -699,9 +735,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16f4a9468c882dc66862cef4e1fd8423d47e67972377d85d80e022786427768c"
 dependencies = [
  "ahash 0.8.11",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "chrono",
+ "chrono-tz",
+ "half",
+ "hashbrown 0.14.5",
+ "num",
+]
+
+[[package]]
+name = "arrow-array"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd2bf348cf9f02a5975c5962c7fa6dee107a2009a7b41ac5fb1a027e12dc033f"
+dependencies = [
+ "ahash 0.8.11",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "chrono",
  "chrono-tz",
  "half",
@@ -721,16 +774,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-buffer"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3092e37715f168976012ce52273c3989b5793b0db5f06cbaa246be25e5f0924d"
+dependencies = [
+ "bytes",
+ "half",
+ "num",
+]
+
+[[package]]
 name = "arrow-cast"
 version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da26719e76b81d8bc3faad1d4dbdc1bcc10d14704e63dc17fc9f3e7e1e567c8e"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
- "arrow-select",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "arrow-select 52.2.0",
+ "atoi",
+ "base64 0.22.1",
+ "chrono",
+ "comfy-table",
+ "half",
+ "lexical-core",
+ "num",
+ "ryu",
+]
+
+[[package]]
+name = "arrow-cast"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce1018bb710d502f9db06af026ed3561552e493e989a79d0d0f5d9cf267a785"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
+ "arrow-select 53.0.0",
  "atoi",
  "base64 0.22.1",
  "chrono",
@@ -747,11 +832,30 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c13c36dc5ddf8c128df19bab27898eea64bf9da2b555ec1cd17a8ff57fba9ec2"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-cast",
- "arrow-data",
- "arrow-schema",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-cast 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "chrono",
+ "csv",
+ "csv-core",
+ "lazy_static",
+ "lexical-core",
+ "regex",
+]
+
+[[package]]
+name = "arrow-csv"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd178575f45624d045e4ebee714e246a05d9652e41363ee3f57ec18cca97f740"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-cast 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "chrono",
  "csv",
  "csv-core",
@@ -766,31 +870,43 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd9d6f18c65ef7a2573ab498c374d8ae364b4a4edf67105357491c031f716ca5"
 dependencies = [
- "arrow-buffer",
- "arrow-schema",
+ "arrow-buffer 52.2.0",
+ "arrow-schema 52.2.0",
+ "half",
+ "num",
+]
+
+[[package]]
+name = "arrow-data"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e4ac0c4ee79150afe067dc4857154b3ee9c1cd52b5f40d59a77306d0ed18d65"
+dependencies = [
+ "arrow-buffer 53.0.0",
+ "arrow-schema 53.0.0",
  "half",
  "num",
 ]
 
 [[package]]
 name = "arrow-flight"
-version = "52.2.0"
+version = "53.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e7ffbc96072e466ae5188974725bb46757587eafe427f77a25b828c375ae882"
+checksum = "b915fb36d935b969894d7909ad417c67ddeadebbbd57c3c168edf64721a37d31"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-cast",
- "arrow-ipc",
- "arrow-schema",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-cast 53.0.0",
+ "arrow-ipc 53.0.0",
+ "arrow-schema 53.0.0",
  "base64 0.22.1",
  "bytes",
  "futures",
  "paste",
- "prost 0.12.6",
- "prost-types",
+ "prost 0.13.2",
+ "prost-types 0.13.2",
  "tokio",
- "tonic 0.11.0",
+ "tonic 0.12.2",
 ]
 
 [[package]]
@@ -799,11 +915,25 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e786e1cdd952205d9a8afc69397b317cfbb6e0095e445c69cda7e8da5c1eeb0f"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-cast",
- "arrow-data",
- "arrow-schema",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-cast 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "flatbuffers",
+]
+
+[[package]]
+name = "arrow-ipc"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb307482348a1267f91b0912e962cd53440e5de0f7fb24c5f7b10da70b38c94a"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-cast 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "flatbuffers",
  "lz4_flex",
  "zstd",
@@ -815,11 +945,31 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb22284c5a2a01d73cebfd88a33511a3234ab45d66086b2ca2d1228c3498e445"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-cast",
- "arrow-data",
- "arrow-schema",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-cast 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "chrono",
+ "half",
+ "indexmap 2.2.6",
+ "lexical-core",
+ "num",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "arrow-json"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d24805ba326758effdd6f2cbdd482fcfab749544f21b134701add25b33f474e6"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-cast 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "chrono",
  "half",
  "indexmap 2.2.6",
@@ -835,11 +985,26 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42745f86b1ab99ef96d1c0bcf49180848a64fe2c7a7a0d945bc64fa2b21ba9bc"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
- "arrow-select",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "arrow-select 52.2.0",
+ "half",
+ "num",
+]
+
+[[package]]
+name = "arrow-ord"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "644046c479d80ae8ed02a7f1e1399072ea344ca6a7b0e293ab2d5d9ed924aa3b"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
+ "arrow-select 53.0.0",
  "half",
  "num",
 ]
@@ -851,10 +1016,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd09a518c602a55bd406bcc291a967b284cfa7a63edfbf8b897ea4748aad23c"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "half",
+]
+
+[[package]]
+name = "arrow-row"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a29791f8eb13b340ce35525b723f5f0df17ecb955599e11f65c2a94ab34e2efb"
+dependencies = [
+ "ahash 0.8.11",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "half",
 ]
 
@@ -863,6 +1042,12 @@ name = "arrow-schema"
 version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e972cd1ff4a4ccd22f86d3e53e835c2ed92e0eea6a3e8eadb72b4f1ac802cf8"
+
+[[package]]
+name = "arrow-schema"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c85320a3a2facf2b2822b57aa9d6d9d55edb8aee0b6b5d3b8df158e503d10858"
 dependencies = [
  "serde",
 ]
@@ -874,10 +1059,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "600bae05d43483d216fb3494f8c32fdbefd8aa4e1de237e790dbb3d9f44690a3"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "num",
+]
+
+[[package]]
+name = "arrow-select"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cc7e6b582e23855fd1625ce46e51647aa440c20ea2e71b1d748e0839dd73cba"
+dependencies = [
+ "ahash 0.8.11",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
  "num",
 ]
 
@@ -887,11 +1086,28 @@ version = "52.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0dc1985b67cb45f6606a248ac2b4a288849f196bab8c657ea5589f47cdd55e6"
 dependencies = [
- "arrow-array",
- "arrow-buffer",
- "arrow-data",
- "arrow-schema",
- "arrow-select",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-data 52.2.0",
+ "arrow-schema 52.2.0",
+ "arrow-select 52.2.0",
+ "memchr",
+ "num",
+ "regex",
+ "regex-syntax 0.8.4",
+]
+
+[[package]]
+name = "arrow-string"
+version = "53.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0775b6567c66e56ded19b87a954b6b1beffbdd784ef95a3a2b03f59570c1d230"
+dependencies = [
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-schema 53.0.0",
+ "arrow-select 53.0.0",
  "memchr",
  "num",
  "regex",
@@ -1020,7 +1236,7 @@ dependencies = [
  "rand",
  "regex",
  "ring",
- "rustls-native-certs 0.7.0",
+ "rustls-native-certs",
  "rustls-pemfile 2.1.2",
  "rustls-webpki 0.102.4",
  "serde",
@@ -1188,7 +1404,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b829e4e32b91e643de6eafe82b1d90675f5874230191a4ffbc1b336dec4d6bf"
 dependencies = [
  "async-trait",
- "axum-core",
+ "axum-core 0.3.4",
  "bitflags 1.3.2",
  "bytes",
  "futures-util",
@@ -1203,7 +1419,34 @@ dependencies = [
  "pin-project-lite",
  "rustversion",
  "serde",
- "sync_wrapper",
+ "sync_wrapper 0.1.2",
+ "tower",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
+name = "axum"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
+dependencies = [
+ "async-trait",
+ "axum-core 0.4.3",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "itoa",
+ "matchit",
+ "memchr",
+ "mime",
+ "percent-encoding",
+ "pin-project-lite",
+ "rustversion",
+ "serde",
+ "sync_wrapper 1.0.1",
  "tower",
  "tower-layer",
  "tower-service",
@@ -1222,6 +1465,26 @@ dependencies = [
  "http-body 0.4.6",
  "mime",
  "rustversion",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
+name = "axum-core"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
+ "rustversion",
+ "sync_wrapper 0.1.2",
  "tower-layer",
  "tower-service",
 ]
@@ -2058,9 +2321,9 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "arc-swap",
- "arrow",
- "arrow-json",
- "arrow-schema",
+ "arrow 53.0.0",
+ "arrow-json 53.0.0",
+ "arrow-schema 53.0.0",
  "async-recursion",
  "async-walkdir",
  "base64 0.21.7",
@@ -2095,7 +2358,7 @@ dependencies = [
  "proto",
  "rand",
  "regex",
- "reqwest 0.11.27",
+ "reqwest 0.12.4",
  "segment",
  "serde",
  "serde_json",
@@ -2118,7 +2381,7 @@ checksum = "fd326812b3fd01da5bb1af7d340d0d555fd3d4b641e7f1dfcf5962a902952787"
 dependencies = [
  "futures-core",
  "prost 0.12.6",
- "prost-types",
+ "prost-types 0.12.6",
  "tonic 0.10.2",
  "tracing-core",
 ]
@@ -2135,7 +2398,7 @@ dependencies = [
  "futures-task",
  "hdrhistogram",
  "humantime",
- "prost-types",
+ "prost-types 0.12.6",
  "serde",
  "serde_json",
  "thread_local",
@@ -2499,13 +2762,13 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-ipc",
- "arrow-schema",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-ipc 53.0.0",
+ "arrow-schema 53.0.0",
  "async-compression",
  "async-trait",
  "bytes",
@@ -2513,10 +2776,10 @@ dependencies = [
  "chrono",
  "dashmap",
  "datafusion-catalog",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-common-runtime",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-functions",
  "datafusion-functions-aggregate",
  "datafusion-functions-nested",
@@ -2536,7 +2799,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "num_cpus",
- "object_store",
+ "object_store 0.11.0",
  "parking_lot",
  "parquet",
  "paste",
@@ -2555,14 +2818,15 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow-schema",
+ "arrow-schema 53.0.0",
  "async-trait",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-physical-plan",
+ "parking_lot",
 ]
 
 [[package]]
@@ -2572,10 +2836,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44fdbc877e3e40dcf88cc8f283d9f5c8851f0a3aa07fee657b1b75ac1ad49b9c"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-buffer",
- "arrow-schema",
+ "arrow 52.2.0",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
+ "arrow-schema 52.2.0",
  "chrono",
  "half",
  "hashbrown 0.14.5",
@@ -2588,20 +2852,20 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-buffer",
- "arrow-schema",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-schema 53.0.0",
  "chrono",
  "half",
  "hashbrown 0.14.5",
  "instant",
  "libc",
  "num_cpus",
- "object_store",
+ "object_store 0.11.0",
  "parquet",
  "paste",
  "sqlparser 0.50.0",
@@ -2611,7 +2875,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common-runtime"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "log",
  "tokio",
@@ -2623,7 +2887,7 @@ version = "41.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "799e70968c815b611116951e3dd876aef04bf217da31b72eec01ee6a959336a1"
 dependencies = [
- "arrow",
+ "arrow 52.2.0",
  "chrono",
  "dashmap",
  "datafusion-common 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2631,7 +2895,7 @@ dependencies = [
  "futures",
  "hashbrown 0.14.5",
  "log",
- "object_store",
+ "object_store 0.10.2",
  "parking_lot",
  "rand",
  "tempfile",
@@ -2641,17 +2905,17 @@ dependencies = [
 [[package]]
 name = "datafusion-execution"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
+ "arrow 53.0.0",
  "chrono",
  "dashmap",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "futures",
  "hashbrown 0.14.5",
  "log",
- "object_store",
+ "object_store 0.11.0",
  "parking_lot",
  "rand",
  "tempfile",
@@ -2665,9 +2929,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c1841c409d9518c17971d15c9bae62e629eb937e6fb6c68cd32e9186f8b30d2"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-buffer",
+ "arrow 52.2.0",
+ "arrow-array 52.2.0",
+ "arrow-buffer 52.2.0",
  "chrono",
  "datafusion-common 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "paste",
@@ -2680,14 +2944,14 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-buffer",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
  "chrono",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-expr-common",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr-common",
@@ -2701,27 +2965,27 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "paste",
 ]
 
 [[package]]
 name = "datafusion-functions"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
- "arrow-buffer",
+ "arrow 53.0.0",
+ "arrow-buffer 53.0.0",
  "base64 0.22.1",
  "blake2",
  "blake3",
  "chrono",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "hashbrown 0.14.5",
  "hex",
  "itertools 0.13.0",
@@ -2737,14 +3001,14 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-schema",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow 53.0.0",
+ "arrow-schema 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr",
  "datafusion-physical-expr-common",
@@ -2757,11 +3021,11 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-expr-common",
  "datafusion-physical-expr-common",
  "rand",
@@ -2773,8 +3037,8 @@ version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00900606bdd73248f0a0bea254379ef06832f4958510581e752fedd17b33b8b4"
 dependencies = [
- "arrow",
- "arrow-schema",
+ "arrow 52.2.0",
+ "arrow-schema 52.2.0",
  "datafusion-common 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "datafusion-execution 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "datafusion-expr 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2786,16 +3050,16 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-nested"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
- "arrow-array",
- "arrow-buffer",
- "arrow-ord",
- "arrow-schema",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-ord 53.0.0",
+ "arrow-schema 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-functions",
  "datafusion-functions-aggregate",
  "datafusion-physical-expr-common",
@@ -2808,10 +3072,10 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-physical-expr-common",
  "log",
 ]
@@ -2819,13 +3083,13 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
+ "arrow 53.0.0",
  "async-trait",
  "chrono",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-physical-expr",
  "hashbrown 0.14.5",
  "indexmap 2.2.6",
@@ -2838,20 +3102,20 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-buffer",
- "arrow-ord",
- "arrow-schema",
- "arrow-string",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-ord 53.0.0",
+ "arrow-schema 53.0.0",
+ "arrow-string 53.0.0",
  "base64 0.22.1",
  "chrono",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-expr-common",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr-common",
@@ -2869,11 +3133,11 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-expr-common",
  "hashbrown 0.14.5",
  "rand",
@@ -2882,10 +3146,11 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-optimizer"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow-schema 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-physical-expr",
  "datafusion-physical-plan",
  "itertools 0.13.0",
@@ -2894,20 +3159,20 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
  "ahash 0.8.11",
- "arrow",
- "arrow-array",
- "arrow-buffer",
- "arrow-ord",
- "arrow-schema",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-ord 53.0.0",
+ "arrow-schema 53.0.0",
  "async-trait",
  "chrono",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-common-runtime",
- "datafusion-execution 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-execution 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-functions-aggregate",
  "datafusion-functions-aggregate-common",
  "datafusion-physical-expr",
@@ -2928,40 +3193,40 @@ dependencies = [
 [[package]]
 name = "datafusion-proto"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
+ "arrow 53.0.0",
  "chrono",
  "datafusion",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "datafusion-proto-common",
- "object_store",
- "prost 0.12.6",
+ "object_store 0.11.0",
+ "prost 0.13.2",
 ]
 
 [[package]]
 name = "datafusion-proto-common"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
+ "arrow 53.0.0",
  "chrono",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "object_store",
- "prost 0.12.6",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "object_store 0.11.0",
+ "prost 0.13.2",
 ]
 
 [[package]]
 name = "datafusion-sql"
 version = "41.0.0"
-source = "git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43#bc7f8e9431c716fd642346c1e45f0c33acfdaf43"
+source = "git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482#f7efd2d31adb51a67dc6bfb6d6eae6a525d60482"
 dependencies = [
- "arrow",
- "arrow-array",
- "arrow-schema",
- "datafusion-common 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
- "datafusion-expr 41.0.0 (git+https://github.com/haohuaijin/arrow-datafusion?rev=bc7f8e9431c716fd642346c1e45f0c33acfdaf43)",
+ "arrow 53.0.0",
+ "arrow-array 53.0.0",
+ "arrow-schema 53.0.0",
+ "datafusion-common 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
+ "datafusion-expr 41.0.0 (git+https://github.com/openobserve/datafusion?rev=f7efd2d31adb51a67dc6bfb6d6eae6a525d60482)",
  "log",
  "regex",
  "sqlparser 0.50.0",
@@ -4093,6 +4358,7 @@ dependencies = [
  "http 1.1.0",
  "http-body 1.0.0",
  "httparse",
+ "httpdate",
  "itoa",
  "pin-project-lite",
  "smallvec",
@@ -4141,6 +4407,19 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-io-timeout",
+]
+
+[[package]]
+name = "hyper-timeout"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3203a961e5c83b6f5498933e78b6b263e208c197b63e9c6c53cc82ffd3f63793"
+dependencies = [
+ "hyper 1.3.1",
+ "hyper-util",
+ "pin-project-lite",
+ "tokio",
+ "tower-service",
 ]
 
 [[package]]
@@ -4393,7 +4672,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "hashlink 0.9.1",
  "log",
- "object_store",
+ "object_store 0.11.0",
  "once_cell",
  "parking_lot",
  "serde",
@@ -4410,8 +4689,8 @@ dependencies = [
 name = "ingester"
 version = "0.1.0"
 dependencies = [
- "arrow",
- "arrow-schema",
+ "arrow 53.0.0",
+ "arrow-schema 53.0.0",
  "async-walkdir",
  "byteorder",
  "bytes",
@@ -5019,9 +5298,9 @@ checksum = "8878cd8d1b3c8c8ae4b2ba0a36652b7cf192f618a599a7fbdfa25cffd4ea72dd"
 
 [[package]]
 name = "memchr"
-version = "2.7.2"
+version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
+checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "memmap2"
@@ -5416,6 +5695,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6da452820c715ce78221e8202ccc599b4a52f3e1eb3eedb487b680c81a8e3f3"
 dependencies = [
  "async-trait",
+ "bytes",
+ "chrono",
+ "futures",
+ "humantime",
+ "itertools 0.13.0",
+ "parking_lot",
+ "percent-encoding",
+ "snafu 0.7.5",
+ "tokio",
+ "tracing",
+ "url",
+ "walkdir",
+]
+
+[[package]]
+name = "object_store"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25a0c4b3a0e31f8b66f71ad8064521efa773910196e2cde791436f13409f3b45"
+dependencies = [
+ "async-trait",
  "base64 0.22.1",
  "bytes",
  "chrono",
@@ -5433,7 +5733,7 @@ dependencies = [
  "rustls-pemfile 2.1.2",
  "serde",
  "serde_json",
- "snafu 0.7.5",
+ "snafu 0.8.4",
  "tokio",
  "tracing",
  "url",
@@ -5519,9 +5819,9 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "argon2",
- "arrow",
+ "arrow 53.0.0",
  "arrow-flight",
- "arrow-schema",
+ "arrow-schema 53.0.0",
  "async-recursion",
  "async-trait",
  "awc",
@@ -5565,9 +5865,9 @@ dependencies = [
  "maxminddb",
  "memory-stats",
  "mimalloc",
- "object_store",
+ "object_store 0.11.0",
  "once_cell",
- "opentelemetry",
+ "opentelemetry 0.25.0",
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk",
@@ -5575,7 +5875,7 @@ dependencies = [
  "parquet",
  "prometheus",
  "promql-parser",
- "prost 0.12.6",
+ "prost 0.13.2",
  "proto",
  "pyroscope",
  "pyroscope_pprofrs",
@@ -5584,7 +5884,7 @@ dependencies = [
  "regex",
  "regex-syntax 0.8.4",
  "report_server",
- "reqwest 0.11.27",
+ "reqwest 0.12.4",
  "rust-embed-for-web",
  "segment",
  "serde",
@@ -5602,7 +5902,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
- "tonic 0.11.0",
+ "tonic 0.12.2",
  "tracing",
  "tracing-appender",
  "tracing-opentelemetry",
@@ -5638,52 +5938,66 @@ dependencies = [
 ]
 
 [[package]]
-name = "opentelemetry-http"
-version = "0.11.1"
+name = "opentelemetry"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7690dc77bf776713848c4faa6501157469017eaf332baccd4eb1cea928743d94"
+checksum = "803801d3d3b71cd026851a53f974ea03df3d179cb758b260136a6c9e22e196af"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "once_cell",
+ "pin-project-lite",
+ "thiserror",
+]
+
+[[package]]
+name = "opentelemetry-http"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88d8c2b76e5f7848a289aa9666dbe56b16f8a22a4c5246ef37a14941818d2913"
 dependencies = [
  "async-trait",
  "bytes",
- "http 0.2.12",
- "opentelemetry",
- "reqwest 0.11.27",
+ "http 1.1.0",
+ "opentelemetry 0.25.0",
+ "reqwest 0.12.4",
 ]
 
 [[package]]
 name = "opentelemetry-otlp"
-version = "0.15.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a016b8d9495c639af2145ac22387dcb88e44118e45320d9238fbf4e7889abcb"
+checksum = "596b1719b3cab83addb20bcbffdf21575279d9436d9ccccfe651a3bf0ab5ab06"
 dependencies = [
  "async-trait",
  "futures-core",
- "http 0.2.12",
- "opentelemetry",
+ "http 1.1.0",
+ "opentelemetry 0.25.0",
  "opentelemetry-http",
  "opentelemetry-proto",
- "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
- "prost 0.12.6",
- "reqwest 0.11.27",
+ "prost 0.13.2",
+ "reqwest 0.12.4",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
- "tonic 0.11.0",
+ "tonic 0.12.2",
 ]
 
 [[package]]
 name = "opentelemetry-proto"
-version = "0.5.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a8fddc9b68f5b80dae9d6f510b88e02396f006ad48cac349411fbecc80caae4"
+checksum = "2c43620e8f93359eb7e627a3b16ee92d8585774986f24f2ab010817426c5ce61"
 dependencies = [
  "hex",
- "opentelemetry",
+ "opentelemetry 0.25.0",
  "opentelemetry_sdk",
- "prost 0.12.6",
+ "prost 0.13.2",
  "serde",
- "tonic 0.11.0",
+ "tonic 0.12.2",
 ]
 
 [[package]]
@@ -5694,19 +6008,17 @@ checksum = "f9ab5bd6c42fb9349dcf28af2ba9a0667f697f9bdcca045d39f2cec5543e2910"
 
 [[package]]
 name = "opentelemetry_sdk"
-version = "0.22.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e90c7113be649e31e9a0f8b5ee24ed7a16923b322c3c5ab6367469c049d6b7e"
+checksum = "e0da0d6b47a3dbc6e9c9e36a0520e25cf943e046843818faaa3f87365a548c82"
 dependencies = [
  "async-trait",
- "crossbeam-channel",
  "futures-channel",
  "futures-executor",
  "futures-util",
  "glob",
  "once_cell",
- "opentelemetry",
- "ordered-float 4.2.0",
+ "opentelemetry 0.25.0",
  "percent-encoding",
  "rand",
  "serde_json",
@@ -5817,18 +6129,18 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "52.2.0"
+version = "53.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e977b9066b4d3b03555c22bdc442f3fadebd96a39111249113087d0edb2691cd"
+checksum = "f0fbf928021131daaa57d334ca8e3904fe9ae22f73c56244fc7db9b04eedc3d8"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array",
- "arrow-buffer",
- "arrow-cast",
- "arrow-data",
- "arrow-ipc",
- "arrow-schema",
- "arrow-select",
+ "arrow-array 53.0.0",
+ "arrow-buffer 53.0.0",
+ "arrow-cast 53.0.0",
+ "arrow-data 53.0.0",
+ "arrow-ipc 53.0.0",
+ "arrow-schema 53.0.0",
+ "arrow-select 53.0.0",
  "base64 0.22.1",
  "brotli 6.0.0",
  "bytes",
@@ -5840,7 +6152,7 @@ dependencies = [
  "lz4_flex",
  "num",
  "num-bigint",
- "object_store",
+ "object_store 0.11.0",
  "paste",
  "seq-macro",
  "snap",
@@ -6300,6 +6612,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b2ecbe40f08db5c006b5764a2645f7f3f141ce756412ac9e1dd6087e6d32995"
+dependencies = [
+ "bytes",
+ "prost-derive 0.13.2",
+]
+
+[[package]]
 name = "prost-build"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6314,7 +6636,7 @@ dependencies = [
  "petgraph",
  "prettyplease",
  "prost 0.12.6",
- "prost-types",
+ "prost-types 0.12.6",
  "regex",
  "syn 2.0.66",
  "tempfile",
@@ -6347,6 +6669,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acf0c195eebb4af52c752bec4f52f645da98b6e92077a04110c7f349477ae5ac"
+dependencies = [
+ "anyhow",
+ "itertools 0.13.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
+]
+
+[[package]]
 name = "prost-reflect"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6354,7 +6689,7 @@ checksum = "6f5eec97d5d34bdd17ad2db2219aabf46b054c6c41bd5529767c9ce55be5898f"
 dependencies = [
  "once_cell",
  "prost 0.12.6",
- "prost-types",
+ "prost-types 0.12.6",
 ]
 
 [[package]]
@@ -6367,18 +6702,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-types"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60caa6738c7369b940c3d49246a8d1749323674c65cb13010134f5c9bad5b519"
+dependencies = [
+ "prost 0.13.2",
+]
+
+[[package]]
 name = "proto"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "datafusion",
  "datafusion-proto",
- "prost 0.12.6",
+ "prost 0.13.2",
  "prost-build",
  "serde",
  "serde_json",
  "tokio",
- "tonic 0.11.0",
+ "tonic 0.12.2",
  "tonic-build 0.11.0",
 ]
 
@@ -6744,21 +7088,18 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rustls 0.21.12",
- "rustls-native-certs 0.6.3",
  "rustls-pemfile 1.0.4",
  "serde",
  "serde_json",
  "serde_urlencoded",
- "sync_wrapper",
+ "sync_wrapper 0.1.2",
  "system-configuration",
  "tokio",
  "tokio-rustls 0.24.1",
- "tokio-util",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
  "web-sys",
  "webpki-roots 0.25.4",
  "winreg 0.50.0",
@@ -6772,6 +7113,7 @@ checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.5",
@@ -6789,13 +7131,13 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rustls 0.22.4",
- "rustls-native-certs 0.7.0",
+ "rustls-native-certs",
  "rustls-pemfile 2.1.2",
  "rustls-pki-types",
  "serde",
  "serde_json",
  "serde_urlencoded",
- "sync_wrapper",
+ "sync_wrapper 0.1.2",
  "tokio",
  "tokio-rustls 0.25.0",
  "tokio-util",
@@ -6805,6 +7147,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
+ "webpki-roots 0.26.2",
  "winreg 0.52.0",
 ]
 
@@ -7048,18 +7391,6 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
-dependencies = [
- "openssl-probe",
- "rustls-pemfile 1.0.4",
- "schannel",
- "security-framework",
-]
-
-[[package]]
-name = "rustls-native-certs"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1fb85efa936c42c6d5fc28d2629bb51e4b2f4b8a5211e297d599cc5a093792"
@@ -7222,12 +7553,12 @@ dependencies = [
 
 [[package]]
 name = "segment"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12485833e00457a6bbba60397d3f19362751a0caefe27f6755fff1a2be4fd601"
+checksum = "5bdca318192c89bb31bffa2ef8e9e9898bc80f15a78db2fdd41cd051f1b41d01"
 dependencies = [
  "async-trait",
- "reqwest 0.11.27",
+ "reqwest 0.12.4",
  "serde",
  "serde_json",
  "thiserror",
@@ -8045,6 +8376,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 
 [[package]]
+name = "sync_wrapper"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
+
+[[package]]
 name = "synstructure"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8442,14 +8779,14 @@ checksum = "d560933a0de61cf715926b9cac824d4c883c2c43142f787595e48280c40a1d0e"
 dependencies = [
  "async-stream",
  "async-trait",
- "axum",
+ "axum 0.6.20",
  "base64 0.21.7",
  "bytes",
  "h2 0.3.26",
  "http 0.2.12",
  "http-body 0.4.6",
  "hyper 0.14.29",
- "hyper-timeout",
+ "hyper-timeout 0.4.1",
  "percent-encoding",
  "pin-project",
  "prost 0.12.6",
@@ -8466,24 +8803,27 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.11.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76c4eb7a4e9ef9d4763600161f12f5070b92a578e1b634db88a6887844c91a13"
+checksum = "c6f6ba989e4b2c58ae83d862d3a3e27690b6e3ae630d0deb59f3697f32aa88ad"
 dependencies = [
  "async-stream",
  "async-trait",
- "axum",
- "base64 0.21.7",
+ "axum 0.7.5",
+ "base64 0.22.1",
  "bytes",
  "flate2",
- "h2 0.3.26",
- "http 0.2.12",
- "http-body 0.4.6",
- "hyper 0.14.29",
- "hyper-timeout",
+ "h2 0.4.5",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "hyper 1.3.1",
+ "hyper-timeout 0.5.1",
+ "hyper-util",
  "percent-encoding",
  "pin-project",
- "prost 0.12.6",
+ "prost 0.13.2",
+ "socket2",
  "tokio",
  "tokio-stream",
  "tower",
@@ -8608,13 +8948,13 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.23.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9be14ba1bbe4ab79e9229f7f89fab8d120b865859f10527f31c033e599d2284"
+checksum = "5eabc56d23707ad55ba2a0750fc24767125d5a0f51993ba41ad2c441cc7b8dea"
 dependencies = [
  "js-sys",
  "once_cell",
- "opentelemetry",
+ "opentelemetry 0.25.0",
  "opentelemetry_sdk",
  "smallvec",
  "tracing",

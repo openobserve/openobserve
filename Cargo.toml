@@ -109,19 +109,20 @@ maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
-opentelemetry = "0.22"
-opentelemetry_sdk = { version = "0.22", features = [
+opentelemetry = "0.25"
+opentelemetry_sdk = { version = "0.25", features = [
   "rt-tokio",
   "trace",
   "metrics",
 ] }
-opentelemetry-otlp = { version = "0.15", features = [
+opentelemetry-otlp = { version = "0.25", features = [
   "http-proto",
   "serialize",
   "serde",
+  "trace",
   "reqwest-client",
 ] }
-opentelemetry-proto = { version = "0.5", features = [
+opentelemetry-proto = { version = "0.25", features = [
   "gen-tonic",
   "with-serde",
   "logs",
@@ -229,15 +230,16 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "6.0", features = ["serde"] }
-datafusion = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "bc7f8e9431c716fd642346c1e45f0c33acfdaf43" }
-datafusion-proto = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "bc7f8e9431c716fd642346c1e45f0c33acfdaf43" }
-datafusion-functions-aggregate-common = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "bc7f8e9431c716fd642346c1e45f0c33acfdaf43" }
-arrow = { version = "52.2.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "52.2.0"
-arrow-json = "52.2.0"
-arrow-schema = { version = "52.2.0", features = ["serde"] }
-parquet = { version = "52.2.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.10.2", features = ["aws", "azure", "gcp"] }
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "f7efd2d31adb51a67dc6bfb6d6eae6a525d60482" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "f7efd2d31adb51a67dc6bfb6d6eae6a525d60482" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "f7efd2d31adb51a67dc6bfb6d6eae6a525d60482" }
+arrow = { version = "53.0.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "53.0.0"
+arrow-json = "53.0.0"
+arrow-schema = { version = "53.0.0", features = ["serde"] }
+parquet = { version = "53.0.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.11.0", features = ["aws", "azure", "gcp"] }
+sqlparser = { version = "0.50.0", features = ["serde", "visitor"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -269,16 +271,16 @@ async-nats = "0.35.1"
 once_cell = "1.17"
 parking_lot = "0.12"
 prometheus = "0.13"
-prost = "0.12"
+prost = "0.13.1"
 rand = "0.8"
 rayon = "1.7.0"
 regex = "1.7"
 regex-syntax = "0.8"
-reqwest = { version = "0.11", default-features = false, features = [
+reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls-native-roots",
   "stream",
 ] }
-segment = "~0.2.3"
+segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha256 = "1.4.0"
@@ -291,7 +293,6 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.50", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"
@@ -299,12 +300,12 @@ thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
-tonic = { version = "0.11", features = ["prost", "gzip"] }
+tonic = { version = "0.12.0", features = ["prost", "gzip"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.23"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.26"
+tracing-subscriber = { version = "0.3.0", features = ["registry", "env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
