@@ -900,7 +900,11 @@ pub async fn get_file_list_by_inverted_index(
 
     let fts_condition = terms
         .iter()
-        .map(|x| format!("term LIKE '{x}%'"))
+        .map(|x| match cfg.common.full_text_search_type.as_str() {
+            "eq" => format!("term = '{x}'"),
+            "contains" => format!("term LIKE '%{x}%'"),
+            _ => format!("term LIKE '{x}%'"),
+        })
         .collect::<Vec<_>>()
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {
