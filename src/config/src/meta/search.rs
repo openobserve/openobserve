@@ -368,21 +368,14 @@ pub struct SearchPartitionResponse {
     pub partitions: Vec<[i64; 2]>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct SearchHistoryRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub org_id: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub stream_type: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub stream_name: String,
-    #[serde(rename = "start_time")]
-    pub min_ts: i64,
-    #[serde(rename = "end_time")]
-    pub max_ts: i64,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub trace_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<String>,
+    pub stream_name: Option<String>,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub trace_id: Option<String>,
     pub user_email: Option<String>,
     #[serde(default = "default_size")]
     pub size: i64
@@ -390,7 +383,7 @@ pub struct SearchHistoryRequest {
 
 impl SearchHistoryRequest {
     pub fn validate(&self) -> Result<bool, String> {
-        if self.min_ts >= self.max_ts {
+        if self.start_time >= self.end_time {
             return Err("start_time must be less than end_time".to_string());
         }
         Ok(true)
@@ -419,8 +412,8 @@ impl SearchHistoryRequest {
                 sql,
                 from: 0,
                 size: self.size,
-                start_time: self.min_ts,
-                end_time: self.max_ts,
+                start_time: self.start_time,
+                end_time: self.end_time,
                 sort_by: Some(format!("{} DESC", sort_by)),
                 quick_mode: false,
                 query_type: "".to_string(),
@@ -872,18 +865,18 @@ mod search_history_utils {
             self
         }
 
-        pub fn with_stream_type(mut self, stream_type: &str) -> Self {
-            self.stream_type = Some(stream_type.to_string());
+        pub fn with_stream_type(mut self, stream_type: &Option<String>) -> Self {
+            self.stream_type = stream_type.to_owned();
             self
         }
 
-        pub fn with_stream_name(mut self, stream_name: &str) -> Self {
-            self.stream_name = Some(stream_name.to_string());
+        pub fn with_stream_name(mut self, stream_name: &Option<String>) -> Self {
+            self.stream_name = stream_name.to_owned();
             self
         }
 
-        pub fn with_trace_id(mut self, trace_id: &str) -> Self {
-            self.trace_id = Some(trace_id.to_string());
+        pub fn with_trace_id(mut self, trace_id: &Option<String>) -> Self {
+            self.trace_id = trace_id.to_owned();
             self
         }
 
@@ -949,7 +942,7 @@ mod search_history_utils {
         #[test]
         fn test_with_stream_type() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_stream_type("logs")
+                .with_stream_type(&Some("logs".to_string()))
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'");
         }
@@ -957,7 +950,7 @@ mod search_history_utils {
         #[test]
         fn test_with_stream_name() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_stream_name("streamA")
+                .with_stream_name(&Some("streamA".to_string()))
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'");
         }
@@ -973,7 +966,7 @@ mod search_history_utils {
         #[test]
         fn test_with_trace_id() {
             let query = SearchHistoryQueryBuilder::new()
-                .with_trace_id("trace123")
+                .with_trace_id(&Some("trace123".to_string()))
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'");
         }
@@ -982,10 +975,10 @@ mod search_history_utils {
         fn test_combined_query() {
             let query = SearchHistoryQueryBuilder::new()
                 .with_org_id(&Some("org123".to_string()))
-                .with_stream_type("logs")
-                .with_stream_name("streamA")
+                .with_stream_type(&Some("logs".to_string()))
+                .with_stream_name(&Some("streamA".to_string()))
                 .with_user_email(&Some("user123@gmail.com".to_string()))
-                .with_trace_id("trace123")
+                .with_trace_id(&Some("trace123".to_string()))
                 .build(SEARCH_STREAM_NAME);
 
             let expected_query = "SELECT * FROM usage WHERE 1=1 \
