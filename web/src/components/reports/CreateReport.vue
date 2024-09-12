@@ -425,31 +425,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template v-else>
-                  <div
-                    class="q-mt-md"
-                    style="
-                      border: 1px solid #d7d7d7;
-                      width: fit-content;
-                      border-radius: 2px;
-                    "
-                  >
-                    <template v-for="visual in timeTabs" :key="visual.value">
-                      <q-btn
-                        :data-test="`add-report-schedule-${visual.value}-btn`"
-                        :color="
-                          visual.value === selectedTimeTab ? 'primary' : ''
-                        "
-                        :flat="visual.value === selectedTimeTab ? false : true"
-                        dense
-                        no-caps
-                        size="12px"
-                        class="q-px-md visual-selection-btn"
-                        style="padding-top: 4px; padding-bottom: 4px"
-                        @click="selectedTimeTab = visual.value"
+                  <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
+                    <div
+                      class="tw-flex tw-justify-center tw-align-center"
+                      style="
+                        border: 1px solid #d7d7d7;
+                        width: fit-content;
+                        border-radius: 2px;
+                      "
+                    >
+                      <template v-for="visual in timeTabs" :key="visual.value">
+                        <q-btn
+                          :data-test="`add-report-schedule-${visual.value}-btn`"
+                          :color="
+                            visual.value === selectedTimeTab ? 'primary' : ''
+                          "
+                          :flat="
+                            visual.value === selectedTimeTab ? false : true
+                          "
+                          dense
+                          no-caps
+                          size="12px"
+                          class="q-px-md visual-selection-btn"
+                          style="padding-top: 4px; padding-bottom: 4px"
+                          @click="selectedTimeTab = visual.value"
+                        >
+                          {{ visual.label }}</q-btn
+                        >
+                      </template>
+                    </div>
+                    <q-icon
+                      name="info_outline"
+                      class="cursor-pointer q-ml-sm"
+                      size="16px"
+                    >
+                      <q-tooltip
+                        anchor="center end"
+                        self="center left"
+                        class="tw-text-[12px]"
                       >
-                        {{ visual.label }}</q-btn
-                      >
-                    </template>
+                        "Schedule Now" will schedule the report using the
+                        current date, time, and timezone.<br />
+                        In "Schedule Later" you can customize the date, time,
+                        and timezone.
+                      </q-tooltip>
+                    </q-icon>
                   </div>
 
                   <div
@@ -503,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     data-test="add-report-schedule-send-later-section"
-                    v-if="selectedTimeTab === 'sendLater'"
+                    v-if="selectedTimeTab === 'scheduleLater'"
                     class="flex items-center justify-start q-mt-md"
                   >
                     <div
@@ -842,7 +862,7 @@ const defaultReport = {
   password: "",
   timezone: "UTC",
   timezoneOffset: 0,
-  lastTriggeredAt: 0,
+  lastTriggeredAt: null,
   createdAt: "",
   updatedAt: "",
   owner: "",
@@ -876,12 +896,12 @@ const dialog = ref({
 
 const timeTabs = [
   {
-    label: "Send now",
-    value: "sendNow",
+    label: "Schedule now",
+    value: "scheduleNow",
   },
   {
-    label: "Send later",
-    value: "sendLater",
+    label: "Schedule later",
+    value: "scheduleLater",
   },
 ];
 
@@ -916,7 +936,7 @@ const frequencyTabs = [
   },
 ];
 
-const selectedTimeTab = ref("sendLater");
+const selectedTimeTab = ref("scheduleNow");
 
 const store = useStore();
 
@@ -949,8 +969,8 @@ const frequency = ref({
   cron: "",
 });
 
-onBeforeMount(() => {
-  getDashboaordFolders();
+onBeforeMount(async () => {
+  await getDashboaordFolders();
 
   isEditingReport.value = !!router.currentRoute.value.query?.name;
 
@@ -1002,7 +1022,7 @@ const isValidName = computed(() => {
   return roleNameRegex.test(formData.value.name);
 });
 
-const setInitialReportData = () => {
+const setInitialReportData = async () => {
   const queryParams = router.currentRoute.value.query;
 
   if (queryParams.type === "cached") {
@@ -1013,24 +1033,31 @@ const setInitialReportData = () => {
 
   if (queryParams.folderId) {
     formData.value.dashboards[0].folder = queryParams.folderId as string;
-    onFolderSelection(queryParams.folderId as string);
+    await onFolderSelection(queryParams.folderId as string);
   }
 
-  if (queryParams.dashboardId) {
+  if (queryParams.folderId && queryParams.dashboardId) {
     formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
+    setDashboardTabOptions(queryParams.dashboardId);
   }
 
-  if (queryParams.tabId) {
-    formData.value.dashboards[0].tabs = [queryParams.tabId as string];
+  if (queryParams.dashboardId && queryParams.tabId) {
+    formData.value.dashboards[0].tabs = queryParams.tabId as string;
   }
 };
 
-const onFolderSelection = (id: string) => {
+const onFolderSelection = async (id: string) => {
   formData.value.dashboards.forEach((dashboard: any) => {
     dashboard.dashboard = "";
     dashboard.tabs = "";
   });
-  setDashboardOptions(id);
+
+  try {
+    await setDashboardOptions(id);
+    return true;
+  } catch (err) {
+    return false;
+  }
 };
 
 const setDashboardOptions = (id: string) => {
@@ -1067,11 +1094,12 @@ const setDashboardOptions = (id: string) => {
                 version: dashboard.version,
               });
               options.value["dashboards"] = [...dashboardOptions.value];
-              resolve(true);
             },
           );
+
+        resolve(true);
       })
-      .catch((err) => resolve(false))
+      .catch((err) => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1177,21 +1205,25 @@ const removeDashboardVariable = (variable: any) => {
 };
 
 const getDashboaordFolders = () => {
-  isFetchingFolders.value = true;
-  dashboardService
-    .list_Folders(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      res.data.list.forEach((folder: { name: string; folderId: string }) => {
-        folderOptions.value.push({
-          label: folder.name,
-          value: folder.folderId,
+  return new Promise((resolve, reject) => {
+    isFetchingFolders.value = true;
+    dashboardService
+      .list_Folders(store.state.selectedOrganization.identifier)
+      .then((res) => {
+        res.data.list.forEach((folder: { name: string; folderId: string }) => {
+          folderOptions.value.push({
+            label: folder.name,
+            value: folder.folderId,
+          });
+          options.value["folders"] = [...folderOptions.value];
         });
-        options.value["folders"] = [...folderOptions.value];
+        resolve(true);
+      })
+      .catch((err) => reject(true))
+      .finally(() => {
+        isFetchingFolders.value = false;
       });
-    })
-    .finally(() => {
-      isFetchingFolders.value = false;
-    });
+  });
 };
 
 /**
@@ -1230,7 +1262,12 @@ const convertDateToTimestamp = (
 
 const saveReport = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  if (selectedTimeTab.value === "sendNow" || frequency.value.type === "cron") {
+  const reportPayload = JSON.parse(JSON.stringify(formData.value));
+
+  if (
+    selectedTimeTab.value === "scheduleNow" ||
+    frequency.value.type === "cron"
+  ) {
     const now = new Date();
 
     // Get the day, month, and year from the date object
@@ -1258,42 +1295,42 @@ const saveReport = async () => {
     scheduling.value.timezone,
   );
 
-  formData.value.start = convertedDateTime.timestamp;
+  reportPayload.start = convertedDateTime.timestamp;
 
-  formData.value.timezoneOffset = convertedDateTime.offset;
+  reportPayload.timezoneOffset = convertedDateTime.offset;
 
-  formData.value.orgId = store.state.selectedOrganization.identifier;
+  reportPayload.orgId = store.state.selectedOrganization.identifier;
 
-  formData.value.destinations = emails.value.split(/[,;]/).map((email) => ({
+  reportPayload.destinations = emails.value.split(/[,;]/).map((email) => ({
     email: email.trim(),
   }));
 
   if (frequency.value.type === "custom") {
-    formData.value.frequency.type = frequency.value.custom.period;
-    formData.value.frequency.interval = Number(frequency.value.custom.interval);
+    reportPayload.frequency.type = frequency.value.custom.period;
+    reportPayload.frequency.interval = Number(frequency.value.custom.interval);
   } else if (frequency.value.type === "cron") {
-    formData.value.frequency.type = frequency.value.type;
-    formData.value.frequency.cron =
+    reportPayload.frequency.type = frequency.value.type;
+    reportPayload.frequency.cron =
       frequency.value.cron.toString().trim() + " *";
   } else {
-    formData.value.frequency.type = frequency.value.type;
-    formData.value.frequency.interval = 1;
+    reportPayload.frequency.type = frequency.value.type;
+    reportPayload.frequency.interval = 1;
   }
 
-  formData.value.timezone = scheduling.value.timezone;
+  reportPayload.timezone = scheduling.value.timezone;
 
   if (isEditingReport.value) {
-    formData.value.updatedAt = new Date().toISOString();
-    formData.value.lastEditedBy = store.state.userInfo.email;
+    reportPayload.updatedAt = new Date().toISOString();
+    reportPayload.lastEditedBy = store.state.userInfo.email;
   } else {
-    formData.value.createdAt = new Date().toISOString();
-    formData.value.owner = store.state.userInfo.email;
-    formData.value.lastTriggeredAt = new Date().getTime();
-    formData.value.lastEditedBy = store.state.userInfo.email;
-    formData.value.updatedAt = new Date().toISOString();
+    reportPayload.createdAt = new Date().toISOString();
+    reportPayload.owner = store.state.userInfo.email;
+    reportPayload.lastTriggeredAt = null;
+    reportPayload.lastEditedBy = store.state.userInfo.email;
+    reportPayload.updatedAt = new Date().toISOString();
   }
 
-  if (isCachedReport.value) formData.value.destinations = [];
+  if (isCachedReport.value) reportPayload.destinations = [];
 
   // Check if all report input fields are valid
   try {
@@ -1307,9 +1344,9 @@ const saveReport = async () => {
   }
 
   // This is unitil we support multiple dashboards and tabs
-  if (formData.value.dashboards[0]?.tabs)
-    formData.value.dashboards[0].tabs = [
-      formData.value.dashboards[0].tabs as string,
+  if (reportPayload.dashboards[0]?.tabs)
+    reportPayload.dashboards[0].tabs = [
+      reportPayload.dashboards[0].tabs as string,
     ];
 
   const reportAction = isEditingReport.value
@@ -1322,7 +1359,7 @@ const saveReport = async () => {
     timeout: 2000,
   });
 
-  reportAction(store.state.selectedOrganization.identifier, formData.value)
+  reportAction(store.state.selectedOrganization.identifier, reportPayload)
     .then(() => {
       q.notify({
         type: "positive",
@@ -1345,10 +1382,6 @@ const saveReport = async () => {
       });
     })
     .finally(() => {
-      // TODO OK : Remove this after multi tab support in reports, this is a workaround
-      formData.value.dashboards[0].tabs =
-        formData.value?.dashboards[0]?.tabs[0];
-
       dismiss();
     });
 };
@@ -1432,12 +1465,25 @@ const goToReports = () => {
 };
 
 const onFilterOptions = (type: string, val: String, update: Function) => {
-  const optionsMapping: { [key: string]: any[] } = {
-    folders: folderOptions.value,
-    dashboards: dashboardOptions.value,
-    tabs: dashboardTabOptions.value,
-  };
-  optionsMapping[type] = filterOptions(options.value[type] || [], val, update);
+  if (type === "folders") {
+    folderOptions.value = filterOptions(options.value[type] || [], val, update);
+  }
+
+  if (type === "dashboards") {
+    dashboardOptions.value = filterOptions(
+      options.value[type] || [],
+      val,
+      update,
+    );
+  }
+
+  if (type === "tabs") {
+    dashboardTabOptions.value = filterOptions(
+      dashboardTabOptions.value,
+      val,
+      update,
+    );
+  }
 };
 
 const filterOptions = (options: any[], val: String, update: Function) => {
@@ -1458,10 +1504,18 @@ const filterOptions = (options: any[], val: String, update: Function) => {
 };
 
 const setupEditingReport = async (report: any) => {
-  formData.value = report;
-
-  // This is unitil we support multiple dashboards and tabs
-  formData.value.dashboards[0].tabs = report.dashboards[0].tabs[0];
+  formData.value = {
+    ...report,
+    dashboards: [
+      {
+        folder: "",
+        dashboard: "",
+        tabs: "" as string | string[],
+        variables: report.dashboards[0].variables,
+        timerange: report.dashboards[0].timerange,
+      },
+    ],
+  };
 
   // set date, time and timezone in scheduling
   const date = new Date(report.start / 1000);
@@ -1483,8 +1537,8 @@ const setupEditingReport = async (report: any) => {
 
   scheduling.value.timezone = report.timezone;
 
-  // set selectedTimeTab to sendLater
-  selectedTimeTab.value = "sendLater";
+  // set selectedTimeTab to scheduleLater
+  selectedTimeTab.value = "scheduleLater";
 
   emails.value = report.destinations
     .map((destination: { email: string }) => destination.email)
@@ -1507,9 +1561,57 @@ const setupEditingReport = async (report: any) => {
     frequency.value.type = report.frequency.type;
   }
 
-  await setDashboardOptions(formData.value.dashboards[0].folder);
+  await setDashboardOptions(report.dashboards[0].folder);
+
+  // Check if folder is present in the options and set the folder
+  if (
+    folderOptions.value.some(
+      (folder) => folder.value === report.dashboards[0].folder,
+    )
+  ) {
+    formData.value.dashboards[0].folder = report.dashboards[0].folder;
+  } else {
+    formData.value.dashboards[0].folder = "";
+    q.notify({
+      type: "negative",
+      message: "Selected folder has been deleted!",
+      timeout: 4000,
+    });
+  }
+
+  // Check if dashboard is present in the options and set the dashboard
+  if (
+    dashboardOptions.value.some(
+      (dashboard) => dashboard.value === report.dashboards[0].dashboard,
+    )
+  ) {
+    formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
+  } else {
+    formData.value.dashboards[0].dashboard = "";
+    q.notify({
+      type: "negative",
+      message: "Selected dashboard has been deleted!",
+      timeout: 4000,
+    });
+  }
 
   setDashboardTabOptions(formData.value.dashboards[0].dashboard);
+
+  // Check if tab is present in the options and set the tab
+  const tab = dashboardTabOptions.value.filter(
+    (tab) => tab.value === report.dashboards[0].tabs[0],
+  )[0];
+
+  if (tab) {
+    formData.value.dashboards[0].tabs = tab.value;
+  } else {
+    q.notify({
+      type: "negative",
+      message: "Selected dashboard tab has been deleted!",
+      timeout: 4000,
+    });
+    formData.value.dashboards[0].tabs = "";
+  }
 };
 
 const openCancelDialog = () => {
