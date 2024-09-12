@@ -438,7 +438,7 @@ pub async fn write_file(
         tasks.push(task);
     }
 
-    let task_results = try_join_all(tasks).await?;
+    let task_results = try_join_all(tasks).await.unwrap();
     for task in task_results {
         match task {
             Ok((entry_records, entry_size)) => {
