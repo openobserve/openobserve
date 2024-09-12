@@ -120,7 +120,7 @@ pub async fn search(
     };
 
     // No cache data present, add delta for full query
-    if !c_resp.has_cached_data {
+    if !c_resp.has_cached_data && c_resp.deltas.is_empty() {
         c_resp.deltas.push(QueryDelta {
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
@@ -193,6 +193,10 @@ pub async fn search(
             .dec();
 
         let mut tasks = Vec::new();
+
+        log::info!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas);
+        c_resp.deltas.sort();
+        c_resp.deltas.dedup();
 
         let delta_len = c_resp.deltas.len();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
