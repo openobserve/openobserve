@@ -1373,8 +1373,6 @@ export default defineComponent({
           this.formData.trigger_condition.timezone,
         );
 
-        alert(convertedDateTime.timestamp + " : " + convertedDateTime.offset);
-
         this.formData.tz_offset = convertedDateTime.offset;
       }
 

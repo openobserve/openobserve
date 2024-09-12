@@ -783,7 +783,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="
               (!Number(triggerData.frequency) &&
                 triggerData.frequency_type == 'minutes') ||
-              (triggerData.frequency_type == 'cron' && triggerData.cron == '')
+              (triggerData.frequency_type == 'cron' &&
+                (triggerData.cron == '' || !triggerData.timezone))
             "
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
