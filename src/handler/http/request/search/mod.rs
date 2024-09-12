@@ -21,7 +21,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        search::SearchEventType,
+        search::{SearchEventType, SearchHistoryHitResponse},
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -31,7 +31,7 @@ use config::{
 };
 use infra::errors;
 use tracing::{Instrument, Span};
-use config::meta::search::SearchHistoryHitResponse;
+
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -1408,10 +1408,7 @@ pub async fn search_history(
     let org_id = org_id.into_inner();
     let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!(
-            "/api/{org_id}/_search_history",
-            org_id = org_id.clone()
-        )
+        tracing::info_span!("/api/{org_id}/_search_history", org_id = org_id.clone())
     } else {
         Span::none()
     };
@@ -1473,57 +1470,66 @@ pub async fn search_history(
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,
-        &history_org_id,
+        history_org_id,
         stream_type,
         user_id.clone(),
         &search_query_req,
     )
-        .instrument(http_span)
-        .await;
+    .instrument(http_span)
+    .await;
 
     let mut search_res = match search_res {
         Ok(res) => res,
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, stream_name, "500", "_search_history");
+            http_report_metrics(
+                start,
+                &org_id,
+                stream_type,
+                stream_name,
+                "500",
+                "_search_history",
+            );
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
                     meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                 ),
-                _ => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    ),
-                )
-            })
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
         }
     };
 
-    search_res.hits = search_res.hits
+    search_res.hits = search_res
+        .hits
         .into_iter()
-        .filter_map(|hit| {
-            match SearchHistoryHitResponse::try_from(hit) {
-                Ok(response) => {
-                    match serde_json::to_value(response) {
-                        Ok(json_value) => Some(json_value),
-                        Err(e) => {
-                            log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
-                            None
-                        }
-                    }
-                },
+        .filter_map(|hit| match SearchHistoryHitResponse::try_from(hit) {
+            Ok(response) => match serde_json::to_value(response) {
+                Ok(json_value) => Some(json_value),
                 Err(e) => {
-                    log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
                     None
                 }
+            },
+            Err(e) => {
+                log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                None
             }
         })
         .collect::<Vec<_>>();
     search_res.trace_id = trace_id.clone();
 
     // report http metrics
-    http_report_metrics(start, &org_id, stream_type, stream_name, "200", "_search_history");
+    http_report_metrics(
+        start,
+        &org_id,
+        stream_type,
+        stream_name,
+        "200",
+        "_search_history",
+    );
 
     // prepare usage metrics
     let time_taken = start.elapsed().as_secs_f64();
@@ -1557,7 +1563,7 @@ pub async fn search_history(
         num_fn,
         started_at,
     )
-        .await;
+    .await;
 
     Ok(HttpResponse::Ok().json(search_res))
 }

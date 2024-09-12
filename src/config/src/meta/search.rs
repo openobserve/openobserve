@@ -378,7 +378,7 @@ pub struct SearchHistoryRequest {
     pub trace_id: Option<String>,
     pub user_email: Option<String>,
     #[serde(default = "default_size")]
-    pub size: i64
+    pub size: i64,
 }
 
 impl SearchHistoryRequest {
@@ -460,18 +460,60 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
 
     fn try_from(value: json::Value) -> Result<Self, Self::Error> {
         Ok(SearchHistoryHitResponse {
-            org_id: value.get("org_id").and_then(|v| v.as_str()).ok_or("org_id missing".to_string())?.to_string(),
-            stream_type: value.get("stream_type").and_then(|v| v.as_str()).ok_or("stream_type missing".to_string())?.to_string(),
-            stream_name: value.get("stream_name").and_then(|v| v.as_str()).ok_or("stream_name missing".to_string())?.to_string(),
-            user_email: value.get("user_email").and_then(|v| v.as_str()).ok_or("user_email missing".to_string())?.to_string(),
-            min_ts: value.get("min_ts").and_then(|v| v.as_i64()).ok_or("min_ts missing".to_string())?,
-            max_ts: value.get("max_ts").and_then(|v| v.as_i64()).ok_or("max_ts missing".to_string())?,
-            request_body: value.get("request_body").and_then(|v| v.as_str()).ok_or("request_body".to_string())?.to_string(),
-            size: value.get("size").and_then(|v| v.as_f64()).ok_or("size missing".to_string())?,
-            num_records: value.get("num_records").and_then(|v| v.as_i64()).ok_or("num_records missing".to_string())?,
-            response_time: value.get("response_time").and_then(|v| v.as_f64()).ok_or("response_time missing".to_string())?,
-            cached_ratio: value.get("cached_ratio").and_then(|v| v.as_i64()).ok_or("cached_ratio missing".to_string())?,
-            trace_id: value.get("trace_id").and_then(|v| v.as_str()).ok_or("trace_id missing".to_string())?.to_string(),
+            org_id: value
+                .get("org_id")
+                .and_then(|v| v.as_str())
+                .ok_or("org_id missing".to_string())?
+                .to_string(),
+            stream_type: value
+                .get("stream_type")
+                .and_then(|v| v.as_str())
+                .ok_or("stream_type missing".to_string())?
+                .to_string(),
+            stream_name: value
+                .get("stream_name")
+                .and_then(|v| v.as_str())
+                .ok_or("stream_name missing".to_string())?
+                .to_string(),
+            user_email: value
+                .get("user_email")
+                .and_then(|v| v.as_str())
+                .ok_or("user_email missing".to_string())?
+                .to_string(),
+            min_ts: value
+                .get("min_ts")
+                .and_then(|v| v.as_i64())
+                .ok_or("min_ts missing".to_string())?,
+            max_ts: value
+                .get("max_ts")
+                .and_then(|v| v.as_i64())
+                .ok_or("max_ts missing".to_string())?,
+            request_body: value
+                .get("request_body")
+                .and_then(|v| v.as_str())
+                .ok_or("request_body".to_string())?
+                .to_string(),
+            size: value
+                .get("size")
+                .and_then(|v| v.as_f64())
+                .ok_or("size missing".to_string())?,
+            num_records: value
+                .get("num_records")
+                .and_then(|v| v.as_i64())
+                .ok_or("num_records missing".to_string())?,
+            response_time: value
+                .get("response_time")
+                .and_then(|v| v.as_f64())
+                .ok_or("response_time missing".to_string())?,
+            cached_ratio: value
+                .get("cached_ratio")
+                .and_then(|v| v.as_i64())
+                .ok_or("cached_ratio missing".to_string())?,
+            trace_id: value
+                .get("trace_id")
+                .and_then(|v| v.as_str())
+                .ok_or("trace_id missing".to_string())?
+                .to_string(),
         })
     }
 }
@@ -846,7 +888,7 @@ mod search_history_utils {
         pub stream_type: Option<String>,
         pub stream_name: Option<String>,
         pub user_email: Option<String>,
-        pub trace_id: Option<String>
+        pub trace_id: Option<String>,
     }
 
     impl SearchHistoryQueryBuilder {
@@ -919,7 +961,6 @@ mod search_history_utils {
         }
     }
 
-
     #[cfg(test)]
     mod tests {
         use super::SearchHistoryQueryBuilder;
@@ -944,7 +985,10 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_stream_type(&Some("logs".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'");
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'"
+            );
         }
 
         #[test]
@@ -952,7 +996,10 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_stream_name(&Some("streamA".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'");
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'"
+            );
         }
 
         #[test]
@@ -960,7 +1007,10 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_user_email(&Some("user123@gmail.com".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'");
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'"
+            );
         }
 
         #[test]
@@ -968,7 +1018,10 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_trace_id(&Some("trace123".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'");
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'"
+            );
         }
 
         #[test]
