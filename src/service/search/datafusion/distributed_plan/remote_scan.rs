@@ -341,6 +341,7 @@ struct FlightStream {
 }
 
 impl FlightStream {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         trace_id: String,
         schema: SchemaRef,
