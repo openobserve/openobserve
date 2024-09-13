@@ -477,15 +477,10 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         let mut new_streams = Vec::new();
         let mut update_streams = Vec::with_capacity(streams.len());
         for (stream_key, item) in streams {
-            let mut stats = match old_stats.get(stream_key) {
-                Some(s) => s.to_owned(),
-                None => {
-                    new_streams.push(stream_key);
-                    StreamStats::default()
-                }
-            };
-            stats.add_stream_stats(item);
-            update_streams.push((stream_key, stats));
+            if old_stats.get(stream_key).is_none() {
+                new_streams.push(stream_key);
+            }
+            update_streams.push((stream_key, item));
         }
 
         let mut tx = pool.begin().await?;
@@ -519,7 +514,7 @@ INSERT INTO stream_stats
             if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats 
-    SET file_num = ?, min_ts = ?, max_ts = ?, records = ?, original_size = ?, compressed_size = ?
+    SET file_num = file_num + ?, min_ts = ?, max_ts = ?, records = records + ?, original_size = original_size + ?, compressed_size = compressed_size + ?
     WHERE stream = ?;
                 "#,
             )
@@ -567,6 +562,12 @@ UPDATE stream_stats
             .bind(stream)
             .execute(&pool)
             .await?;
+        sqlx::query(
+            r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = ? AND max_ts < min_ts;"#,
+        )
+        .bind(stream)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 
