@@ -33,7 +33,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   }
 
   const options: any = {};
-  
+
   options.tooltip = {
     trigger: "item",
     showDelay: 0,
@@ -49,8 +49,8 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
             formattedValue,
             panelSchema.config?.unit,
             panelSchema.config?.unit_custom,
-            panelSchema.config?.decimals
-          )
+            panelSchema.config?.decimals,
+          ),
         );
       }
 
@@ -119,16 +119,15 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
     };
   });
+  if (!options.series.map((item: any) => item.data).every(Array.isArray)) {
+    return;
+  }
 
   const seriesData = options.series.flatMap((series: any) => series.data);
 
   if (seriesData.length > 0) {
-    const minValue = Math.min(
-      ...seriesData.map((item: any) => item.value)
-    );
-    const maxValue = Math.max(
-      ...seriesData.map((item: any) => item.value)
-    );
+    const minValue = Math.min(...seriesData.map((item: any) => item.value));
+    const maxValue = Math.max(...seriesData.map((item: any) => item.value));
 
     options.visualMap.min = minValue;
     options.visualMap.max = maxValue;
