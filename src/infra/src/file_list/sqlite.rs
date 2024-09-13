@@ -487,15 +487,10 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let mut new_streams = Vec::new();
         let mut update_streams = Vec::with_capacity(streams.len());
         for (stream_key, item) in streams {
-            let mut stats = match old_stats.get(stream_key) {
-                Some(s) => s.to_owned(),
-                None => {
-                    new_streams.push(stream_key);
-                    StreamStats::default()
-                }
-            };
-            stats.add_stream_stats(item);
-            update_streams.push((stream_key, stats));
+            if old_stats.get(stream_key).is_none() {
+                new_streams.push(stream_key);
+            }
+            update_streams.push((stream_key, item));
         }
 
         let client = CLIENT_RW.clone();
@@ -530,8 +525,8 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         for (stream_key, stats) in update_streams {
             if let Err(e) = sqlx::query(
                 r#"
-    UPDATE stream_stats 
-    SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
+UPDATE stream_stats 
+    SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6
     WHERE stream = $7;
                 "#,
             )
@@ -572,6 +567,12 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
             .bind(stream)
             .execute(&*client)
             .await?;
+        sqlx::query(
+            r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = $1 AND max_ts < min_ts;"#,
+        )
+        .bind(stream)
+        .execute(&*client)
+        .await?;
         Ok(())
     }
 
