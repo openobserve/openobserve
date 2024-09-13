@@ -69,6 +69,7 @@ pub struct RemoteScanExec {
 
 impl RemoteScanExec {
     /// Create a new RemoteScanExec
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
         file_list: Vec<Vec<FileKey>>,

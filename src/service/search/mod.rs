@@ -53,7 +53,7 @@ use {
     o2_enterprise::enterprise::search::TaskStatus,
     std::collections::HashSet,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
-    tracing::{info_span, Instrument},
+    tracing::info_span,
 };
 
 use super::usage::report_request_usage_stats;

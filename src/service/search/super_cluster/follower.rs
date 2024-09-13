@@ -31,6 +31,7 @@ use infra::{
     },
 };
 use proto::cluster_rpc::{FlightSearchRequest, KvItem, SearchQuery};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     cluster::flight::{
@@ -58,6 +59,7 @@ use crate::service::search::{
 // 4. get physical plan
 // 5. add remote scan to physical plan
 // 6. execute physical plan to get stream
+#[tracing::instrument(name = "service:search:flight:follower:search", skip_all)]
 pub async fn search(
     flight_request: &FlightSearchRequest,
 ) -> Result<(
@@ -224,6 +226,7 @@ pub async fn search(
     // partition file list
     let partition_file_lists = partition_filt_list(file_list, &nodes, node_group).await?;
 
+    let context = tracing::Span::current().context();
     // add sort preserving merge node to preserving the order
     if physical_plan.name() == "SortPreservingMergeExec" {
         let top_merge_node = physical_plan.clone();
@@ -235,6 +238,7 @@ pub async fn search(
             false,
             req.clone(),
             nodes.into_arc_vec(),
+            context,
         ));
         physical_plan = top_merge_node.with_new_children(vec![remote_scan_exec])?;
     } else {
@@ -246,6 +250,7 @@ pub async fn search(
             false,
             req.clone(),
             nodes.into_arc_vec(),
+            context,
         ));
     }
 

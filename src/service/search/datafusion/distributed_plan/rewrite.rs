@@ -38,7 +38,7 @@ pub struct RemoteScanRewriter {
     pub match_all_keys: Vec<String>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
-    pub context: opentelemetry::Context, 
+    pub context: opentelemetry::Context,
 }
 
 impl RemoteScanRewriter {
@@ -121,7 +121,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),
-                    self.context.clone()
+                    self.context.clone(),
                 ));
                 let new_node = node.with_new_children(vec![remote_scan])?;
                 self.is_changed = true;
