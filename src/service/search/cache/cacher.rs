@@ -627,7 +627,7 @@ fn calculate_deltas_multi(
             meta.cached_response.hits.len()
         );
 
-        let delta_end_time = if current_end_time != start_time && histogram_interval > 0 {
+        let delta_end_time = if histogram_interval > 0 && !meta.cached_response.hits.is_empty() {
             // If there is a histogram interval, we need to adjust the end time to the nearest
             // interval
             let mut end_time = meta.response_start_time;
@@ -651,7 +651,11 @@ fn calculate_deltas_multi(
     }
 
     // Check if there is a gap at the end
-    if current_end_time < end_time {
+    if current_end_time < end_time
+        && results.last().map_or(false, |last_meta| {
+            !last_meta.cached_response.hits.is_empty()
+        })
+    {
         deltas.push(QueryDelta {
             delta_start_time: current_end_time,
             delta_end_time: end_time,
