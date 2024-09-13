@@ -47,7 +47,6 @@ use tonic::{
     transport::Channel,
     Streaming,
 };
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
 use crate::service::search::{request::Request, MetadataMap};
@@ -65,7 +64,7 @@ pub struct RemoteScanExec {
     partitions: usize,
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
-    // pub context: opentelemetry::Context,
+    pub context: opentelemetry::Context,
 }
 
 impl RemoteScanExec {
@@ -78,6 +77,7 @@ impl RemoteScanExec {
         is_super_cluster: bool,
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
+        context: opentelemetry::Context,
     ) -> Self {
         let output_partitions = nodes.len();
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
@@ -92,6 +92,7 @@ impl RemoteScanExec {
             partitions: output_partitions,
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
+            context,
         }
     }
 
@@ -178,6 +179,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.is_super_cluster,
             req,
             self.scan_stats.clone(),
+            self.context.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -192,7 +194,6 @@ impl ExecutionPlan for RemoteScanExec {
 }
 
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(name = "remote_scan", skip_all)]
 async fn get_remote_batch(
     input: Arc<dyn ExecutionPlan>,
     partition: usize,
@@ -203,6 +204,7 @@ async fn get_remote_batch(
     is_super_cluster: bool,
     req: Request,
     scan_stats: Arc<Mutex<ScanStats>>,
+    context: opentelemetry::Context,
 ) -> Result<SendableRecordBatchStream> {
     let proto = ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
@@ -255,10 +257,7 @@ async fn get_remote_batch(
         .map_err(|_| DataFusionError::Internal("invalid org_id".to_string()))?;
 
     opentelemetry::global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(
-            &tracing::Span::current().context(),
-            &mut MetadataMap(request.metadata_mut()),
-        )
+        propagator.inject_context(&context, &mut MetadataMap(request.metadata_mut()))
     });
 
     let org_header_key: MetadataKey<_> = cfg
@@ -352,11 +351,6 @@ impl Stream for FlightStream {
             }
         }
     }
-
-    // fn size_hint(&self) -> (usize, Option<usize>) {
-    //     // TODO: check this
-    //     (1, None)
-    // }
 }
 
 impl RecordBatchStream for FlightStream {

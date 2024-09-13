@@ -38,6 +38,7 @@ pub struct RemoteScanRewriter {
     pub match_all_keys: Vec<String>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
+    pub context: opentelemetry::Context, 
 }
 
 impl RemoteScanRewriter {
@@ -48,6 +49,7 @@ impl RemoteScanRewriter {
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         is_leader: bool,
+        context: opentelemetry::Context,
     ) -> Self {
         Self {
             req,
@@ -57,6 +59,7 @@ impl RemoteScanRewriter {
             match_all_keys,
             is_leader,
             is_changed: false,
+            context,
         }
     }
 }
@@ -87,6 +90,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),
+                    self.context.clone(),
                 ));
                 let partitioning = Partitioning::RoundRobinBatch(self.nodes.len());
                 let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
@@ -117,6 +121,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),
+                    self.context.clone()
                 ));
                 let new_node = node.with_new_children(vec![remote_scan])?;
                 self.is_changed = true;

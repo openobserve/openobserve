@@ -48,6 +48,7 @@ use infra::{
 };
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster as infra_cluster,
@@ -328,6 +329,8 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
+
+    let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes.into_arc_vec(),
@@ -335,6 +338,7 @@ pub async fn run_datafusion(
         equal_keys,
         match_all_keys,
         false, // for super cluster
+        context,
     );
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
@@ -353,6 +357,7 @@ pub async fn run_datafusion(
             false,
             rewrite.req,
             rewrite.nodes,
+            rewrite.context,
         ));
     }
 
