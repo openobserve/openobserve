@@ -24,7 +24,8 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        function::{StreamTransform, VRLResultResolver},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -34,14 +35,10 @@ use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
 use crate::{
-    common::meta::{
-        functions::{StreamTransform, VRLResultResolver},
-        ingestion::{
-            AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
-            IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
-            StreamStatus,
-        },
-        stream::StreamParams,
+    common::meta::ingestion::{
+        AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
+        IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
+        StreamStatus,
     },
     service::{
         format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,

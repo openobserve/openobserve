@@ -24,7 +24,8 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        function::{StreamTransform, VRLResultResolver},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -33,11 +34,7 @@ use config::{
 };
 
 use crate::{
-    common::meta::{
-        functions::{StreamTransform, VRLResultResolver},
-        ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
-        stream::StreamParams,
-    },
+    common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
     },

@@ -22,7 +22,8 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        function::{StreamTransform, VRLResultResolver},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -36,10 +37,8 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        functions::{StreamTransform, VRLResultResolver},
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionStatus, StreamStatus},
-        stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{

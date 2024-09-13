@@ -24,7 +24,12 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
+        alerts::alert::Alert,
+        function::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+        stream::{
+            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
+            StreamType,
+        },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
     utils::{flatten, json::*},
@@ -43,15 +48,10 @@ use crate::{
         infra::config::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
-        meta::{
-            alerts::alert::Alert,
-            functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            ingestion::IngestionRequest,
-            stream::{SchemaRecords, StreamParams},
-        },
+        meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::{alerts::alert::AlertExt, db, format_partition_key},
 };
 
 pub mod grpc;

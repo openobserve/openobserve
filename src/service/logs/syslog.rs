@@ -23,7 +23,10 @@ use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
-    meta::stream::{Routing, StreamType},
+    meta::{
+        function::{StreamTransform, VRLResultResolver},
+        stream::{Routing, StreamParams, StreamType},
+    },
     metrics,
     utils::{flatten, json},
 };
@@ -34,10 +37,8 @@ use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
         meta::{
-            functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
             ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
-            stream::StreamParams,
             syslog::SyslogRoute,
         },
     },
