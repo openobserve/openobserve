@@ -102,8 +102,8 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
               formattedValue,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         }
 
@@ -213,18 +213,22 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     };
   });
 
+  if (!options.series.map((item: any) => item.data).every(Array.isArray)) {
+    return;
+  }
   //min max for symbol size
   const seriesDataaa = options.series.flatMap((series: any) => series.data);
+
   const minValue = Math.min(...seriesDataaa.map((item: any) => item[2]));
   const maxValue = Math.max(...seriesDataaa.map((item: any) => item[2]));
 
   //min max for visual map
   const seriesData = options.series.flatMap((series: any) => series.data);
-  
+
   if (seriesData.length > 0) {
     const minValue = Math.min(...seriesData.map((item: any) => item[2]));
     const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
-    
+
     options.visualMap.min = minValue;
     options.visualMap.max = maxValue;
   } else {
