@@ -430,52 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+F</div>
                   </q-btn>
                 </div>
-                <div
-                  class="field_icons"
-                  v-if="
-                    !(
-                      promqlMode ||
-                      (dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                        props.pageIndex >= customQueryFieldsLength)
-                    ) && dashboardPanelData.data.type == 'maps'
-                  "
-                >
-                  <q-btn
-                    :disabled="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields?.name != null
-                    "
-                    no-caps
-                    padding="sm"
-                    @click="addMapName(props.row)"
-                    data-test="dashboard-add-x-data"
-                  >
-                    <div>+N</div>
-                  </q-btn>
-                  <q-btn
-                    :disabled="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields?.value != null
-                    "
-                    no-caps
-                    padding="sm"
-                    @click="addMapValue(props.row)"
-                    data-test="dashboard-add-y-data"
-                  >
-                    <div>+V</div>
-                  </q-btn>
-                  <q-btn
-                    padding="sm"
-                    @click="addFilteredItem(props.row.name)"
-                    data-test="dashboard-add-filter-maps-data"
-                  >
-                    <div>+F</div>
-                  </q-btn>
-                </div>
+
                 <div
                   class="field_icons"
                   v-if="
