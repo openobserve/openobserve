@@ -232,13 +232,11 @@ async fn get_remote_batch(
         index_type: req.inverted_index_type.clone(),
     };
 
-    // TODO: how to add response
-    // TODO: how to add spend time on each node
     log::info!(
         "[trace_id {}] flight->search: request node: {}, is_querier: {}, files: {}",
         req.trace_id,
         &node.get_grpc_addr(),
-        file_list.is_empty(),
+        !file_list.is_empty(),
         file_list.len()
     );
 
@@ -303,27 +301,66 @@ async fn get_remote_batch(
         .map_err(|e| DataFusionError::Execution(e.to_string()))?
         .into_inner();
 
+    let start = std::time::Instant::now();
+
     // the schema should be the first message returned, else client should error
     let flight_data = stream.message().await.unwrap().unwrap();
     // convert FlightData to a stream
     let schema = Arc::new(Schema::try_from(&flight_data)?);
 
+    let mut files = 0;
+    let mut scan_size = 0;
     if let Some(stats) = schema.metadata().get("scan_stats") {
         let stats: ScanStats = serde_json::from_str(stats).unwrap_or_default();
+        files = stats.files;
+        scan_size = stats.original_size;
         scan_stats.lock().add(&stats);
     }
 
-    Ok(Box::pin(FlightStream::new(schema, stream)))
+    Ok(Box::pin(FlightStream::new(
+        req.trace_id,
+        schema,
+        stream,
+        node.get_grpc_addr(),
+        !file_list.is_empty(),
+        files,
+        scan_size,
+        start,
+    )))
 }
 
 struct FlightStream {
+    trace_id: String,
     schema: SchemaRef,
     stream: Streaming<FlightData>,
+    node_addr: String,
+    is_querier: bool,
+    files: i64,
+    scan_size: i64,
+    start: std::time::Instant,
 }
 
 impl FlightStream {
-    fn new(schema: SchemaRef, stream: Streaming<FlightData>) -> Self {
-        Self { schema, stream }
+    fn new(
+        trace_id: String,
+        schema: SchemaRef,
+        stream: Streaming<FlightData>,
+        node_addr: String,
+        is_querier: bool,
+        files: i64,
+        scan_size: i64,
+        start: std::time::Instant,
+    ) -> Self {
+        Self {
+            trace_id,
+            schema,
+            stream,
+            node_addr,
+            is_querier,
+            files,
+            scan_size,
+            start,
+        }
     }
 }
 
@@ -351,6 +388,20 @@ impl Stream for FlightStream {
                 Poll::Ready(Some(Err(DataFusionError::Internal(e.to_string()))))
             }
         }
+    }
+}
+
+impl Drop for FlightStream {
+    fn drop(&mut self) {
+        log::info!(
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, files: {}, scan_size: {}",
+            self.trace_id,
+            self.node_addr,
+            self.is_querier,
+            self.start.elapsed().as_millis(),
+            self.files,
+            self.scan_size / 1024 / 1024,
+        );
     }
 }
 

@@ -59,7 +59,7 @@ use crate::service::search::{
 // 4. get physical plan
 // 5. add remote scan to physical plan
 // 6. execute physical plan to get stream
-#[tracing::instrument(name = "service:search:flight:follower:search", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:flight:follower:search", skip_all)]
 pub async fn search(
     flight_request: &FlightSearchRequest,
 ) -> Result<(

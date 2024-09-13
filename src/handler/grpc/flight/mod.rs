@@ -145,6 +145,7 @@ impl FlightService for FlightServiceImpl {
 
         schema = add_scan_stats_to_schema(schema, scan_stats);
 
+        let start = std::time::Instant::now();
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
             .try_with_compression(Some(CompressionType::ZSTD))
             .map_err(|e| Status::internal(e.to_string()))?;
@@ -162,6 +163,7 @@ impl FlightService for FlightServiceImpl {
                     Status::internal(e.to_string())
                 })?,
                 defer,
+                start,
             ))
             .map_err(|err| Status::from_error(Box::new(err)));
 
@@ -238,14 +240,21 @@ struct FlightSenderStream {
     trace_id: String,
     stream: SendableRecordBatchStream,
     defer: Option<AsyncDefer>,
+    start: std::time::Instant,
 }
 
 impl FlightSenderStream {
-    fn new(trace_id: String, stream: SendableRecordBatchStream, defer: Option<AsyncDefer>) -> Self {
+    fn new(
+        trace_id: String,
+        stream: SendableRecordBatchStream,
+        defer: Option<AsyncDefer>,
+        start: std::time::Instant,
+    ) -> Self {
         Self {
             trace_id,
             stream,
             defer,
+            start,
         }
     }
 }
@@ -260,7 +269,12 @@ impl Stream for FlightSenderStream {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
             Poll::Ready(None) => {
-                log::info!("[trace_id {}] flight->search: stream end", self.trace_id);
+                let end = self.start.elapsed().as_millis();
+                log::info!(
+                    "[trace_id {}] flight->search: stream end, took: {} ms",
+                    self.trace_id,
+                    end
+                );
                 Poll::Ready(None)
             }
             Poll::Pending => Poll::Pending,
@@ -296,6 +310,7 @@ type PlanResult = (
 );
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:search:grpc:flight::enter", skip_all)]
 async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
@@ -310,7 +325,7 @@ async fn get_ctx_and_physical_plan(
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[tracing::instrument(name = "service:search:flight::enter", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:flight::enter", skip_all)]
 async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
