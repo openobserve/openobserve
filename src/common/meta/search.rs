@@ -31,7 +31,9 @@ pub struct CachedQueryResponse {
     pub is_descending: bool,
     pub limit: i64,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, ToSchema, Default, PartialEq, Eq, PartialOrd, Ord,
+)]
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
