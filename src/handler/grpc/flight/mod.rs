@@ -268,15 +268,7 @@ impl Stream for FlightSenderStream {
     ) -> Poll<Option<Self::Item>> {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => {
-                let end = self.start.elapsed().as_millis();
-                log::info!(
-                    "[trace_id {}] flight->search: stream end, took: {} ms",
-                    self.trace_id,
-                    end
-                );
-                Poll::Ready(None)
-            }
+            Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(FlightError::Tonic(
                 Status::internal(e.to_string()),
@@ -287,6 +279,12 @@ impl Stream for FlightSenderStream {
 
 impl Drop for FlightSenderStream {
     fn drop(&mut self) {
+        let end = self.start.elapsed().as_millis();
+        log::info!(
+            "[trace_id {}] flight->search: stream end, took: {} ms",
+            self.trace_id,
+            end
+        );
         if let Some(defer) = self.defer.take() {
             drop(defer);
         } else {
