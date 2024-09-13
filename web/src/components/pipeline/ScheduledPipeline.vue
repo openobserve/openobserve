@@ -1124,8 +1124,6 @@ const filterColumns = (options: string[], val: string, update: Function) => {
     });
   }
 
-  console.log("options", options);
-
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter((column: any) => {
