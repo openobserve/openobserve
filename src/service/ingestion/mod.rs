@@ -406,7 +406,7 @@ pub async fn write_file(
     let mut req_stats = RequestStats::default();
     let cfg = get_config();
     let mut tasks = Vec::with_capacity(buf.len());
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
@@ -438,7 +438,13 @@ pub async fn write_file(
         tasks.push(task);
     }
 
-    let task_results = try_join_all(tasks).await.unwrap();
+    let task_results = match try_join_all(tasks).await {
+        Ok(res) => res,
+        Err(e) => {
+            log::error!("ingestion write file error: {}", e);
+            vec![]
+        }
+    };
     for task in task_results {
         match task {
             Ok((entry_records, entry_size)) => {
