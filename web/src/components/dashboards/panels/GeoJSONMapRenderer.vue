@@ -75,6 +75,11 @@ export default defineComponent({
 
     onMounted(async () => {
       await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
       await initChart();
       window.addEventListener("resize", windowResizeEventCallback);
     });
@@ -106,7 +111,7 @@ export default defineComponent({
           }
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef };
   },
