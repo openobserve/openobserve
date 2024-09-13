@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragover="onDragOver($event, 'name')"
         @drop="onDrop($event, 'name')"
         @dragenter="onDragEnter($event, 'name', null)"
-        data-test="dashboard-x-layout"
+        data-test="dashboard-name-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ].fields?.name?.column
               "
               class="q-pl-sm"
-              :data-test="`dashboard-x-item-${
+              :data-test="`dashboard-name-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.name?.column
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-x-item-${
+                :data-test="`dashboard-name-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].fields?.name?.column
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     dense
                     filled
-                    data-test="dashboard-x-item-input"
+                    data-test="dashboard-name-item-input"
                     :label="t('common.label')"
                     v-model="
                       dashboardPanelData.data.queries[
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-x-item-${
+              :data-test="`dashboard-name-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.name?.column
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragover="onDragOver($event, 'value_for_maps')"
         @drop="onDrop($event, 'value_for_maps')"
         @dragenter="onDragEnter($event, 'value_for_maps', null)"
-        data-test="dashboard-y-layout"
+        data-test="dashboard-value_for_maps-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               size="sm"
               :label="valueLabel"
-              :data-test="`dashboard-y-item-${
+              :data-test="`dashboard-value_for_maps-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.value_for_maps?.column
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-y-item-${
+                :data-test="`dashboard-value_for_maps-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].fields?.value_for_maps?.column
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         emit-value
                         map-options
                         :label="t('common.aggregation')"
-                        data-test="dashboard-y-item-dropdown"
+                        data-test="dashboard-value_for_maps-item-dropdown"
                       >
                         <template v-slot:append>
                           <q-icon
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     filled
                     :label="t('common.label')"
-                    data-test="dashboard-y-item-input"
+                    data-test="dashboard-value_for_maps-item-input"
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-y-item-${
+              :data-test="`dashboard-value_for_maps-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.value_for_maps?.column
