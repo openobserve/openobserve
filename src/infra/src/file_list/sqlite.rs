@@ -487,10 +487,15 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let mut new_streams = Vec::new();
         let mut update_streams = Vec::with_capacity(streams.len());
         for (stream_key, item) in streams {
-            if old_stats.get(stream_key).is_none() {
-                new_streams.push(stream_key);
-            }
-            update_streams.push((stream_key, item));
+            let mut stats = match old_stats.get(stream_key) {
+                Some(s) => s.to_owned(),
+                None => {
+                    new_streams.push(stream_key);
+                    StreamStats::default()
+                }
+            };
+            stats.format_by(item); // format stats
+            update_streams.push((stream_key, stats));
         }
 
         let client = CLIENT_RW.clone();
