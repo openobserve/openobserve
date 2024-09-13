@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :alertData="formData"
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
                 :vrlFunctionError="vrlFunctionError"
+                :showTimezoneWarning="showTimezoneWarning"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
@@ -607,6 +608,8 @@ export default defineComponent({
     let parser: any = null;
 
     const vrlFunctionError = ref("");
+
+    const showTimezoneWarning = ref(false);
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -1243,6 +1246,7 @@ export default defineComponent({
       updateFunctionVisibility,
       convertDateToTimestamp,
       getTimezonesByOffset,
+      showTimezoneWarning,
     };
   },
 
@@ -1271,6 +1275,7 @@ export default defineComponent({
         } else {
           this.getTimezonesByOffset(this.formData.tz_offset).then(
             (res: any) => {
+              if (res.length > 0) this.showTimezoneWarning = true;
               this.formData.trigger_condition.timezone = res[0];
             },
           );

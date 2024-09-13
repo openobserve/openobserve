@@ -699,9 +699,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </q-tooltip>
           </q-icon>
+          <template
+            v-if="triggerData.frequency_type == 'cron' && showTimezoneWarning"
+          >
+            <q-icon
+              :name="outlinedWarning"
+              size="18px"
+              class="cursor-pointer tw-ml-[8px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-orange-500'
+                  : 'tw-text-orange-500'
+              "
+            >
+              <q-tooltip
+                anchor="center right"
+                self="center left"
+                max-width="auto"
+                class="tw-text-[14px]"
+              >
+                Warning: The displayed timezone is approximate. Verify and
+                select the correct timezone manually.
+              </q-tooltip>
+            </q-icon>
+          </template>
         </div>
         <div style="min-height: 78px">
-          <div class="flex items-center q-mr-sm" style="width: fit-content">
+          <div class="flex items-center" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"
               :style="
@@ -759,7 +783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="timezone-select showLabelOnTop q-ml-sm"
                   stack-label
                   outlined
-                  style="width: 220px"
+                  style="width: 210px"
                 />
               </div>
             </div>
@@ -804,6 +828,7 @@ import { useI18n } from "vue-i18n";
 import {
   outlinedDelete,
   outlinedInfo,
+  outlinedWarning,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
@@ -831,6 +856,7 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "vrlFunctionError",
+  "showTimezoneWarning",
 ]);
 
 const emits = defineEmits([
