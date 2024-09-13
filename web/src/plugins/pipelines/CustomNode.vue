@@ -22,8 +22,35 @@ import {
   useNodesData,
 } from "@vue-flow/core";
 
+import useDragAndDrop from "./useDnD";
+
+const props = defineProps({
+  id: {
+    type: String,
+  },
+  data: {
+    type: Object,
+  },
+  io_type: {
+    type: String,
+  },
+});
+
+function getIcon(searchTerm, ioType) {
+  const node = this.pipelineObj.nodeTypes.find(
+    (node) => node.subtype === searchTerm && node.io_type === ioType
+  );
+  return node ? node.icon : undefined;
+}
+function getTooltip(searchTerm) {
+  const node = this.pipelineObj.nodeTypes.find(
+    (node) => node.subtype === searchTerm,
+  );
+  return node ? node.tooltip : "";
+}
+const { onDragStart, pipelineObj } = useDragAndDrop();
+
 const connections = useHandleConnections({
-  type: "target",
   useHandleConnections: true,
 });
 
@@ -31,12 +58,105 @@ const nodesData = useNodesData(() => connections.value[0]?.source);
 </script>
 
 <template>
-  <Handle
-    id="4"
-    type="target"
-    :style="{ height: '6px', width: '6px', filter: 'invert(100%)' }"
-  />
-  Custom Node
+  <!-- Input Handle (Target) -->
+  <div class="o2vf_node">
+    <Handle
+      v-if="io_type == 'output' || io_type === 'default'"
+      id="input"
+      type="target"
+      position="top"
+      :style="{ filter: 'invert(100%)' }"
+    />
+    <div
+      v-if="data.node_type == 'function'"
+      :class="`o2vf_node_${type}`"
+      class="custom-btn q-pa-none btn-fixed-width"
+      style="
+        width: 170px;
+        display: flex;
+        align-items: center;
+        border: none;
+        cursor: pointer;
+      "
+    >
+      <div class="icon-container" style="display: flex; align-items: center">
+        <!-- Icon -->
+        <q-icon :name="getIcon(data.node_type, io_type)"
+size="1em" class="q-ma-sm" />
+      </div>
+
+      <!-- Separator -->
+      <q-separator vertical class="q-mr-sm" />
+
+      <!-- Label -->
+      <div class="container">
+        <div
+          class="row"
+          align="left"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          {{ data.name }}
+        </div>
+        <div class="row">
+          <div style="text-transform: capitalize">
+            Run
+            {{
+              data.afterFlattening ? "After Flattening" : "Before Flattening"
+            }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="data.node_type == 'stream'"
+      :class="`o2vf_node_${io_type}`"
+      class="custom-btn q-pa-none btn-fixed-width"
+      style="
+        width: 170px;
+        display: flex;
+        align-items: center;
+        border: none;
+        cursor: pointer;
+      "
+    >
+      <div class="icon-container" style="display: flex; align-items: center">
+        <!-- Icon -->
+        <q-icon :name="getIcon(data.node_type, io_type)"
+size="1em" class="q-ma-sm" />
+      </div>
+
+      <!-- Separator -->
+      <q-separator vertical class="q-mr-sm" />
+
+      <!-- Label -->
+      <div class="container">
+        <div
+          class="row"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          {{ data.stream_type }} - {{ data.stream_name }}
+        </div>
+      </div>
+    </div>
+    <Handle
+      v-if="io_type === 'input' || io_type === 'default'"
+      id="output"
+      type="source"
+      position="bottom"
+      :style="{ filter: 'invert(100%)' }"
+    />
+  </div>
 </template>
 
 <style lang="scss">
