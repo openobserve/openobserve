@@ -1275,7 +1275,7 @@ export default defineComponent({
         } else {
           this.getTimezonesByOffset(this.formData.tz_offset).then(
             (res: any) => {
-              if (res.length > 0) this.showTimezoneWarning = true;
+              if (res.length > 1) this.showTimezoneWarning = true;
               this.formData.trigger_condition.timezone = res[0];
             },
           );

@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableVrlFunction="true"
             :isValidSqlQuery="isValidSqlQuery"
             :disableQueryTypeSelection="true"
+            :showTimezoneWarning="showTimezoneWarning"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:query_type="streamRoute.query_condition.type"
@@ -315,6 +316,8 @@ const isAggregationEnabled = ref(false);
 
 const routeFormRef = ref<any>(null);
 
+const showTimezoneWarning = ref(false);
+
 const nodeLink = ref({
   from: "",
   to: "",
@@ -380,6 +383,7 @@ onMounted(() => {
         } else {
           getTimezonesByOffset(streamRoute.value.tz_offset as number).then(
             (res: any) => {
+              if (res.length > 1) showTimezoneWarning.value = true;
               streamRoute.value.trigger_condition.timezone = res[0];
             },
           );
