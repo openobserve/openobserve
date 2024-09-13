@@ -65,6 +65,7 @@ pub struct RemoteScanExec {
     partitions: usize,
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
+    // pub context: opentelemetry::Context,
 }
 
 impl RemoteScanExec {

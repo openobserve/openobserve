@@ -215,7 +215,92 @@ pub async fn search(
         )
         .await;
 
-    // 6. construct physical plan
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if super::super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::info!(
+            "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
+        );
+        return Err(Error::ErrorCode(
+            infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
+            )),
+        ));
+    }
+
+    let datafusion_span = info_span!(
+        "service:search:flight:datafusion",
+        org_id = sql.org_id,
+        stream_name = sql.stream_names.first().unwrap(),
+        stream_type = sql.stream_type.to_string(),
+    );
+
+    let trace_id_move = trace_id.to_string();
+    let query_task = DATAFUSION_RUNTIME.spawn(async move {
+        run_datafusion(trace_id_move, req, sql, nodes, partition_file_lists)
+            .instrument(datafusion_span)
+            .await
+    });
+    tokio::pin!(query_task);
+
+    // 8. execute physical plan
+    let task = tokio::select! {
+        ret = &mut query_task => {
+            match ret {
+                Ok(ret) => Ok(ret),
+                Err(err) => {
+                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {}", err);
+                    Err(DataFusionError::Execution(err.to_string()))
+                }
+            }
+        },
+        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
+            query_task.abort();
+            log::error!("[trace_id {trace_id}] flight->search: search timeout");
+            Err(DataFusionError::ResourcesExhausted("flight->search: search timeout".to_string()))
+        },
+        _ = async {
+            #[cfg(feature = "enterprise")]
+            let _ = abort_receiver.await;
+            #[cfg(not(feature = "enterprise"))]
+            futures::future::pending::<()>().await;
+        } => {
+            query_task.abort();
+            log::info!("[trace_id {trace_id}] flight->search: search canceled");
+            Err(DataFusionError::ResourcesExhausted("flight->search: search canceled".to_string()))
+        }
+    };
+
+    // release source
+    drop(_defer);
+
+    // 9. get data from datafusion
+    let (data, mut scan_stats): (Vec<RecordBatch>, ScanStats) = match task {
+        Ok(Ok(data)) => Ok(data),
+        Ok(Err(err)) => Err(err),
+        Err(err) => Err(Error::Message(err.to_string())),
+    }?;
+
+    log::info!("[trace_id {trace_id}] flight->search: search finished");
+
+    scan_stats.format_to_mb();
+    Ok((data, scan_stats, took_wait, false, idx_took))
+}
+
+#[tracing::instrument(name = "service:search:cluster:flight:run_datafusion", skip_all)]
+pub async fn run_datafusion(
+    trace_id: String,
+    req: Request,
+    sql: Arc<NewSql>,
+    nodes: Vec<Node>,
+    partition_file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+) -> Result<(Vec<RecordBatch>, ScanStats)> {
+    let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
 
     register_table(&ctx, &sql).await?;
@@ -275,90 +360,18 @@ pub async fn search(
         print_plan(&physical_plan, "after");
     }
 
-    #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if super::super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
-        .await
-        .is_err()
-    {
-        log::info!(
-            "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
-        );
-        return Err(Error::ErrorCode(
-            infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] flight->search: search canceled before call flight->search"
-            )),
-        ));
+    // run datafusion
+    let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+    let mut visit = ScanStatsVisitor::new();
+    let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
+    if let Err(e) = ret {
+        log::error!("[trace_id {trace_id}] flight->search: datafusion collect error: {e}");
+        Err(e.into())
+    } else {
+        log::info!("[trace_id {trace_id}] flight->search: datafusion collect done");
+        ret.map(|data| (data, visit.scan_stats))
+            .map_err(|e| e.into())
     }
-
-    let datafusion_span = info_span!(
-        "service:search:flight:datafusion",
-        org_id = sql.org_id,
-        stream_name = sql.stream_names.first().unwrap(),
-        stream_type = sql.stream_type.to_string(),
-    );
-
-    let trace_id_move = trace_id.to_string();
-    let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx())
-            .instrument(datafusion_span)
-            .await;
-        let mut visit = ScanStatsVisitor::new();
-        let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-        if let Err(e) = ret {
-            log::error!("[trace_id {trace_id_move}] flight->search: datafusion collect error: {e}");
-            Err(e)
-        } else {
-            log::info!("[trace_id {trace_id_move}] flight->search: datafusion collect done");
-            ret.map(|data| (data, visit.scan_stats))
-        }
-    });
-    tokio::pin!(query_task);
-
-    // 8. execute physical plan
-    let task = tokio::select! {
-        ret = &mut query_task => {
-            match ret {
-                Ok(ret) => Ok(ret),
-                Err(err) => {
-                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {}", err);
-                    Err(DataFusionError::Execution(err.to_string()))
-                }
-            }
-        },
-        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-            query_task.abort();
-            log::error!("[trace_id {trace_id}] flight->search: search timeout");
-            Err(DataFusionError::ResourcesExhausted("flight->search: search timeout".to_string()))
-        },
-        _ = async {
-            #[cfg(feature = "enterprise")]
-            let _ = abort_receiver.await;
-            #[cfg(not(feature = "enterprise"))]
-            futures::future::pending::<()>().await;
-        } => {
-            query_task.abort();
-            log::info!("[trace_id {trace_id}] flight->search: search canceled");
-            Err(DataFusionError::ResourcesExhausted("flight->search: search canceled".to_string()))
-        }
-    };
-
-    // release source
-    drop(_defer);
-
-    // 9. get data from datafusion
-    let (data, mut scan_stats): (Vec<RecordBatch>, ScanStats) = match task {
-        Ok(Ok(data)) => Ok(data),
-        Ok(Err(err)) => Err(err.into()),
-        Err(err) => Err(Error::Message(err.to_string())),
-    }?;
-
-    log::info!("[trace_id {trace_id}] flight->search: search finished");
-
-    scan_stats.format_to_mb();
-    Ok((data, scan_stats, took_wait, false, idx_took))
 }
 
 pub async fn get_online_querier_nodes(
