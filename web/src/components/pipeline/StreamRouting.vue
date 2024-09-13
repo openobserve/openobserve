@@ -375,12 +375,14 @@ onMounted(() => {
         !!props.editingRoute.query_condition.aggregation;
 
       if (!streamRoute.value.trigger_condition?.timezone) {
-        if (streamRoute.value.tz_offset === 0) {
+        if (streamRoute.value.tz_offset === 0 || !streamRoute.value.tz_offset) {
           streamRoute.value.trigger_condition.timezone = "UTC";
         } else {
-          getTimezonesByOffset(streamRoute.value.tz_offset).then((res: any) => {
-            streamRoute.value.trigger_condition.timezone = res[0];
-          });
+          getTimezonesByOffset(streamRoute.value.tz_offset as number).then(
+            (res: any) => {
+              streamRoute.value.trigger_condition.timezone = res[0];
+            },
+          );
         }
       }
 
