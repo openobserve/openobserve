@@ -264,29 +264,34 @@ export const convertDateToTimestamp = (
   time: string,
   timezone: string,
 ) => {
-  const browserTime =
-    "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+  try {
+    const browserTime =
+      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
-  const [day, month, year] = date.split("-");
-  const [hour, minute] = time.split(":");
+    const [day, month, year] = date.split("-");
+    const [hour, minute] = time.split(":");
 
-  const _date = {
-    year: Number(year),
-    month: Number(month),
-    day: Number(day),
-    hour: Number(hour),
-    minute: Number(minute),
-  };
+    const _date = {
+      year: Number(year),
+      month: Number(month),
+      day: Number(day),
+      hour: Number(hour),
+      minute: Number(minute),
+    };
 
-  if (timezone.toLowerCase() == browserTime.toLowerCase()) {
-    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone.toLowerCase() == browserTime.toLowerCase()) {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+
+    // Create a DateTime instance from date and time, then set the timezone
+    const dateTime = _DateTime.fromObject(_date, { zone: timezone });
+
+    // Convert the DateTime to a Unix timestamp in milliseconds
+    const unixTimestampMillis = dateTime.toMillis();
+
+    return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
+  } catch (error) {
+    console.log("Error converting date to timestamp");
+    return { timestamp: 0, offset: 0 };
   }
-
-  // Create a DateTime instance from date and time, then set the timezone
-  const dateTime = _DateTime.fromObject(_date, { zone: timezone });
-
-  // Convert the DateTime to a Unix timestamp in milliseconds
-  const unixTimestampMillis = dateTime.toMillis();
-
-  return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
 };
