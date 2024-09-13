@@ -529,7 +529,7 @@ async fn write_results(
                 w.entry(query_key)
                     .or_insert_with(Vec::new)
                     .push(ResultCacheMeta {
-                        start_time: req_query_start_time,
+                        start_time: cache_start_time,
                         end_time: cache_end_time,
                         is_aggregate,
                         is_descending,

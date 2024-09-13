@@ -663,5 +663,8 @@ fn calculate_deltas_multi(
         });
     }
 
+    deltas.sort(); // Sort the deltas to bring duplicates together
+    deltas.dedup(); // Remove consecutive duplicates
+
     deltas
 }
