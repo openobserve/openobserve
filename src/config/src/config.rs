@@ -761,7 +761,7 @@ pub struct Common {
     pub use_multi_result_cache: bool,
     #[env_config(
         name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
-        default = "both",
+        default = "overlap",
         help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
     )]
     pub result_cache_selection_strategy: String,
