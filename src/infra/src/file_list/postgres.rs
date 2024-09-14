@@ -482,10 +482,15 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         let mut new_streams = Vec::new();
         let mut update_streams = Vec::with_capacity(streams.len());
         for (stream_key, item) in streams {
-            if old_stats.get(stream_key).is_none() {
-                new_streams.push(stream_key);
-            }
-            update_streams.push((stream_key, item));
+            let mut stats = match old_stats.get(stream_key) {
+                Some(s) => s.to_owned(),
+                None => {
+                    new_streams.push(stream_key);
+                    StreamStats::default()
+                }
+            };
+            stats.format_by(item); // format stats
+            update_streams.push((stream_key, stats));
         }
 
         let mut tx = pool.begin().await?;
