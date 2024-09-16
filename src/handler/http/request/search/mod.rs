@@ -817,29 +817,23 @@ async fn values_v1(
         None
     };
     let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        log::info!("should be here");
         stats.as_ref().unwrap().doc_time_min
     } else {
-        log::info!("should not be here");
         query
             .get("start_time")
             .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
     };
 
-    log::info!("start_time: {}", start_time);
     if start_time == 0 {
         return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
     let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        log::info!("should be here");
         stats.as_ref().unwrap().doc_time_max
     } else {
-        log::info!("should not be here");
         query
             .get("end_time")
             .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
     };
-    log::info!("end_time: {}", end_time);
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
