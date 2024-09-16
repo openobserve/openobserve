@@ -481,7 +481,6 @@ pub async fn all_history(
     } else {
         filters.from
     };
-    let key = format!("{}/{}/{}", stream_type, stream_name, name);
     let mut sql = format!(
         "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert'",
         TRIGGERS_USAGE_STREAM, org_id
@@ -489,7 +488,7 @@ pub async fn all_history(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: match filters.status {
-                Some(value) => {
+                Some(v) => {
                     if v.eq("completed") || v.eq("failed") || v.eq("condition_not_satisfied") {
                         format!("{} AND status = '{}'", sql, value)
                     } else {
