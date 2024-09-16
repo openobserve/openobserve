@@ -37,17 +37,19 @@ use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    transport::Channel,
     Request,
 };
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::cluster::get_cached_online_ingester_nodes,
-    service::search::{
-        datafusion::exec::{prepare_datafusion_context, register_table},
-        MetadataMap,
+    common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+    service::{
+        grpc::get_cached_channel,
+        search::{
+            datafusion::exec::{prepare_datafusion_context, register_table},
+            MetadataMap,
+        },
     },
 };
 
@@ -255,14 +257,14 @@ async fn get_file_list(
                 let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|_| {
-                        DataFusionError::Execution("connect search node error".to_string())
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    DataFusionError::Execution("connect search node error".to_string())
+                })?;
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
