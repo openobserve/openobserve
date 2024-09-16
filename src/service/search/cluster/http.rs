@@ -164,7 +164,7 @@ pub async fn search(
                                         program: program.program.clone(),
                                         fields: program.fields.clone(),
                                     },
-                                    &json::Value::Object(hit.clone()),
+                                    &json::Value::Object(hit),
                                     &sql.org_id,
                                     &sql.stream_names,
                                 );
@@ -226,11 +226,14 @@ pub async fn search(
             / scan_stats.querier_files as f64) as usize,
     );
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
+
     result.set_idx_took(if idx_took > 0 {
         idx_took
     } else {
         scan_stats.idx_took as usize
     });
+    // result.set_original_cond(id_timestamps);
+
 
     if query_type == "table" {
         result.response_type = "table".to_string();
@@ -238,6 +241,7 @@ pub async fn search(
         result.response_type = "matrix".to_string();
     }
 
+    
     log::info!(
         "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
