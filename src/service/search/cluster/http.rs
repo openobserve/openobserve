@@ -232,8 +232,6 @@ pub async fn search(
     } else {
         scan_stats.idx_took as usize
     });
-    // result.set_original_cond(id_timestamps);
-
 
     if query_type == "table" {
         result.response_type = "table".to_string();
@@ -241,7 +239,6 @@ pub async fn search(
         result.response_type = "matrix".to_string();
     }
 
-    
     log::info!(
         "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
