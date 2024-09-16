@@ -1279,6 +1279,8 @@ const saveReport = async () => {
 
     // Combine them in the HH:MM format
     scheduling.value.time = `${hours}:${minutes}`;
+
+    scheduling.value.timezone = timezone.value;
   }
 
   const convertedDateTime = convertDateToTimestamp(
