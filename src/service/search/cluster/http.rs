@@ -216,6 +216,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         result.response_type = "matrix".to_string();
     }
 
+    
     log::info!(
         "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
