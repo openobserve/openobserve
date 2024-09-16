@@ -207,7 +207,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     } else {
         scan_stats.idx_took as usize
     });
-    result.set_original_cond(id_timestamps);
+    // result.set_original_cond(id_timestamps);
 
 
     if query_type == "table" {
