@@ -452,6 +452,7 @@ pub async fn history(
     Ok(res)
 }
 
+// TODO: use it in the alert history endpoint and fix the permitted
 pub async fn all_history(
     org_id: &str,
     user_id: &str,
@@ -489,7 +490,7 @@ pub async fn all_history(
             sql: match filters.status {
                 Some(v) => {
                     if v.eq("completed") || v.eq("failed") || v.eq("condition_not_satisfied") {
-                        format!("{} AND status = '{}'", sql, value)
+                        format!("{} AND status = '{}'", sql, v)
                     } else {
                         sql
                     }
