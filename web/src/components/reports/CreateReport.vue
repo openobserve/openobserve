@@ -1279,7 +1279,10 @@ const saveReport = async () => {
 
     // Combine them in the HH:MM format
     scheduling.value.time = `${hours}:${minutes}`;
+  }
 
+  // If the user has selected to schedule now, we set the timezone to the current timezone
+  if (selectedTimeTab.value === "scheduleNow") {
     scheduling.value.timezone = timezone.value;
   }
 
