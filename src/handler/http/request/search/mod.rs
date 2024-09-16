@@ -837,6 +837,11 @@ async fn values_v1(
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
+    let (start_time, end_time) = if start_time == end_time {
+        (start_time - 1, end_time + 1)
+    } else {
+        (start_time, end_time)
+    };
 
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
