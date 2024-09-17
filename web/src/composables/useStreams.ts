@@ -278,16 +278,11 @@ const useStreams = () => {
 
   function removeSchemaFields (streamData: any) {
 
-    if (streamData.schema ) {
-      if(streamData.schema[streamData.schema.length - 1].name === '_original') {
-        streamData.schema.pop();
-        return streamData;
+    if (streamData.schema) {
+          streamData.schema = streamData.schema.filter((item: any) => {
+          return item.name !== '_original' && item.name !== '_o2_id';
+        });
       }
-      
-      streamData.schema = streamData.schema.filter((item: any) => {
-        return item.name !== '_original' && item.name !== '_o2_id';
-      });
-    }
     return streamData
   }
 
