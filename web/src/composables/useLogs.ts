@@ -3333,7 +3333,6 @@ const useLogs = () => {
         });
 
         const mergedData: any = Array.from(histogramMappedData.values());
-        console.log(mergedData,"res")
         mergedData.map(
           (bucket: {
             zo_sql_key: string | number | Date;

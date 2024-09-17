@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h5 class="text-center">
               <SanitizedHtmlRenderer
                 data-test="logs-search-error-message"
-                :htmlContent="searchObj.data.errorMsg + '<br>' +  searchObj.data.errorDetail"
+                :htmlContent="searchObj.data.errorMsg + '<br><h6>' + searchObj.data.errorDetail + '</h6>'"
                 />
 
               <br />
