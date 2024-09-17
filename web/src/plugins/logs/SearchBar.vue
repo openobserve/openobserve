@@ -2566,7 +2566,7 @@ export default defineComponent({
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } =
       useCancelQuery();
 
-    const cancelVisualizeQuery = () => {
+    const cancelVisualizeQueries = () => {
       traceIdRef.value = visualizeSearchRequestTraceIds.value;
       cancelVisualizeQuery();
     };
