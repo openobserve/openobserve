@@ -21,10 +21,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster,
-    service::{grpc::get_ingester_channel, search::MetadataMap},
-};
+use crate::service::{grpc::get_ingester_channel, search::MetadataMap};
 
 #[derive(Default)]
 pub struct LogsServer;
