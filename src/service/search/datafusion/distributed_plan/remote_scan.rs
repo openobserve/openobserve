@@ -44,12 +44,14 @@ use proto::cluster_rpc::{self, FlightSearchRequest, KvItem};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    transport::Channel,
     Streaming,
 };
 
 use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
-use crate::service::search::{request::Request, MetadataMap};
+use crate::service::{
+    grpc::get_cached_channel,
+    search::{request::Request, MetadataMap},
+};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -268,10 +270,7 @@ async fn get_remote_batch(
         .get_auth_token()
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid token".to_string()))?;
-    let channel = Channel::from_shared(node.get_grpc_addr().clone())
-        .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-        .connect()
+    let channel = get_cached_channel(&node.get_grpc_addr())
         .await
         .map_err(|err| {
             log::error!(
