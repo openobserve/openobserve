@@ -21,8 +21,9 @@ use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
     openfga::{
         authorizer::authz::{
-            add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
-            get_ownership_all_org_tuple, get_user_role_tuple, update_tuples,
+            add_tuple_for_pipeline, get_history_creation_tuples, get_index_creation_tuples,
+            get_org_creation_tuples, get_ownership_all_org_tuple, get_user_role_tuple,
+            update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
@@ -46,6 +47,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut migrate_native_objects = false;
     let mut need_migrate_index_streams = false;
     let mut need_pipeline_migration = false;
+    let mut need_migrate_history_tuples = false;
     let mut existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
@@ -118,6 +120,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
         if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
+            need_migrate_history_tuples = true;
         }
     }
 
@@ -214,6 +217,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                 );
                             }
                         }
+                    }
+                    if need_migrate_history_tuples {
+                        get_history_creation_tuples(org_name, &mut tuples).await;
                     }
                 }
             }
