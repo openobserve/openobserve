@@ -493,10 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('search.runQuery')"
                 class="q-pa-none search-button"
                 @click="handleRunQueryFn"
-                :disable="
-                  searchObj.loading == true ||
-                  searchObj.loadingHistogram == true
-                "
+                :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
               >
             </div>
@@ -2563,8 +2560,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery: cancelVisualizeQuery } =
-      useCancelQuery();
+    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
     const cancelVisualizeQueries = () => {
       traceIdRef.value = visualizeSearchRequestTraceIds.value;
