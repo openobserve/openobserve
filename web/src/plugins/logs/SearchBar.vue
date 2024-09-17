@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
               <q-btn
                 v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-                data-test="logs-search-bar-refresh-btn"
+                data-test="logs-search-bar-visualize-cancel-btn"
                 dense
                 flat
                 :title="t('search.cancel')"
@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <q-btn
                 v-else
-                data-test="logs-search-bar-refresh-btn"
+                data-test="logs-search-bar-visualize-refresh-btn"
                 dense
                 flat
                 :title="t('search.runQuery')"
