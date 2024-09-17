@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('search.cancel')"
                 class="q-pa-none search-button cancel-search-button"
-                @click="cancelVisualizeQuery"
+                @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
               <q-btn
@@ -2563,7 +2563,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelVisualizeQuery: QuerycancelQuery } =
+    const { traceIdRef, cancelQuery: cancelVisualizeQuery } =
       useCancelQuery();
 
     const cancelVisualizeQuery = () => {
@@ -2661,7 +2661,7 @@ export default defineComponent({
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
       disable,
-      cancelVisualizeQuery,
+      cancelVisualizeQueries,
     };
   },
   computed: {
