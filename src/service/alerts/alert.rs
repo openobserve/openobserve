@@ -338,7 +338,7 @@ pub async fn trigger(
         }
     };
     alert
-        .send_notification(&[])
+        .send_notification(&[], Utc::now().timestamp_micros())
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -369,12 +369,13 @@ impl Alert {
     pub async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
+        rows_end_time: i64,
     ) -> Result<(bool, String), anyhow::Error> {
         let mut message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            if let Err(e) = send_notification(self, &dest, rows).await {
+            if let Err(e) = send_notification(self, &dest, rows, rows_end_time).await {
                 log::error!(
                     "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
                     self.org_id,
@@ -414,13 +415,21 @@ pub async fn send_notification(
     alert: &Alert,
     dest: &DestinationWithTemplate,
     rows: &[Map<String, Value>],
+    rows_end_time: i64,
 ) -> Result<(), anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let msg: String = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
+    let msg: String = process_dest_template(
+        &dest.template.body,
+        alert,
+        rows,
+        &rows_tpl_val,
+        rows_end_time,
+    )
+    .await;
 
     match dest.destination_type {
         DestinationType::Http => send_http_notification(dest, msg.clone()).await,
@@ -627,6 +636,7 @@ async fn process_dest_template(
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_tpl_val: &[String],
+    rows_end_time: i64,
 ) -> String {
     let cfg = get_config();
     // format values
@@ -648,7 +658,7 @@ async fn process_dest_template(
 
     // calculate start and end time
     let (alert_start_time, alert_end_time) =
-        get_alert_start_end_time(&vars, alert.trigger_condition.period);
+        get_alert_start_end_time(&vars, alert.trigger_condition.period, rows_end_time);
 
     let alert_start_time_str = if alert_start_time > 0 {
         Local
@@ -840,6 +850,7 @@ pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSe
 pub fn get_alert_start_end_time(
     vars: &HashMap<String, HashSet<String>>,
     period: i64,
+    rows_end_time: i64,
 ) -> (i64, i64) {
     let cfg = get_config();
 
@@ -876,7 +887,7 @@ pub fn get_alert_start_end_time(
 
     // Hack time range for alert url
     alert_end_time = if alert_end_time == 0 {
-        Utc::now().timestamp_micros()
+        rows_end_time
     } else {
         // the frontend will drop the second, so we add 1 minute to the end time
         alert_end_time

@@ -234,10 +234,10 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
         let (alert_start_time, alert_end_time) =
-            get_alert_start_end_time(&vars, alert.trigger_condition.period);
+            get_alert_start_end_time(&vars, alert.trigger_condition.period, end_time);
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
-        match alert.send_notification(&data).await {
+        match alert.send_notification(&data, end_time).await {
             Ok((true, _)) => {
                 log::info!(
                     "Alert notification sent, org: {}, module_key: {}",
