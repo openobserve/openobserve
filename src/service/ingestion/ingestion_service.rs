@@ -22,7 +22,7 @@ use tonic::{
     Request,
 };
 
-use crate::service::grpc::get_ingester_channel;
+use crate::{common::infra::cluster, service::grpc::get_ingester_channel};
 
 pub async fn ingest(
     dest_org_id: &str,

@@ -50,11 +50,9 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::get_cached_channel,
-    config::meta::cluster::get_internal_grpc_token,
     o2_enterprise::enterprise::search::TaskStatus,
     std::collections::HashSet,
-    tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
+    tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
     tracing::info_span,
 };
 
@@ -378,6 +376,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
+
+    use config::meta::cluster::get_internal_grpc_token;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -414,14 +414,19 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "search->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "search->grpc: node: {}, connect err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        server_internal_error("connect search node error")
+                    })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -535,6 +540,8 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
+
+    use config::meta::cluster::get_internal_grpc_token;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -572,14 +579,19 @@ pub async fn cancel_query(
                 let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "grpc_cancel_query: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "grpc_cancel_query: node: {}, connect err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        server_internal_error("connect search node error")
+                    })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {

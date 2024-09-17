@@ -43,7 +43,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::cluster::get_cached_online_ingester_nodes,
+    common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     service::{
         grpc::get_cached_channel,
         search::{
