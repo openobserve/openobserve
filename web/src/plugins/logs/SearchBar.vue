@@ -470,37 +470,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </q-btn-dropdown>
             </q-btn-group>
-
-            <q-btn
-              v-if="
-                config.isEnterprise == 'true' &&
-                !!searchObj.data.searchRequestTraceIds.length &&
-                (searchObj.loading == true ||
-                  searchObj.loadingHistogram == true)
-              "
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              :title="t('search.cancel')"
-              class="q-pa-none search-button cancel-search-button"
-              @click="cancelQuery"
-              >{{ t("search.cancel") }}</q-btn
-            >
-            <q-btn
-              v-else
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              :title="t('search.runQuery')"
-              class="q-pa-none search-button"
-              @click="handleRunQueryFn"
-              :disable="
-                searchObj.loading == true || searchObj.loadingHistogram == true
-              "
-              >{{ t("search.runQuery") }}</q-btn
-            >
+            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
+              <q-btn
+                v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+                data-test="logs-search-bar-refresh-btn"
+                dense
+                flat
+                :title="t('search.cancel')"
+                class="q-pa-none search-button cancel-search-button"
+                @click="cancelAddPanelQuery"
+                >{{ t("search.cancel") }}</q-btn
+              >
+              <q-btn
+                v-else
+                data-test="logs-search-bar-refresh-btn"
+                dense
+                flat
+                :title="t('search.runQuery')"
+                class="q-pa-none search-button"
+                @click="handleRunQueryFn"
+                :disable="
+                  searchObj.loading == true ||
+                  searchObj.loadingHistogram == true
+                "
+                >{{ t("search.runQuery") }}</q-btn
+              >
+            </div>
+            <div v-else>
+              <q-btn
+                v-if="
+                  config.isEnterprise == 'true' &&
+                  !!searchObj.data.searchRequestTraceIds.length &&
+                  (searchObj.loading == true ||
+                    searchObj.loadingHistogram == true)
+                "
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                flat
+                :title="t('search.cancel')"
+                class="q-pa-none search-button cancel-search-button"
+                @click="cancelQuery"
+                >{{ t("search.cancel") }}</q-btn
+              >
+              <q-btn
+                v-else
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                flat
+                :title="t('search.runQuery')"
+                class="q-pa-none search-button"
+                @click="handleRunQueryFn"
+                :disable="
+                  searchObj.loading == true ||
+                  searchObj.loadingHistogram == true
+                "
+                >{{ t("search.runQuery") }}</q-btn
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -2515,6 +2543,12 @@ export default defineComponent({
       dashboardPanelData.meta = dashboardPanelDataMetaObj;
     };
 
+    const cancelAddPanelQuery = () => {
+      console.log("cancelAddPanelQuery");
+      // event dispatch
+      window.dispatchEvent(new Event("cancelAddPanelQuery"));
+    };
+    
     return {
       t,
       store,
@@ -2592,6 +2626,7 @@ export default defineComponent({
       confirmLogsVisualizeModeChangeDialog,
       changeLogsVisualizeToggle,
       onLogsVisualizeToggleUpdate,
+      cancelAddPanelQuery,
     };
   },
   computed: {
