@@ -15,6 +15,7 @@
 
 use async_trait::async_trait;
 use config::{
+    get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     utils::parquet::parse_file_key_columns,
 };
@@ -309,7 +310,25 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
-            sqlx::query_as::<_, super::FileRecord>(
+            let cfg = get_config();
+            if cfg.limit.use_upper_bound_for_max_ts {
+                let max_ts_upper_bound =
+                    time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                sqlx::query_as::<_, super::FileRecord>(
+                r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(time_start)
+            .bind(max_ts_upper_bound)
+            .bind(time_end)
+            .fetch_all(&pool)
+            .await
+            } else {
+                sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
@@ -321,6 +340,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .bind(time_end)
             .fetch_all(&pool)
             .await
+            }
         };
         Ok(ret?
             .iter()

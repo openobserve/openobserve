@@ -939,6 +939,18 @@ pub struct Limit {
         help = "Maximum size of a single enrichment table in mb"
     )]
     pub max_enrichment_table_size: usize,
+    #[env_config(
+        name = "ZO_USE_UPPER_BOUND_FOR_MAX_TS",
+        default = false,
+        help = "use upper bound for max tx"
+    )]
+    pub use_upper_bound_for_max_ts: bool,
+    #[env_config(
+        name = "ZO_BUFFER_FOR_MAX_TS",
+        default = 60,
+        help = "buffer for upper bound in mins"
+    )]
+    pub upper_bound_for_max_ts: i64,
 }
 
 #[derive(EnvConfig)]
