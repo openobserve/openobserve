@@ -44,8 +44,9 @@ use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    crate::service::grpc::get_cached_channel,
     o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
-    tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
+    tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
     tracing::{info_span, Instrument},
 };
 
@@ -395,19 +396,14 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -558,19 +554,14 @@ pub async fn cancel_query(
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "grpc_cancel_query: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "search->cancel_query: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
