@@ -543,7 +543,7 @@ async fn show_all_alert_history(
             &org_id,
             user_id.to_str().unwrap(),
             "GET",
-            "alert",
+            "alert_history",
         )
         .await
         {
