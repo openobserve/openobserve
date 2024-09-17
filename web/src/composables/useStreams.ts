@@ -277,12 +277,11 @@ const useStreams = () => {
   };
 
   function removeSchemaFields (streamData: any) {
-
-    if (streamData.schema) {
-          streamData.schema = streamData.schema.filter((item: any) => {
-          return item.name !== '_original' && item.name !== '_o2_id';
-        });
-      }
+    if(streamData.schema){
+      streamData.schema = streamData.schema.filter((field: any) => {
+        return field.name != '_original' && field.name != '_o2_id';
+      });
+    }
     return streamData
   }
 

@@ -2938,6 +2938,9 @@ const useLogs = () => {
 
               // Object.keys(recordwithMaxAttribute).forEach((key) => {
               for (const key of Object.keys(recordwithMaxAttribute)) {
+                if(key == '_o2_id' || key == '_original'){
+                  continue;
+                }
                 if (key == store.state.zoConfig.timestamp_column) {
                   searchObj.data.hasSearchDataTimestampField = true;
                 }
