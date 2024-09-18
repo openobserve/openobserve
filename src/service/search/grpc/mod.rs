@@ -396,11 +396,11 @@ pub(crate) async fn get_file_list_by_ids(
             file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
         for idx_file in idx_file_list.iter() {
             if let Some(file) = file_list_map.get(&idx_file.key) {
-                let mut idx_file = file.clone();
+                let mut new_file = file.clone();
                 if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
-                    idx_file.segment_ids = Some(segment_ids.clone());
+                    new_file.segment_ids = Some(segment_ids.clone());
                 }
-                files.push(idx_file);
+                files.push(new_file);
             }
         }
         files

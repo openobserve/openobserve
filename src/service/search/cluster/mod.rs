@@ -173,7 +173,7 @@ pub async fn search(
         log::info!(
             "[trace_id {trace_id}] search: get idx_file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
             meta.meta.time_range,
-            file_id_list.len(),
+            idx_file_list.len(),
             idx_scan_size,
             idx_took,
         );
@@ -196,7 +196,7 @@ pub async fn search(
     // 1. get work group
     #[cfg(feature = "enterprise")]
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list),
+        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_id_list),
     );
     #[cfg(feature = "enterprise")]
     super::SEARCH_SERVER
@@ -537,7 +537,7 @@ pub async fn search(
                     work_group
                         .as_ref()
                         .unwrap()
-                        .done(&trace_id, user_id)
+                        .done(trace_id, user_id)
                         .await
                         .map_err(|e| Error::Message(e.to_string()))?;
                 }
@@ -556,7 +556,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(&trace_id, user_id)
+                    .done(trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
@@ -586,7 +586,7 @@ pub async fn search(
                 work_group
                     .as_ref()
                     .unwrap()
-                    .done(&trace_id, user_id)
+                    .done(trace_id, user_id)
                     .await
                     .map_err(|e| Error::Message(e.to_string()))?;
             }
@@ -603,7 +603,7 @@ pub async fn search(
         work_group
             .as_ref()
             .unwrap()
-            .done(&trace_id, user_id)
+            .done(trace_id, user_id)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
     }

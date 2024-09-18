@@ -414,7 +414,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if cfg.limit.use_upper_bound_for_max_ts {
             let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
             sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
+                r#"SELECT id, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
             )
             .bind(stream_key)
             .bind(time_start)
@@ -424,7 +424,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await?
         } else {
             sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
+                r#"SELECT id, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
             )
             .bind(stream_key)
             .bind(time_start)

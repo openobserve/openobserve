@@ -415,7 +415,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await?
         } else {
             sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id FROM file_list FORCE INDEX (file_list_stream_ts_idx) WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
+                r#"SELECT id, original_size FROM file_list FORCE INDEX (file_list_stream_ts_idx) WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
             )
             .bind(stream_key)
             .bind(time_start)
