@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
+
   <q-page class="logPage q-my-xs" id="logPage">
-    <div id="secondLevel" class="full-height">
+    <div v-if="!showSearchHistory"  id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -36,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @handleQuickModeChange="handleQuickModeChange"
             @handleRunQueryFn="handleRunQueryFn"
             @on-auto-interval-trigger="onAutoIntervalTrigger"
+            @showSearchHistory="showSearchHistoryfn"
           />
         </template>
         <template v-slot:after>
@@ -252,6 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
+    <div v-else>
+      <search-history
+        @closeSearchHistory="closeSearchHistoryfn"
+        />
+    </div>
   </q-page>
 </template>
 
@@ -267,6 +274,7 @@ import {
   watch,
   defineAsyncComponent,
   provide,
+  onMounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -287,6 +295,7 @@ import { cloneDeep } from "lodash-es";
 import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
+import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -303,6 +312,7 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
+    SearchHistory,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -447,6 +457,7 @@ export default defineComponent({
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const showSearchHistory = ref(false);
     let parser: any;
 
     const expandedLogs = ref([]);
@@ -504,6 +515,7 @@ export default defineComponent({
     // });
 
     onActivated(async () => {
+      
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
@@ -551,6 +563,7 @@ export default defineComponent({
         // visualize tab
         handleRunQueryFn();
       }
+
     });
 
     onBeforeMount(async () => {
@@ -582,12 +595,20 @@ export default defineComponent({
         searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
       }
     });
+    onMounted( async() => {
+      //
+        if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
+        showSearchHistory.value = true;
+      }
+
+    });
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
      * This watcher is used to check if the user has changed the stream type from stream explorer to logs.
      * This gets triggered when stream explorer is active and user clicks on logs icon from left menu sidebar. Then we need to redirect the user to logs page again.
      */
+
     watch(
       () => router.currentRoute.value.query.type,
       (type, prev) => {
@@ -602,6 +623,22 @@ export default defineComponent({
         }
       },
     );
+    watch(
+      ()=> router.currentRoute.value.query,
+      ()=>{
+       if(!router.currentRoute.value.query.hasOwnProperty("action") ){
+        showSearchHistory.value = false;
+      }
+      if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
+        showSearchHistory.value = true;
+      }
+    }
+      // (action) => {
+      //   if (action === "history") {
+      //     showSearchHistory.value = true;
+      //   }
+      // }
+    )
 
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");
@@ -779,6 +816,16 @@ export default defineComponent({
         handleRunQueryFn();
       }
     };
+    const showSearchHistoryfn = () => {
+      router.push({
+          name: "logs",
+          query: {
+            action: "history",
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      showSearchHistory.value = true;
+    }
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
@@ -986,6 +1033,10 @@ export default defineComponent({
       // set filters
       dashboardPanelData.data.queries[0].fields.filter = filters;
     };
+    const closeSearchHistoryfn = () => {
+      router.back();
+      showSearchHistory.value = false;
+    };
 
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
@@ -1115,6 +1166,8 @@ export default defineComponent({
       refreshHistogramChart,
       onChangeInterval,
       onAutoIntervalTrigger,
+      showSearchHistory,
+      showSearchHistoryfn,
       handleRunQuery,
       refreshTimezone,
       resetSearchObj,
@@ -1127,6 +1180,7 @@ export default defineComponent({
       handleChartApiError,
       visualizeErrorData,
       disableMoreErrorDetails,
+      closeSearchHistoryfn,
     };
   },
   computed: {
