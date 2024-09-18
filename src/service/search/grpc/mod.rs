@@ -21,7 +21,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, StreamPartition, StreamType},
     },
@@ -32,7 +31,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, IdxFileName};
 
 use crate::service::{
     db,
@@ -143,72 +142,15 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
-        let idx_file_list = &req.idx_files;
-
-        let file_list_map: HashMap<_, _> = get_file_list_by_ids(
+        let file_list = get_file_list_by_ids(
             &trace_id,
             &req.file_ids,
             &sql,
             stream_type,
             &stream_settings.partition_keys,
+            &req.idx_files,
         )
-        .await
-        .into_iter()
-        .map(|f| (f.key.clone(), f))
-        .collect();
-
-        let mut file_list: Vec<FileKey>;
-
-        // if there are any files in idx_files_list,use them to
-        // filter the files we got from ids, otherwise use all the
-        // files we got from ids
-        if let Some(idx_files) = idx_file_list {
-            let mut file_map = HashMap::new();
-
-            for idx_file in &idx_files.items {
-                let Some(file) = file_list_map.get(&idx_file.key) else {
-                    // ignore files not in the id list sent to us
-                    continue;
-                };
-                let segment_ids = &idx_file.segment_ids;
-                let entry = file_map.entry(&file.key).or_insert(file.clone());
-                match (&entry.segment_ids, &segment_ids) {
-                    (Some(_), None) => {}
-                    (Some(bin_data), Some(segment_ids)) => {
-                        let mut bv = BitVec::from_slice(bin_data);
-                        bv |= BitVec::from_slice(segment_ids);
-                        entry.segment_ids = Some(bv.into_vec());
-                    }
-                    (None, _) => {
-                        entry.segment_ids = segment_ids.clone();
-                    }
-                }
-            }
-
-            file_list = file_map.into_values().collect();
-        } else {
-            file_list = file_list_map.into_values().collect();
-        }
-        let mut files = Vec::with_capacity(file_list.len());
-        // cannot use .iter().filter() as the function is async cannot be used in filter closure
-        for file in file_list {
-            if sql
-                .match_source(
-                    &file,
-                    false,
-                    false,
-                    stream_type,
-                    &stream_settings.partition_keys,
-                )
-                .await
-            {
-                files.push(file);
-            }
-        }
-        files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-        files.dedup_by(|a, b| a.key == b.key);
-
-        file_list = files;
+        .await;
 
         let (tbls, stats, partitions) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
@@ -434,25 +376,51 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
     Ok(())
 }
 
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub(crate) async fn get_file_list_by_ids(
     _trace_id: &str,
     ids: &[i64],
     sql: &super::sql::Sql,
     stream_type: StreamType,
     partition_keys: &[StreamPartition],
+    idx_file_list: &[IdxFileName],
 ) -> Vec<FileKey> {
     let file_list = query_by_ids(ids).await.unwrap_or_default();
+    // if there are any files in idx_files_list, use them to filter the files we got from ids,
+    // otherwise use all the files we got from ids
+    let file_list = if idx_file_list.is_empty() {
+        file_list
+    } else {
+        let mut files = Vec::with_capacity(idx_file_list.len());
+        let file_list_map: HashMap<_, _> =
+            file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
+        for idx_file in idx_file_list.iter() {
+            if let Some(file) = file_list_map.get(&idx_file.key) {
+                let mut idx_file = file.clone();
+                if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
+                    idx_file.segment_ids = Some(segment_ids.clone());
+                }
+                files.push(idx_file);
+            }
+        }
+        files
+    };
 
+    // filter file_list by partition keys
+    // cannot use .iter().filter() as the function is async cannot be used in filter closure
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
         if sql
             .match_source(&file, false, false, stream_type, partition_keys)
             .await
         {
-            files.push(file.to_owned());
+            files.push(file);
         }
     }
+
+    // sort by min_ts and dedup
+    files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    files.dedup_by(|a, b| a.key == b.key);
     files
 }
 

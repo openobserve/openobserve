@@ -19,7 +19,7 @@ use config::{
     get_config, ider,
     meta::{
         search::ScanStats,
-        stream::{FileKey, FileMeta, FileQueryData, PartitionTimeLevel, StreamType},
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
     utils::{file::get_file_meta as util_get_file_meta, json},
 };
@@ -87,14 +87,13 @@ pub async fn query_ids(
     time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
-) -> Result<Vec<FileQueryData>, anyhow::Error> {
+) -> Result<Vec<file_list::FileId>, anyhow::Error> {
     Ok(file_list::query_ids(
         org_id,
         stream_type,
         stream_name,
         time_level,
         Some((time_min, time_max)),
-        None,
     )
     .await?)
 }

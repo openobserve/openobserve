@@ -17,7 +17,6 @@ use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
 use config::{
-    meta::stream::{FileKey, FileMeta, FileQueryData, PartitionTimeLevel, StreamStats, StreamType},
     get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     utils::parquet::parse_file_key_columns,
@@ -216,7 +215,7 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-    SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -302,7 +301,7 @@ impl super::FileList for SqliteFileList {
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-    SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -333,7 +332,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             } else {
                 sqlx::query_as::<_, super::FileRecord>(
                 r#"
-    SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
@@ -364,24 +363,21 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
 
-        // 5000 is arbitrary
-        for chunk in ids.chunks(5000) {
-            //  unfortunately sqlite does not have any specific support for arrays,
-            // so we have to build the query manually, id-by-id.
-            // see https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-            let params = format!("?{}", ", ?".repeat(chunk.len() - 1));
-            let query_str = format!(
-                r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
-                WHERE id IN ( { } )"#,
-                params
-            );
-
-            let mut query = sqlx::query_as::<_, super::FileRecord>(&query_str);
-            for id in chunk {
-                query = query.bind(*id);
+        for chunk in ids.chunks(super::ID_BATCH_SIZE) {
+            if chunk.is_empty() {
+                continue;
             }
-
-            let res = query.fetch_all(&pool).await?;
+            let ids = chunk
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            let query_str = format!(
+                "SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list WHERE id IN ({ids})"
+            );
+            let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
+                .fetch_all(&pool)
+                .await?;
             ret.extend_from_slice(&res);
         }
 
@@ -403,8 +399,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         stream_name: &str,
         _time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
-        flattened: Option<bool>,
-    ) -> Result<Vec<FileQueryData>> {
+    ) -> Result<Vec<super::FileId>> {
         if let Some((start, end)) = time_range {
             if start == 0 && end == 0 {
                 return Ok(Vec::new());
@@ -414,29 +409,32 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
         let pool = CLIENT_RO.clone();
-        let ret = if flattened.is_some() {
-            sqlx::query_as::<_, (i64,)>(
-                r#"SELECT id FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;"#,
+
+        let (time_start, time_end) = time_range.unwrap_or((0, 0));
+        let cfg = get_config();
+        let ret = if cfg.limit.use_upper_bound_for_max_ts {
+            let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+            sqlx::query_as::<_, super::FileId>(
+                r#"SELECT id FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
             )
             .bind(stream_key)
-            .bind(flattened.unwrap())
+            .bind(time_start)
+            .bind(max_ts_upper_bound)
+            .bind(time_end)
             .fetch_all(&pool)
-            .await
+            .await?
         } else {
-            let (time_start, time_end) = time_range.unwrap_or((0, 0));
-            sqlx::query_as::<_, (i64,)>(
+            sqlx::query_as::<_, super::FileId>(
                 r#"SELECT id FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
             )
             .bind(stream_key)
             .bind(time_start)
             .bind(time_end)
             .fetch_all(&pool)
-            .await
+            .await?
         };
-        Ok(ret?
-            .into_iter()
-            .map(|r| FileQueryData { id: r.0 })
-            .collect())
+
+        Ok(ret)
     }
 
     async fn query_deleted(

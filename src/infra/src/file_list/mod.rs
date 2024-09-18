@@ -18,7 +18,7 @@ use std::collections::HashMap as stdHashMap;
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
-    stream::{FileKey, FileMeta, FileQueryData, PartitionTimeLevel, StreamStats, StreamType},
+    stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
 };
 use once_cell::sync::Lazy;
 
@@ -27,6 +27,8 @@ use crate::errors::{Error, Result};
 pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
+
+const ID_BATCH_SIZE: usize = 1000;
 
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
@@ -79,8 +81,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
-        flattened: Option<bool>,
-    ) -> Result<Vec<FileQueryData>>;
+    ) -> Result<Vec<FileId>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -267,22 +268,14 @@ pub async fn query_ids(
     stream_name: &str,
     time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
-    flattened: Option<bool>,
-) -> Result<Vec<FileQueryData>> {
+) -> Result<Vec<FileId>> {
     if let Some((start, end)) = time_range {
         if start > end || start == 0 || end == 0 {
             return Err(Error::Message("[file_list] invalid time range".to_string()));
         }
     }
     CLIENT
-        .query_ids(
-            org_id,
-            stream_type,
-            stream_name,
-            time_level,
-            time_range,
-            flattened,
-        )
+        .query_ids(org_id, stream_type, stream_name, time_level, time_range)
         .await
 }
 
@@ -493,4 +486,10 @@ pub enum FileListJobStatus {
     Pending,
     Running,
     Done,
+}
+
+#[derive(Clone, Debug, Default, sqlx::FromRow)]
+pub struct FileId {
+    pub id: i64,
+    pub original_size: i64,
 }

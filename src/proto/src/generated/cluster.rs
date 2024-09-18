@@ -992,34 +992,25 @@ pub struct SearchRequest {
     pub query: ::core::option::Option<SearchQuery>,
     #[prost(enumeration = "AggregateMode", tag = "6")]
     pub agg_mode: i32,
-    #[prost(int64, tag = "7")]
-    pub timeout: i64,
-    #[prost(string, tag = "8")]
-    pub work_group: ::prost::alloc::string::String,
-    #[prost(string, tag = "9")]
-    pub index_type: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "10")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "11")]
-    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(int64, repeated, tag = "12")]
+    #[prost(int64, repeated, tag = "7")]
     pub file_ids: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, optional, tag = "13")]
-    pub idx_files: ::core::option::Option<IdxFileList>,
+    #[prost(message, repeated, tag = "8")]
+    pub idx_files: ::prost::alloc::vec::Vec<IdxFileName>,
+    #[prost(int64, tag = "9")]
+    pub timeout: i64,
+    #[prost(string, tag = "10")]
+    pub work_group: ::prost::alloc::string::String,
+    #[prost(string, tag = "11")]
+    pub index_type: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "12")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "13")]
+    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
-/// proto3 does not allow 'optional repeated', so this
-/// needs to be extracted as a separate message type
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IdxFileList {
-    #[prost(message, repeated, tag = "1")]
-    pub items: ::prost::alloc::vec::Vec<FileName>,
-}
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileName {
+pub struct IdxFileName {
     #[prost(string, tag = "1")]
     pub key: ::prost::alloc::string::String,
     #[prost(bytes = "vec", optional, tag = "2")]

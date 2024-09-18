@@ -53,9 +53,8 @@ use opentelemetry_proto::tonic::collector::{
 };
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
 use proto::cluster_rpc::{
-    event_server::EventServer, ingest_server::IngestServer,
-    metrics_server::MetricsServer, query_cache_server::QueryCacheServer,
-    search_server::SearchServer, usage_server::UsageServer,
+    event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
+    query_cache_server::QueryCacheServer, search_server::SearchServer, usage_server::UsageServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;

@@ -20,11 +20,11 @@ use async_recursion::async_recursion;
 use config::{
     get_config,
     meta::{
+        bitvec::BitVec,
         cluster::{Node, Role, RoleGroup},
         search::{self, ScanStats, SearchEventType},
         stream::{
-            FileKey, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition,
-            StreamType,
+            FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
     metrics,
@@ -35,9 +35,10 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, ErrorCodes, Result},
+    file_list::FileId,
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
-use proto::cluster_rpc::{self, FileName, IdxFileList};
+use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -170,20 +171,20 @@ pub async fn search(
         (idx_file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone()).await?;
         log::info!(
-            "[trace_id {trace_id}] search: get idx_file_list from inverted index time_range: {:?},
-    num: {}, scan_size: {}, took: {} ms",
+            "[trace_id {trace_id}] search: get idx_file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
             meta.meta.time_range,
             file_id_list.len(),
             idx_scan_size,
             idx_took,
         );
 
-        req.idx_files = idx_file_list.map(|v| IdxFileList {
-            items: v
-                .into_iter()
-                .map(|(key, segment_ids)| FileName { key, segment_ids })
-                .collect(),
-        });
+        req.idx_files = idx_file_list
+            .into_iter()
+            .map(|f| cluster_rpc::IdxFileName {
+                key: f.key,
+                segment_ids: f.segment_ids,
+            })
+            .collect();
     }
 
     metrics::QUERY_PENDING_NUMS
@@ -192,19 +193,15 @@ pub async fn search(
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
-    #[cfg(feature = "enterprise")]
-    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = None;
-    // TODO fix: as we are not querying the original size,
-    // how to choose work_group
     // 1. get work group
-    // #[cfg(feature = "enterprise")]
-    // let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-    //     o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_id_list),
-    // );
-    // #[cfg(feature = "enterprise")]
-    // super::SEARCH_SERVER
-    //     .add_work_group(trace_id, work_group.clone())
-    //     .await;
+    #[cfg(feature = "enterprise")]
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
+        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list),
+    );
+    #[cfg(feature = "enterprise")]
+    super::SEARCH_SERVER
+        .add_work_group(trace_id, work_group.clone())
+        .await;
     // 2. check concurrency
     let work_group_str = if let Some(wg) = &work_group {
         wg.to_string()
@@ -243,26 +240,29 @@ pub async fn search(
 
     // 3. process the search in the work group
     #[cfg(feature = "enterprise")]
-    if let Some(wg) = &work_group {
-        if let Err(e) = wg.process(trace_id, user_id).await {
-            metrics::QUERY_PENDING_NUMS
-                .with_label_values(&[&req.org_id])
-                .dec();
-            dist_lock::unlock(&locker).await?;
-            return Err(Error::Message(e.to_string()));
-        }
+    if let Err(e) = work_group
+        .as_ref()
+        .unwrap()
+        .process(trace_id, user_id)
+        .await
+    {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        dist_lock::unlock(&locker).await?;
+        return Err(Error::Message(e.to_string()));
     }
-
     #[cfg(feature = "enterprise")]
     if let Err(e) = dist_lock::unlock(&locker).await {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&req.org_id])
             .dec();
-        if let Some(wg) = &work_group {
-            wg.done(trace_id, user_id)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-        }
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         return Err(e);
     }
     // done in the queue
@@ -290,6 +290,12 @@ pub async fn search(
                 (file_num / querier_num) + 1
             }
         }
+        QueryPartitionStrategy::FileSize => {
+            let files = partition_file_by_bytes(&file_id_list, querier_num);
+            file_num = files.len();
+            partition_files = files;
+            1
+        }
         QueryPartitionStrategy::FileHash => {
             let files = partition_file_by_hash(&file_id_list, &nodes, req_node_group).await;
             file_num = files.len();
@@ -303,30 +309,25 @@ pub async fn search(
         meta.meta.time_range
     );
 
-    // TODO fix : as we are not getting the whole data, need to figure
-    // how to calculate this
-    // #[cfg(feature = "enterprise")]
-    // {
-    //     let mut records = 0;
-    //     let mut original_size = 0;
-    //     let mut compressed_size = 0;
-    //     for file in file_list.iter() {
-    //         let file_meta = &file.meta;
-    //         records += file_meta.records;
-    //         original_size += file_meta.original_size;
-    //         compressed_size += file_meta.compressed_size;
-    //     }
-    //     original_size += idx_scan_size as i64;
-    //     super::SEARCH_SERVER
-    //         .add_file_stats(
-    //             trace_id,
-    //             file_list.len() as i64,
-    //             records,
-    //             original_size,
-    //             compressed_size,
-    //         )
-    //         .await;
-    // }
+    #[cfg(feature = "enterprise")]
+    {
+        let records = 0;
+        let compressed_size = 0;
+        let mut original_size = 0;
+        for file in file_id_list.iter() {
+            original_size += file.original_size;
+        }
+        original_size += idx_scan_size as i64;
+        super::SEARCH_SERVER
+            .add_file_stats(
+                trace_id,
+                file_id_list.len() as i64,
+                records,
+                original_size,
+                compressed_size,
+            )
+            .await;
+    }
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -359,7 +360,7 @@ pub async fn search(
                             .collect();
                         offset_start += offset;
                     }
-                    QueryPartitionStrategy::FileHash => {
+                    QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
                         req.file_ids = partition_files
                             .get(offset_start)
                             .unwrap()
@@ -401,12 +402,12 @@ pub async fn search(
             log::info!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             );
-            if let Some(wg) = &work_group {
-                wg.done(&trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
-
+            work_group
+                .as_ref()
+                .unwrap()
+                .done(&trace_id, user_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             ))));
@@ -533,11 +534,12 @@ pub async fn search(
                 dist_lock::unlock(&locker).await?;
                 #[cfg(feature = "enterprise")]
                 {
-                    if let Some(wg) = &work_group {
-                        wg.done(trace_id, user_id)
-                            .await
-                            .map_err(|e| Error::Message(e.to_string()))?;
-                    }
+                    work_group
+                        .as_ref()
+                        .unwrap()
+                        .done(&trace_id, user_id)
+                        .await
+                        .map_err(|e| Error::Message(e.to_string()))?;
                 }
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     e.to_string(),
@@ -551,11 +553,12 @@ pub async fn search(
             dist_lock::unlock(&locker).await?;
             #[cfg(feature = "enterprise")]
             {
-                if let Some(wg) = &work_group {
-                    wg.done(trace_id, user_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                }
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(&trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
             }
             return Err(err);
         }
@@ -580,11 +583,12 @@ pub async fn search(
             dist_lock::unlock(&locker).await?;
             #[cfg(feature = "enterprise")]
             {
-                if let Some(wg) = &work_group {
-                    wg.done(trace_id, user_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                }
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(&trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
             }
             return Err(e);
         }
@@ -596,11 +600,12 @@ pub async fn search(
     dist_lock::unlock(&locker).await?;
     #[cfg(feature = "enterprise")]
     {
-        if let Some(wg) = &work_group {
-            wg.done(trace_id, user_id)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-        }
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(&trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
     }
 
     scan_stats.idx_scan_size = idx_scan_size as i64;
@@ -679,20 +684,16 @@ async fn work_group_need_wait(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));
         }
-        if let Some(wg) = work_group {
-            match wg.need_wait(user_id).await {
-                Ok(true) => {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                }
-                Ok(false) => {
-                    return Ok(());
-                }
-                Err(e) => {
-                    return Err(Error::Message(e.to_string()));
-                }
+        match work_group.as_ref().unwrap().need_wait(user_id).await {
+            Ok(true) => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
-        } else {
-            return Ok(());
+            Ok(false) => {
+                return Ok(());
+            }
+            Err(e) => {
+                return Err(Error::Message(e.to_string()));
+            }
         }
     }
 }
@@ -875,7 +876,7 @@ pub(crate) async fn get_file_id_list(
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
-) -> Vec<FileQueryData> {
+) -> Vec<FileId> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     file_list::query_ids(
         &sql.org_id,
@@ -889,11 +890,30 @@ pub(crate) async fn get_file_id_list(
     .unwrap_or_default()
 }
 
+pub(crate) fn partition_file_by_bytes(file_keys: &[FileId], num_nodes: usize) -> Vec<Vec<&FileId>> {
+    let mut partitions: Vec<Vec<&FileId>> = vec![Vec::new(); num_nodes];
+    let sum_original_size = file_keys.iter().map(|fk| fk.original_size).sum::<i64>();
+    let avg_size = sum_original_size / num_nodes as i64;
+    let mut node_size = 0;
+    let mut node_k = 0;
+    for fk in file_keys {
+        node_size += fk.original_size;
+        if node_size >= avg_size && node_k != num_nodes - 1 && !partitions[node_k].is_empty() {
+            node_size = fk.original_size;
+            node_k += 1;
+            partitions[node_k].push(fk);
+            continue;
+        }
+        partitions[node_k].push(fk);
+    }
+    partitions
+}
+
 pub(crate) async fn partition_file_by_hash<'a>(
-    file_keys: &'a [FileQueryData],
+    file_keys: &'a [FileId],
     nodes: &'a [Node],
     group: Option<RoleGroup>,
-) -> Vec<Vec<&'a FileQueryData>> {
+) -> Vec<Vec<&'a FileId>> {
     let mut node_idx = HashMap::with_capacity(nodes.len());
     let mut idx = 0;
     for node in nodes {
@@ -903,7 +923,7 @@ pub(crate) async fn partition_file_by_hash<'a>(
         node_idx.insert(&node.name, idx);
         idx += 1;
     }
-    let mut partitions: Vec<Vec<&FileQueryData>> = vec![Vec::new(); idx];
+    let mut partitions: Vec<Vec<&FileId>> = vec![Vec::new(); idx];
     for fk in file_keys {
         let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
@@ -991,7 +1011,7 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
-) -> Result<(Option<Vec<(String, Option<Vec<u8>>)>>, usize, usize)> {
+) -> Result<(Vec<FileKey>, usize, usize)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -1019,9 +1039,8 @@ async fn get_file_list_by_inverted_index(
     let fts_condition = terms
         .iter()
         .map(|x| match cfg.common.full_text_search_type.as_str() {
-            "contains" => format!("term LIKE '%{x}%'"),
             "eq" => format!("term = '{x}'"),
-            // Default to "prefix"
+            "contains" => format!("term LIKE '%{x}%'"),
             _ => format!("term LIKE '{x}%'"),
         })
         .collect::<Vec<_>>()
@@ -1060,7 +1079,7 @@ async fn get_file_list_by_inverted_index(
     // If both empty return original file list with other params as 0
     let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
         (true, true) => {
-            return Ok((None, 0, 0));
+            return Ok((vec![], 0, 0));
         }
         (true, false) => fts_condition,
         (false, true) => index_condition,
@@ -1095,38 +1114,130 @@ async fn get_file_list_by_inverted_index(
         .iter()
         .filter_map(|hit| {
             if hit.get("deleted").unwrap().as_bool().unwrap() {
-                Some(hit.get("file_name").unwrap().as_str().unwrap())
+                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
             } else {
                 None
             }
         })
         .collect::<HashSet<_>>();
 
-    // Make idx file list to return
-    let mut ret = Vec::new();
+    // Merge bitmap segment_ids of the same file
+    let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
     for item in idx_resp.hits.iter() {
         let filename = match item.get("file_name") {
             None => continue,
             Some(v) => v.as_str().unwrap(),
         };
-        if deleted_files.contains(&filename) {
+        if deleted_files.contains(filename) {
             continue;
         }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
         );
-
         let segment_ids = match item.get("segment_ids") {
             None => None,
             Some(v) => hex::decode(v.as_str().unwrap()).ok(),
         };
-        ret.push((prefixed_filename, segment_ids));
+        let entry = idx_file_list
+            .entry(prefixed_filename.clone())
+            .or_insert(FileKey {
+                key: prefixed_filename,
+                ..Default::default()
+            });
+        match (&entry.segment_ids, &segment_ids) {
+            (Some(_), None) => {}
+            (Some(bin_data), Some(segment_ids)) => {
+                let mut bv = BitVec::from_slice(bin_data);
+                bv |= BitVec::from_slice(segment_ids);
+                entry.segment_ids = Some(bv.into_vec());
+            }
+            (None, _) => {
+                entry.segment_ids = segment_ids;
+            }
+        }
     }
-
+    let mut idx_file_list = idx_file_list
+        .into_iter()
+        .map(|(_, f)| f)
+        .collect::<Vec<_>>();
+    // sorted by _timestamp
+    idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
     Ok((
-        Some(ret),
+        idx_file_list,
         idx_resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_partition_file_by_bytes() {
+        let vec = vec![
+            FileId {
+                id: 0,
+                original_size: 256,
+            },
+            FileId {
+                id: 0,
+                original_size: 256,
+            },
+            FileId {
+                id: 0,
+                original_size: 100,
+            },
+            FileId {
+                id: 0,
+                original_size: 256,
+            },
+            FileId {
+                id: 0,
+                original_size: 1,
+            },
+            FileId {
+                id: 0,
+                original_size: 256,
+            },
+            FileId {
+                id: 0,
+                original_size: 200,
+            },
+            FileId {
+                id: 0,
+                original_size: 30,
+            },
+            FileId {
+                id: 0,
+                original_size: 90,
+            },
+            FileId {
+                id: 0,
+                original_size: 256,
+            },
+            FileId {
+                id: 0,
+                original_size: 5,
+            },
+            FileId {
+                id: 0,
+                original_size: 150,
+            },
+        ];
+        let expected: Vec<Vec<i64>> = vec![
+            vec![256, 256, 100],
+            vec![256, 1, 256],
+            vec![200, 30, 90, 256, 5, 150],
+        ];
+        let byte = partition_file_by_bytes(&vec, 3);
+        for value in byte
+            .iter()
+            .map(|x| x.iter().map(|v| v.original_size).collect::<Vec<i64>>())
+            .enumerate()
+        {
+            assert_eq!(value.1, expected.get(value.0).unwrap().clone());
+        }
+    }
 }
