@@ -238,6 +238,14 @@ pub async fn search(
     .await;
     match res {
         Ok(mut res) => {
+            if res.is_partial {
+                let partial_err = "Please be aware that the response is based on partial data";
+                res.function_error = if res.function_error.is_empty() {
+                    partial_err.to_string()
+                } else {
+                    format!("{} \n {}", partial_err, res.function_error)
+                };
+            }
             if !range_error.is_empty() {
                 res.is_partial = true;
                 res.function_error = if res.function_error.is_empty() {
