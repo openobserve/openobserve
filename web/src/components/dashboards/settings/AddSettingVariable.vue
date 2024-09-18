@@ -1092,6 +1092,7 @@ export default defineComponent({
       () => variableData?.multiSelect,
       (newVal) => {
         if (!newVal) {
+          variableData.selectAllValueForMultiSelect = 'first';
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {
