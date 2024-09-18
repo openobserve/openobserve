@@ -157,18 +157,19 @@ async fn run_datafusion(
     nodes: Vec<Arc<dyn NodeInfo>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats)> {
     let cfg = get_config();
-    // 4. construct physical plan
-    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
+    // construct physical plan
+    let mut ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
         }
     };
 
-    // 5. register table
+    // register table
     register_table(&ctx, &sql).await?;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
-    // 5. create physical plan
+    // create physical plan
     let plan = match ctx.state().create_logical_plan(&sql.sql).await {
         Ok(v) => v,
         Err(e) => {

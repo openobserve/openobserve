@@ -74,8 +74,12 @@ pub async fn search(
     let trace_id = req.trace_id.clone();
 
     // create datafusion context, just used for decode plan, the params can use default
-    let ctx = prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
-        .await?;
+    let mut ctx =
+        prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
+            .await?;
+
+    // register function
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {
