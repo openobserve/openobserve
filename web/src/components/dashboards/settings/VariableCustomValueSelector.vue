@@ -143,10 +143,10 @@ export default defineComponent({
             const firstTwoLabels = selectedValue.value
               .slice(0, 2)
               .map((val) => {
-                const option = props.variableItem.options.find(
+                const option = props.variableItem?.options?.find(
                   (opt: any) => opt.value === val,
                 );
-                return option.label;
+                return option ? option.label : val;
               })
               .join(", ");
 
@@ -155,18 +155,18 @@ export default defineComponent({
           } else {
             return selectedValue.value
               .map((val) => {
-                const option = props.variableItem.options.find(
+                const option = props.variableItem?.options?.find(
                   (opt: any) => opt.value === val,
                 );
-                return option.label;
+                return option ? option.label : val;
               })
               .join(", ");
           }
         } else {
-          const option = props.variableItem.options.find(
+          const option = props.variableItem?.options?.find(
             (opt: any) => opt.value === selectedValue.value,
           );
-          return option.label;
+          return option ? option.label : selectedValue.value;
         }
       } else if (!props.variableItem.isLoading) {
         return "(No Options Available)";
