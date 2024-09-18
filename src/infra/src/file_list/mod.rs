@@ -28,7 +28,7 @@ pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
-const ID_BATCH_SIZE: usize = 1000;
+const ID_BATCH_SIZE: usize = 2000;
 
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
