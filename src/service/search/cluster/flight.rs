@@ -836,7 +836,7 @@ pub async fn generate_context(
     target_partitions: usize,
 ) -> Result<SessionContext> {
     let optimizer_rules = generate_optimizer_rules(sql);
-    let ctx = prepare_datafusion_context(
+    let mut ctx = prepare_datafusion_context(
         req.work_group.clone(),
         optimizer_rules,
         sql.sorted_by_time,
@@ -846,6 +846,7 @@ pub async fn generate_context(
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     Ok(ctx)
 }
