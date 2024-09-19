@@ -52,7 +52,8 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         }
 
         // get lock
-        let locker = dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0).await?;
+        let locker =
+            dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0, None).await?;
         let (last_query_ts, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
@@ -81,19 +82,18 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
 
         let query = config::meta::search::Query {
             sql,
-            sql_mode: "full".to_owned(),
             size: 100000000,
             ..Default::default()
         };
 
         let req = config::meta::search::Request {
             query,
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            index_type: "".to_string(),
         };
         // do search
         match SearchService::search("", &cfg.common.usage_org, StreamType::Logs, None, &req).await {
@@ -140,19 +140,18 @@ async fn get_last_stats(
 
     let query = config::meta::search::Query {
         sql,
-        sql_mode: "full".to_owned(),
         size: 100000000,
         ..Default::default()
     };
 
     let req = config::meta::search::Request {
         query,
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     match SearchService::search(
         "",

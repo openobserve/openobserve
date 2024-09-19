@@ -13,27 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use {
-    crate::common::{infra::config::USERS, meta::organization::DEFAULT_ORG, meta::user::UserRole},
-    crate::service::db,
-    hashbrown::HashSet,
-    infra::dist_lock,
-    o2_enterprise::enterprise::openfga::{
+use std::cmp::Ordering;
+
+use hashbrown::HashSet;
+use infra::dist_lock;
+use o2_enterprise::enterprise::{
+    common::infra::config::O2_CONFIG,
+    openfga::{
         authorizer::authz::{
             get_index_creation_tuples, get_org_creation_tuples, get_user_role_tuple, update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
+    super_cluster::kv::ofga::{get_model, set_model},
 };
 
-#[cfg(feature = "enterprise")]
-pub async fn init() {
-    use o2_enterprise::enterprise::openfga::authorizer::authz::get_tuple_for_new_index;
+use crate::{
+    common::{
+        infra::config::USERS,
+        meta::{organization::DEFAULT_ORG, user::UserRole},
+    },
+    service::db,
+};
 
+pub async fn init() -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::openfga::{
+        authorizer::authz::get_tuple_for_new_index, get_all_init_tuples,
+    };
+
+    let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
     let mut need_migrate_index_streams = false;
-    let existing_meta = match db::ofga::get_ofga_model().await {
+    let mut existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
             migrate_native_objects = true;
@@ -41,11 +52,57 @@ pub async fn init() {
         }
     };
 
+    // sync with super cluster
+    if O2_CONFIG.super_cluster.enabled {
+        let meta_in_super = get_model().await?;
+        match (meta_in_super, &existing_meta) {
+            (None, Some(existing_model)) => {
+                // set to super cluster
+                set_model(Some(existing_model.clone())).await?;
+            }
+            (Some(model), None) => {
+                // set to local
+                existing_meta = Some(model.clone());
+                migrate_native_objects = false;
+                db::ofga::set_ofga_model_to_db(model).await?;
+            }
+            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
+            {
+                Ordering::Less => {
+                    // update version in super cluster
+                    set_model(Some(existing_model.clone())).await?;
+                }
+                Ordering::Greater => {
+                    // update version in local
+                    existing_meta = Some(model.clone());
+                    migrate_native_objects = false;
+                    db::ofga::set_ofga_model_to_db(model).await?;
+                }
+                Ordering::Equal => {}
+            },
+            _ => {}
+        }
+    }
+
     let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model().await;
+    get_all_init_tuples(&mut init_tuples).await;
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
-            return;
+            if !init_tuples.is_empty() {
+                match update_tuples(init_tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("Data migrated to openfga");
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Error writing init ofga tuples to the openfga during migration: {}",
+                            e
+                        );
+                    }
+                }
+            }
+            return Ok(());
         }
         // Check if ofga migration of index streams are needed
         let meta_version = version_compare::Version::from(&meta.version).unwrap();
@@ -59,7 +116,7 @@ pub async fn init() {
     }
 
     // 1. create a cluster lock
-    let locker = dist_lock::lock("/ofga/model/", 0)
+    let locker = dist_lock::lock("/ofga/model/", 0, None)
         .await
         .expect("Failed to acquire lock for openFGA");
     match db::ofga::set_ofga_model(existing_meta).await {
@@ -136,6 +193,11 @@ pub async fn init() {
                 }
             }
 
+            // Check if there are init ofga tuples that needs to be added now
+            for tuple in init_tuples {
+                tuples.push(tuple);
+            }
+
             if tuples.is_empty() {
                 log::info!("No orgs to update to the openfga");
             } else {
@@ -162,4 +224,6 @@ pub async fn init() {
     dist_lock::unlock(&locker)
         .await
         .expect("Failed to release lock");
+
+    Ok(())
 }

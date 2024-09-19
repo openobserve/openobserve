@@ -1,4 +1,4 @@
-import { utcToZonedTime, format } from "date-fns-tz";
+import { toZonedTime, format } from "date-fns-tz";
 
 export const getChartData = (
   x: any,
@@ -96,7 +96,7 @@ export const getChartData = (
     series: [
       {
         data: [...x].map((it: any, index: any) => [
-          params.timezone != "UTC" ? utcToZonedTime(it, params.timezone) : it,
+          params.timezone != "UTC" ? toZonedTime(it, params.timezone) : it,
           y[index] || 0,
         ]),
         type: "line",

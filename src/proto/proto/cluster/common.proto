@@ -23,12 +23,14 @@ message FileMeta {
 }
 
 enum StreamType {
-    LOGS     = 0;
-    METRICS  = 1;
-    TRACES   = 2;
-    METADATA = 3;
-    FILELIST = 4;
-    INDEX    = 5;
+    LOGS             = 0;
+    METRICS          = 1;
+    TRACES           = 2;
+    METADATA         = 3;
+    EnrichmentTables = 4;
+    FILELIST         = 5;
+    INDEX            = 6;
+
 }
 
 // Search request type
@@ -48,13 +50,15 @@ message Job {
 }
 
 message ScanStats {
-    int64 files           = 1;
-    int64 records         = 2;
-    int64 original_size   = 3; // unit: MB
-    int64 compressed_size = 4; // unit: MB
-    int64 querier_files   = 5;
+    int64 files                       = 1;
+    int64 records                     = 2;
+    int64 original_size               = 3; // unit: MB
+    int64 compressed_size             = 4; // unit: MB
+    int64 querier_files               = 5;
     int64 querier_memory_cached_files = 6;
     int64 querier_disk_cached_files   = 7;
+    int64 idx_scan_size               = 8; // unit: MB
+    int64 idx_took                    = 9; // unit: ms
 }
 
 message FileList {

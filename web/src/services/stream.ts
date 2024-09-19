@@ -54,6 +54,19 @@ const stream = {
     }
     return http().put(url, data);
   },
+  createSettings: (
+    org_identifier: string,
+    stream_name: string,
+    type: string,
+    data: any
+  ) => {
+    let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
+
+    if (type != "") {
+      url += "?type=" + type;
+    }
+    return http().post(url, data);
+  },
 
   fieldValues: ({
     org_identifier,
@@ -67,10 +80,12 @@ const stream = {
     type,
     regions,
     clusters,
+    no_count,
   }: any) => {
     const fieldsString = fields.join(",");
     let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
     if (query_context) url = url + `&sql=${query_context}`;
+    if (no_count) url = url + `&no_count=${no_count}`;
     if (query_fn?.trim()) url = url + `&query_fn=${query_fn}`;
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;

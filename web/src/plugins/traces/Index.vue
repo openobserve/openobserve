@@ -89,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :html-content="searchObj.data.errorMsg"
-                />
-
+                  :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
                 <div
                   data-test="logs-search-error-20003"
                   v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -173,7 +171,6 @@ import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
 
-import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
@@ -260,7 +257,8 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useTraces();
+    const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
+      useTraces();
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -276,7 +274,7 @@ export default defineComponent({
       store.state.selectedOrganization.identifier;
 
     const selectedStreamName = computed(
-      () => searchObj.data.stream.selectedStream.value
+      () => searchObj.data.stream.selectedStream.value,
     );
 
     const importSqlParser = async () => {
@@ -294,7 +292,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
           .then((res) => {
             res.data.list.map((data: any) => {
@@ -452,7 +450,7 @@ export default defineComponent({
 
           const startTimeStamp = date.subtractFromDate(
             endTimeStamp,
-            JSON.parse(subtractObject)
+            JSON.parse(subtractObject),
           );
 
           return {
@@ -470,7 +468,7 @@ export default defineComponent({
             start = new Date(
               searchObj.data.datetime.absolute.date.from +
                 " " +
-                searchObj.data.datetime.absolute.startTime
+                searchObj.data.datetime.absolute.startTime,
             );
           }
           if (
@@ -482,7 +480,7 @@ export default defineComponent({
             end = new Date(
               searchObj.data.datetime.absolute.date.to +
                 " " +
-                searchObj.data.datetime.absolute.endTime
+                searchObj.data.datetime.absolute.endTime,
             );
           }
           const rVal = {
@@ -522,7 +520,7 @@ export default defineComponent({
         let timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod
+                searchObj.data.datetime.relativeTimePeriod,
               )
             : cloneDeep(searchObj.data.datetime);
 
@@ -556,7 +554,7 @@ export default defineComponent({
 
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
-            " WHERE " + whereClause
+            " WHERE " + whereClause,
           );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
@@ -564,12 +562,12 @@ export default defineComponent({
 
         req.query.sql = req.query.sql.replace(
           "[QUERY_FUNCTIONS]",
-          queryFunctions
+          queryFunctions,
         );
 
         req.query.sql = req.query.sql.replace(
           "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.value
+          searchObj.data.stream.selectedStream.value,
         );
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
@@ -578,11 +576,15 @@ export default defineComponent({
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
         const queryParams = getUrlQueryParams();
+
         router.push({ query: queryParams });
         return req;
       } catch (e) {
+        console.log(e);
         searchObj.loading = false;
-        showErrorNotification("Invalid SQL Syntax");
+        showErrorNotification(
+          "An error occurred while constructing the search query.",
+        );
       }
     }
 
@@ -625,7 +627,7 @@ export default defineComponent({
 
     const showTraceDetailsError = () => {
       showErrorNotification(
-        `Trace ${router.currentRoute.value.query.trace_id} not found`
+        `Trace ${router.currentRoute.value.query.trace_id} not found`,
       );
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
@@ -646,7 +648,7 @@ export default defineComponent({
       req.query.end_time = trace.trace_end_time + 30000000;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
+        `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
       );
 
       return req;
@@ -657,7 +659,7 @@ export default defineComponent({
       searchObj.data.traceDetails.loading = true;
       searchObj.data.traceDetails.spanList = [];
       const req = buildTraceSearchQuery(
-        searchObj.data.traceDetails.selectedTrace
+        searchObj.data.traceDetails.selectedTrace,
       );
 
       delete req.aggs;
@@ -669,7 +671,7 @@ export default defineComponent({
             query: req,
             page_type: "traces",
           },
-          "UI"
+          "UI",
         )
         .then((res) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
@@ -765,15 +767,17 @@ export default defineComponent({
 
         let filter = searchObj.data.editorValue.trim();
 
-        let duration = "";
-        if (searchObj.meta.filterType === "basic" && durationFilter.max) {
-          duration += ` duration >= ${
-            durationFilter.min * 1000
-          } AND duration <= ${durationFilter.max * 1000}`;
+        if (
+          searchObj.meta.filterType === "basic" &&
+          durationFilter.max !== undefined &&
+          durationFilter.min !== undefined
+        ) {
+          const minDuration = durationFilter.min * 1000;
+          const maxDuration = durationFilter.max * 1000;
 
-          filter = filter
-            ? searchObj.data.editorValue + " AND" + duration
-            : duration;
+          const duration = `duration >= ${minDuration} AND duration <= ${maxDuration}`;
+
+          filter = filter ? `${filter} AND ${duration}` : duration;
         }
 
         searchService
@@ -805,8 +809,6 @@ export default defineComponent({
 
             //update grid columns
             updateGridColumns();
-
-            if (router.currentRoute.value.query.trace_id) openTraceDetails();
 
             // dismiss();
           })
@@ -891,7 +893,7 @@ export default defineComponent({
           const stream = await getStream(
             searchObj.data.stream.selectedStream.value,
             "traces",
-            true
+            true,
           );
 
           schema.push(...stream.schema);
@@ -965,17 +967,17 @@ export default defineComponent({
 
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
-          field: (row: any) =>
+          accessorfn: (row: any) =>
             timestampToTimezoneDate(
               row["trace_start_time"],
               store.state.timezone,
-              "yyyy-MM-dd HH:mm:ss.SSS"
+              "yyyy-MM-dd HH:mm:ss.SSS",
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
               row["trace_start_time"],
               store.state.timezone,
-              "yyyy-MM-dd HH:mm:ss.SSS"
+              "yyyy-MM-dd HH:mm:ss.SSS",
             ),
           label: "Start Time",
           align: "left",
@@ -1070,7 +1072,7 @@ export default defineComponent({
             let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
             xData.push(Math.floor(histDate.getTime()));
             yData.push(Number((bucket.duration / 1000).toFixed(2)));
-          }
+          },
         );
       }
 
@@ -1145,6 +1147,11 @@ export default defineComponent({
     });
 
     onActivated(() => {
+      restoreUrlQueryParams();
+      const params = router.currentRoute.value.query;
+      if (params.reload === "true") {
+        loadPageData();
+      }
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier
@@ -1204,71 +1211,6 @@ export default defineComponent({
       }
     }
 
-    const copyTracesUrl = (customTimeRange = null) => {
-      const queryParams = getUrlQueryParams(true);
-
-      if (customTimeRange) {
-        queryParams.from = customTimeRange.from;
-        queryParams.to = customTimeRange.to;
-      }
-
-      const queryString = Object.entries(queryParams)
-        .map(
-          ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
-        )
-        .join("&");
-
-      let shareURL = window.location.origin + window.location.pathname;
-
-      if (queryString != "") {
-        shareURL += "?" + queryString;
-      }
-
-      copyToClipboard(shareURL)
-        .then(() => {
-          $q.notify({
-            type: "positive",
-            message: "Link Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Error while copy link.",
-            timeout: 5000,
-          });
-        });
-    };
-
-    function getUrlQueryParams(getShareLink: false) {
-      const date = searchObj.data.datetime;
-      const query = {};
-
-      query["stream"] = selectedStreamName.value;
-
-      if (date.type == "relative" && !getShareLink) {
-        query["period"] = date.relativeTimePeriod;
-      } else {
-        query["from"] = date.startTime;
-        query["to"] = date.endTime;
-      }
-
-      query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
-
-      query["filter_type"] = searchObj.meta.filterType;
-
-      query["org_identifier"] = store.state.selectedOrganization.identifier;
-
-      query["trace_id"] = router.currentRoute.value.query.trace_id;
-
-      if (router.currentRoute.value.query.span_id)
-        query["span_id"] = router.currentRoute.value.query.span_id;
-
-      return query;
-    }
-
     const onSplitterUpdate = () => {
       window.dispatchEvent(new Event("resize"));
     };
@@ -1286,7 +1228,7 @@ export default defineComponent({
           let values = [];
           if (node.operator === "IN") {
             values = node.right.value.map(
-              (_value: { value: string }) => _value.value
+              (_value: { value: string }) => _value.value,
             );
           }
           searchObj.data.stream.fieldValues[node.left.column].selectedValues =
@@ -1327,7 +1269,6 @@ export default defineComponent({
       updateGridColumns,
       getConsumableDateTime,
       runQueryFn,
-      getTraceDetails,
       verifyOrganizationStatus,
       fieldValues,
       onSplitterUpdate,
@@ -1335,6 +1276,7 @@ export default defineComponent({
       indexListRef,
       copyTracesUrl,
       extractFields,
+      getTraceDetails,
     };
   },
   computed: {

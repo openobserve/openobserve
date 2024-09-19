@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use infra::errors::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
+
+use crate::common::meta::stream::StreamParams;
 
 pub mod alerts;
 pub mod compact;
@@ -25,6 +28,7 @@ pub mod enrichment_table;
 pub mod exporter;
 pub mod file_list;
 pub mod functions;
+pub mod grpc;
 pub mod ingestion;
 pub mod kv;
 pub mod logs;
@@ -44,7 +48,7 @@ pub mod users;
 
 const MAX_KEY_LENGTH: usize = 100;
 
-static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_:]+").unwrap());
+static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 // format partition key
 pub fn format_partition_key(input: &str) -> String {
@@ -58,6 +62,17 @@ pub fn format_partition_key(input: &str) -> String {
         }
     }
     output
+}
+
+// format stream name
+pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
+    let stream_name = params.stream_name.to_string();
+    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type).await?;
+    Ok(if schema.fields_map().is_empty() {
+        format_stream_name(&stream_name)
+    } else {
+        stream_name
+    })
 }
 
 // format stream name

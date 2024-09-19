@@ -34,8 +34,12 @@ use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
         meta::{
+            functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
+            ingestion::{
+                IngestionResponse, IngestionStatus, StreamStatus, ID_COL_NAME,
+                ORIGINAL_DATA_COL_NAME,
+            },
             stream::StreamParams,
             syslog::SyslogRoute,
         },
@@ -51,6 +55,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let route = match matching_route {
         Some(matching_route) => matching_route,
         None => {
+            log::warn!("Syslogs from the IP {} are not allowed", ip);
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -64,7 +69,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let org_id = &route.org_id;
 
     // check stream
-    let mut stream_name = format_stream_name(in_stream_name);
+    let stream_name = format_stream_name(in_stream_name);
     if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -78,14 +83,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Logs,
-        &stream_name,
-    );
-    // End Register Transforms for stream
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
+    let mut stream_before_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_after_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -110,12 +111,24 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    crate::service::ingestion::get_user_defined_schema(
+    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
+        &mut streams_need_original_set,
     )
     .await;
     // End get user defined schema
+
+    // Start Register functions for stream
+    crate::service::ingestion::get_stream_functions(
+        &stream_params,
+        &mut stream_before_functions_map,
+        &mut stream_after_functions_map,
+        &mut stream_vrl_map,
+    )
+    .await;
+    // End Register functions for stream
 
     let mut stream_status = StreamStatus::new(&stream_name);
 
@@ -123,9 +136,41 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
 
+    // store a copy of original data before it's being transformed and/or flattened, unless
+    // 1. original data is not an object -> won't be flattened.
+    // 2. no routing and current StreamName not in streams_need_original_set
+    let original_data = if value.is_object() {
+        if stream_routing_map.is_empty() && !streams_need_original_set.contains(&stream_name) {
+            None
+        } else {
+            // otherwise, make a copy in case the routed stream needs original data
+            Some(value.to_string())
+        }
+    } else {
+        None // `item` won't be flattened, no need to store original
+    };
+
+    let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+
+    // Start row based transform. Apply vrl functions with apply_before_flattening flag
+    if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
+        if !transforms.is_empty() {
+            value = crate::service::ingestion::apply_stream_functions(
+                transforms,
+                value,
+                &stream_vrl_map,
+                org_id,
+                &stream_name,
+                &mut runtime,
+            )?;
+        }
+    }
+    // end row based transformation
+
     // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
+    let mut routed_stream_name = stream_name.clone();
     // Start re-rerouting if exists
     if let Some(routings) = stream_routing_map.get(&stream_name) {
         if !routings.is_empty() {
@@ -139,7 +184,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     }
                 }
                 if !val.is_empty() && is_routed {
-                    stream_name = route.destination.clone();
+                    routed_stream_name = route.destination.clone();
                     break;
                 }
             }
@@ -147,17 +192,23 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     }
     // End re-routing
 
+    let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
+
     // Start row based transform
-    if !local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_functions(
-            &local_trans,
-            value,
-            &stream_vrl_map,
-            org_id,
-            &stream_name,
-            &mut runtime,
-        )?;
+    if let Some(transforms) = stream_after_functions_map.get(&key) {
+        if !transforms.is_empty() {
+            value = crate::service::ingestion::apply_stream_functions(
+                transforms,
+                value,
+                &stream_vrl_map,
+                org_id,
+                &routed_stream_name,
+                &mut runtime,
+            )
+            .unwrap();
+        }
     }
+    // end row based transform
 
     if value.is_null() || !value.is_object() {
         stream_status.status.failed += 1; // transform failed or dropped
@@ -174,8 +225,25 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         _ => unreachable!(),
     };
 
-    if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+    if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
         local_val = crate::service::logs::refactor_map(local_val, fields);
+    }
+
+    // add `_original` and '_record_id` if required by StreamSettings
+    if streams_need_original_set.contains(&routed_stream_name) && original_data.is_some() {
+        local_val.insert(
+            ORIGINAL_DATA_COL_NAME.to_string(),
+            original_data.unwrap().into(),
+        );
+        let record_id = crate::service::ingestion::generate_record_id(
+            org_id,
+            &routed_stream_name,
+            &StreamType::Logs,
+        );
+        local_val.insert(
+            ID_COL_NAME.to_string(),
+            json::Value::String(record_id.to_string()),
+        );
     }
 
     // handle timestamp
@@ -195,7 +263,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs(
             org_id,
-            &stream_name,
+            &routed_stream_name,
             &mut status,
             vec![(timestamp, local_val)],
         )

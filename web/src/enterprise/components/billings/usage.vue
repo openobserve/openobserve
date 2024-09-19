@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           v-model="usageDate"
           :options="options"
-          @update:model-value="(value) => selectUsageDate()"
+          @update:model-value="(value: any) => selectUsageDate()"
         />
       </div>
     </div>

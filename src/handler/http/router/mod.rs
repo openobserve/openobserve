@@ -16,11 +16,10 @@
 use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
-use actix_http::header::HeaderName;
 use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
-    http::header,
+    http::{header, ConnectionType, StatusCode},
     middleware, web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
@@ -55,7 +54,7 @@ fn get_cors() -> Rc<Cors> {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
-            HeaderName::from_lowercase(b"traceparent").unwrap(),
+            header::HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
         .allow_any_origin()
         .supports_credentials()
@@ -138,6 +137,19 @@ async fn audit_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     next.call(req).await
+}
+
+async fn check_keepalive(
+    req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let mut resp = next.call(req).await?;
+    if resp.status() >= StatusCode::BAD_REQUEST {
+        resp.response_mut()
+            .head_mut()
+            .set_connection_type(ConnectionType::Close);
+    }
+    Ok(resp)
 }
 
 /// This is a very trivial proxy to overcome the cors errors while
@@ -316,6 +328,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
+            .wrap(from_fn(check_keepalive))
             .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
             .service(users::list)
             .service(users::save)
@@ -344,6 +357,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::es::org_data_stream_create)
             .service(stream::schema)
             .service(stream::settings)
+            .service(stream::update_settings)
             .service(stream::delete_fields)
             .service(stream::delete)
             .service(stream::list)
@@ -377,6 +391,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::search_partition)
             .service(search::around)
             .service(search::values)
+            .service(search::search_history)
             .service(search::saved_view::create_view)
             .service(search::saved_view::update_view)
             .service(search::saved_view::get_view)
@@ -407,14 +422,14 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(dashboards::reports::delete_report)
             .service(dashboards::reports::enable_report)
             .service(dashboards::reports::trigger_report)
-            .service(alerts::save_alert)
-            .service(alerts::update_alert)
-            .service(alerts::get_alert)
-            .service(alerts::list_alerts)
-            .service(alerts::list_stream_alerts)
-            .service(alerts::delete_alert)
-            .service(alerts::enable_alert)
-            .service(alerts::trigger_alert)
+            .service(alerts::alert::save_alert)
+            .service(alerts::alert::update_alert)
+            .service(alerts::alert::get_alert)
+            .service(alerts::alert::list_alerts)
+            .service(alerts::alert::list_stream_alerts)
+            .service(alerts::alert::delete_alert)
+            .service(alerts::alert::enable_alert)
+            .service(alerts::alert::trigger_alert)
             .service(alerts::templates::save_template)
             .service(alerts::templates::update_template)
             .service(alerts::templates::get_template)

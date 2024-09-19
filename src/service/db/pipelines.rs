@@ -22,10 +22,10 @@ use crate::{
     service::db,
 };
 
-pub async fn set(org_id: &str, name: &str, pipeline: &PipeLine) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, pipeline: &PipeLine) -> Result<(), anyhow::Error> {
     let key = format!(
-        "/pipeline/{org_id}/{}/{}/{name}",
-        pipeline.stream_type, pipeline.stream_name
+        "/pipeline/{org_id}/{}/{}/{}",
+        pipeline.stream_type, pipeline.stream_name, pipeline.name
     );
     match db::put(
         &key,

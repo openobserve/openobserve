@@ -1,4 +1,4 @@
-import { utcToZonedTime, format } from "date-fns-tz";
+import { toZonedTime, format } from "date-fns-tz";
 export const convertLogData = (
   x: any,
   y: any,
@@ -95,7 +95,7 @@ export const convertLogData = (
     series: [
       {
         data: [...x].map((it: any, index: any) => [
-          params.timezone != "UTC" ? utcToZonedTime(it, params.timezone) : it,
+          params.timezone != "UTC" ? toZonedTime(it, params.timezone) : it,
           y[index] || 0,
         ]),
         type: "bar",

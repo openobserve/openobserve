@@ -1,6 +1,7 @@
 {
   "references": [{ "path": "./tsconfig.node.json" }],
   "include": ["src/**/*.ts", "vite.config.*", "vitest.config.*", "cypress.config.*"],
+  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "allowJs": true,
     "target": "esnext",
@@ -17,6 +18,7 @@
     "skipLibCheck": true,
     "composite": true,
     "types": ["node"],
-    "baseUrl": "."
+    "baseUrl": ".",
+    "downlevelIteration": true,
   }
 }

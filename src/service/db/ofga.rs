@@ -13,18 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use {
-    crate::service::db, config::utils::json, o2_enterprise::enterprise::common::infra::config::*,
-    o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel, std::sync::Arc,
+use std::sync::Arc;
+
+use config::utils::json;
+use o2_enterprise::enterprise::{
+    common::infra::config::*,
+    openfga::{
+        meta::mapping::OFGAModel,
+        model::{create_open_fga_store, read_ofga_model, write_auth_models},
+    },
 };
 
-#[cfg(feature = "enterprise")]
-pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
-    use o2_enterprise::enterprise::openfga::model::{
-        create_open_fga_store, read_ofga_model, write_auth_models,
-    };
+use crate::service::db;
 
+pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
     let meta = read_ofga_model().await;
     if let Some(existing_model) = existing_meta {
         if meta.version == existing_model.version {
@@ -38,22 +40,10 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
             };
             match write_auth_models(&meta, &store_id).await {
                 Ok(_) => {
-                    let key = "/ofga/model";
                     let mut loc_meta = meta.clone();
                     loc_meta.store_id = store_id;
                     loc_meta.model = None;
-
-                    match db::put(
-                        key,
-                        json::to_vec(&loc_meta).unwrap().into(),
-                        db::NEED_WATCH,
-                        None,
-                    )
-                    .await
-                    {
-                        Ok(_) => Ok(loc_meta.store_id),
-                        Err(e) => Err(anyhow::anyhow!(e)),
-                    }
+                    set_ofga_model_to_db(loc_meta).await
                 }
                 Err(e) => Err(anyhow::anyhow!(e)),
             }
@@ -62,29 +52,32 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
         let store_id = create_open_fga_store().await.unwrap();
         match write_auth_models(&meta, &store_id).await {
             Ok(_) => {
-                let key = "/ofga/model";
                 let mut loc_meta = meta.clone();
                 loc_meta.store_id = store_id;
                 loc_meta.model = None;
-
-                match db::put(
-                    key,
-                    json::to_vec(&loc_meta).unwrap().into(),
-                    db::NEED_WATCH,
-                    None,
-                )
-                .await
-                {
-                    Ok(_) => Ok(loc_meta.store_id),
-                    Err(e) => Err(anyhow::anyhow!(e)),
-                }
+                set_ofga_model_to_db(loc_meta).await
             }
             Err(e) => Err(anyhow::anyhow!(e)),
         }
     }
 }
 
-#[cfg(feature = "enterprise")]
+pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow::Error> {
+    let key = "/ofga/model";
+    meta.model = None;
+    match db::put(
+        key,
+        json::to_vec(&meta).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
+    {
+        Ok(_) => Ok(meta.store_id),
+        Err(e) => Err(anyhow::anyhow!(e)),
+    }
+}
+
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
     let key = "/ofga/model";
     let ret = db::get(key).await?;
@@ -93,7 +86,6 @@ pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
     Ok(value)
 }
 
-#[cfg(feature = "enterprise")]
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/ofga/model";
     let cluster_coordinator = db::get_coordinator().await;
@@ -139,7 +131,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[cfg(feature = "enterprise")]
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/ofga/model";
     let ret = db::list(key).await?;

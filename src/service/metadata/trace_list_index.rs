@@ -126,6 +126,22 @@ impl Metadata for TraceListIndex {
             log::error!("[TraceListIndex] error while syncing writer: {}", e);
         }
 
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::{
+                common::infra::config::O2_CONFIG,
+                openfga::authorizer::authz::set_ownership_if_not_exists,
+            };
+
+            if O2_CONFIG.openfga.enabled {
+                set_ownership_if_not_exists(
+                    org_id,
+                    &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
+                )
+                .await;
+            }
+        }
+
         Ok(())
     }
     async fn flush(&self) -> infra::errors::Result<()> {
@@ -189,6 +205,7 @@ impl TraceListIndex {
                 flatten_level: None,
                 max_query_range: 0,
                 defined_schema_fields: None,
+                store_original_data: false,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)

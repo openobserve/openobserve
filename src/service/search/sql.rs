@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-};
+use std::collections::HashMap;
 
 use chrono::Duration;
 use config::{
@@ -25,6 +22,7 @@ use config::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
+    utils::sql::is_aggregate_query,
     QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -39,12 +37,12 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
 use crate::{
-    common::meta::stream::StreamParams,
-    service::search::{self, match_source},
+    common::meta::{ingestion::ID_COL_NAME, stream::StreamParams},
+    service::search::match_source,
 };
 
 const SQL_DELIMITERS: [u8; 12] = [
@@ -52,15 +50,10 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
-static RE_ONLY_GROUPBY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
-static RE_SELECT_FIELD: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
-
-static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
-static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
+pub static RE_SELECT_WILDCARD: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
+pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
@@ -69,9 +62,6 @@ static RE_MATCH_ALL_RAW: Lazy<Regex> =
 static RE_MATCH_ALL_RAW_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-
-pub static _TS_WITH_ALIAS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -82,44 +72,17 @@ pub struct Sql {
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
-    pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
-    pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no group by, no aggregatioin,
                           * no where or only 1 equality where clause with term as a partition
                           * key, we can just get data from the latest file */
     pub schema: Schema,
-    pub query_context: String,
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
     pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
     pub use_inverted_index: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum SqlMode {
-    Context,
-    Full,
-}
-
-impl From<&str> for SqlMode {
-    fn from(mode: &str) -> Self {
-        match mode.to_lowercase().as_str() {
-            "full" => SqlMode::Full,
-            "context" => SqlMode::Context,
-            _ => SqlMode::Context,
-        }
-    }
-}
-
-impl Display for SqlMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SqlMode::Context => write!(f, "context"),
-            SqlMode::Full => write!(f, "full"),
-        }
-    }
+    pub inverted_index_type: String,
 }
 
 impl Sql {
@@ -158,75 +121,12 @@ impl Sql {
         // Hack for table name
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
-        let mut fast_mode =
-            is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
+
+        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
+        let fast_mode = !track_total_hits
+            && is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
 
         let cfg = get_config();
-
-        // check sql_mode
-        let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
-        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
-
-        // check SQL limitation
-        // in context mode, disallow, [limit|offset|group by|having|join|union]
-        // in full    mode, disallow, [join|union]
-        if sql_mode.eq(&SqlMode::Context)
-            && (meta.offset > 0 || meta.limit > 0 || !meta.group_by.is_empty())
-        {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "sql_mode=context, Query SQL does not supported [limit|offset|group by|having|join|union]".to_string()
-            )));
-        }
-
-        // check Agg SQL
-        // 1. must from query
-        // 2. disallow select *
-        // 3. must select group by field
-        let mut req_aggs = HashMap::new();
-        for agg in req.aggs.iter() {
-            req_aggs.insert(agg.name.to_string(), agg.sql.to_string());
-        }
-        if sql_mode.eq(&SqlMode::Full) && !req_aggs.is_empty() {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "sql_mode=full, Query not supported aggs".to_string(),
-            )));
-        }
-
-        // check aggs
-        for sql in req_aggs.values() {
-            if !RE_ONLY_FROM.is_match(sql) {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Aggregation SQL only support 'from query' as context".to_string(),
-                )));
-            }
-            if RE_ONLY_SELECT.is_match(sql) {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Aggregation SQL is not supported 'select *' please specify the fields"
-                        .to_string(),
-                )));
-            }
-            if RE_ONLY_GROUPBY.is_match(sql) {
-                let caps = RE_ONLY_GROUPBY.captures(sql).unwrap();
-                let group_by = caps
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .trim_matches(|v| v == '\'' || v == '"');
-                let select_caps = match RE_SELECT_FIELD.captures(sql) {
-                    Some(caps) => caps,
-                    None => {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                            sql.to_owned(),
-                        )));
-                    }
-                };
-                if !select_caps.get(1).unwrap().as_str().contains(group_by) {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-                        "Aggregation SQL used [group by] you should select the field [{group_by}]"
-                    ))));
-                }
-            }
-        }
 
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{stream_name}[ '"]?"#)).unwrap();
 
@@ -235,52 +135,47 @@ impl Sql {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
         }
         origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
-        // replace table for subquery
-        if meta.subquery.is_some() {
-            meta.subquery = Some(
-                re.replace_all(&meta.subquery.clone().unwrap(), " FROM tbl ")
-                    .to_string(),
-            );
-        }
 
-        // remove subquery in from clause
-        if meta.subquery.is_some() {
-            origin_sql =
-                search::datafusion::rewrite::replace_data_source_to_tbl(origin_sql.as_str())?;
-        }
+        // fetch schema
+        let schema = match infra::schema::get(&org_id, &meta.source, stream_type).await {
+            Ok(schema) => schema,
+            Err(_) => Schema::empty(),
+        };
+        let schema_fields = schema.fields().to_vec();
+        let stream_settings = infra::schema::unwrap_stream_settings(&schema);
 
-        if meta.subquery.is_some() {
-            // Hack select in subquery for _timestamp, add _timestamp to select clause
-            let re = Regex::new(r"(?i)\b(avg|count|min|max|sum|group_concat)\b").unwrap();
-            let has_aggregate_function = re.is_match(meta.subquery.as_ref().unwrap());
-            if !has_aggregate_function && !RE_ONLY_GROUPBY.is_match(meta.subquery.as_ref().unwrap())
-            {
-                let caps = RE_SELECT_FROM
-                    .captures(meta.subquery.as_ref().unwrap())
-                    .unwrap();
-                let cap_str = caps.get(1).unwrap().as_str();
-                if !cap_str.contains(&cfg.common.column_timestamp) {
-                    meta.subquery = Some(meta.subquery.as_ref().unwrap().replace(
-                        cap_str,
-                        &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                    ));
-                }
-            } else {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Subquery sql current not support aggregate function".to_string(),
-                )));
-            }
-        }
-
-        // Hack select for _timestamp, add _timestamp to select clause
-        if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
+        // Hack select for _timestamp & _o2_id, add both to select clause if needed
+        let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
+        if !is_aggregate && meta.group_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
-            if !cap_str.contains(&cfg.common.column_timestamp) {
-                origin_sql = origin_sql.replace(
-                    cap_str,
-                    &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                );
+
+            let (need_o2_id_col, need_timestamp_col) =
+                if stream_settings.as_ref().map_or(false, |settings| {
+                    settings.store_original_data
+                        && stream_type == StreamType::Logs
+                        && !cap_str.contains(ID_COL_NAME)
+                }) {
+                    meta.fields.push(ID_COL_NAME.to_string());
+                    (true, !cap_str.contains(&cfg.common.column_timestamp))
+                } else {
+                    (false, !cap_str.contains(&cfg.common.column_timestamp))
+                };
+            // if order by is not empty, we don't need to add timestamp column
+            let need_timestamp_col = need_timestamp_col && meta.order_by.is_empty();
+
+            let replacement = match (need_o2_id_col, need_timestamp_col) {
+                (true, true) => format!(
+                    "{}, {}, {}",
+                    &cfg.common.column_timestamp, ID_COL_NAME, cap_str
+                ),
+                (true, false) => format!("{}, {}", ID_COL_NAME, cap_str),
+                (false, true) => format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                (false, false) => String::new(),
+            };
+
+            if !replacement.is_empty() {
+                origin_sql = origin_sql.replacen(cap_str, &replacement, 1);
             }
         }
 
@@ -319,11 +214,6 @@ impl Sql {
             meta.time_range = Some(req_time_range); // update meta
         };
 
-        let mut rewrite_time_range_sql = origin_sql.clone();
-        if meta.subquery.is_some() {
-            rewrite_time_range_sql = meta.subquery.clone().unwrap();
-        }
-
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -344,30 +234,9 @@ impl Sql {
                 && meta_time_range_is_empty
                 && req_query.size > QUERY_WITH_NO_LIMIT
             {
-                match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
-                    Some(caps) => {
-                        let mut where_str = caps.get(1).unwrap().as_str().to_string();
-                        if !meta.group_by.is_empty() {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" group ").unwrap()]
-                                .to_string();
-                        } else if meta.having {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" having ").unwrap()]
-                                .to_string();
-                        } else if !meta.order_by.is_empty() {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
-                                .to_string();
-                        } else if meta.limit > 0 {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" limit ").unwrap()]
-                                .to_string();
-                        } else if meta.offset > 0 {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" offset ").unwrap()]
-                                .to_string();
-                        }
+                let mut rewrite_time_range_sql = origin_sql.clone();
+                match pickup_where(&rewrite_time_range_sql, Some(meta.clone()))? {
+                    Some(where_str) => {
                         let pos_start = rewrite_time_range_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
                         rewrite_time_range_sql = format!(
@@ -383,13 +252,8 @@ impl Sql {
                             .replace(" FROM tbl", &format!(" FROM tbl WHERE {time_range_sql}"));
                     }
                 };
+                origin_sql = rewrite_time_range_sql;
             }
-        }
-
-        if meta.subquery.is_some() {
-            meta.subquery = Some(rewrite_time_range_sql);
-        } else {
-            origin_sql = rewrite_time_range_sql;
         }
 
         // Hack offset limit and sort by for sql
@@ -402,15 +266,14 @@ impl Sql {
                 cfg.limit.query_default_limit * std::cmp::max(1, meta.group_by.len() as i64)
             };
             origin_sql = if meta.order_by.is_empty()
-                && (!sql_mode.eq(&SqlMode::Full)
-                    || (meta.group_by.is_empty()
-                        && !origin_sql
-                            .to_lowercase()
-                            .split(" from ")
-                            .next()
-                            .unwrap_or_default()
-                            .contains('('))
-                        && !origin_sql.to_lowercase().contains("distinct"))
+                && ((meta.group_by.is_empty()
+                    && !origin_sql
+                        .to_lowercase()
+                        .split(" from ")
+                        .next()
+                        .unwrap_or_default()
+                        .contains('('))
+                    && !origin_sql.to_lowercase().contains("distinct"))
             {
                 let sort_by = if req_query.sort_by.is_empty() {
                     meta.order_by = vec![(cfg.common.column_timestamp.to_string(), true)];
@@ -440,14 +303,6 @@ impl Sql {
             };
         }
 
-        // fetch schema
-        let schema = match infra::schema::get(&org_id, &meta.source, stream_type).await {
-            Ok(schema) => schema,
-            Err(_) => Schema::empty(),
-        };
-        let schema_fields = schema.fields().to_vec();
-        let stream_settings = infra::schema::unwrap_stream_settings(&schema);
-
         // fetch inverted index fields
         let mut fts_terms = HashSet::new();
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -456,7 +311,7 @@ impl Sql {
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
-        if req_query.quick_mode
+        if (req_query.quick_mode || cfg.limit.quick_mode_force_enabled)
             && schema_fields.len() > cfg.limit.quick_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
@@ -488,7 +343,7 @@ impl Sql {
         let where_pos = where_tokens
             .iter()
             .position(|x| x.to_lowercase() == "where");
-        let mut where_tokens = if let Some(v) = where_pos {
+        let where_tokens = if let Some(v) = where_pos {
             where_tokens[v + 1..].to_vec()
         } else {
             Vec::new()
@@ -579,6 +434,13 @@ impl Sql {
                 if !index_fields.contains(&key.to_string()) {
                     continue;
                 }
+                let value = value
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .collect::<Vec<_>>();
+                if value.is_empty() {
+                    continue;
+                }
                 let entry = index_terms
                     .entry(key.to_string())
                     .or_insert_with(HashSet::new);
@@ -620,91 +482,28 @@ impl Sql {
         }
 
         // pickup where
-        let mut where_str = match RE_WHERE.captures(&origin_sql) {
-            Some(caps) => caps[1].to_string(),
+        let where_str = match pickup_where(&origin_sql, Some(meta.clone()))? {
+            Some(where_str) => where_str,
             None => "".to_string(),
         };
-        if !where_str.is_empty() {
-            let mut where_str_lower = where_str.to_lowercase();
-            for key in ["group", "order", "offset", "limit"].iter() {
-                if !where_tokens.iter().any(|x| x.to_lowercase().eq(key)) {
-                    continue;
-                }
-                let where_pos = where_tokens
-                    .iter()
-                    .position(|x| x.to_lowercase().eq(key))
-                    .unwrap();
-                where_tokens = where_tokens[..where_pos].to_vec();
-                if let Some(pos) = where_str_lower.rfind(key) {
-                    where_str = where_str[..pos].to_string();
-                    where_str_lower = where_str.to_lowercase();
-                }
-            }
-        }
 
-        // Hack for aggregation
+        // Hack for track total hits
         if track_total_hits {
-            req_aggs.insert(
-                "_count".to_string(),
-                String::from("SELECT COUNT(*) as num from query"),
-            );
-        }
-        let mut aggs = hashbrown::HashMap::new();
-        for (key, sql) in &req_aggs {
-            let mut sql = sql.to_string();
-            if let Some(caps) = RE_ONLY_FROM.captures(&sql) {
-                sql = sql.replace(&caps[0].to_string(), " FROM tbl ");
-            }
-            if !where_str.is_empty() {
-                match RE_ONLY_WHERE.captures(&sql) {
-                    Some(caps) => {
-                        sql = sql
-                            .replace(&caps[0].to_string(), &format!(" WHERE ({where_str}) AND "));
-                    }
-                    None => {
-                        sql = sql.replace(
-                            &" FROM tbl ".to_string(),
-                            &format!(" FROM tbl WHERE ({where_str}) "),
-                        );
-                    }
-                }
-            }
+            let sql = if where_str.is_empty() {
+                "SELECT COUNT(*) as zo_sql_num FROM tbl".to_string()
+            } else {
+                format!("SELECT COUNT(*) as zo_sql_num FROM tbl WHERE {}", where_str)
+            };
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
                 log::error!(
-                    "sql_meta: parse sql error: {}, sql: {}",
+                    "sql_meta: parse track_total_hits sql error: {}, sql: {}",
                     sql_meta.err().unwrap(),
                     sql
                 );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
-            let sql_meta = sql_meta.unwrap();
-            for cap in RE_HISTOGRAM.captures_iter(sql.clone().as_str()) {
-                let attrs = cap
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .split(',')
-                    .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-                    .collect::<Vec<&str>>();
-                let field = attrs.first().unwrap();
-                let interval = attrs.get(1).unwrap();
-                sql = sql.replace(
-                    cap.get(0).unwrap().as_str(),
-                    &format!(
-                        "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))"
-                    )
-                );
-            }
-
-            if !(sql_meta.group_by.is_empty()
-                || (sql_meta.field_alias.len() == 2
-                    && sql_meta.field_alias[0].1 == "zo_sql_key"
-                    && sql_meta.field_alias[1].1 == "zo_sql_num"))
-            {
-                fast_mode = false;
-            }
-            aggs.insert(key.clone(), (sql, sql_meta));
+            origin_sql = sql;
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());
@@ -752,6 +551,13 @@ impl Sql {
             checking_inverted_index(&meta, &fts_fields, &index_fields)
         };
 
+        // check index search type
+        let inverted_index_type = if req.index_type.is_empty() {
+            cfg.common.inverted_index_search_format.clone()
+        } else {
+            req.index_type.clone()
+        };
+
         Ok(Sql {
             origin_sql,
             rewrite_sql,
@@ -760,11 +566,8 @@ impl Sql {
             stream_name,
             meta,
             fulltext,
-            aggs,
-            sql_mode,
             fast_mode,
             schema,
-            query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
@@ -774,6 +577,7 @@ impl Sql {
                 .collect(),
             histogram_interval,
             use_inverted_index,
+            inverted_index_type,
         })
     }
 
@@ -916,10 +720,8 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
         (Duration::try_hours(24 * 30), "12 hour"),
         (Duration::try_hours(24 * 28), "6 hour"),
         (Duration::try_hours(24 * 21), "3 hour"),
-        (Duration::try_hours(24 * 14), "2 hour"),
-        (Duration::try_hours(24 * 7), "1 hour"),
-        (Duration::try_hours(24), "30 minute"),
-        (Duration::try_hours(6), "5 minute"),
+        (Duration::try_hours(24 * 15), "2 hour"),
+        (Duration::try_hours(6), "1 hour"),
         (Duration::try_hours(2), "1 minute"),
         (Duration::try_hours(1), "30 second"),
         (Duration::try_minutes(30), "15 second"),
@@ -952,11 +754,61 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
     seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
 }
 
+pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
+    let meta = match meta {
+        Some(v) => v,
+        None => match MetaSql::new(sql) {
+            Ok(meta) => meta,
+            Err(_) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    sql.to_string(),
+                )));
+            }
+        },
+    };
+    let Some(caps) = RE_WHERE.captures(sql) else {
+        return Ok(None);
+    };
+    let mut where_str = caps.get(1).unwrap().as_str().to_string();
+    if !meta.group_by.is_empty() {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" group ").unwrap()].to_string();
+    } else if meta.having {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
+    } else if !meta.order_by.is_empty() {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
+    } else if meta.limit > 0 || where_str.to_lowercase().ends_with(" limit 0") {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
+    } else if meta.offset > 0 {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
+    }
+    Ok(Some(where_str))
+}
+
+fn closing_brace_index(opening_brace_index: usize, expr: &str) -> Option<usize> {
+    let mut brace_count = 0;
+    for (i, c) in expr[opening_brace_index..].chars().enumerate() {
+        if c == '(' {
+            brace_count += 1;
+        }
+        if c == ')' {
+            brace_count -= 1;
+        }
+        if brace_count == 0 {
+            return Some(opening_brace_index + i);
+        }
+    }
+
+    None
+}
+
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
     if token.is_empty() {
         return vec![];
     }
-    if token.starts_with('(') && token.ends_with(')') {
+    if token.starts_with('(')
+        && token.ends_with(')')
+        && closing_brace_index(0, token) == Some(token.len() - 1)
+    {
         return split_sql_token_unwrap_brace(&token[1..token.len() - 1]);
     }
     let tokens = split_sql_token(token);
@@ -1134,14 +986,12 @@ mod tests {
             sql: format!("select {} from {} ", col, table),
             from: 0,
             size: 100,
-            sql_mode: "full".to_owned(),
             quick_mode: false,
             query_type: "".to_owned(),
             start_time: 1667978895416,
             end_time: 1667978900217,
             sort_by: None,
             track_total_hits: false,
-            query_context: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
@@ -1149,12 +999,12 @@ mod tests {
 
         let req: config::meta::search::Request = config::meta::search::Request {
             query,
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            index_type: "".to_string(),
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -1174,17 +1024,17 @@ mod tests {
             ("select * from table1 where a='b'", true, (0, 0)),
             (
                 "select * from table1 where a='b' limit 10 offset 10",
-                false,
+                true,
                 (0, 0),
             ),
             (
                 "select * from table1 where a='b' group by abc",
-                false,
+                true,
                 (0, 0),
             ),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                false,
+                true,
                 (0, 0),
             ),
             ("select * from table1, table2 where a='b'", false, (0, 0)),
@@ -1205,7 +1055,7 @@ mod tests {
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                false,
+                true,
                 (0, 0),
             ),
             (
@@ -1246,31 +1096,30 @@ mod tests {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
-                sql_mode: "context".to_owned(),
                 quick_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 sort_by: None,
                 track_total_hits: true,
-                query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
-                aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],
                 timeout: 0,
                 search_type: None,
+                index_type: "".to_string(),
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();
 
             let resp = Sql::new(&rpc_req).await;
+            println!("sql: {}", sql);
             assert_eq!(resp.is_ok(), ok);
             if ok {
                 let resp = resp.unwrap();
@@ -1284,7 +1133,6 @@ mod tests {
                         Some((query.start_time, query.end_time))
                     );
                 }
-                assert_eq!(resp.meta.limit, query.size);
             }
         }
     }
@@ -1370,26 +1218,24 @@ mod tests {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
-                sql_mode: "full".to_owned(),
                 quick_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 sort_by: None,
                 track_total_hits: true,
-                query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
-                aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],
                 timeout: 0,
                 search_type: None,
+                index_type: "".to_string(),
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();

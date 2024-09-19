@@ -18,8 +18,8 @@ use std::{
     io::{Error, ErrorKind},
 };
 
-use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{StreamSettings, StreamType};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use config::meta::stream::{StreamSettings, StreamType, UpdateStreamSettings};
 
 use crate::{
     common::{
@@ -72,7 +72,7 @@ async fn schema(
     stream::get_stream(&org_id, &stream_name, stream_type).await
 }
 
-/// UpdateStreamSettings
+/// CreateStreamSettings
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -90,14 +90,14 @@ async fn schema(
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/streams/{stream_name}/settings")]
+#[post("/{org_id}/streams/{stream_name}/settings")]
 async fn settings(
     path: web::Path<(String, String)>,
     settings: web::Json<StreamSettings>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_bulk_stream_name {
+    if !config::get_config().common.skip_formatting_stream_name {
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -129,6 +129,71 @@ async fn settings(
 
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+}
+
+/// UpdateStreamSettings
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "UpdateStreamSettings",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    request_body(content = UpdateStreamSettings, description = "Stream settings", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/streams/{stream_name}/settings")]
+async fn update_settings(
+    path: web::Path<(String, String)>,
+    stream_settings: web::Json<UpdateStreamSettings>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => {
+            if let Some(s_type) = v {
+                if s_type == StreamType::EnrichmentTables || s_type == StreamType::Index {
+                    return Ok(
+                        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                            http::StatusCode::BAD_REQUEST.into(),
+                            format!("Stream type '{}' not allowed", s_type),
+                        )),
+                    );
+                }
+                Some(s_type)
+            } else {
+                v
+            }
+        }
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    stream::update_stream_settings(
+        &org_id,
+        &stream_name,
+        stream_type,
+        stream_settings.into_inner(),
+    )
+    .await
 }
 
 /// DeleteStreamFields
@@ -274,25 +339,28 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         let user_id = req.headers().get("user_id").unwrap();
         if let Some(s_type) = &stream_type {
-            if !s_type.eq(&StreamType::EnrichmentTables) && !s_type.eq(&StreamType::Metadata) {
-                match crate::handler::http::auth::validator::list_objects_for_user(
-                    &org_id,
-                    user_id.to_str().unwrap(),
-                    "GET",
-                    &s_type.to_string(),
-                )
-                .await
-                {
-                    Ok(stream_list) => {
-                        _stream_list_from_rbac = stream_list;
-                    }
-                    Err(e) => {
-                        return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                            e.to_string(),
-                        ));
-                    }
+            let stream_type_str = s_type.to_string();
+            match crate::handler::http::auth::validator::list_objects_for_user(
+                &org_id,
+                user_id.to_str().unwrap(),
+                "GET",
+                OFGA_MODELS
+                    .get(stream_type_str.as_str())
+                    .map_or(stream_type_str.as_str(), |model| model.key),
+            )
+            .await
+            {
+                Ok(stream_list) => {
+                    _stream_list_from_rbac = stream_list;
+                }
+                Err(e) => {
+                    return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                        e.to_string(),
+                    ));
                 }
             }
         }

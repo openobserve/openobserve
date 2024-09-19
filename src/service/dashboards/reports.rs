@@ -17,6 +17,7 @@ use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
+use chrono::Timelike;
 use config::{get_chrome_launch_options, get_config, SMTP_CLIENT};
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
@@ -30,12 +31,16 @@ use crate::{
     common::{
         meta::{
             authz::Authz,
-            dashboards::reports::{
-                HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
-                ReportFrequencyType, ReportTimerangeType,
+            dashboards::{
+                datetime_now,
+                reports::{
+                    HttpReportPayload, Report, ReportDashboard, ReportDestination,
+                    ReportEmailDetails, ReportFrequencyType, ReportListFilters,
+                    ReportTimerangeType,
+                },
             },
         },
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::db,
 };
@@ -66,6 +71,13 @@ pub async fn save(
     if !name.is_empty() {
         report.name = name.to_string();
     }
+
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&report.name) {
+        return Err(anyhow::anyhow!(
+            "Report name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
+        ));
+    }
     if report.name.is_empty() {
         return Err(anyhow::anyhow!("Report name is required"));
     }
@@ -74,6 +86,17 @@ pub async fn save(
     }
 
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let cron_exp = report.frequency.cron.clone();
+        if cron_exp.starts_with("* ") {
+            let (_, rest) = cron_exp.split_once(" ").unwrap();
+            let now = chrono::Utc::now().second().to_string();
+            report.frequency.cron = format!("{now} {rest}");
+            log::debug!(
+                "New cron expression for report {}: {}",
+                report.name,
+                report.frequency.cron
+            );
+        }
         // Check if the cron expression is valid
         Schedule::from_str(&report.frequency.cron)?;
     } else if report.frequency.interval == 0 {
@@ -81,20 +104,25 @@ pub async fn save(
     }
 
     match db::dashboards::reports::get(org_id, &report.name).await {
-        Ok(_) => {
+        Ok(old_report) => {
             if create {
                 return Err(anyhow::anyhow!("Report already exists"));
             }
+            report.last_triggered_at = old_report.last_triggered_at;
+            report.owner = old_report.owner;
+            report.updated_at = Some(datetime_now());
         }
         Err(_) => {
             if !create {
                 return Err(anyhow::anyhow!("Report not found"));
+            } else {
+                report.last_triggered_at = None;
             }
         }
     }
 
-    // Atleast one `ReportDashboard` and `ReportDestination` needs to be present
-    if report.dashboards.is_empty() || report.destinations.is_empty() {
+    // Atleast one `ReportDashboard` needs to be present
+    if report.dashboards.is_empty() {
         return Err(anyhow::anyhow!(
             "Atleast one dashboard/destination is required"
         ));
@@ -154,11 +182,14 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
 
 pub async fn list(
     org_id: &str,
+    filters: ReportListFilters,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Report>, anyhow::Error> {
     match db::dashboards::reports::list(org_id).await {
         Ok(reports) => {
             let mut result = Vec::new();
+            let dashboard = filters.dashboard;
+            let destination_less = filters.destination_less;
             for report in reports {
                 if permitted.is_none()
                     || permitted
@@ -170,7 +201,29 @@ pub async fn list(
                         .unwrap()
                         .contains(&format!("report:_all_{}", org_id))
                 {
-                    result.push(report);
+                    let mut should_include = true;
+                    if let Some(dashboard_id) = dashboard.as_ref() {
+                        // Check if report contains this dashboard
+                        if report
+                            .dashboards
+                            .iter()
+                            .any(|x| !x.dashboard.eq(dashboard_id))
+                        {
+                            should_include = false;
+                        }
+                    }
+                    if let Some(destination_less) = destination_less.as_ref() {
+                        // destination_less = true -> push only if the report is destination-less
+                        // destination_less = false -> push only if the report has destinations
+                        if (*destination_less && !report.destinations.is_empty())
+                            || (!*destination_less && report.destinations.is_empty())
+                        {
+                            should_include = false;
+                        }
+                    }
+                    if should_include {
+                        result.push(report);
+                    }
                 }
             }
             Ok(result)
@@ -240,14 +293,14 @@ impl Report {
         }
 
         let cfg = get_config();
-        if !cfg.common.report_server_url.is_empty() {
-            let mut recepients = vec![];
-            for recepient in &self.destinations {
-                match recepient {
-                    ReportDestination::Email(email) => recepients.push(email.clone()),
-                }
+        let mut recepients = vec![];
+        for recepient in &self.destinations {
+            match recepient {
+                ReportDestination::Email(email) => recepients.push(email.clone()),
             }
-
+        }
+        let no_of_recepients = recepients.len();
+        if !cfg.common.report_server_url.is_empty() {
             let report_data = HttpReportPayload {
                 dashboards: self.dashboards.clone(),
                 email_details: ReportEmailDetails {
@@ -260,7 +313,7 @@ impl Report {
             };
 
             let url = url::Url::parse(&format!(
-                "{}/{}/reports/{}/send",
+                "{}/api/{}/reports/{}/send",
                 &cfg.common.report_server_url, &self.org_id, &self.name
             ))
             .unwrap();
@@ -298,6 +351,7 @@ impl Report {
                 &cfg.common.report_user_name,
                 &cfg.common.report_user_password,
                 &self.timezone,
+                no_of_recepients,
             )
             .await?;
             self.send_email(&report.0, report.1).await
@@ -316,6 +370,10 @@ impl Report {
             match recepient {
                 ReportDestination::Email(email) => recepients.push(email),
             }
+        }
+
+        if recepients.is_empty() {
+            return Ok(());
         }
 
         let mut email = Message::builder()
@@ -364,6 +422,7 @@ async fn generate_report(
     user_id: &str,
     user_pass: &str,
     timezone: &str,
+    no_of_recepients: usize,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
@@ -429,6 +488,11 @@ async fn generate_report(
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
+    let search_type = if no_of_recepients == 0 {
+        "ui"
+    } else {
+        "reports"
+    };
 
     // dashboard link in the email should contain data of the same period as the report
     let (dashb_url, email_dashb_url) = match timerange.range_type {
@@ -436,7 +500,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -486,7 +550,7 @@ async fn generate_report(
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
@@ -520,6 +584,7 @@ async fn generate_report(
 
     if let Err(e) = page.find_element("main").await {
         browser.close().await?;
+        browser.wait().await?;
         handle.await?;
         return Err(anyhow::anyhow!(
             "[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}"
@@ -527,6 +592,7 @@ async fn generate_report(
     }
     if let Err(e) = page.find_element("div.displayDiv").await {
         browser.close().await?;
+        browser.wait().await?;
         handle.await?;
         return Err(anyhow::anyhow!(
             "[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: {e}"
@@ -535,14 +601,19 @@ async fn generate_report(
 
     // Last two elements loaded means atleast the metric components have loaded.
     // Convert the page into pdf
-    let pdf_data = page
-        .pdf(PrintToPdfParams {
+    let pdf_data = if no_of_recepients != 0 {
+        page.pdf(PrintToPdfParams {
             landscape: Some(true),
             ..Default::default()
         })
-        .await?;
+        .await?
+    } else {
+        // No need to capture pdf
+        vec![]
+    };
 
     browser.close().await?;
+    browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
     Ok((pdf_data, email_dashb_url))

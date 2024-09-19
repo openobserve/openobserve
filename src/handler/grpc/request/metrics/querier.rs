@@ -41,10 +41,10 @@ use crate::{
     service::{promql::search as SearchService, search::match_source},
 };
 
-pub struct Querier;
+pub struct MetricsQuerier;
 
 #[tonic::async_trait]
-impl Metrics for Querier {
+impl Metrics for MetricsQuerier {
     #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(org_id = req.get_ref().org_id))]
     async fn query(
         &self,
@@ -184,7 +184,7 @@ impl Metrics for Querier {
                     .to_string()
             })
             .collect::<Vec<_>>();
-        wal::lock_files(&files).await;
+        wal::lock_files(&files);
 
         for file in files.iter() {
             // check time range by filename
@@ -199,7 +199,7 @@ impl Metrics for Querier {
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(&[file.clone()]).await;
+                wal::release_files(&[file.clone()]);
                 continue;
             }
             // filter by partition keys
@@ -222,7 +222,7 @@ impl Metrics for Querier {
             )
             .await
             {
-                wal::release_files(&[file.clone()]).await;
+                wal::release_files(&[file.clone()]);
                 continue;
             }
             // check time range by parquet metadata
@@ -257,7 +257,7 @@ impl Metrics for Querier {
         }
 
         // release all files
-        wal::release_files(&files).await;
+        wal::release_files(&files);
 
         // append arrow files
         resp.files.extend(arrow_files);

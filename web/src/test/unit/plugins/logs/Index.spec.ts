@@ -21,6 +21,7 @@ import { Dialog, Notify } from "quasar";
 import Index from "@/plugins/logs/Index.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
+// @ts-ignore
 import { rest } from "msw";
 import "plotly.js";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
@@ -105,7 +106,7 @@ describe("Logs Index", async () => {
     global.server.use(
       rest.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        (req, res, ctx) => {
+        (req: any, res: any, ctx: any) => {
           return res(
             ctx.status(200),
             ctx.json({
@@ -145,7 +146,7 @@ describe("Logs Index", async () => {
     global.server.use(
       rest.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        (req, res, ctx) => {
+        (req: any, res: any, ctx: any) => {
           return res(
             ctx.status(400),
             ctx.json({
@@ -173,7 +174,7 @@ describe("Logs Index", async () => {
     global.server.use(
       rest.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        (req, res, ctx) => {
+        (req: any, res: any, ctx: any) => {
           return res(
             ctx.status(400),
             ctx.json({

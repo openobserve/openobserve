@@ -3,8 +3,21 @@
   "exclude": [],
   "compilerOptions": {
     "allowJs": true,
+    "target": "esnext",
+    "useDefineForClassFields": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "strict": true,
+    "jsx": "preserve",
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["esnext", "dom"],
+    "skipLibCheck": true,
     "composite": true,
-    "lib": [],
-    "types": ["node", "jsdom"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "downlevelIteration": true,
   }
 }

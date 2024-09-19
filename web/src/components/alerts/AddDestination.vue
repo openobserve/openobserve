@@ -58,7 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             v-bind:readonly="isUpdatingDestination"
             v-bind:disable="isUpdatingDestination"
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :rules="[
+              (val: any) =>
+                !!val
+                  ? isValidResourceName(val) ||
+                    `Characters like :, ?, /, #, and spaces are not allowed.`
+                  : t('common.nameRequired'),
+            ]"
             tabindex="0"
           />
         </div>
@@ -233,6 +239,8 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import type { Template, DestinationData, Headers } from "@/ts/interfaces";
 import { useRouter } from "vue-router";
+import { isValidResourceName } from "@/utils/zincutils";
+
 const props = defineProps<{
   templates: Template[] | [];
   destination: DestinationData | null;
@@ -289,14 +297,14 @@ const setupDestinationData = () => {
   }
 };
 const getFormattedTemplates = computed(() =>
-  props.templates.map((template: any) => template.name)
+  props.templates.map((template: any) => template.name),
 );
 const isValidDestination = computed(
   () =>
     formData.value.name &&
     formData.value.url &&
     formData.value.method &&
-    formData.value.template
+    formData.value.template,
 );
 const saveDestination = () => {
   if (!isValidDestination.value) {
@@ -383,7 +391,7 @@ const addApiHeader = (key: string = "", value: string = "") => {
 };
 const deleteApiHeader = (header: any) => {
   apiHeaders.value = apiHeaders.value.filter(
-    (_header) => _header.uuid !== header.uuid
+    (_header) => _header.uuid !== header.uuid,
   );
   if (formData.value.headers[header.key])
     delete formData.value.headers[header.key];

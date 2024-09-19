@@ -43,7 +43,7 @@ use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::{
-            alerts,
+            alerts::alert,
             functions::StreamTransform,
             prom::*,
             stream::{SchemaRecords, StreamParams},
@@ -95,7 +95,7 @@ pub async fn remote_write(
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
-    let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
@@ -298,7 +298,7 @@ pub async fn remote_write(
             let mut runtime = crate::service::ingestion::init_functions_runtime();
 
             // Start Register Transforms for stream
-            let (local_trans, stream_vrl_map) =
+            let (_, local_trans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_functions(
                     org_id,
                     &StreamType::Metrics,
@@ -405,7 +405,7 @@ pub async fn remote_write(
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     for alert in alerts {
-                        if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }
@@ -459,7 +459,9 @@ pub async fn remote_write(
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in stream_trigger_map {
-        evaluate_trigger(entry).await;
+        if let Some(entry) = entry {
+            evaluate_trigger(entry).await;
+        }
     }
 
     metrics::HTTP_RESPONSE_TIME
@@ -637,15 +639,14 @@ pub(crate) async fn get_series(
             size: 1000,
             start_time: start,
             end_time: end,
-            sql_mode: "full".to_string(),
             ..Default::default()
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -783,15 +784,14 @@ pub(crate) async fn get_label_values(
             size: 1000,
             start_time: start,
             end_time: end,
-            sql_mode: "full".to_string(),
             ..Default::default()
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

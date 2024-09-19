@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val) => !!val || t('organization.nameRequired')]"
+          :rules="[(val: any) => !!val || t('organization.nameRequired')]"
           data-test="org-name"
         />
 

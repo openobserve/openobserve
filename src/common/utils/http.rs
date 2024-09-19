@@ -16,12 +16,15 @@
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind},
+    net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_http::header::HeaderName;
-use actix_web::web::Query;
+use actix_web::{http::header::HeaderName, web::Query};
 use awc::http::header::HeaderMap;
-use config::meta::{search::SearchEventType, stream::StreamType};
+use config::{
+    get_config,
+    meta::{search::SearchEventType, stream::StreamType},
+};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -62,6 +65,7 @@ pub(crate) fn get_search_type_from_request(
             "alerts" => Some(SearchEventType::Alerts),
             "values" => Some(SearchEventType::Values),
             "rum" => Some(SearchEventType::RUM),
+            "derived_stream" => Some(SearchEventType::DerivedStream),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,
@@ -73,6 +77,41 @@ pub(crate) fn get_search_type_from_request(
     };
 
     Ok(event_type)
+}
+
+/// Index type for a search can be either `parquet` or `fst`. It's only effective when env
+/// `ZO_INVERTED_INDEX_STORE_FORMAT` is set as `both`.
+/// Otherwise 'index_type' is set by env `ZO_INVERTED_INDEX_SEARCH_FORMAT`, which is also
+/// the same as store format if store format is not `both`.
+///
+/// For performance testing phrase only. Will be deprecated after 1 month.
+#[inline(always)]
+pub(crate) fn get_index_type_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Result<String, Error> {
+    let cfg = get_config();
+    let index_type = query
+        .get("index_type")
+        .cloned()
+        .unwrap_or_default()
+        .to_lowercase();
+    if index_type.is_empty() || index_type == cfg.common.inverted_index_search_format {
+        Ok(cfg.common.inverted_index_search_format.to_string())
+    } else if cfg.common.inverted_index_store_format == "both" {
+        match index_type.as_str() {
+            "parquet" => Ok("parquet".to_string()),
+            "fst" => Ok("fst".to_string()),
+            _ => Err(Error::new(
+                ErrorKind::Other,
+                "'index_type' query param with value 'parquet' or 'fst' allowed",
+            )),
+        }
+    } else {
+        Err(Error::new(
+            ErrorKind::Other,
+            "'index_type' query param with value 'parquet' or 'fst' allowed",
+        ))
+    }
 }
 
 #[inline(always)]
@@ -130,6 +169,25 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
     }
 }
 
+/// This function can handle IPv4 and IPv6 addresses which may have port numbers appended
+pub fn parse_ip_addr(ip_address: &str) -> Result<(IpAddr, Option<u16>), AddrParseError> {
+    let mut port: Option<u16> = None;
+    let ip = ip_address.parse::<IpAddr>().or_else(|_| {
+        ip_address
+            .parse::<SocketAddr>()
+            .map(|sock_addr| {
+                port = Some(sock_addr.port());
+                sock_addr.ip()
+            })
+            .map_err(|e| {
+                log::error!("Error parsing IP address: {}, {}", &ip_address, e);
+                e
+            })
+    })?;
+
+    Ok((ip, port))
+}
+
 // Extractor for request headers
 pub struct RequestHeaderExtractor<'a> {
     headers: &'a HeaderMap,
@@ -180,5 +238,31 @@ mod tests {
         map.insert(key.clone(), "TRACES".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
         assert_eq!(resp.unwrap(), Some(StreamType::Traces));
+    }
+
+    /// Test logic for IP parsing
+    #[test]
+    fn test_ip_parsing() {
+        let valid_addressses = vec![
+            "127.0.0.1",
+            "127.0.0.1:8080",
+            "::1",
+            "192.168.0.1:8080",
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
+        ];
+
+        let parsed_addresses: Vec<IpAddr> = valid_addressses
+            .iter()
+            .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
+            .collect();
+
+        assert!(
+            parsed_addresses
+                .iter()
+                .zip(valid_addressses)
+                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+                .fold(true, |acc, x| { acc | x })
+        );
     }
 }

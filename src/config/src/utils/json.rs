@@ -82,6 +82,8 @@ pub fn get_string_value(value: &Value) -> String {
         value.as_f64().unwrap_or_default().to_string()
     } else if value.is_boolean() {
         value.as_bool().unwrap_or_default().to_string()
+    } else if value.is_null() {
+        "".to_string()
     } else {
         value.to_string()
     }

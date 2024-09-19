@@ -163,6 +163,8 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
+import { onUnmounted } from "vue";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -215,13 +217,26 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
+    dashboardId: {
+      default: "",
+      required: false,
+      type: String,
+    },
+    folderId: {
+      default: "",
+      required: false,
+      type: String,
+    },
   },
   emits: [
     "updated:data-zoom",
     "error",
     "metadata-update",
     "result-metadata-update",
+    "last-triggered-at-update",
+    "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
+    "updated:vrlFunctionFieldList",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -241,17 +256,29 @@ export default defineComponent({
       variablesData,
       forceLoad,
       searchType,
+      dashboardId,
+      folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } =
-      usePanelDataLoader(
-        panelSchema,
-        selectedTimeObj,
-        variablesData,
-        chartPanelRef,
-        forceLoad,
-        searchType
-      );
+    let {
+      data,
+      loading,
+      errorDetail,
+      metadata,
+      resultMetaData,
+      lastTriggeredAt,
+      isCachedDataDifferWithCurrentTimeRange,
+      searchRequestTraceIds,
+    } = usePanelDataLoader(
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      chartPanelRef,
+      forceLoad,
+      searchType,
+      dashboardId,
+      folderId,
+    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -266,7 +293,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {} }
+      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -279,12 +306,58 @@ export default defineComponent({
         };
       }
     });
-
+    //watch trace id and add in the searchRequestTraceIds
+    watch(searchRequestTraceIds, (updatedSearchRequestTraceIds) => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: updatedSearchRequestTraceIds,
+        };
+      }
+    });
     // ======= [END] dashboard PrintMode =======
 
+    // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
+    // As some panels were getting true cancel button and datetime picker were not getting updated
+    onUnmounted(() => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: [],
+        };
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: false,
+        };
+      }
+    });
     watch(
       [data, store?.state],
       async () => {
+        // emit vrl function field list
+        if (data.value?.length && data.value[0] && data.value[0].length) {
+          // Find the index of the record with max attributes
+          const maxAttributesIndex = data.value[0].reduce(
+            (
+              maxIndex: string | number,
+              obj: {},
+              currentIndex: any,
+              array: { [x: string]: {} },
+            ) => {
+              const numAttributes = Object.keys(obj).length;
+              const maxNumAttributes = Object.keys(array[maxIndex]).length;
+              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
+            },
+            0,
+          );
+
+          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
+
+          const responseFields = Object.keys(recordwithMaxAttribute);
+
+          emit("updated:vrlFunctionFieldList", responseFields);
+        }
+
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
           try {
@@ -296,7 +369,7 @@ export default defineComponent({
               chartPanelRef,
               hoveredSeriesState,
               resultMetaData,
-              metadata.value
+              metadata.value,
             );
 
             errorDetail.value = "";
@@ -312,33 +385,52 @@ export default defineComponent({
             panelSchema.value?.error_config?.default_data_on_error
           ) {
             data.value = JSON.parse(
-              panelSchema.value?.error_config?.default_data_on_error
+              panelSchema.value?.error_config?.default_data_on_error,
             );
             errorDetail.value = "";
           }
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // when we get the new metadata from the apis, emit the metadata update
-    watch(metadata, () => {
-      emit("metadata-update", metadata.value);
+    watch(
+      metadata,
+      () => {
+        emit("metadata-update", metadata.value);
+      },
+      { deep: true },
+    );
+
+    watch(
+      resultMetaData,
+      () => {
+        emit("result-metadata-update", resultMetaData.value);
+      },
+      { deep: true },
+    );
+
+    watch(lastTriggeredAt, () => {
+      emit("last-triggered-at-update", lastTriggeredAt.value);
     });
 
-    watch(resultMetaData, () => {
-      emit("result-metadata-update", resultMetaData.value);
+    watch(isCachedDataDifferWithCurrentTimeRange, () => {
+      emit(
+        "is-cached-data-differ-with-current-time-range-update",
+        isCachedDataDifferWithCurrentTimeRange.value,
+      );
     });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
       const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
       const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
 
       switch (panelType) {
@@ -366,7 +458,7 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every(
               (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0
+                data.value[0][0][y] != null || data.value[0][0][y] === 0,
             )
           );
         }
@@ -406,7 +498,7 @@ export default defineComponent({
       // Check if the queryType is 'promql'
       else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
-        return data.value.length &&
+        return data.value?.length &&
           data.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
@@ -560,6 +652,31 @@ export default defineComponent({
         // also, if value is an array, then last value will be taken
         const drilldownVariables: any = {};
 
+        // selected start time and end time
+        if (
+          selectedTimeObj?.value?.start_time &&
+          selectedTimeObj?.value?.start_time != "Invalid Date"
+        ) {
+          drilldownVariables.start_time = new Date(
+            selectedTimeObj?.value?.start_time?.toISOString(),
+          ).getTime();
+        }
+
+        if (
+          selectedTimeObj?.value?.end_time &&
+          selectedTimeObj?.value?.end_time != "Invalid Date"
+        ) {
+          drilldownVariables.end_time = new Date(
+            selectedTimeObj?.value?.end_time?.toISOString(),
+          ).getTime();
+        }
+
+        // param to pass current query
+        drilldownVariables.query = panelSchema.value.queries[0].query ?? "";
+        drilldownVariables.query_encoded = b64EncodeUnicode(
+          panelSchema.value.queries[0].query ?? "",
+        );
+
         // if chart type is 'table' then we need to pass the table name
         if (panelSchema.value.type == "table") {
           const fields: any = {};
@@ -621,7 +738,7 @@ export default defineComponent({
             // open url
             return window.open(
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
-              drilldownData.targetBlank ? "_blank" : "_self"
+              drilldownData.targetBlank ? "_blank" : "_self",
             );
           } catch (error) {}
         } else if (drilldownData.type == "byDashboard") {
@@ -637,7 +754,7 @@ export default defineComponent({
             await getFoldersList(store);
           }
           const folderId = store.state.organizationData.folders.find(
-            (folder: any) => folder.name == drilldownData.data.folder
+            (folder: any) => folder.name == drilldownData.data.folder,
           )?.folderId;
 
           if (!folderId) {
@@ -647,10 +764,10 @@ export default defineComponent({
           // get dashboard id
           const allDashboardData = await getAllDashboardsByFolderId(
             store,
-            folderId
+            folderId,
           );
           const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title == drilldownData.data.dashboard
+            (dashboard: any) => dashboard.title == drilldownData.data.dashboard,
           );
 
           if (!dashboardData) {
@@ -660,7 +777,7 @@ export default defineComponent({
           // get tab id
           const tabId =
             dashboardData.tabs.find(
-              (tab: any) => tab.name == drilldownData.data.tab
+              (tab: any) => tab.name == drilldownData.data.tab,
             )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
@@ -693,7 +810,7 @@ export default defineComponent({
                 url.searchParams.set(
                   "var-" +
                     replacePlaceholders(variable.name, drilldownVariables),
-                  replacePlaceholders(variable.value, drilldownVariables)
+                  replacePlaceholders(variable.value, drilldownVariables),
                 );
               }
             });
@@ -755,6 +872,7 @@ export default defineComponent({
       chartPanelRef,
       data,
       loading,
+      searchRequestTraceIds,
       errorDetail,
       panelData,
       noData,

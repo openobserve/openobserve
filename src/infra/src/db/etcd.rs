@@ -159,7 +159,7 @@ impl super::Db for Etcd {
     ) -> Result<()> {
         // acquire lock and update
         let lock_key = format!("/meta{key}/{}", start_dt.unwrap_or_default());
-        let locker = match dist_lock::lock(&lock_key, 0).await {
+        let locker = match dist_lock::lock(&lock_key, 0, None).await {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(

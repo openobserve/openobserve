@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
-            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.filterErrMsg !== '' &&
                     searchObj.loading == false
                   "
+                  class="q-mt-lg"
                 >
                   <h5 class="text-center">
                     <q-icon name="warning" color="warning" size="10rem" /><br />
@@ -110,18 +111,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
+                  class="q-ma-lg"
                 >
-                  <h5 class="text-center">
+                  <h5 class="text-center q-ma-none">
                     <div
                       data-test="logs-search-result-not-found-text"
-                      v-if="searchObj.data.errorCode == 0"
+                      v-if="
+                        searchObj.data.errorCode == 0 &&
+                        searchObj.data.errorMsg == ''
+                      "
                     >
                       Result not found.
                     </div>
-                    <SanitizedHtmlRenderer
-                      data-test="logs-search-error-message"
-                      :htmlContent="searchObj.data.errorMsg"
-                    />
+                    <div data-test="logs-search-error-message" v-else>
+                      Error occurred while retrieving search events.
+                      <q-btn
+                        v-if="searchObj.data.errorMsg != ''"
+                        @click="toggleErrorDetails"
+                        size="sm"
+                        data-test="logs-page-result-error-details-btn"
+                        >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                      >
+                    </div>
                     <div
                       data-test="logs-search-error-20003"
                       v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -140,7 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                       to configure a full text search field to the stream.
                     </div>
-                    <br />
                     <q-item-label>{{
                       searchObj.data.additionalErrorMsg
                     }}</q-item-label>
@@ -151,11 +161,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.stream.selectedStream.length == 0 &&
                     searchObj.loading == false
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center col-10 q-mx-auto"
+                    class="text-center col-10 q-mx-none"
                   >
                     <q-icon name="info" color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
@@ -170,14 +180,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.loading == false &&
                     searchObj.meta.searchApplied == true
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-error-message"
-                    class="text-center q-mx-auto col-10"
+                    class="text-center q-ma-none col-10"
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
+                    <q-btn
+                      v-if="searchObj.data.errorMsg != ''"
+                      @click="toggleErrorDetails"
+                      size="sm"
+                      data-test="logs-page-result-error-details-btn"
+                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                    ><br />
                   </h6>
                 </div>
                 <div
@@ -187,11 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.loading == false &&
                     searchObj.meta.searchApplied == false
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-error-message"
-                    class="text-center q-mx-auto col-10"
+                    class="text-center q-ma-none col-10"
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
@@ -211,14 +228,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @expandlog="toggleExpandLog"
                   />
                 </div>
+                <div class="text-center col-10 q-ma-none">
+                  <h5>
+                    <span v-if="disableMoreErrorDetails">
+                      <SanitizedHtmlRenderer
+                        data-test="logs-search-detail-error-message"
+                        :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                    </span>
+                  </h5>
+                </div>
               </template>
             </q-splitter>
           </div>
-          <div else :style="`height: calc(100vh - ${splitterModel}vh - 40px);`">
+          <div
+            v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
+            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+          >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
-              @update:stream-list="streamListUpdated"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -256,27 +284,22 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import {
-  buildSqlQuery,
-  getFieldsFromQuery,
-  getValidConditionObj,
-} from "@/utils/query/sqlUtils";
+import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
+import SearchBar from "@/plugins/logs/SearchBar.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
-    SearchBar: defineAsyncComponent(
-      () => import("@/plugins/logs/SearchBar.vue")
-    ),
+    SearchBar,
     IndexList: defineAsyncComponent(
-      () => import("@/plugins/logs/IndexList.vue")
+      () => import("@/plugins/logs/IndexList.vue"),
     ),
     SearchResult: defineAsyncComponent(
-      () => import("@/plugins/logs/SearchResult.vue")
+      () => import("@/plugins/logs/SearchResult.vue"),
     ),
     ConfirmDialog: defineAsyncComponent(
-      () => import("@/components/ConfirmDialog.vue")
+      () => import("@/components/ConfirmDialog.vue"),
     ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
@@ -316,6 +339,11 @@ export default defineComponent({
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
         this.searchObj.loading = true;
+
+        // As page count request was getting fired on chaning date records per page instead of histogram,
+        // so added this condition to avoid that
+        this.searchObj.meta.refreshHistogram = true;
+
         await this.getQueryData(false);
         this.refreshHistogramChart();
 
@@ -388,12 +416,16 @@ export default defineComponent({
         }
       }
     },
+    toggleErrorDetails() {
+      this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
+    },
   },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+    const disableMoreErrorDetails: boolean = ref(false);
     let {
       searchObj,
       getQueryData,
@@ -416,11 +448,9 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     let parser: any;
-    const expandedLogs = ref({});
-    const splitterModel = ref(10);
 
-    // flag to know if it is the first time visualize
-    let firstTimeVisualizeFlag = false;
+    const expandedLogs = ref([]);
+    const splitterModel = ref(10);
 
     const { showErrorNotification } = useNotifications();
 
@@ -477,10 +507,23 @@ export default defineComponent({
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
+        searchObj.meta.refreshHistogram = true;
 
         const isStreamChanged =
           queryParams.stream_type !== searchObj.data.stream.streamType ||
           queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
+
+        if (queryParams.type === "trace_explorer") {
+          searchObj.organizationIdetifier = queryParams.org_identifier;
+          searchObj.data.stream.selectedStream.value = queryParams.stream;
+          searchObj.data.stream.streamType = queryParams.stream_type;
+          resetSearchObj();
+          resetStreamData();
+          restoreUrlQueryParams();
+          loadLogsData();
+
+          return;
+        }
 
         if (
           isStreamChanged &&
@@ -490,14 +533,16 @@ export default defineComponent({
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
-          // loadLogsData();
+          loadLogsData();
           return;
         }
 
         if (
           searchObj.organizationIdetifier !=
-          store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier &&
+          searchObj.loading == false
         ) {
+          searchObj.loading = true;
           loadLogsData();
         } else if (!searchObj.loading) updateStreams();
 
@@ -511,8 +556,9 @@ export default defineComponent({
     onBeforeMount(async () => {
       await importSqlParser();
       if (searchObj.meta.logsVisualizeToggle == "logs") {
-        searchObj.loading = true;
+        // searchObj.loading = true;
         searchObj.meta.pageType = "logs";
+        searchObj.meta.refreshHistogram = true;
         if (
           config.isEnterprise == "true" &&
           store.state.zoConfig.super_cluster_enabled
@@ -520,12 +566,16 @@ export default defineComponent({
           await getRegionInfo();
         }
 
-        resetSearchObj();
-        resetStreamData();
         searchObj.organizationIdetifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
-        loadLogsData();
+        if (searchObj.loading == false) {
+          resetSearchObj();
+          resetStreamData();
+          restoreUrlQueryParams();
+          searchObj.loading = true;
+          loadLogsData();
+        }
         if (config.isCloud == "true") {
           MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
         }
@@ -550,7 +600,7 @@ export default defineComponent({
           searchObj.meta.pageType = "logs";
           loadLogsData();
         }
-      }
+      },
     );
 
     const importSqlParser = async () => {
@@ -562,7 +612,6 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
-      // expandedLogs.value = {};
       try {
         await getQueryData();
         refreshHistogramChart();
@@ -641,14 +690,14 @@ export default defineComponent({
               const streamData: any = getStream(
                 searchObj.data.stream.selectedStream[0],
                 searchObj.data.stream.streamType || "logs",
-                true
+                true,
               );
               searchObj.data.stream.selectedStreamFields = streamData.schema;
             }
 
             const streamFieldNames: any =
               searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name
+                (item: any) => item.name,
               );
 
             for (
@@ -668,22 +717,23 @@ export default defineComponent({
             ) {
               searchObj.data.query = searchObj.data.query.replace(
                 "[FIELD_LIST]",
-                searchObj.data.stream.interestingFieldList.join(",")
+                searchObj.data.stream.interestingFieldList.join(","),
               );
             } else {
               searchObj.data.query = searchObj.data.query.replace(
                 "[FIELD_LIST]",
-                "*"
+                "*",
               );
             }
           }
 
-          searchObj.data.query = addOrderByToQuery(
-            searchObj.data.query,
-            store.state.zoConfig.timestamp_column,
-            "DESC",
-            searchObj.data.stream.selectedStream.join(",")
-          );
+          // Removed order by as it creating problem while clicking on the URL generated from the Alert. It's appending order by and that is causing issue if _timestamp column not added in select clause
+          // searchObj.data.query = addOrderByToQuery(
+          //   searchObj.data.query,
+          //   store.state.zoConfig.timestamp_column,
+          //   "DESC",
+          //   searchObj.data.stream.selectedStream.join(","),
+          // );
 
           searchObj.data.editorValue = searchObj.data.query;
 
@@ -708,10 +758,10 @@ export default defineComponent({
       return !!searchObj.data.stream.streamLists.length;
     });
 
-    const toggleExpandLog = async (index: number) => {
-      if (expandedLogs.value[index.toString()])
-        delete expandedLogs.value[index.toString()];
-      else expandedLogs.value[index.toString()] = true;
+    const toggleExpandLog = (index: number) => {
+      if (expandedLogs.value.includes(index))
+        expandedLogs.value = expandedLogs.value.filter((item) => item != index);
+      else expandedLogs.value.push(index);
     };
 
     const onSplitterUpdate = () => {
@@ -731,7 +781,7 @@ export default defineComponent({
     };
 
     function removeFieldByName(data, fieldName) {
-      return data.filter((item) => {
+      return data.filter((item: any) => {
         if (item.expr) {
           if (item.expr.column === fieldName) {
             return false;
@@ -749,7 +799,7 @@ export default defineComponent({
 
     const setInterestingFieldInSQLQuery = (
       field: any,
-      isFieldExistInSQL: boolean
+      isFieldExistInSQL: boolean,
     ) => {
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
@@ -761,7 +811,7 @@ export default defineComponent({
             let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
-              field.name
+              field.name,
             );
             if (index > -1) {
               searchObj.data.stream.interestingFieldList.splice(index, 1);
@@ -798,7 +848,7 @@ export default defineComponent({
           .replace(/`/g, "")
           .replace(
             searchObj.data.stream.selectedStream[0],
-            `"${searchObj.data.stream.selectedStream[0]}"`
+            `"${searchObj.data.stream.selectedStream[0]}"`,
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
@@ -820,7 +870,7 @@ export default defineComponent({
             /SELECT\s+(.*?)\s+FROM/i,
             (match, fields) => {
               return `SELECT ${field_list} FROM`;
-            }
+            },
           );
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
@@ -849,12 +899,34 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
         return false;
       }
       return true;
     };
+
+    watch(
+      () => [
+        searchObj.data.tempFunctionContent,
+        searchObj.meta.logsVisualizeToggle,
+      ],
+      () => {
+        if (
+          searchObj.meta.logsVisualizeToggle == "visualize" &&
+          searchObj.meta.toggleFunction &&
+          searchObj.data.tempFunctionContent
+        ) {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+        } else {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery = "";
+        }
+      },
+    );
 
     const setFieldsAndConditions = async () => {
       let logsQuery = searchObj.data.query ?? "";
@@ -866,20 +938,17 @@ export default defineComponent({
           searchObj.meta.quickMode
             ? searchObj.data.stream.interestingFieldList
             : [],
-          logsQuery
+          logsQuery,
         );
       }
 
-      const { fields, conditions, streamName } = await getFieldsFromQuery(
+      const { fields, filters, streamName } = await getFieldsFromQuery(
         logsQuery ?? "",
-        store.state.zoConfig.timestamp_column ?? "_timestamp"
+        store.state.zoConfig.timestamp_column ?? "_timestamp",
       );
 
       // set stream type and stream name
       if (streamName && streamName != "undefined") {
-        // set firstTimeVisualizeFlag as true
-        firstTimeVisualizeFlag = true;
-
         dashboardPanelData.data.queries[0].fields.stream_type =
           searchObj.data.stream.streamType ?? "logs";
         dashboardPanelData.data.queries[0].fields.stream = streamName;
@@ -904,7 +973,7 @@ export default defineComponent({
       // if x axis fields length is 2, then add 2nd x axis field to breakdown fields
       if (dashboardPanelData.data.queries[0].fields.x.length == 2) {
         dashboardPanelData.data.queries[0].fields.breakdown.push(
-          dashboardPanelData.data.queries[0].fields.x[1]
+          dashboardPanelData.data.queries[0].fields.x[1],
         );
         // remove 2nd x axis field from x axis fields
         dashboardPanelData.data.queries[0].fields.x.splice(1, 1);
@@ -914,15 +983,8 @@ export default defineComponent({
         dashboardPanelData.data.type = "table";
       }
 
-      // set conditions
-      conditions.forEach((condition) => {
-        condition.operator = condition.operator.toLowerCase();
-
-        // get valid condition object
-        condition = getValidConditionObj(condition);
-
-        dashboardPanelData.data.queries[0].fields.filter.push(condition);
-      });
+      // set filters
+      dashboardPanelData.data.queries[0].fields.filter = filters;
     };
 
     // watch for changes in the visualize toggle
@@ -930,25 +992,21 @@ export default defineComponent({
     watch(
       () => [searchObj.meta.logsVisualizeToggle],
       async () => {
+        // emit resize event
+        // this will rerender/call resize method of already rendered chart to resize
+        window.dispatchEvent(new Event("resize"));
+
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          // hide VRL function editor
-          searchObj.config.fnSplitterModel = 99.5;
-
           // set fields and conditions
           await setFieldsAndConditions();
-        } else {
-          // else check if VRL function toggle is true or false
-          // based on that set the splitter model
-          if (searchObj.meta.toggleFunction == false) {
-            searchObj.config.fnSplitterModel = 99.5;
-          } else {
-            searchObj.config.fnSplitterModel = 60;
-          }
+
+          // run query
+          handleRunQueryFn();
         }
-      }
+      },
     );
 
     watch(
@@ -956,9 +1014,9 @@ export default defineComponent({
       async () => {
         // await nextTick();
         visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data)
+          JSON.stringify(dashboardPanelData.data),
         );
-      }
+      },
     );
 
     watch(
@@ -966,7 +1024,7 @@ export default defineComponent({
       () => {
         // rerender chart
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     watch(
@@ -979,7 +1037,7 @@ export default defineComponent({
         const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod
+                searchObj.data.datetime.relativeTimePeriod,
               )
             : cloneDeep(searchObj.data.datetime);
 
@@ -988,7 +1046,7 @@ export default defineComponent({
           end_time: new Date(dateTime.endTime),
         };
       },
-      { deep: true }
+      { deep: true },
     );
 
     const handleRunQueryFn = () => {
@@ -1003,7 +1061,7 @@ export default defineComponent({
           searchBarRef.value.dateTimeRef.refresh();
 
         visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data)
+          JSON.stringify(dashboardPanelData.data),
         );
       }
     };
@@ -1014,16 +1072,22 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
-    const streamListUpdated = () => {
-      if (
-        searchObj.meta.logsVisualizeToggle == "visualize" &&
-        firstTimeVisualizeFlag
-      ) {
-        firstTimeVisualizeFlag = false;
-        // run query
-        handleRunQueryFn();
-      }
-    };
+    // [START] cancel running queries
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    // [END] cancel running queries
 
     return {
       t,
@@ -1062,7 +1126,7 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
-      streamListUpdated,
+      disableMoreErrorDetails,
     };
   },
   computed: {
@@ -1140,13 +1204,22 @@ export default defineComponent({
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
           // this.handleRunQuery();
-          this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
-            (res: any) => {
+          this.searchObj.loadingHistogram = true;
+
+          this.getHistogramQueryData(this.searchObj.data.histogramQuery)
+            .then((res: any) => {
+              this.refreshTimezone();
               this.searchResultRef.reDrawChart();
-            }
-          );
+            })
+            .catch((err: any) => {
+              console.log(err, "err in updating chart");
+            })
+            .finally(() => {
+              this.searchObj.loadingHistogram = false;
+            });
         }
       }
+
       this.updateUrlQueryParams();
     },
     moveSplitter() {
@@ -1286,7 +1359,7 @@ $navbarHeight: 64px;
 
   .thirdlevel {
     .field-list-collapse-btn {
-      z-index: 9;
+      z-index: 11;
       position: absolute;
       top: 5px;
       font-size: 12px !important;

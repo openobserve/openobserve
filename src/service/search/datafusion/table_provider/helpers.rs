@@ -45,9 +45,9 @@ use datafusion::{
         listing::{ListingTableUrl, PartitionedFile},
         physical_plan::parquet::ParquetAccessPlan,
     },
+    logical_expr::{Expr, Volatility},
     parquet::arrow::arrow_reader::{RowSelection, RowSelector},
 };
-use datafusion_expr::{Expr, Volatility};
 use futures::{stream::BoxStream, TryStreamExt};
 use object_store::ObjectStore;
 

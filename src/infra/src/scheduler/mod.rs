@@ -81,6 +81,7 @@ pub enum TriggerModule {
     Report,
     #[default]
     Alert,
+    DerivedStream,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -88,6 +89,7 @@ impl std::fmt::Display for TriggerModule {
         match self {
             TriggerModule::Alert => write!(f, "alert"),
             TriggerModule::Report => write!(f, "report"),
+            TriggerModule::DerivedStream => write!(f, "derived_stream"),
         }
     }
 }
@@ -114,6 +116,7 @@ pub struct Trigger {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
     pub retries: i32,
+    pub data: String,
 }
 
 /// Initializes the scheduler - creates table and index

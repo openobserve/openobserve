@@ -93,13 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="rows"
           :columns="columns"
           :dense="true"
+          :virtual-scroll="false"
           style="height: fit-content"
           :filter="{
             value: userSearchKey,
             method: filterUsers,
           }"
         >
-          <template v-slot:select="slotProps">
+          <template v-slot:select="slotProps: any">
             <q-checkbox
               :data-test="`iam-users-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
               size="xs"
@@ -217,7 +218,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const updateUserTable = async (value: string) => {
@@ -239,7 +240,7 @@ const getchOrgUsers = async () => {
   hasFetchedOrgUsers.value = true;
   return new Promise(async (resolve) => {
     const data: any = await usersState.getOrgUsers(
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
     );
 
     usersState.users = cloneDeep(
@@ -249,7 +250,7 @@ const getchOrgUsers = async () => {
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
         };
-      })
+      }),
     );
 
     users.value = cloneDeep(usersState.users).map(
@@ -259,7 +260,7 @@ const getchOrgUsers = async () => {
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
         };
-      }
+      },
     );
     resolve(true);
   });

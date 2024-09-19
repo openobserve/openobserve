@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{http, http::StatusCode, HttpResponse};
 use config::{
     is_local_disk_storage,
-    meta::stream::{StreamSettings, StreamStats, StreamType},
+    meta::stream::{StreamSettings, StreamStats, StreamType, UpdateStreamSettings},
     utils::json,
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -26,8 +26,8 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     schema::{
-        unwrap_partition_time_level, unwrap_stream_settings, STREAM_SCHEMAS,
-        STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
+        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
 
@@ -77,6 +77,10 @@ pub async fn get_streams(
         .unwrap_or_default();
 
     let filtered_indices = if let Some(s_type) = stream_type {
+        let s_type = match s_type {
+            StreamType::EnrichmentTables => "enrichment_table".to_string(),
+            _ => s_type.to_string(),
+        };
         match permitted_streams {
             Some(permitted_streams) => {
                 if permitted_streams.contains(&format!("{}:_all_{}", s_type, org_id)) {
@@ -280,6 +284,108 @@ pub async fn save_stream_settings(
     )))
 }
 
+#[tracing::instrument(skip(update_settings))]
+pub async fn update_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    update_settings: UpdateStreamSettings,
+) -> Result<HttpResponse, Error> {
+    match infra::schema::get_settings(org_id, stream_name, stream_type).await {
+        Some(mut settings) => {
+            if let Some(max_query_range) = update_settings.max_query_range {
+                settings.max_query_range = max_query_range;
+            }
+            if let Some(store_original_data) = update_settings.store_original_data {
+                settings.store_original_data = store_original_data;
+            }
+            if let Some(flatten_level) = update_settings.flatten_level {
+                settings.flatten_level = Some(flatten_level);
+            }
+
+            if let Some(data_retention) = update_settings.data_retention {
+                settings.data_retention = data_retention;
+            }
+
+            if !update_settings.defined_schema_fields.add.is_empty() {
+                settings.defined_schema_fields =
+                    if let Some(mut schema_fields) = settings.defined_schema_fields {
+                        schema_fields.extend(update_settings.defined_schema_fields.add);
+                        Some(schema_fields)
+                    } else {
+                        Some(update_settings.defined_schema_fields.add)
+                    }
+            }
+
+            if !update_settings.defined_schema_fields.remove.is_empty() {
+                if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
+                    schema_fields.retain(|field| {
+                        !update_settings.defined_schema_fields.remove.contains(field)
+                    });
+                }
+            }
+
+            if !update_settings.bloom_filter_fields.add.is_empty() {
+                settings
+                    .bloom_filter_fields
+                    .extend(update_settings.bloom_filter_fields.add);
+            }
+
+            if !update_settings.bloom_filter_fields.remove.is_empty() {
+                settings
+                    .bloom_filter_fields
+                    .retain(|field| !update_settings.bloom_filter_fields.remove.contains(field));
+            }
+
+            if !update_settings.index_fields.add.is_empty() {
+                settings
+                    .index_fields
+                    .extend(update_settings.index_fields.add);
+            }
+
+            if !update_settings.index_fields.remove.is_empty() {
+                settings
+                    .index_fields
+                    .retain(|field| !update_settings.index_fields.remove.contains(field));
+            }
+
+            if !update_settings.full_text_search_keys.add.is_empty() {
+                settings
+                    .full_text_search_keys
+                    .extend(update_settings.full_text_search_keys.add);
+            }
+
+            if !update_settings.full_text_search_keys.remove.is_empty() {
+                settings
+                    .full_text_search_keys
+                    .retain(|field| !update_settings.full_text_search_keys.remove.contains(field));
+            }
+
+            if !update_settings.partition_keys.add.is_empty() {
+                settings
+                    .partition_keys
+                    .extend(update_settings.partition_keys.add);
+            }
+
+            if !update_settings.partition_keys.remove.is_empty() {
+                settings
+                    .partition_keys
+                    .retain(|field| !update_settings.partition_keys.remove.contains(field));
+            }
+
+            // TODO: What to do if partition time level is intentionally None?
+            if let Some(partition_time_level) = update_settings.partition_time_level {
+                settings.partition_time_level = Some(partition_time_level);
+            }
+            save_stream_settings(org_id, stream_name, stream_type, settings).await
+        }
+        None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "stream settings could not be found".to_string(),
+        ))),
+    }
+}
+
 #[tracing::instrument]
 pub async fn delete_stream(
     org_id: &str,
@@ -334,6 +440,11 @@ pub async fn delete_stream(
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
+
+    // delete stream record id generator cache
+    {
+        STREAM_RECORD_ID_GENERATOR.remove(&key);
+    }
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);

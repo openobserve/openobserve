@@ -61,9 +61,6 @@ use crate::{
             "end_time": 1675185660872049i64,
             "from": 0,
             "size": 10
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '30 second') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
     })),
     responses(
@@ -87,18 +84,6 @@ use crate::{
                     "stream": "stderr"
                 }
             ],
-            "aggs": {
-                "agg1": [
-                    {
-                        "key": "2023-01-15 14:00:00",
-                        "num": 345940
-                    },
-                    {
-                        "key": "2023-01-15 19:00:00",
-                        "num": 384026
-                    }
-                ]
-            },
             "total": 27179431,
             "from": 0,
             "size": 1,
@@ -188,6 +173,8 @@ pub async fn search_multi(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
+            use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
             use crate::common::{
                 infra::config::USERS,
                 utils::auth::{is_root_user, AuthExtractor},
@@ -196,6 +183,7 @@ pub async fn search_multi(
             if !is_root_user(user_id) {
                 let user: meta::user::User =
                     USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
+                let stream_type_str = stream_type.to_string();
 
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
@@ -203,7 +191,13 @@ pub async fn search_multi(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("{}:{}", stream_type, resp.stream_name),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(stream_type_str.as_str())
+                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                resp.stream_name
+                            ),
                             org_id: org_id.clone(),
                             bypass_check: false,
                             parent_id: "".to_string(),
@@ -326,9 +320,8 @@ pub async fn search_multi(
                 multi_res.file_count += res.file_count;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
-                multi_res.columns.append(&mut res.columns);
-                multi_res.hits.append(&mut res.hits);
-                multi_res.aggs.extend(res.aggs.into_iter());
+                multi_res.columns.extend(res.columns);
+                multi_res.hits.extend(res.hits);
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
@@ -370,10 +363,14 @@ pub async fn search_multi(
         }
     }
 
+    let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
-        let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
-        let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
+        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
+            return std::cmp::Ordering::Equal;
+        }
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_res))
@@ -691,21 +688,19 @@ pub async fn around_multi(
                 start_time: around_start_time,
                 end_time: around_key,
                 sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
-                sql_mode: "".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            index_type: "".to_string(),
         };
         let search_res =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
@@ -766,21 +761,19 @@ pub async fn around_multi(
                 start_time: around_key,
                 end_time: around_end_time,
                 sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
-                sql_mode: "".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            index_type: "".to_string(),
         };
         let search_res =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)

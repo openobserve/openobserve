@@ -221,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       props.row.type == 'Utf8'
                         ? 'text_fields'
                         : props.row.type == 'Int64'
-                        ? 'tag'
-                        : 'toggle_off'
+                          ? 'tag'
+                          : 'toggle_off'
                     "
                     color="grey-6"
                     class="q-mr-xs"
@@ -303,6 +303,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
+                    :disable="
+                      !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                        (vrlField: any) => vrlField.name == props.row.name,
+                      )
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-data"
@@ -366,6 +371,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
+                    :disable="
+                      !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                        (vrlField: any) => vrlField.name == props.row.name,
+                      )
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-geomap-data"
@@ -428,6 +438,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
+                    "
+                    :disable="
+                      !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                        (vrlField: any) => vrlField.name == props.row.name,
+                      )
                     "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
@@ -605,11 +620,10 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "FieldList",
   props: ["editMode"],
-  emits: ["update:streamList"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
 
     const userDefinedSchemaBtnGroupOption = [
@@ -627,7 +641,7 @@ export default defineComponent({
 
     const pagination = ref({
       page: 1,
-      rowsPerPage: 10000,
+      rowsPerPage: 250,
     });
 
     // custom query fields length
@@ -638,8 +652,8 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const data = reactive<any>({
-      schemaList: [],
-      indexOptions: [],
+      // schemaList: [],
+      // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
       currentFieldsList: [],
     });
@@ -663,6 +677,7 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
@@ -678,12 +693,12 @@ export default defineComponent({
     };
 
     const selectedMetricTypeIcon = computed(() => {
-      return data.schemaList.find(
+      return dashboardPanelData.meta.stream.streamResults.find(
         (it: any) =>
           it.name ==
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream
+          ].fields.stream,
       )?.metrics_meta?.metric_type;
     });
 
@@ -697,7 +712,7 @@ export default defineComponent({
       streamDataLoading.execute(
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type
+        ].fields.stream_type,
       );
     };
 
@@ -709,7 +724,7 @@ export default defineComponent({
         ].fields.stream_type,
       async () => {
         loadStreamsListBasedOnType();
-      }
+      },
     );
 
     onMounted(() => {
@@ -719,13 +734,13 @@ export default defineComponent({
     const getStreamFields = useLoading(
       async (fieldName: string, streamType: string) => {
         return await getStream(fieldName, streamType, true);
-      }
+      },
     );
 
     // update the selected stream fields list
     watch(
       () => [
-        data.schemaList,
+        dashboardPanelData.meta.stream.streamResults,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
@@ -735,7 +750,7 @@ export default defineComponent({
       ],
       async () => {
         // get the selected stream fields based on the selected stream type
-        const fields: any = data.schemaList.find(
+        const fields: any = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
             it.name ==
               dashboardPanelData.data.queries[
@@ -744,7 +759,7 @@ export default defineComponent({
             it.stream_type ==
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type
+              ].fields.stream_type,
         );
 
         // if fields found
@@ -753,11 +768,11 @@ export default defineComponent({
             await extractFields();
           } catch (error: any) {
             showErrorNotification(
-              error?.message ?? "Failed to get stream fields"
+              error?.message ?? "Failed to get stream fields",
             );
           }
         }
-      }
+      },
     );
 
     watch(
@@ -765,7 +780,7 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
-        data.schemaList,
+        dashboardPanelData.meta.stream.streamResults,
       ],
       () => {
         // if (!props.editMode) {
@@ -774,13 +789,13 @@ export default defineComponent({
         //   ].fields.stream = "";
         // }
 
-        data.indexOptions = data.schemaList.filter(
-          (data: any) =>
-            data.stream_type ==
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type
-        );
+        // data.indexOptions = data.schemaList.filter(
+        //   (data: any) =>
+        //     data.stream_type ==
+        //     dashboardPanelData.data.queries[
+        //       dashboardPanelData.layout.currentQueryIndex
+        //     ].fields.stream_type
+        // );
 
         // set the first stream as the selected stream when the api loads the data
         if (
@@ -788,18 +803,18 @@ export default defineComponent({
           // !dashboardPanelData.data.queries[
           //   dashboardPanelData.layout.currentQueryIndex
           // ].fields.stream &&
-          data.indexOptions.length > 0
+          dashboardPanelData.meta.stream.streamResults.length > 0
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
           if (
-            data.indexOptions.find(
+            dashboardPanelData.meta.stream.streamResults.find(
               (it: any) =>
                 it.name ==
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream
+                ].fields.stream,
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
@@ -808,10 +823,10 @@ export default defineComponent({
               ].fields.stream;
           } else {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
-              data.indexOptions[0]?.name;
+              dashboardPanelData.meta.stream.streamResults[0]?.name;
           }
         }
-      }
+      },
     );
     // update the current list fields if any of the lists changes
     watch(
@@ -821,6 +836,7 @@ export default defineComponent({
         dashboardPanelData.meta.stream.customQueryFields,
         dashboardPanelData.meta.stream.userDefinedSchema,
         dashboardPanelData.meta.stream.useUserDefinedSchemas,
+        dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ],
       () => {
         data.currentFieldsList = [];
@@ -835,19 +851,22 @@ export default defineComponent({
         ) {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ...dashboardPanelData.meta.stream.userDefinedSchema,
           ];
         } else {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ...dashboardPanelData.meta.stream.selectedStreamFields,
           ];
         }
 
         // set the custom query fields length
         customQueryFieldsLength.value =
-          dashboardPanelData.meta.stream.customQueryFields.length;
-      }
+          dashboardPanelData.meta.stream.customQueryFields.length +
+          dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
+      },
     );
 
     watch(
@@ -856,14 +875,12 @@ export default defineComponent({
         // set the custom query fields length
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length;
-      }
+      },
     );
 
     // get the stream list by making an API call
     const getStreamList = async (stream_type: any) => {
       await getStreams(stream_type, false).then((res: any) => {
-        data.schemaList = [];
-        data.schemaList = res.list;
         // below line required for pass by reference
         // if we don't set blank, then same object from cache is being set
         // and that doesn't call the watchers,
@@ -900,16 +917,16 @@ export default defineComponent({
 
         for (
           let i = 0;
-          i < dashboardPanelData.meta.stream.selectedStreamFields.length;
+          i < selectedStreamFieldsBasedOnUserDefinedSchema.value.length;
           i++
         ) {
           if (
-            dashboardPanelData.meta.stream.selectedStreamFields[i]["name"]
+            selectedStreamFieldsBasedOnUserDefinedSchema.value[i]["name"]
               .toLowerCase()
               .includes(terms)
           ) {
             filtered.push(
-              dashboardPanelData.meta.stream.selectedStreamFields[i]
+              selectedStreamFieldsBasedOnUserDefinedSchema.value[i],
             );
           }
         }
@@ -917,7 +934,7 @@ export default defineComponent({
       return filtered;
     };
 
-    const mutationHandler = (mutationRecords: any) => {};
+    const mutationHandler: any = (mutationRecords: any) => {};
 
     const onDragEnter = (e: any) => {
       e.preventDefault();
@@ -948,9 +965,10 @@ export default defineComponent({
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        filteredStreams.value = data.indexOptions.filter((stream: any) => {
-          return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        });
+        filteredStreams.value =
+          dashboardPanelData.meta.stream.streamResults.filter((stream: any) => {
+            return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+          });
       });
     };
 
@@ -962,7 +980,7 @@ export default defineComponent({
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.stream_type ?? "logs",
-            true
+            true,
           ).then((res) => {
             return res;
           });
@@ -980,8 +998,8 @@ export default defineComponent({
         const schemaFields: any = [];
         let userDefineSchemaSettings: any = [];
 
-        if (data.schemaList.length > 0) {
-          for (const stream of data.schemaList) {
+        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
+          for (const stream of dashboardPanelData.meta.stream.streamResults) {
             if (
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -997,15 +1015,6 @@ export default defineComponent({
                 }
                 stream.settings = streamData.settings;
                 stream.schema = streamSchema;
-              }
-
-              if (
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
-                stream.settings.defined_schema_fields.length > 0
-              ) {
-                dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
-              } else {
-                dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
               }
 
               // create a schema field mapping based on field name to avoind iteration over object.
@@ -1030,12 +1039,34 @@ export default defineComponent({
 
               dashboardPanelData.meta.stream.selectedStreamFields =
                 schemaFields ?? [];
-              dashboardPanelData.meta.stream.userDefinedSchema =
-                userDefineSchemaSettings ?? [];
+
+              if (
+                stream.settings.hasOwnProperty("defined_schema_fields") &&
+                stream.settings.defined_schema_fields.length > 0
+              ) {
+                dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
+                // set user defined schema
+                // 1) Timestamp field
+                // 2) selected user defined schema fields
+                // 3) all_fields_name fields
+                dashboardPanelData.meta.stream.userDefinedSchema = [
+                  {
+                    name: store.state.zoConfig?.timestamp_column,
+                    type: "Int64",
+                  },
+                  ...(userDefineSchemaSettings ?? []),
+                  {
+                    name: store.state.zoConfig?.all_fields_name,
+                    type: "Utf8",
+                  },
+                ];
+              } else {
+                dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
+                dashboardPanelData.meta.stream.userDefinedSchema = [];
+              }
             }
           }
         }
-        emit("update:streamList");
       } catch (e: any) {
         console.log("Error while extracting fields");
       }
@@ -1089,7 +1120,7 @@ export default defineComponent({
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /
-            pagination.value.rowsPerPage
+            pagination.value.rowsPerPage,
         );
       }),
     };
