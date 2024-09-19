@@ -61,6 +61,7 @@ pub struct TriggerData {
     pub end_time: i64,
     pub retries: i32,
     pub error: Option<String>,
+    pub success_response: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
