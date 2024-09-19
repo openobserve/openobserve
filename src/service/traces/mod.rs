@@ -620,7 +620,7 @@ async fn write_traces(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
+                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val), None).await {
                         triggers.push((alert.clone(), v));
                         evaluated_alerts.insert(key);
                     }

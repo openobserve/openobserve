@@ -28,6 +28,8 @@ pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
+const ID_BATCH_SIZE: usize = 2000;
+
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
@@ -71,6 +73,15 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_ids(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_level: PartitionTimeLevel,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileId>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -236,6 +247,35 @@ pub async fn query(
             time_range,
             flattened,
         )
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    CLIENT.query_by_ids(ids).await
+}
+
+#[inline]
+#[tracing::instrument(
+    name = "infra:file_list:query_db_ids",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_ids(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<FileId>> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    CLIENT
+        .query_ids(org_id, stream_type, stream_name, time_level, time_range)
         .await
 }
 
@@ -446,4 +486,10 @@ pub enum FileListJobStatus {
     Pending,
     Running,
     Done,
+}
+
+#[derive(Clone, Debug, Default, sqlx::FromRow)]
+pub struct FileId {
+    pub id: i64,
+    pub original_size: i64,
 }

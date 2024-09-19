@@ -33,7 +33,6 @@ use openobserve::{
             flight::FlightServiceImpl,
             request::{
                 event::Eventer,
-                file_list::Filelister,
                 ingest::Ingester,
                 logs::LogsServer,
                 metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
@@ -56,9 +55,8 @@ use opentelemetry_proto::tonic::collector::{
 };
 use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
 use proto::cluster_rpc::{
-    event_server::EventServer, filelist_server::FilelistServer, ingest_server::IngestServer,
-    metrics_server::MetricsServer, query_cache_server::QueryCacheServer,
-    search_server::SearchServer, usage_server::UsageServer,
+    event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
+    query_cache_server::QueryCacheServer, search_server::SearchServer, usage_server::UsageServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -388,9 +386,6 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let filelist_svc = FilelistServer::new(Filelister)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
     let metrics_svc = MetricsServer::new(MetricsQuerier)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -426,7 +421,6 @@ async fn init_common_grpc_server(
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
-        .add_service(filelist_svc)
         .add_service(metrics_svc)
         .add_service(metrics_ingest_svc)
         .add_service(trace_svc)

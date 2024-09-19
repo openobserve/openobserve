@@ -111,7 +111,7 @@ pub async fn save(
     } else if alert.trigger_condition.frequency == 0 {
         // default frequency is 60 seconds
         alert.trigger_condition.frequency =
-            std::cmp::max(10, get_config().limit.alert_schedule_interval);
+            std::cmp::max(60, get_config().limit.alert_schedule_interval);
     }
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
@@ -327,7 +327,7 @@ pub async fn trigger(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(bool, String), (http::StatusCode, anyhow::Error)> {
+) -> Result<(String, String), (http::StatusCode, anyhow::Error)> {
     let alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
@@ -338,17 +338,18 @@ pub async fn trigger(
         }
     };
     alert
-        .send_notification(&[])
+        .send_notification(&[], Utc::now().timestamp_micros(), None)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 impl Alert {
     /// Returns the evaluated row data and the end time of the search timerange,
-    /// for realtime this is 0
+    /// for realtime this is 0. `start_time` is the start time of the search timerange.
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
@@ -358,7 +359,7 @@ impl Alert {
                     &self.get_stream_params(),
                     &self.trigger_condition,
                     &self.query_condition,
-                    None,
+                    start_time,
                 )
                 .await
         }
@@ -369,35 +370,41 @@ impl Alert {
     pub async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
-    ) -> Result<(bool, String), anyhow::Error> {
-        let mut message = "".to_string();
+        rows_end_time: i64,
+        start_time: Option<i64>,
+    ) -> Result<(String, String), anyhow::Error> {
+        let mut err_message = "".to_string();
+        let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            if let Err(e) = send_notification(self, &dest, rows).await {
-                log::error!(
-                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
-                    self.org_id,
-                    self.stream_type,
-                    self.stream_name,
-                    self.name,
-                    dest.name,
-                    e
-                );
-                no_of_error += 1;
-                message = format!(
-                    "{message} Error sending notification for destination {} err: {e};",
-                    dest.name
-                );
+            match send_notification(self, &dest, rows, rows_end_time, start_time).await {
+                Ok(resp) => {
+                    success_message =
+                        format!("{success_message} destination {} {resp};", dest.name);
+                }
+                Err(e) => {
+                    log::error!(
+                        "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
+                        self.org_id,
+                        self.stream_type,
+                        self.stream_name,
+                        self.name,
+                        dest.name,
+                        e
+                    );
+                    no_of_error += 1;
+                    err_message = format!(
+                        "{err_message} Error sending notification for destination {} err: {e};",
+                        dest.name
+                    );
+                }
             }
         }
         if no_of_error == self.destinations.len() {
-            Err(anyhow::anyhow!(message))
-        } else if no_of_error != 0 {
-            // Some send notification job failed
-            Ok((false, message))
+            Err(anyhow::anyhow!(err_message))
         } else {
-            Ok((true, "".to_owned()))
+            Ok((success_message, err_message))
         }
     }
 
@@ -414,13 +421,23 @@ pub async fn send_notification(
     alert: &Alert,
     dest: &DestinationWithTemplate,
     rows: &[Map<String, Value>],
-) -> Result<(), anyhow::Error> {
+    rows_end_time: i64,
+    start_time: Option<i64>,
+) -> Result<String, anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let msg: String = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
+    let msg: String = process_dest_template(
+        &dest.template.body,
+        alert,
+        rows,
+        &rows_tpl_val,
+        rows_end_time,
+        start_time,
+    )
+    .await;
 
     match dest.destination_type {
         DestinationType::Http => send_http_notification(dest, msg.clone()).await,
@@ -431,7 +448,7 @@ pub async fn send_notification(
 pub async fn send_http_notification(
     dest: &DestinationWithTemplate,
     msg: String,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let client = if dest.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -473,7 +490,12 @@ pub async fn send_http_notification(
         resp_body,
     );
     if !resp_status.is_success() {
-        log::error!("Alert body: {}", msg);
+        log::error!(
+            "Alert http notification failed with status: {}, body: {}, payload: {}",
+            resp_status,
+            resp_body,
+            msg
+        );
         return Err(anyhow::anyhow!(
             "sent error status: {}, err: {}",
             resp_status,
@@ -481,14 +503,14 @@ pub async fn send_http_notification(
         ));
     }
 
-    Ok(())
+    Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
 }
 
 pub async fn send_email_notification(
     alert_name: &str,
     dest: &DestinationWithTemplate,
     msg: String,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let cfg = get_config();
     if !cfg.smtp.smtp_enabled {
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
@@ -515,7 +537,7 @@ pub async fn send_email_notification(
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
-        Ok(_) => Ok(()),
+        Ok(resp) => Ok(format!("sent response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
 }
@@ -627,6 +649,8 @@ async fn process_dest_template(
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_tpl_val: &[String],
+    rows_end_time: i64,
+    start_time: Option<i64>,
 ) -> String {
     let cfg = get_config();
     // format values
@@ -647,8 +671,12 @@ async fn process_dest_template(
     }
 
     // calculate start and end time
-    let (alert_start_time, alert_end_time) =
-        get_alert_start_end_time(&vars, alert.trigger_condition.period);
+    let (alert_start_time, alert_end_time) = get_alert_start_end_time(
+        &vars,
+        alert.trigger_condition.period,
+        rows_end_time,
+        start_time,
+    );
 
     let alert_start_time_str = if alert_start_time > 0 {
         Local
@@ -840,6 +868,8 @@ pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSe
 pub fn get_alert_start_end_time(
     vars: &HashMap<String, HashSet<String>>,
     period: i64,
+    rows_end_time: i64,
+    start_time: Option<i64>,
 ) -> (i64, i64) {
     let cfg = get_config();
 
@@ -876,7 +906,7 @@ pub fn get_alert_start_end_time(
 
     // Hack time range for alert url
     alert_end_time = if alert_end_time == 0 {
-        Utc::now().timestamp_micros()
+        rows_end_time
     } else {
         // the frontend will drop the second, so we add 1 minute to the end time
         alert_end_time
@@ -886,11 +916,16 @@ pub fn get_alert_start_end_time(
                 .unwrap()
     };
     if alert_start_time == 0 {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+        alert_start_time = match start_time {
+            Some(start_time) => start_time,
+            None => {
+                alert_end_time
+                    - Duration::try_minutes(period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+            }
+        };
     }
     if alert_end_time - alert_start_time
         < Duration::try_minutes(1)
@@ -898,11 +933,16 @@ pub fn get_alert_start_end_time(
             .num_microseconds()
             .unwrap()
     {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+        alert_start_time = match start_time {
+            Some(start_time) => start_time,
+            None => {
+                alert_end_time
+                    - Duration::try_minutes(period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+            }
+        };
     }
     (alert_start_time, alert_end_time)
 }
