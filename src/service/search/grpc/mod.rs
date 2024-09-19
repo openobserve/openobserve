@@ -142,7 +142,7 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
-        let file_list = get_file_list_by_ids(
+        let (file_list, took) = get_file_list_by_ids(
             &trace_id,
             &req.file_ids,
             &sql,
@@ -151,6 +151,12 @@ pub async fn search(
             &req.idx_files,
         )
         .await;
+        log::info!(
+            "[trace_id {trace_id}] grpc->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
+            req.job.as_ref().unwrap().partition,
+            file_list.len(),
+            took,
+        );
 
         let (tbls, stats, partitions) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
@@ -384,7 +390,8 @@ pub(crate) async fn get_file_list_by_ids(
     stream_type: StreamType,
     partition_keys: &[StreamPartition],
     idx_file_list: &[IdxFileName],
-) -> Vec<FileKey> {
+) -> (Vec<FileKey>, usize) {
+    let start = std::time::Instant::now();
     let file_list = query_by_ids(ids).await.unwrap_or_default();
     // if there are any files in idx_files_list, use them to filter the files we got from ids,
     // otherwise use all the files we got from ids
@@ -421,7 +428,7 @@ pub(crate) async fn get_file_list_by_ids(
     // sort by min_ts and dedup
     files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
     files.dedup_by(|a, b| a.key == b.key);
-    files
+    (files, start.elapsed().as_millis() as usize)
 }
 
 struct ReleaseFileGuard {
