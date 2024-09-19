@@ -536,7 +536,6 @@ export default defineComponent({
 
           return;
         }
-
         if (
           isStreamChanged &&
           queryParams.type === "stream_explorer" &&
@@ -613,6 +612,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.type,
       (type, prev) => {
         if (
+
           searchObj.shouldIgnoreWatcher == false &&
           router.currentRoute.value.name === "logs" &&
           prev === "stream_explorer" &&
@@ -638,7 +638,22 @@ export default defineComponent({
       //     showSearchHistory.value = true;
       //   }
       // }
-    )
+    );
+    watch(
+      () => router.currentRoute.value.query.type,
+      (type) => {
+        if(type == "search_history_re_apply"){
+          searchObj.organizationIdetifier = router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
+          searchObj.data.stream.streamType = router.currentRoute.value.query.stream_type;
+          resetSearchObj();
+          resetStreamData();
+          restoreUrlQueryParams();
+          loadLogsData();
+        }
+      },
+    );
+
 
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");

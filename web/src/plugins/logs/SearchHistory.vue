@@ -45,10 +45,8 @@
         :rows="dataToBeLoaded"
         :columns="columnsToBeRendered"
         :pagination="pagination"
-        @row-click="onRowClick"
         hide-bottom
         row-key="trace_id"
-
         :rows-per-page-options="[]"
         class="custom-table"
         style="width: 100%;"
@@ -87,6 +85,12 @@
             icon="content_copy"
             class="copy-btn tw-py-3"
           />
+          <q-btn
+            @click.stop="goToLogs(props.row)"
+            size="xs"
+            label="Go To Logs"
+            class="copy-btn tw-py-3 tw-mx-2"
+          />
          </div>
         
          
@@ -120,7 +124,7 @@
   //@ts-nocheck
   import { ref, watch, onMounted  , nextTick} from 'vue';
   import {
-    timestampToTimezoneDate} from "@/utils/zincutils";
+    timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp } from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
   import { useStore } from 'vuex';
   import { defineAsyncComponent ,defineComponent} from 'vue';
@@ -173,12 +177,12 @@
     { key: 'trace_id', label: 'Trace ID' },
     { key: 'start_time', label: 'Start Time' },
     { key: 'end_time', label: 'End Time' },
+    { key: 'duration', label: 'Duration' },
     { key: 'took', label: 'Took' },
-    { key: 'cached_ratio', label: 'Cached Ratio' },
     { key: 'scan_size', label: 'Scan Size' },
     { key: 'scan_records', label: 'Scan Records' },
+    { key: 'cached_ratio', label: 'Cached Ratio' },
     { key: 'sql', label: 'SQL Query' },
-    // { key: 'duration', label: 'Duration' },
   ];
 
   return desiredColumns.map(({ key, label }) => {
@@ -226,68 +230,14 @@
            );
            columnsToBeRendered.value = generateColumns(response.data.hits);
            response.data.hits.forEach((hit:any)=>{
+            hit.duration = calculateDuration(hit.start_time, hit.end_time);
+            hit.toBeStoredStartTime = hit.start_time;
+            hit.toBeStoredEndTime = hit.end_time;
             hit.start_time = timestampToTimezoneDate(hit.start_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
-            console.log(hit.start_time,"start")
             hit.end_time = timestampToTimezoneDate(hit.end_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
             hit.took  = formatTime(hit.took);
-            hit.duration = calculateDuration(hit.start_time, hit.end_time);
             })
            dataToBeLoaded.value = response.data.hits;
-           dataToBeLoaded.value[0].sql = `SELECT 
-    e.employee_id,
-    e.first_name,
-    e.last_name,
-    e.email,
-    d.department_name,
-    m.manager_name,
-    j.job_title,
-    l.location_name,
-    c.country_name,
-    r.region_name,
-    (
-        SELECT AVG(salary)
-        FROM employees
-        WHERE department_id = e.department_id
-    ) AS avg_department_salary,
-    (
-        SELECT COUNT(*)
-        FROM projects p
-        WHERE p.employee_id = e.employee_id
-    ) AS project_count
-FROM 
-    employees e
-JOIN 
-    departments d ON e.department_id = d.department_id
-LEFT JOIN 
-    managers m ON e.manager_id = m.manager_id
-JOIN 
-    jobs j ON e.job_id = j.job_id
-JOIN 
-    locations l ON d.location_id = l.location_id
-JOIN 
-    countries c ON l.country_id = c.country_id
-JOIN 
-    regions r ON c.region_id = r.region_id
-WHERE 
-    e.hire_date > '2020-01-01'
-    AND e.salary > (
-        SELECT AVG(salary) 
-        FROM employees
-    )
-    AND e.employee_id IN (
-        SELECT employee_id
-        FROM project_assignments
-        WHERE project_id IN (
-            SELECT project_id
-            FROM projects
-            WHERE project_status = 'Active'
-        )
-    )
-ORDER BY 
-    e.last_name, e.first_name
-LIMIT 100;`;
-           
-          // dataToBeLoaded.value = response.data;
           isLoading.value = false;
      } catch (error) {
       console.log(error, "error")
@@ -361,26 +311,66 @@ LIMIT 100;`;
       const  formatTime = (took)  => {
       return `${took.toFixed(2)} sec`;
     }
-    const calculateDuration = (startTime, endTime) => {
-      // Calculate the duration in microseconds
-      const durationMicroseconds = endTime - startTime;
-      
-      // Convert microseconds to seconds
-      const durationSeconds = durationMicroseconds / 1e6;
+      const calculateDuration = (startTime, endTime) => {
+    
+    // Calculate the duration in microseconds
+    const durationMicroseconds = endTime - startTime;
 
-      // Convert to minutes and hours if needed
-      if (durationSeconds < 60) {
-        return `${durationSeconds.toFixed(2)} seconds`;
-      } else if (durationSeconds < 3600) {
-        const minutes = Math.floor(durationSeconds / 60);
-        const seconds = durationSeconds % 60;
-        return `${minutes} minutes and ${seconds.toFixed(2)} seconds`;
-      } else {
-        const hours = Math.floor(durationSeconds / 3600);
-        const minutes = Math.floor((durationSeconds % 3600) / 60);
-        return `${hours} hours and ${minutes} minutes`;
+    // Convert microseconds to seconds
+    const durationSeconds = durationMicroseconds / 1e6;
+
+    // Define time unit conversions
+    const secondsInMinute = 60;
+    const secondsInHour = 3600;
+    const secondsInDay = 86400;
+    const secondsInMonth = 2592000; // Approximation (30 days)
+    const secondsInYear = 31536000; // Approximation (365 days)
+
+    // Convert to the appropriate time unit
+    let result = '';
+
+    if (durationSeconds < secondsInMinute) {
+      result = `${durationSeconds.toFixed(2)} seconds`;
+    } else if (durationSeconds < secondsInHour) {
+      const minutes = Math.floor(durationSeconds / secondsInMinute);
+      const seconds = durationSeconds % secondsInMinute;
+      result = `${minutes} minutes`;
+      if (seconds > 0) {
+        result += ` and ${seconds.toFixed(2)} seconds`;
+      }
+    } else if (durationSeconds < secondsInDay) {
+      const hours = Math.floor(durationSeconds / secondsInHour);
+      const minutes = Math.floor((durationSeconds % secondsInHour) / secondsInMinute);
+      result = `${hours} hours`;
+      if (minutes > 0) {
+        result += ` and ${minutes} minutes`;
+      }
+    } else if (durationSeconds < secondsInMonth) {
+      const days = Math.floor(durationSeconds / secondsInDay);
+      const hours = Math.floor((durationSeconds % secondsInDay) / secondsInHour);
+      result = `${days} days`;
+      if (hours > 0) {
+        result += ` and ${hours} hours`;
+      }
+    } else if (durationSeconds < secondsInYear) {
+      const months = Math.floor(durationSeconds / secondsInMonth);
+      const days = Math.floor((durationSeconds % secondsInMonth) / secondsInDay);
+      result = `${months} months`;
+      if (days > 0) {
+        result += ` and ${days} days`;
+      }
+    } else {
+      const years = Math.floor(durationSeconds / secondsInYear);
+      const months = Math.floor((durationSeconds % secondsInYear) / secondsInMonth);
+      result = `${years} years`;
+      if (months > 0) {
+        result += ` and ${months} months`;
       }
     }
+
+    return result;
+    };
+
 
       const triggerExpand = (props) =>{
         if (expandedRow.value === props.row.trace_id) {
@@ -390,17 +380,57 @@ LIMIT 100;`;
             expandedRow.value = props.row.trace_id;
   }
       }
-      const   onRowClick = (evt, row) => {
-      console.log("Row clicked:", row);
-      // row.expand = !row.expand; // Log the row data
-      // const index = expandedRows.value.indexOf(row.trace_id);
-      // console.log(index, "index")
-      // if (index === -1) {
-      //   expandedRows.value.push(row.trace_id);
-      //   console.log(expandedRows.value, "expandedRows")
-      // } else {
-      //   expandedRows.value.splice(index, 1); // Optional: toggle functionality
-      // }
+      const   goToLogs = ( row) => {
+        const duration_suffix = row.duration.split(" ")[1];
+        let relativeTime = row.duration.split(" ")[0];
+        switch (duration_suffix) {
+          case "seconds":
+            relativeTime = '1m';
+            break;
+          case "minutes":
+            relativeTime += "m";
+            break;
+          case "hours":
+            relativeTime += "h";
+            break;
+          case "days":
+            relativeTime += "d";
+            break;
+          case "months":
+            relativeTime += "M";
+            break;
+          default:
+            relativeTime += "m";
+            break;
+        }
+        // emit('closeSearchHistory');
+        const stream: string =
+        row.stream_name
+      const from =
+       row.toBeStoredStartTime;
+      const to =
+       row.toBeStoredEndTime ;
+      const refresh = 0;
+
+      const query = b64EncodeUnicode(row.sql);
+
+      router.push({
+        path: "/logs",
+        query: {
+          stream_type: "logs",
+          stream,
+          period: relativeTime,
+          refresh,
+          sql_mode: "true",
+          query,
+          defined_schemas:"user_defined_schema",
+          org_identifier: row.org_id,
+          quick_mode: "false",
+          show_histogram: "true",
+          type: "search_history_re_apply"
+
+        },
+      });
     };
       onMounted(() => {
         fetchSearchHistory(); 
@@ -420,7 +450,7 @@ LIMIT 100;`;
         pagination,  
         dateTimeRef,
         expandedRow,
-        onRowClick,
+        goToLogs,
         triggerExpand,
         copyToClipboard,
         formatTime,
@@ -455,7 +485,9 @@ LIMIT 100;`;
 .custom-table .q-tr > .q-td:first-child {
   text-align: left;
 }
-
+.custom-table .q-tr > .q-td:nth-child(4) {
+  text-align: left;
+}
 
 
  </style>
