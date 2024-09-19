@@ -32,7 +32,7 @@ import {
 export const convertTableData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
 ) => {
   // if no data than return it
   if (
@@ -45,9 +45,9 @@ export const convertTableData = (
   }
   const x = panelSchema?.queries[0].fields?.x || [];
   const y = panelSchema?.queries[0].fields?.y || [];
-  const columnData = [...x, ...y];
+  let columnData = [...x, ...y];
 
-  const tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
+  let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
 
   // identify histogram fields for auto and custom sql
@@ -88,49 +88,128 @@ export const convertTableData = (
     }
   }
 
-  const columns = columnData.map((it: any) => {
-    let obj: any = {};
-    const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
-    obj["name"] = it.label;
-    obj["field"] = it.alias;
-    obj["label"] = it.label;
-    obj["align"] = !isNumber ? "left" : "right";
-    obj["sortable"] = true;
-    // if number then sort by number and use decimal point config option in format
-    if (isNumber) {
-      obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-      obj["format"] = (val: any) => {
-        return !Number.isNaN(val)
-          ? `${
-              formatUnitValue(
-                getUnitValue(
-                  val,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals ?? 2
-                )
-              ) ?? 0
-            }`
-          : val;
-      };
-    }
+  console.log("columnsData", columnData);
+  
+  const isTransposeEnabled = true;
+  const transposeColumn = columnData[0]?.alias || "";
+  console.log("transposeColumn", transposeColumn);
+  
+  let columns;
 
-    // if current field is histogram field then return formatted date
-    if (histogramFields.includes(it.alias)) {
+  if (!isTransposeEnabled) {
+    columns = columnData.map((it: any) => {
+      let obj: any = {};
+      const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
+      obj["name"] = it.label;
+      obj["field"] = it.alias;
+      obj["label"] = it.label;
+      obj["align"] = !isNumber ? "left" : "right";
+      obj["sortable"] = true;
+      // if number then sort by number and use decimal point config option in format
+      if (isNumber) {
+        obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+        obj["format"] = (val: any) => {
+          return !Number.isNaN(val)
+            ? `${
+                formatUnitValue(
+                  getUnitValue(
+                    val,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals ?? 2,
+                  ),
+                ) ?? 0
+              }`
+            : val;
+        };
+      }
+
       // if current field is histogram field then return formatted date
-      obj["format"] = (val: any) => {
-        return formatDate(
-          toZonedTime(
-            typeof val === "string"
-              ? `${val}Z`
-              : new Date(val)?.getTime() / 1000,
-            store.state.timezone
-          )
-        );
-      };
-    }
-    return obj;
-  });
+      if (histogramFields.includes(it.alias)) {
+        // if current field is histogram field then return formatted date
+        obj["format"] = (val: any) => {
+          return formatDate(
+            toZonedTime(
+              typeof val === "string"
+                ? `${val}Z`
+                : new Date(val)?.getTime() / 1000,
+              store.state.timezone,
+            ),
+          );
+        };
+      }
+      return obj;
+    });
+  } else {
+    // lets get all columns from a particular field
+    const transposeColumns = searchQueryData[0].map((it:any) => it[transposeColumn]);
+    console.log("transposeColumns", transposeColumns);
+    columns = transposeColumns.map((it: any) => {
+      let obj: any = {};
+      // const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
+      obj["name"] = it;
+      obj["field"] = it;
+      obj["label"] = it;
+      // obj["align"] = !isNumber ? "left" : "right";
+      // obj["sortable"] = true;
+      // if number then sort by number and use decimal point config option in format
+      // if (isNumber) {
+      //   obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+      //   obj["format"] = (val: any) => {
+      //     return !Number.isNaN(val)
+      //       ? `${
+      //           formatUnitValue(
+      //             getUnitValue(
+      //               val,
+      //               panelSchema.config?.unit,
+      //               panelSchema.config?.unit_custom,
+      //               panelSchema.config?.decimals ?? 2,
+      //             ),
+      //           ) ?? 0
+      //         }`
+      //       : val;
+      //   };
+      // }
+
+      // if current field is histogram field then return formatted date
+      // if (histogramFields.includes(it.alias)) {
+      //   // if current field is histogram field then return formatted date
+      //   obj["format"] = (val: any) => {
+      //     return formatDate(
+      //       toZonedTime(
+      //         typeof val === "string"
+      //           ? `${val}Z`
+      //           : new Date(val)?.getTime() / 1000,
+      //         store.state.timezone,
+      //       ),
+      //     );
+      //   };
+      // }
+      return obj;
+    });
+
+    console.log("columnData", columnData);
+
+    // remove transposeColumn from teh columndata
+    columnData = columnData.filter((it: any) => it.alias !== transposeColumn)
+
+    console.log("columnData after filter", columnData);
+
+    tableRows = columnData.map((it: any, index) => {
+      console.log("it", it);
+      let obj = transposeColumns.reduce((acc: any, curr: any, reduceIndex: any) => {
+        console.log("------------------------");
+        console.log("acc", acc);
+        console.log("curr", curr);
+        console.log("it", it);
+        console.log("it[curr]", searchQueryData[0][reduceIndex][it.alias]);
+        acc[curr] = searchQueryData[0][reduceIndex][it.alias]
+        return acc
+      }, {});
+      return obj
+    });
+    console.log("tableRows", tableRows);
+  }
 
   return {
     rows: tableRows,
