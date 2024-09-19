@@ -559,12 +559,20 @@ pub async fn merge_files(
     let mut deleted_files = Vec::new();
     let cfg = get_config();
     for file in files_with_size.iter() {
-        if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-            || new_compressed_file_size + file.meta.compressed_size
-                > cfg.compact.max_file_size as i64
+        let total_new_file_size = new_file_size + file.meta.original_size;
+        let total_new_compressed_file_size = new_compressed_file_size + file.meta.compressed_size;
+
+        if  total_new_file_size > cfg.compact.max_file_size as i64
         {
+            log::info!("[COMPACT:{thread_id}] new file size is bigger then compactor max file size: {}", total_new_file_size);
             break;
         }
+
+        if total_new_compressed_file_size > cfg.compact.max_file_size as i64 {
+            log::info!("[COMPACT:{thread_id}] new compressed file size is bigger then compactor max file size: {}", total_new_compressed_file_size);
+            break;
+        }
+
         new_file_size += file.meta.original_size;
         new_compressed_file_size += file.meta.compressed_size;
         total_records += file.meta.records;
