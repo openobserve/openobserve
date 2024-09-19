@@ -89,11 +89,12 @@ export const convertTableData = (
   }
 
   console.log("columnsData", columnData);
-  
-  const isTransposeEnabled = true;
+
+  const isTransposeEnabled = panelSchema.config.table_transpose;
+  console.log("isTransposeEnabled", isTransposeEnabled);
   const transposeColumn = columnData[0]?.alias || "";
   console.log("transposeColumn", transposeColumn);
-  
+
   let columns;
 
   if (!isTransposeEnabled) {
@@ -142,71 +143,78 @@ export const convertTableData = (
     });
   } else {
     // lets get all columns from a particular field
-    const transposeColumns = searchQueryData[0].map((it:any) => it[transposeColumn]);
+    const transposeColumns = searchQueryData[0].map(
+      (it: any) => it[transposeColumn],
+    );
     console.log("transposeColumns", transposeColumns);
     columns = transposeColumns.map((it: any) => {
       let obj: any = {};
-      // const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
+      const isNumber = isSampleValuesNumbers(tableRows, it, 20);
+      console.log("isNumber", isNumber);
+
       obj["name"] = it;
       obj["field"] = it;
       obj["label"] = it;
-      // obj["align"] = !isNumber ? "left" : "right";
-      // obj["sortable"] = true;
+      obj["align"] = !isNumber ? "left" : "right";
+      obj["sortable"] = true;
       // if number then sort by number and use decimal point config option in format
-      // if (isNumber) {
-      //   obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-      //   obj["format"] = (val: any) => {
-      //     return !Number.isNaN(val)
-      //       ? `${
-      //           formatUnitValue(
-      //             getUnitValue(
-      //               val,
-      //               panelSchema.config?.unit,
-      //               panelSchema.config?.unit_custom,
-      //               panelSchema.config?.decimals ?? 2,
-      //             ),
-      //           ) ?? 0
-      //         }`
-      //       : val;
-      //   };
-      // }
+      if (isNumber) {
+        obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+        obj["format"] = (val: any) => {
+          return !Number.isNaN(val)
+            ? `${
+                formatUnitValue(
+                  getUnitValue(
+                    val,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals ?? 2,
+                  ),
+                ) ?? 0
+              }`
+            : val;
+        };
+      }
 
       // if current field is histogram field then return formatted date
-      // if (histogramFields.includes(it.alias)) {
-      //   // if current field is histogram field then return formatted date
-      //   obj["format"] = (val: any) => {
-      //     return formatDate(
-      //       toZonedTime(
-      //         typeof val === "string"
-      //           ? `${val}Z`
-      //           : new Date(val)?.getTime() / 1000,
-      //         store.state.timezone,
-      //       ),
-      //     );
-      //   };
-      // }
+      if (histogramFields.includes(it.alias)) {
+        // if current field is histogram field then return formatted date
+        obj["format"] = (val: any) => {
+          return formatDate(
+            toZonedTime(
+              typeof val === "string"
+                ? `${val}Z`
+                : new Date(val)?.getTime() / 1000,
+              store.state.timezone,
+            ),
+          );
+        };
+      }
       return obj;
     });
 
     console.log("columnData", columnData);
 
     // remove transposeColumn from teh columndata
-    columnData = columnData.filter((it: any) => it.alias !== transposeColumn)
+    columnData = columnData.filter((it: any) => it.alias !== transposeColumn);
 
     console.log("columnData after filter", columnData);
 
     tableRows = columnData.map((it: any, index) => {
       console.log("it", it);
-      let obj = transposeColumns.reduce((acc: any, curr: any, reduceIndex: any) => {
-        console.log("------------------------");
-        console.log("acc", acc);
-        console.log("curr", curr);
-        console.log("it", it);
-        console.log("it[curr]", searchQueryData[0][reduceIndex][it.alias]);
-        acc[curr] = searchQueryData[0][reduceIndex][it.alias]
-        return acc
-      }, {});
-      return obj
+      let obj = transposeColumns.reduce(
+        (acc: any, curr: any, reduceIndex: any) => {
+          console.log("------------------------");
+          console.log("acc", acc);
+          console.log("curr", curr);
+          console.log("it", it);
+          console.log("it[curr]", searchQueryData[0][reduceIndex][it.alias]);
+          acc[curr] = searchQueryData[0][reduceIndex][it.alias];
+          return acc;
+        },
+        {},
+      );
+      return obj;
     });
     console.log("tableRows", tableRows);
   }
