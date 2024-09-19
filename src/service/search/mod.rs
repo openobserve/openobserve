@@ -76,6 +76,7 @@ pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
+#[tracing::instrument(name = "service:search:enter", skip(in_req))]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -235,7 +236,9 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
@@ -261,6 +264,14 @@ pub async fn search_partition(
         &stream_settings.partition_keys,
     )
     .await;
+
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        meta.meta.time_range,
+        files.len(),
+        file_list_took,
+    );
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -331,7 +342,12 @@ pub async fn search_partition(
     }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
-    step = step - step % min_step;
+    if step < min_step {
+        step = min_step;
+    }
+    if step % min_step > 0 {
+        step = step - step % min_step;
+    }
 
     // generate partitions
     let mut partitions = Vec::with_capacity(part_num);
