@@ -43,10 +43,10 @@ export const convertTableData = (
   ) {
     return { rows: [], columns: [] };
   }
+
   const x = panelSchema?.queries[0].fields?.x || [];
   const y = panelSchema?.queries[0].fields?.y || [];
   let columnData = [...x, ...y];
-
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
 
@@ -59,7 +59,6 @@ export const convertTableData = (
         const sample = tableRows
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
-
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample);
 
@@ -77,7 +76,6 @@ export const convertTableData = (
         const sample = tableRows
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
-
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample);
 
@@ -141,10 +139,11 @@ export const convertTableData = (
       }
       return obj;
     });
+    console.log("columns inside if", columnData);
   } else {
     // lets get all columns from a particular field
     const transposeColumns = searchQueryData[0].map(
-      (it: any) => it[transposeColumn],
+      (it: any) => it[transposeColumn] ?? "",
     );
     console.log("transposeColumns", transposeColumns);
     columns = transposeColumns.map((it: any) => {
@@ -177,7 +176,7 @@ export const convertTableData = (
       }
 
       // if current field is histogram field then return formatted date
-      if (histogramFields.includes(it.alias)) {
+      if (histogramFields.includes(it)) {
         // if current field is histogram field then return formatted date
         obj["format"] = (val: any) => {
           return formatDate(
@@ -200,7 +199,7 @@ export const convertTableData = (
 
     console.log("columnData after filter", columnData);
 
-    tableRows = columnData.map((it: any, index) => {
+    tableRows = columnData.map((it: any) => {
       console.log("it", it);
       let obj = transposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
@@ -209,15 +208,16 @@ export const convertTableData = (
           console.log("curr", curr);
           console.log("it", it);
           console.log("it[curr]", searchQueryData[0][reduceIndex][it.alias]);
-          acc[curr] = searchQueryData[0][reduceIndex][it.alias];
+          acc[curr] = searchQueryData[0][reduceIndex][it.alias] ?? "";
           return acc;
         },
         {},
       );
       return obj;
     });
-    console.log("tableRows", tableRows);
   }
+  console.log("tableRows return", tableRows);
+  console.log("columns return", columns);
 
   return {
     rows: tableRows,
