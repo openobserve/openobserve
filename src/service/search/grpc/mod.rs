@@ -142,7 +142,7 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
-        let (file_list, took) = get_file_list_by_ids(
+        let (file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
             &req.file_ids,
             &sql,
@@ -155,7 +155,7 @@ pub async fn search(
             "[trace_id {trace_id}] grpc->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
             req.job.as_ref().unwrap().partition,
             file_list.len(),
-            took,
+            file_list_took,
         );
 
         let (tbls, stats, partitions) =

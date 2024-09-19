@@ -237,7 +237,9 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
@@ -263,6 +265,14 @@ pub async fn search_partition(
         &stream_settings.partition_keys,
     )
     .await;
+
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        meta.meta.time_range,
+        files.len(),
+        file_list_took,
+    );
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
