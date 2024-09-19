@@ -338,17 +338,18 @@ pub async fn trigger(
         }
     };
     alert
-        .send_notification(&[], Utc::now().timestamp_micros())
+        .send_notification(&[], Utc::now().timestamp_micros(), None)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 impl Alert {
     /// Returns the evaluated row data and the end time of the search timerange,
-    /// for realtime this is 0
+    /// for realtime this is 0. `start_time` is the start time of the search timerange.
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
@@ -358,7 +359,7 @@ impl Alert {
                     &self.get_stream_params(),
                     &self.trigger_condition,
                     &self.query_condition,
-                    None,
+                    start_time,
                 )
                 .await
         }
@@ -370,13 +371,14 @@ impl Alert {
         &self,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
+        start_time: Option<i64>,
     ) -> Result<(String, String), anyhow::Error> {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            match send_notification(self, &dest, rows, rows_end_time).await {
+            match send_notification(self, &dest, rows, rows_end_time, start_time).await {
                 Ok(resp) => {
                     success_message =
                         format!("{success_message} destination {} {resp};", dest.name);
@@ -420,6 +422,7 @@ pub async fn send_notification(
     dest: &DestinationWithTemplate,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
+    start_time: Option<i64>,
 ) -> Result<String, anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
@@ -432,6 +435,7 @@ pub async fn send_notification(
         rows,
         &rows_tpl_val,
         rows_end_time,
+        start_time,
     )
     .await;
 
@@ -646,6 +650,7 @@ async fn process_dest_template(
     rows: &[Map<String, Value>],
     rows_tpl_val: &[String],
     rows_end_time: i64,
+    start_time: Option<i64>,
 ) -> String {
     let cfg = get_config();
     // format values
@@ -666,8 +671,12 @@ async fn process_dest_template(
     }
 
     // calculate start and end time
-    let (alert_start_time, alert_end_time) =
-        get_alert_start_end_time(&vars, alert.trigger_condition.period, rows_end_time);
+    let (alert_start_time, alert_end_time) = get_alert_start_end_time(
+        &vars,
+        alert.trigger_condition.period,
+        rows_end_time,
+        start_time,
+    );
 
     let alert_start_time_str = if alert_start_time > 0 {
         Local
@@ -860,6 +869,7 @@ pub fn get_alert_start_end_time(
     vars: &HashMap<String, HashSet<String>>,
     period: i64,
     rows_end_time: i64,
+    start_time: Option<i64>,
 ) -> (i64, i64) {
     let cfg = get_config();
 
@@ -906,11 +916,16 @@ pub fn get_alert_start_end_time(
                 .unwrap()
     };
     if alert_start_time == 0 {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+        alert_start_time = match start_time {
+            Some(start_time) => start_time,
+            None => {
+                alert_end_time
+                    - Duration::try_minutes(period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+            }
+        };
     }
     if alert_end_time - alert_start_time
         < Duration::try_minutes(1)
@@ -918,11 +933,16 @@ pub fn get_alert_start_end_time(
             .num_microseconds()
             .unwrap()
     {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+        alert_start_time = match start_time {
+            Some(start_time) => start_time,
+            None => {
+                alert_end_time
+                    - Duration::try_minutes(period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+            }
+        };
     }
     (alert_start_time, alert_end_time)
 }

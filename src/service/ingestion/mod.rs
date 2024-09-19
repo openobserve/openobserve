@@ -251,7 +251,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             error: None,
             success_response: None,
         };
-        match alert.send_notification(val, now).await {
+        match alert.send_notification(val, now, None).await {
             Err(e) => {
                 log::error!("Failed to send notification: {}", e);
                 trigger_data_stream.status = TriggerDataStatus::Failed;
