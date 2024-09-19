@@ -216,6 +216,67 @@ export const convertTableData = (
       return obj;
     });
   }
+
+  // use all response keys if tableDynamicColumns is true
+  if (panelSchema?.config?.tableDynamicColumns == true) {
+    let responseKeys: any = new Set();
+
+    // insert all keys of searchQueryData into responseKeys
+    tableRows.forEach((row: any) => {
+      Object.keys(row).forEach((key) => {
+        responseKeys.add(key);
+      });
+    });
+
+    // set to array
+    responseKeys = Array.from(responseKeys);
+
+    columns = responseKeys.map((it: any) => {
+      let obj: any = {};
+      const isNumber = isSampleValuesNumbers(tableRows, it, 20);
+
+      obj["name"] = it;
+      obj["field"] = it;
+      obj["label"] = it;
+      obj["align"] = !isNumber ? "left" : "right";
+      obj["sortable"] = true;
+      // if number then sort by number and use decimal point config option in format
+      if (isNumber) {
+        obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+        obj["format"] = (val: any) => {
+          return !Number.isNaN(val)
+            ? `${
+                formatUnitValue(
+                  getUnitValue(
+                    val,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals ?? 2,
+                  ),
+                ) ?? 0
+              }`
+            : val;
+        };
+      }
+
+      // if current field is histogram field then return formatted date
+      if (histogramFields.includes(it)) {
+        // if current field is histogram field then return formatted date
+        obj["format"] = (val: any) => {
+          return formatDate(
+            toZonedTime(
+              typeof val === "string"
+                ? `${val}Z`
+                : new Date(val)?.getTime() / 1000,
+              store.state.timezone,
+            ),
+          );
+        };
+      }
+      return obj;
+    });
+  }
+
   console.log("tableRows return", tableRows);
   console.log("columns return", columns);
 
