@@ -230,9 +230,8 @@ impl super::FileList for PostgresFileList {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-        let ret = sqlx
-            ::query_as::<_, super::FileRecord>(
-                r#"
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+            r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#
@@ -301,9 +300,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let pool = CLIENT.clone();
         let ret = if flattened.is_some() {
-            sqlx
-                ::query_as::<_, super::FileRecord>(
-                    r#"
+            sqlx::query_as::<_, super::FileRecord>(
+                r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
@@ -319,10 +317,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 let max_ts_upper_bound =
                     time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
                 let sql = r#"
-        SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-        FROM file_list 
-        WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
-    "#;
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
+                "#;
 
                 sqlx::query_as::<_, super::FileRecord>(sql)
                     .bind(stream_key)
@@ -333,10 +331,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .await
             } else {
                 let sql = r#"
-        SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-        FROM file_list 
-        WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
-    "#;
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
+                "#;
 
                 sqlx::query_as::<_, super::FileRecord>(sql)
                     .bind(stream_key)
@@ -355,6 +353,87 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 )
             })
             .collect())
+    }
+
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+        if ids.is_empty() {
+            return Ok(Vec::default());
+        }
+        let mut ret = Vec::new();
+        let pool = CLIENT.clone();
+
+        for chunk in ids.chunks(super::ID_BATCH_SIZE) {
+            if chunk.is_empty() {
+                continue;
+            }
+            let ids = chunk
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            let query_str = format!(
+                "SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list WHERE id IN ({ids})"
+            );
+            let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
+                .fetch_all(&pool)
+                .await?;
+            ret.extend_from_slice(&res);
+        }
+
+        Ok(ret
+            .into_iter()
+            .map(|r| {
+                (
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    FileMeta::from(&r),
+                )
+            })
+            .collect())
+    }
+
+    async fn query_ids(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        _time_level: PartitionTimeLevel,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<super::FileId>> {
+        if let Some((start, end)) = time_range {
+            if start == 0 && end == 0 {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT.clone();
+
+        let (time_start, time_end) = time_range.unwrap_or((0, 0));
+        let cfg = get_config();
+        let ret = if cfg.limit.use_upper_bound_for_max_ts {
+            let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+            sqlx::query_as::<_, super::FileId>(
+                r#"SELECT id, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
+            )
+            .bind(stream_key)
+            .bind(time_start)
+            .bind(max_ts_upper_bound)
+            .bind(time_end)
+            .fetch_all(&pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, super::FileId>(
+                r#"SELECT id, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
+            )
+            .bind(stream_key)
+            .bind(time_start)
+            .bind(time_end)
+            .fetch_all(&pool)
+            .await?
+        };
+
+        Ok(ret)
     }
 
     async fn query_deleted(
