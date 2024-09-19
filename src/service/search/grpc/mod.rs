@@ -22,7 +22,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, SearchType, StorageType},
-        stream::{FileKey, StreamType},
+        stream::{FileKey, StreamPartition, StreamType},
     },
     utils::record_batch_ext::format_recordbatch_by_schema,
 };
@@ -31,10 +31,11 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, IdxFileName};
 
 use crate::service::{
     db,
+    file_list::query_by_ids,
     search::{
         datafusion::exec,
         generate_search_schema, generate_select_start_search_schema,
@@ -141,7 +142,22 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
-        let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
+        let (file_list, file_list_took) = get_file_list_by_ids(
+            &trace_id,
+            &req.file_ids,
+            &sql,
+            stream_type,
+            &stream_settings.partition_keys,
+            &req.idx_files,
+        )
+        .await;
+        log::info!(
+            "[trace_id {trace_id}] grpc->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
+            req.job.as_ref().unwrap().partition,
+            file_list.len(),
+            file_list_took,
+        );
+
         let (tbls, stats, partitions) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
         tables.extend(tbls);
@@ -364,6 +380,55 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+#[tracing::instrument(skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+pub(crate) async fn get_file_list_by_ids(
+    _trace_id: &str,
+    ids: &[i64],
+    sql: &super::sql::Sql,
+    stream_type: StreamType,
+    partition_keys: &[StreamPartition],
+    idx_file_list: &[IdxFileName],
+) -> (Vec<FileKey>, usize) {
+    let start = std::time::Instant::now();
+    let file_list = query_by_ids(ids).await.unwrap_or_default();
+    // if there are any files in idx_files_list, use them to filter the files we got from ids,
+    // otherwise use all the files we got from ids
+    let file_list = if idx_file_list.is_empty() {
+        file_list
+    } else {
+        let mut files = Vec::with_capacity(idx_file_list.len());
+        let file_list_map: HashMap<_, _> =
+            file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
+        for idx_file in idx_file_list.iter() {
+            if let Some(file) = file_list_map.get(&idx_file.key) {
+                let mut new_file = file.clone();
+                if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
+                    new_file.segment_ids = Some(segment_ids.clone());
+                }
+                files.push(new_file);
+            }
+        }
+        files
+    };
+
+    // filter file_list by partition keys
+    // cannot use .iter().filter() as the function is async cannot be used in filter closure
+    let mut files = Vec::with_capacity(file_list.len());
+    for file in file_list {
+        if sql
+            .match_source(&file, false, false, stream_type, partition_keys)
+            .await
+        {
+            files.push(file);
+        }
+    }
+
+    // sort by min_ts and dedup
+    files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    files.dedup_by(|a, b| a.key == b.key);
+    (files, start.elapsed().as_millis() as usize)
 }
 
 struct ReleaseFileGuard {

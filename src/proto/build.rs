@@ -26,6 +26,7 @@ fn main() -> Result<()> {
         .type_attribute("FileList", "#[derive(serde::Serialize)]")
         .type_attribute("FileKey", "#[derive(Eq)]")
         .type_attribute("FileKey", "#[derive(serde::Serialize)]")
+        .type_attribute("IdxFileName", "#[derive(Eq)]")
         .type_attribute("FileDescriptor", "#[derive(Eq)]")
         .type_attribute("FileDescriptor", "#[derive(serde::Serialize)]")
         .type_attribute("FileMeta", "#[derive(Eq)]")
@@ -55,7 +56,6 @@ fn main() -> Result<()> {
             &[
                 "proto/cluster/common.proto",
                 "proto/cluster/event.proto",
-                "proto/cluster/filelist.proto",
                 "proto/cluster/metrics.proto",
                 "proto/cluster/search.proto",
                 "proto/cluster/ingest.proto",
