@@ -650,6 +650,8 @@ export default defineComponent({
           resetStreamData();
           restoreUrlQueryParams();
           loadLogsData();
+          searchObj.meta.refreshHistogram = true;
+
         }
       },
     );
