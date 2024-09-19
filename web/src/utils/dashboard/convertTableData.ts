@@ -218,7 +218,7 @@ export const convertTableData = (
   }
 
   // use all response keys if tableDynamicColumns is true
-  if (panelSchema?.config?.tableDynamicColumns == true) {
+  if (panelSchema?.config?.table_dynamic_columns == true) {
     let responseKeys: any = new Set();
 
     // insert all keys of searchQueryData into responseKeys
