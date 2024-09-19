@@ -178,6 +178,25 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             trigger.retries + 1,
         )
         .await?;
+        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+            // It has been tried the maximum time, just disable the alert
+            // and show the error.
+            if let Some(mut alert) =
+                super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
+            {
+                alert.enabled = false;
+                if let Err(e) = db::alerts::alert::set_without_updating_trigger(
+                    &org_id,
+                    stream_type,
+                    stream_name,
+                    &alert,
+                )
+                .await
+                {
+                    log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+                }
+            }
+        }
         publish_triggers_usage(trigger_data_stream).await;
         return Err(err);
     }
