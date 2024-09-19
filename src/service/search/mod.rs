@@ -343,7 +343,12 @@ pub async fn search_partition(
     }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
-    step = step - step % min_step;
+    if step < min_step {
+        step = min_step;
+    }
+    if step % min_step > 0 {
+        step = step - step % min_step;
+    }
 
     // generate partitions
     let mut partitions = Vec::with_capacity(part_num);
