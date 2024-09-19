@@ -275,8 +275,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <trace-details-sidebar
           :span="spanMap[selectedSpanId as string]"
+          :baseTracePosition="baseTracePosition"
           @view-logs="redirectToLogs"
           @close="closeSidebar"
+          @open-trace="openTraceLink"
         />
       </div>
     </div>
@@ -311,7 +313,11 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
-import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  getImageURL,
+  converTimeFromNsToMs,
+} from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import {
@@ -633,6 +639,10 @@ export default defineComponent({
           "UI",
         )
         .then((res: any) => {
+          if (!res.data?.hits?.length) {
+            showTraceDetailsError();
+            return;
+          }
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
           buildTracesTree();
         })
@@ -1086,6 +1096,11 @@ export default defineComponent({
       });
     };
 
+    const openTraceLink = () => {
+      resetTraceDetails();
+      setupTraceDetails();
+    };
+
     return {
       router,
       t,
@@ -1130,6 +1145,8 @@ export default defineComponent({
       updateSelectedSpan,
       backgroundStyle,
       routeToTracesList,
+      openTraceLink,
+      converTimeFromNsToMs,
     };
   },
 });

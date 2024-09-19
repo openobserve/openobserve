@@ -59,7 +59,8 @@
     "addGroup":"Add Group",
     "addCondition":"Add Condition",
     "required": "Value is required",
-    "valueMustBeGreaterThanZero": "Value must be greater than zero"
+    "valueMustBeGreaterThanZero": "Value must be greater than zero",
+    "links": "Links"
   },
   "search": {
     "selectIndex": "Select Stream First",
