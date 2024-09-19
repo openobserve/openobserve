@@ -160,6 +160,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         end_time: now,
         retries: trigger.retries,
         error: None,
+        success_response: None,
     };
 
     // evaluate alert
@@ -238,23 +239,26 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert.send_notification(&data, end_time).await {
-            Ok((true, _)) => {
-                log::info!(
-                    "Alert notification sent, org: {}, module_key: {}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
-                );
-                db::scheduler::update_trigger(new_trigger).await?;
-            }
-            Ok((false, msg)) => {
-                log::error!(
-                    "Some notifications for alert {}/{} could not be sent: {msg}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
-                );
+            Ok((success_msg, err_msg)) => {
+                let success_msg = success_msg.trim().to_owned();
+                let err_msg = err_msg.trim().to_owned();
+                if !err_msg.is_empty() {
+                    log::error!(
+                        "Some notifications for alert {}/{} could not be sent: {err_msg}",
+                        &new_trigger.org,
+                        &new_trigger.module_key
+                    );
+                    trigger_data_stream.error = Some(err_msg);
+                } else {
+                    log::info!(
+                        "Alert notification sent, org: {}, module_key: {}",
+                        &new_trigger.org,
+                        &new_trigger.module_key
+                    );
+                }
+                trigger_data_stream.success_response = Some(success_msg);
                 // Notification is already sent to some destinations,
-                // hence no need to retry
-                trigger_data_stream.error = Some(msg);
+                // hence in case of partial errors, no need to retry
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Err(e) => {
@@ -437,6 +441,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
+        success_response: None,
     };
 
     match report.send_subscribers().await {
@@ -645,6 +650,7 @@ async fn handle_derived_stream_triggers(
         end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
+        success_response: None,
     };
 
     // ingest evaluation result into destination

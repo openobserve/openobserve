@@ -66,7 +66,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(30));
+    let mut interval = time::interval(time::Duration::from_secs(10));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

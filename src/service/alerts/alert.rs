@@ -327,7 +327,7 @@ pub async fn trigger(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(bool, String), (http::StatusCode, anyhow::Error)> {
+) -> Result<(String, String), (http::StatusCode, anyhow::Error)> {
     let alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
@@ -370,35 +370,39 @@ impl Alert {
         &self,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
-    ) -> Result<(bool, String), anyhow::Error> {
-        let mut message = "".to_string();
+    ) -> Result<(String, String), anyhow::Error> {
+        let mut err_message = "".to_string();
+        let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            if let Err(e) = send_notification(self, &dest, rows, rows_end_time).await {
-                log::error!(
-                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
-                    self.org_id,
-                    self.stream_type,
-                    self.stream_name,
-                    self.name,
-                    dest.name,
-                    e
-                );
-                no_of_error += 1;
-                message = format!(
-                    "{message} Error sending notification for destination {} err: {e};",
-                    dest.name
-                );
+            match send_notification(self, &dest, rows, rows_end_time).await {
+                Ok(resp) => {
+                    success_message =
+                        format!("{success_message} destination {} {resp};", dest.name);
+                }
+                Err(e) => {
+                    log::error!(
+                        "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
+                        self.org_id,
+                        self.stream_type,
+                        self.stream_name,
+                        self.name,
+                        dest.name,
+                        e
+                    );
+                    no_of_error += 1;
+                    err_message = format!(
+                        "{err_message} Error sending notification for destination {} err: {e};",
+                        dest.name
+                    );
+                }
             }
         }
         if no_of_error == self.destinations.len() {
-            Err(anyhow::anyhow!(message))
-        } else if no_of_error != 0 {
-            // Some send notification job failed
-            Ok((false, message))
+            Err(anyhow::anyhow!(err_message))
         } else {
-            Ok((true, "".to_owned()))
+            Ok((success_message, err_message))
         }
     }
 
@@ -416,7 +420,7 @@ pub async fn send_notification(
     dest: &DestinationWithTemplate,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
     } else {
@@ -440,7 +444,7 @@ pub async fn send_notification(
 pub async fn send_http_notification(
     dest: &DestinationWithTemplate,
     msg: String,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let client = if dest.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -482,7 +486,12 @@ pub async fn send_http_notification(
         resp_body,
     );
     if !resp_status.is_success() {
-        log::error!("Alert body: {}", msg);
+        log::error!(
+            "Alert http notification failed with status: {}, body: {}, payload: {}",
+            resp_status,
+            resp_body,
+            msg
+        );
         return Err(anyhow::anyhow!(
             "sent error status: {}, err: {}",
             resp_status,
@@ -490,14 +499,14 @@ pub async fn send_http_notification(
         ));
     }
 
-    Ok(())
+    Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
 }
 
 pub async fn send_email_notification(
     alert_name: &str,
     dest: &DestinationWithTemplate,
     msg: String,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let cfg = get_config();
     if !cfg.smtp.smtp_enabled {
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
@@ -524,7 +533,7 @@ pub async fn send_email_notification(
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
-        Ok(_) => Ok(()),
+        Ok(resp) => Ok(format!("sent response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
 }
