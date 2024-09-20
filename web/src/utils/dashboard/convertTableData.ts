@@ -49,7 +49,6 @@ export const convertTableData = (
   let columnData = [...x, ...y];
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
-  console.log("transposeColumns---------", columnData[0], columnData);
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -175,8 +174,7 @@ export const convertTableData = (
     const transposeColumns = searchQueryData[0].map(
       (it: any) => it[transposeColumn] ?? "",
     );
-    console.log("transposeColumns---", searchQueryData[0]);
-    
+
     const uniqueTransposeColumns: any = [];
     const columnDuplicationMap: any = {};
 
@@ -193,11 +191,15 @@ export const convertTableData = (
 
     // Filter out the first column but retain the label
     columnData = columnData.filter((it: any) => it.alias !== transposeColumn);
-    console.log("transposeColumns---------", columnData[0]);
-    
+
     // Generate label and corresponding transposed data rows
     columns = [
-      { name: "label", field: "label", label: transposeColumnLabel, align: "left" }, // Add label column with the first column's label
+      {
+        name: "label",
+        field: "label",
+        label: transposeColumnLabel,
+        align: "left",
+      }, // Add label column with the first column's label
       ...uniqueTransposeColumns.map((it: any) => {
         let obj: any = {};
         const isNumber = isSampleValuesNumbers(tableRows, it, 20);
@@ -256,9 +258,6 @@ export const convertTableData = (
       return obj;
     });
   }
-
-  console.log("tableRows return", tableRows);
-  console.log("columns return", columns);
 
   return {
     rows: tableRows,
