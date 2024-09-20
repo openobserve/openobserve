@@ -23,7 +23,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
-        stream::{FileKey, StreamPartition, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
@@ -270,8 +270,7 @@ pub async fn search_partition(
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-        let stream_files = cluster::get_file_list(
-            trace_id,
+        let stream_files = get_file_list(
             &sql,
             stream,
             stream_type,
@@ -285,7 +284,7 @@ pub async fn search_partition(
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
-        meta.meta.time_range,
+        (req.start_time, req.end_time),
         files.len(),
         file_list_took,
     );
@@ -664,13 +663,13 @@ pub async fn cancel_query(
 /// match a source is a valid file or not
 #[allow(clippy::too_many_arguments)]
 pub async fn match_file(
-    stream_name: &str,
     org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
     time_range: Option<(i64, i64)>,
     source: &FileKey,
     match_min_ts_only: bool,
     is_wal: bool,
-    stream_type: StreamType,
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
@@ -833,6 +832,30 @@ pub async fn search_partition_multi(
     }
     res.records = total_rec;
     Ok(res)
+}
+
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
+async fn get_file_list(
+    sql: &NewSql,
+    stream_name: &str,
+    stream_type: StreamType,
+    time_level: PartitionTimeLevel,
+    partition_keys: &[StreamPartition],
+) -> Vec<FileKey> {
+    let (time_min, time_max) = sql.time_range.unwrap();
+    let mut files = super::file_list::query(
+        &sql.org_id,
+        stream_name,
+        stream_type,
+        time_level,
+        time_min,
+        time_max,
+    )
+    .await
+    .unwrap_or_default();
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    files
 }
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);

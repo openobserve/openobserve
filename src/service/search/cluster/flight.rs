@@ -23,9 +23,7 @@ use config::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
-        stream::{
-            FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
-        },
+        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
     },
     metrics,
     utils::inverted_index::split_token,
@@ -41,6 +39,7 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, Result},
+    file_list::FileId,
     schema::{
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
         SchemaCache,
@@ -59,7 +58,7 @@ use crate::{
             optimizer::generate_optimizer_rules,
             table_provider::empty_table::NewEmptyTable,
         },
-        generate_filter_from_equal_items, match_file,
+        generate_filter_from_equal_items,
         new_sql::NewSql,
         request::Request,
         utlis::{AsyncDefer, ScanStatsVisitor},
@@ -98,29 +97,27 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
 
-    // 1. get file list
-    let mut file_list = get_file_lists(
+    // 1. get file id list
+    let file_id_list = get_file_id_lists(
         &sql.stream_names,
         &sql.schemas,
         &sql.org_id,
         sql.stream_type,
         sql.time_range,
-        &sql.equal_items,
     )
     .await?;
-
-    let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
-    let file_list_took = start.elapsed().as_millis() as usize;
+    let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
+    let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, num: {}, took: {} ms",
         sql.time_range,
-        file_list_vec.len(),
-        file_list_took,
+        file_id_list_vec.len(),
+        file_id_list_took,
     );
 
-    // 2. filter file list using inverted index
-    let (_use_inverted_index, _scan_stats, idx_took) =
-        get_file_list_from_inverted_index(trace_id, &req, &sql, &query, &mut file_list).await?;
+    // 2. get inverted index file list
+    let (_use_inverted_index, idx_file_list, _idx_scan_size, idx_took) =
+        get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
 
     // 3. get nodes
     let node_group = req
@@ -141,11 +138,10 @@ pub async fn search(
         .inc();
 
     // 4. check work group
+    let file_list_took = start.elapsed().as_millis() as usize;
     #[cfg(not(feature = "enterprise"))]
     let (took_wait, work_group_str, locker) =
         check_work_group(&req, trace_id, &nodes, start, file_list_took).await?;
-    #[cfg(feature = "enterprise")]
-    let file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
     #[cfg(feature = "enterprise")]
     let (took_wait, work_group_str, work_group) = check_work_group(
         &req,
@@ -203,18 +199,27 @@ pub async fn search(
     });
 
     // 5. partition file list
-    let partition_file_lists = partition_file_lists(file_list, &nodes, node_group).await?;
+    let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, node_group).await?;
 
     #[cfg(feature = "enterprise")]
-    super::super::SEARCH_SERVER
-        .add_file_stats(
-            trace_id,
-            _scan_stats.files,
-            _scan_stats.records,
-            _scan_stats.original_size,
-            _scan_stats.compressed_size,
-        )
-        .await;
+    {
+        let records = 0;
+        let compressed_size = 0;
+        let mut original_size = 0;
+        for file in file_id_list.iter() {
+            original_size += file.original_size;
+        }
+        original_size += idx_scan_size as i64;
+        super::super::SEARCH_SERVER
+            .add_file_stats(
+                trace_id,
+                file_id_list.len() as i64,
+                records,
+                original_size,
+                compressed_size,
+            )
+            .await;
+    }
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -243,9 +248,16 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, nodes, partition_file_lists)
-            .instrument(datafusion_span)
-            .await
+        run_datafusion(
+            trace_id_move,
+            req,
+            sql,
+            nodes,
+            partitioned_file_lists,
+            idx_file_list,
+        )
+        .instrument(datafusion_span)
+        .await
     });
     tokio::pin!(query_task);
 
@@ -299,7 +311,8 @@ pub async fn run_datafusion(
     req: Request,
     sql: Arc<NewSql>,
     nodes: Vec<Node>,
-    partition_file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+    partitioned_file_lists: HashMap<String, Vec<Vec<i64>>>,
+    idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -334,7 +347,8 @@ pub async fn run_datafusion(
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes.into_arc_vec(),
-        partition_file_lists,
+        partitioned_file_lists,
+        idx_file_list,
         equal_keys,
         match_all_keys,
         false, // for super cluster
@@ -347,7 +361,8 @@ pub async fn run_datafusion(
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
-            rewrite.file_lists.get(table_name).unwrap().clone(),
+            rewrite.file_id_lists.get(table_name).unwrap().clone(),
+            rewrite.idx_file_list.clone(),
             rewrite
                 .equal_keys
                 .get(table_name)
@@ -403,165 +418,6 @@ pub async fn get_online_querier_nodes(
         return Err(Error::Message("no querier node online".to_string()));
     }
     Ok(nodes)
-}
-
-#[tracing::instrument(name = "service:search:cluster:flight:get_file_lists", skip_all)]
-pub async fn get_file_lists(
-    stream_names: &[String],
-    schemas: &HashMap<String, Arc<SchemaCache>>,
-    org_id: &str,
-    stream_type: StreamType,
-    time_range: Option<(i64, i64)>,
-    equal_items: &HashMap<String, Vec<(String, String)>>,
-) -> Result<HashMap<String, Vec<FileKey>>> {
-    let mut file_lists = HashMap::with_capacity(stream_names.len());
-    for name in stream_names {
-        // stream settings
-        let stream_settings =
-            unwrap_stream_settings(schemas.get(name).unwrap().schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-
-        let empty_filters = vec![];
-        // get file list
-        let file_list = get_file_list(
-            name,
-            org_id,
-            stream_type,
-            time_range,
-            equal_items.get(name).unwrap_or(&empty_filters),
-            partition_time_level,
-            &stream_settings.partition_keys,
-        )
-        .await;
-        file_lists.insert(name.clone(), file_list);
-    }
-    Ok(file_lists)
-}
-
-#[tracing::instrument(name = "service:search:cluster:flight:get_file_list", skip_all)]
-pub(crate) async fn get_file_list(
-    stream_name: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    time_range: Option<(i64, i64)>,
-    equal_items: &[(String, String)],
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Vec<FileKey> {
-    let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default()
-            .len()
-            <= 1;
-    let (time_min, time_max) = time_range.unwrap();
-    let file_list = crate::service::file_list::query(
-        org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-        is_local,
-    )
-    .await
-    .unwrap_or_default();
-
-    let mut files = Vec::with_capacity(file_list.len());
-    for file in file_list {
-        if match_file(
-            stream_name,
-            org_id,
-            time_range,
-            &file,
-            false,
-            false,
-            stream_type,
-            partition_keys,
-            equal_items,
-        )
-        .await
-        {
-            files.push(file.to_owned());
-        }
-    }
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    files
-}
-
-#[tracing::instrument(
-    name = "service:search:cluster:flight:get_file_list_from_inverted_index",
-    skip_all
-)]
-pub async fn get_file_list_from_inverted_index(
-    trace_id: &str,
-    req: &Request,
-    sql: &Arc<NewSql>,
-    query: &SearchQuery,
-    file_list: &mut HashMap<String, Vec<FileKey>>,
-) -> Result<(bool, ScanStats, usize)> {
-    let cfg = get_config();
-    let inverted_index_type = if req.inverted_index_type.is_none()
-        || req.inverted_index_type.as_ref().unwrap().is_empty()
-    {
-        cfg.common.inverted_index_search_format.clone()
-    } else {
-        req.inverted_index_type.as_ref().unwrap().to_string()
-    };
-    let (use_inverted_index, index_terms) = is_use_inverted_index(sql);
-    let use_inverted_index =
-        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
-    log::info!(
-        "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
-        use_inverted_index
-    );
-
-    // use inverted index to filter file list
-    // If the query is of type inverted index and this is not an aggregations request,
-    // then filter the file list based on the inverted index.
-    let mut idx_scan_size = 0;
-    let mut idx_took = 0;
-    let mut file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
-    if use_inverted_index {
-        let stream_file_list;
-        let stream_name = sql.stream_names.first().unwrap();
-        let match_terms = sql.match_items.clone().unwrap_or_default();
-        let index_terms = generate_filter_from_equal_items(&index_terms);
-        (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
-            req.clone(),
-            query.clone(),
-            stream_name,
-            &file_list_vec,
-            &match_terms,
-            &index_terms,
-        )
-        .await?;
-        log::info!(
-            "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
-            sql.time_range,
-            stream_file_list.len(),
-            idx_scan_size,
-            idx_took,
-        );
-        file_list.insert(stream_name.to_string(), stream_file_list);
-        file_list_vec = file_list.values().flatten().collect::<Vec<_>>();
-    }
-
-    // calculate records, original_size, compressed_size
-    let mut scan_stats = ScanStats::new();
-    scan_stats.files = file_list_vec.len() as i64;
-    for file in file_list_vec.iter() {
-        let file_meta = &file.meta;
-        scan_stats.records += file_meta.records;
-        scan_stats.original_size += file_meta.original_size;
-        scan_stats.compressed_size += file_meta.compressed_size;
-    }
-    scan_stats.original_size += idx_scan_size as i64;
-    scan_stats.idx_scan_size = idx_scan_size as i64;
-
-    Ok((use_inverted_index, scan_stats, idx_took))
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -698,23 +554,23 @@ pub async fn check_work_group(
 
 #[tracing::instrument(name = "service:search:cluster:flight:partition_file_lists", skip_all)]
 pub async fn partition_file_lists(
-    file_lists: HashMap<String, Vec<FileKey>>,
+    file_id_lists: HashMap<String, Vec<FileId>>,
     nodes: &[Node],
     group: Option<RoleGroup>,
-) -> Result<HashMap<String, Vec<Vec<FileKey>>>> {
-    let mut file_partitions = HashMap::with_capacity(file_lists.len());
-    for (stream_name, file_list) in file_lists {
-        let partitions = partition_filt_list(file_list, nodes, group).await?;
+) -> Result<HashMap<String, Vec<Vec<i64>>>> {
+    let mut file_partitions = HashMap::with_capacity(file_id_lists.len());
+    for (stream_name, file_id_list) in file_id_lists {
+        let partitions = partition_filt_list(file_id_list, nodes, group).await?;
         file_partitions.insert(stream_name, partitions);
     }
     Ok(file_partitions)
 }
 
 pub async fn partition_filt_list(
-    file_list: Vec<FileKey>,
+    file_id_list: Vec<FileId>,
     nodes: &[Node],
     group: Option<RoleGroup>,
-) -> Result<Vec<Vec<FileKey>>> {
+) -> Result<Vec<Vec<i64>>> {
     let cfg = get_config();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     let mut partition_strategy =
@@ -723,9 +579,11 @@ pub async fn partition_filt_list(
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
     let partitions = match partition_strategy {
-        QueryPartitionStrategy::FileNum => partition_file_by_nums(file_list, querier_num),
-        QueryPartitionStrategy::FileSize => partition_file_by_bytes(file_list, querier_num),
-        QueryPartitionStrategy::FileHash => partition_file_by_hash(file_list, nodes, group).await,
+        QueryPartitionStrategy::FileNum => partition_file_by_nums(file_id_list, querier_num),
+        QueryPartitionStrategy::FileSize => partition_file_by_bytes(file_id_list, querier_num),
+        QueryPartitionStrategy::FileHash => {
+            partition_file_by_hash(file_id_list, nodes, group).await
+        }
     };
     let mut partition_file_list = Vec::with_capacity(nodes.len());
     let mut partitions = partitions.into_iter();
@@ -741,10 +599,10 @@ pub async fn partition_filt_list(
 }
 
 pub(crate) fn partition_file_by_nums(
-    file_keys: Vec<FileKey>,
+    file_id_list: Vec<FileId>,
     querier_num: usize,
-) -> Vec<Vec<FileKey>> {
-    let file_distribute = distribute(file_keys.len(), querier_num);
+) -> Vec<Vec<i64>> {
+    let file_distribute = distribute(file_id_list.len(), querier_num);
 
     let mut partitions = vec![Vec::new(); querier_num];
 
@@ -754,13 +612,13 @@ pub(crate) fn partition_file_by_nums(
         }
         let start = file_distribute.iter().take(i).sum::<usize>();
         let end = start + num;
-        partitions[i] = file_keys[start..end].to_vec();
+        partitions[i] = file_id_list[start..end].iter().map(|f| f.id).collect();
     }
 
     partitions
 }
 
-pub fn distribute(total: usize, n: usize) -> Vec<usize> {
+fn distribute(total: usize, n: usize) -> Vec<usize> {
     let base_value = total / n;
     let remainder = total % n;
     let mut buckets = vec![base_value; n];
@@ -771,35 +629,32 @@ pub fn distribute(total: usize, n: usize) -> Vec<usize> {
 }
 
 pub(crate) fn partition_file_by_bytes(
-    file_keys: Vec<FileKey>,
+    file_id_list: Vec<FileId>,
     querier_num: usize,
-) -> Vec<Vec<FileKey>> {
+) -> Vec<Vec<i64>> {
     let mut partitions = vec![Vec::new(); querier_num];
-    let sum_original_size = file_keys
-        .iter()
-        .map(|fk| fk.meta.original_size)
-        .sum::<i64>();
+    let sum_original_size = file_id_list.iter().map(|fk| fk.original_size).sum::<i64>();
     let avg_size = sum_original_size / querier_num as i64;
     let mut node_size = 0;
     let mut node_k = 0;
-    for fk in file_keys {
-        node_size += fk.meta.original_size;
+    for fk in file_id_list {
+        node_size += fk.original_size;
         if node_size >= avg_size && node_k != querier_num - 1 && !partitions[node_k].is_empty() {
-            node_size = fk.meta.original_size;
+            node_size = fk.original_size;
             node_k += 1;
-            partitions[node_k].push(fk);
+            partitions[node_k].push(fk.id);
             continue;
         }
-        partitions[node_k].push(fk);
+        partitions[node_k].push(fk.id);
     }
     partitions
 }
 
 pub(crate) async fn partition_file_by_hash(
-    file_keys: Vec<FileKey>,
+    file_id_list: Vec<FileId>,
     nodes: &[Node],
     group: Option<RoleGroup>,
-) -> Vec<Vec<FileKey>> {
+) -> Vec<Vec<i64>> {
     let mut node_idx = HashMap::with_capacity(nodes.len());
     let mut idx = 0;
     for node in nodes {
@@ -810,9 +665,9 @@ pub(crate) async fn partition_file_by_hash(
         idx += 1;
     }
     let mut partitions = vec![Vec::new(); idx];
-    for fk in file_keys {
+    for fk in file_id_list {
         let node_name =
-            infra_cluster::get_node_from_consistent_hash(&fk.key, &Role::Querier, group)
+            infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
                 .await
                 .expect("there is no querier node in consistent hash ring");
         let idx = match node_idx.get(&node_name) {
@@ -825,7 +680,7 @@ pub(crate) async fn partition_file_by_hash(
                 0
             }
         };
-        partitions[idx].push(fk);
+        partitions[idx].push(fk.id);
     }
     partitions
 }
@@ -881,11 +736,108 @@ pub fn filter_index_fields(
     result
 }
 
-pub async fn get_file_list_by_inverted_index(
+#[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]
+pub async fn get_file_id_lists(
+    stream_names: &[String],
+    schemas: &HashMap<String, Arc<SchemaCache>>,
+    org_id: &str,
+    stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
+) -> Result<HashMap<String, Vec<FileId>>> {
+    let mut file_lists = HashMap::with_capacity(stream_names.len());
+    for name in stream_names {
+        // stream settings
+        let stream_settings =
+            unwrap_stream_settings(schemas.get(name).unwrap().schema()).unwrap_or_default();
+        let partition_time_level =
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        // get file list
+        let file_id_list =
+            get_file_id_list(name, org_id, stream_type, time_range, partition_time_level).await;
+        file_lists.insert(name.clone(), file_id_list);
+    }
+    Ok(file_lists)
+}
+
+#[tracing::instrument(name = "service:search:cluster:flight:get_file_id_list", skip_all)]
+pub(crate) async fn get_file_id_list(
+    stream_name: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
+    time_level: PartitionTimeLevel,
+) -> Vec<FileId> {
+    let (time_min, time_max) = time_range.unwrap();
+    let mut files = crate::service::file_list::query_ids(
+        org_id,
+        stream_name,
+        stream_type,
+        time_level,
+        time_min,
+        time_max,
+    )
+    .await
+    .unwrap_or_default();
+    files.sort_by(|a, b| a.id.cmp(&b.id));
+    files.dedup_by(|a, b| a.id == b.id);
+    files
+}
+
+#[tracing::instrument(
+    name = "service:search:cluster:flight:get_inverted_index_file_list",
+    skip_all
+)]
+async fn get_inverted_index_file_lists(
+    trace_id: &str,
+    req: &Request,
+    sql: &Arc<NewSql>,
+    query: &SearchQuery,
+) -> Result<(bool, Vec<FileKey>, usize, usize)> {
+    let cfg = get_config();
+    let inverted_index_type = if req.inverted_index_type.is_none()
+        || req.inverted_index_type.as_ref().unwrap().is_empty()
+    {
+        cfg.common.inverted_index_search_format.clone()
+    } else {
+        req.inverted_index_type.as_ref().unwrap().to_string()
+    };
+    let (use_inverted_index, index_terms) = is_use_inverted_index(sql);
+    let use_inverted_index =
+        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    log::info!(
+        "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
+        use_inverted_index
+    );
+    if !use_inverted_index {
+        return Ok((false, vec![], 0, 0));
+    }
+
+    let stream_name = sql.stream_names.first().unwrap();
+    let match_terms = sql.match_items.clone().unwrap_or_default();
+    let index_terms = generate_filter_from_equal_items(&index_terms);
+    let (idx_file_list, idx_scan_size, idx_took) = get_inverted_index_file_list(
+        req.clone(),
+        query.clone(),
+        stream_name,
+        &match_terms,
+        &index_terms,
+    )
+    .await?;
+    log::info!(
+        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        sql.time_range,
+        idx_file_list.len(),
+        idx_scan_size,
+        idx_took,
+    );
+
+    Ok((use_inverted_index, idx_file_list, idx_scan_size, idx_took))
+}
+
+pub async fn get_inverted_index_file_list(
     mut req: Request,
     mut query: SearchQuery,
     stream_name: &str,
-    file_list: &[&FileKey],
     match_terms: &[String],
     index_terms: &[(String, Vec<String>)],
 ) -> Result<(Vec<FileKey>, usize, usize)> {
@@ -894,10 +846,6 @@ pub async fn get_file_list_by_inverted_index(
 
     let org_id = req.org_id.clone();
     let stream_type = req.stream_type;
-    let file_list_map = file_list
-        .iter()
-        .map(|f| (&f.key, &f.meta))
-        .collect::<HashMap<_, _>>();
 
     // Get all the unique terms which the user has searched.
     let terms = match_terms
@@ -958,11 +906,7 @@ pub async fn get_file_list_by_inverted_index(
     // If both empty return original file list with other params as 0
     let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
         (true, true) => {
-            return Ok((
-                file_list.iter().map(|v| (*v).clone()).collect::<Vec<_>>(),
-                0,
-                0,
-            ));
+            return Ok((vec![], 0, 0));
         }
         (true, false) => fts_condition,
         (false, true) => index_condition,
@@ -1018,9 +962,6 @@ pub async fn get_file_list_by_inverted_index(
             "files/{}/{}/{}/{}",
             &org_id, stream_type, stream_name, filename
         );
-        let Some(file_meta) = file_list_map.get(&prefixed_filename) else {
-            continue;
-        };
         let segment_ids = match item.get("segment_ids") {
             None => None,
             Some(v) => hex::decode(v.as_str().unwrap()).ok(),
@@ -1029,9 +970,7 @@ pub async fn get_file_list_by_inverted_index(
             .entry(prefixed_filename.clone())
             .or_insert(FileKey {
                 key: prefixed_filename,
-                meta: (*file_meta).clone(),
-                deleted: false,
-                segment_ids: None,
+                ..Default::default()
             });
         match (&entry.segment_ids, &segment_ids) {
             (Some(_), None) => {}
@@ -1069,7 +1008,12 @@ fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     println!("{}", plan);
 }
 
-pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> (bool, Vec<(String, String)>) {
+fn is_use_inverted_index(sql: &Arc<NewSql>) -> (bool, Vec<(String, String)>) {
+    // parquet format inverted index only support single table
+    if sql.stream_names.len() != 1 {
+        return (false, vec![]);
+    }
+
     let cfg = get_config();
     let index_terms = if sql.equal_items.len() == 1 {
         let schema = sql.schemas.values().next().unwrap().schema();
@@ -1087,174 +1031,4 @@ pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> (bool, Vec<(String, String)>)
         && (sql.match_items.is_some() || !index_terms.is_empty());
 
     (use_inverted_index, index_terms)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_partition_file_by_bytes() {
-        use config::meta::stream::FileMeta;
-
-        let vec = vec![
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 100,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 1,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 200,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 30,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 90,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 5,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 150,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-        ];
-        let expected: Vec<Vec<i64>> = vec![
-            vec![256, 256, 100],
-            vec![256, 1, 256],
-            vec![200, 30, 90, 256, 5, 150],
-        ];
-        let byte = partition_file_by_bytes(vec, 3);
-        for value in byte
-            .iter()
-            .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
-            .enumerate()
-        {
-            assert_eq!(value.1, expected.get(value.0).unwrap().clone());
-        }
-    }
 }

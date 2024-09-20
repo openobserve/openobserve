@@ -57,7 +57,8 @@ use crate::service::{
 #[derive(Debug)]
 pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
-    file_list: Vec<Vec<FileKey>>,
+    file_id_list: Vec<Vec<i64>>,
+    idx_file_list: Vec<FileKey>,
     equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
     is_super_cluster: bool,
@@ -74,7 +75,8 @@ impl RemoteScanExec {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
-        file_list: Vec<Vec<FileKey>>,
+        file_id_list: Vec<Vec<i64>>,
+        idx_file_list: Vec<FileKey>,
         equal_keys: Vec<KvItem>,
         match_all_keys: Vec<String>,
         is_super_cluster: bool,
@@ -87,7 +89,8 @@ impl RemoteScanExec {
         RemoteScanExec {
             input,
             req,
-            file_list,
+            file_id_list,
+            idx_file_list,
             equal_keys,
             match_all_keys,
             is_super_cluster,
@@ -167,16 +170,17 @@ impl ExecutionPlan for RemoteScanExec {
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         let req = self.req.clone();
-        let file_list = if self.file_list.is_empty() {
+        let file_id_list = if self.file_id_list.is_empty() {
             vec![]
         } else {
-            self.file_list[partition].clone()
+            self.file_id_list[partition].clone()
         };
         let fut = get_remote_batch(
             self.input.clone(),
             partition,
             self.nodes[partition].clone(),
-            file_list,
+            file_id_list,
+            self.idx_file_list.clone(),
             self.equal_keys.clone(),
             self.match_all_keys.clone(),
             self.is_super_cluster,
@@ -201,7 +205,8 @@ async fn get_remote_batch(
     input: Arc<dyn ExecutionPlan>,
     partition: usize,
     node: Arc<dyn NodeInfo>,
-    file_list: Vec<FileKey>,
+    file_id_list: Vec<i64>,
+    idx_file_list: Vec<FileKey>,
     equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
     is_super_cluster: bool,
@@ -214,13 +219,28 @@ async fn get_remote_batch(
     };
     let physical_plan_bytes = physical_plan_to_bytes_with_extension_codec(input, &proto)?;
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+
+    let is_querier = !file_id_list.is_empty();
+    let idx_file_list = if is_querier {
+        idx_file_list
+            .iter()
+            .map(|f| cluster_rpc::IdxFileName {
+                key: f.key.clone(),
+                segment_ids: f.segment_ids.clone(),
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+
     let request = FlightSearchRequest {
         trace_id: req.trace_id.clone(),
         partition: partition as u32,
         org_id: req.org_id.clone(),
         stream_type: req.stream_type.to_string(),
         plan: physical_plan_bytes.to_vec(),
-        file_list: file_list.iter().map(cluster_rpc::FileKey::from).collect(),
+        file_id_list: file_id_list.to_vec(),
+        idx_file_list,
         equal_keys,
         match_all_keys,
         is_super_cluster,
@@ -235,11 +255,12 @@ async fn get_remote_batch(
     };
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, is_querier: {}, files: {}",
+        "[trace_id {}] flight->search: request node: {}, is_querier: {}, files: {}, idx_files: {}",
         req.trace_id,
         &node.get_grpc_addr(),
-        !file_list.is_empty(),
-        file_list.len()
+        is_querier,
+        request.file_id_list.len(),
+        request.idx_file_list.len(),
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -321,7 +342,7 @@ async fn get_remote_batch(
         schema,
         stream,
         node.get_grpc_addr(),
-        !file_list.is_empty(),
+        is_querier,
         files,
         scan_size,
         start,

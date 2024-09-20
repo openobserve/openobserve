@@ -98,6 +98,15 @@ pub struct FileKey {
     #[prost(bytes = "vec", optional, tag = "4")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
+#[derive(Eq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdxFileName {
+    #[prost(string, tag = "1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", optional, tag = "2")]
+    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum StreamType {
@@ -965,15 +974,6 @@ pub struct SearchRequest {
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "13")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-}
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IdxFileName {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", optional, tag = "2")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -2781,30 +2781,32 @@ pub struct FlightSearchRequest {
     /// used for search
     #[prost(bytes = "vec", tag = "6")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
-    #[prost(message, repeated, tag = "7")]
-    pub file_list: ::prost::alloc::vec::Vec<FileKey>,
+    #[prost(int64, repeated, tag = "7")]
+    pub file_id_list: ::prost::alloc::vec::Vec<i64>,
     #[prost(message, repeated, tag = "8")]
+    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
+    #[prost(message, repeated, tag = "9")]
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
-    #[prost(string, repeated, tag = "9")]
+    #[prost(string, repeated, tag = "10")]
     pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(int64, tag = "10")]
-    pub start_time: i64,
     #[prost(int64, tag = "11")]
-    pub end_time: i64,
+    pub start_time: i64,
     #[prost(int64, tag = "12")]
+    pub end_time: i64,
+    #[prost(int64, tag = "13")]
     pub timeout: i64,
     /// used for super cluster and enterprise
-    #[prost(bool, tag = "13")]
-    pub is_super_cluster: bool,
     #[prost(bool, tag = "14")]
+    pub is_super_cluster: bool,
+    #[prost(bool, tag = "15")]
     pub use_inverted_index: bool,
-    #[prost(string, optional, tag = "15")]
-    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "16")]
-    pub index_type: ::core::option::Option<::prost::alloc::string::String>,
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "17")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    pub index_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "18")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "19")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]

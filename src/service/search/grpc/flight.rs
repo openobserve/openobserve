@@ -24,7 +24,7 @@ use config::{
     get_config,
     meta::{
         search::ScanStats,
-        stream::{FileKey, StreamType},
+        stream::{FileKey, StreamPartition, StreamType},
     },
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -34,14 +34,17 @@ use proto::cluster_rpc;
 
 use crate::service::{
     db,
-    search::datafusion::{
-        distributed_plan::{
-            codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-            empty_exec::NewEmptyExec,
-            NewEmptyExecVisitor, ReplaceTableScanExec,
+    search::{
+        datafusion::{
+            distributed_plan::{
+                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                empty_exec::NewEmptyExec,
+                NewEmptyExecVisitor, ReplaceTableScanExec,
+            },
+            exec::{prepare_datafusion_context, register_udf},
+            table_provider::uniontable::NewUnionTable,
         },
-        exec::{prepare_datafusion_context, register_udf},
-        table_provider::uniontable::NewUnionTable,
+        match_file,
     },
 };
 
@@ -144,8 +147,28 @@ pub async fn search(
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
     // search in object storage
-    if !req.file_list.is_empty() {
-        let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
+    if !req.file_id_list.is_empty() {
+        let stream_settings = infra::schema::get_settings(&org_id, stream_name, stream_type)
+            .await
+            .unwrap_or_default();
+        let (file_list, file_list_took) = get_file_list_by_ids(
+            &org_id,
+            stream_type,
+            stream_name,
+            query_params.time_range,
+            &stream_settings.partition_keys,
+            &search_partition_keys,
+            &req.file_id_list,
+            &req.idx_file_list,
+        )
+        .await;
+        log::info!(
+            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
+            req.partition,
+            file_list.len(),
+            file_list_took,
+        );
+
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             schema_latest.clone(),
@@ -241,4 +264,64 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: generated physical plan");
 
     Ok((ctx, physical_plan, scan_stats))
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(skip_all, fields(org_id = org_id, stream_name = stream_name))]
+async fn get_file_list_by_ids(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+    partition_keys: &[StreamPartition],
+    equal_items: &Option<Vec<(String, String)>>,
+    ids: &[i64],
+    idx_file_list: &[cluster_rpc::IdxFileName],
+) -> (Vec<FileKey>, usize) {
+    let start = std::time::Instant::now();
+    let file_list = crate::service::file_list::query_by_ids(ids)
+        .await
+        .unwrap_or_default();
+    // if there are any files in idx_files_list, use them to filter the files we got from ids,
+    // otherwise use all the files we got from ids
+    let file_list = if idx_file_list.is_empty() {
+        file_list
+    } else {
+        let mut files = Vec::with_capacity(idx_file_list.len());
+        let file_list_map: HashMap<_, _> =
+            file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
+        for idx_file in idx_file_list.iter() {
+            if let Some(file) = file_list_map.get(&idx_file.key) {
+                let mut new_file = file.clone();
+                if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
+                    new_file.segment_ids = Some(segment_ids.clone());
+                }
+                files.push(new_file);
+            }
+        }
+        files
+    };
+
+    let mut files = Vec::with_capacity(file_list.len());
+    let equal_items = equal_items.clone().unwrap_or_default();
+    for file in file_list {
+        if match_file(
+            org_id,
+            stream_type,
+            stream_name,
+            time_range,
+            &file,
+            false,
+            false,
+            partition_keys,
+            &equal_items,
+        )
+        .await
+        {
+            files.push(file.to_owned());
+        }
+    }
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    (files, start.elapsed().as_millis() as usize)
 }

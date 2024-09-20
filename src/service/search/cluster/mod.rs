@@ -16,14 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::datatypes::Schema;
-use config::{
-    get_config,
-    meta::{
-        cluster::RoleGroup,
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
-    },
-    utils::json,
-};
+use config::{get_config, utils::json};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
@@ -32,9 +25,6 @@ use {
     infra::dist_lock,
     infra::errors::{Error, ErrorCodes, Result},
 };
-
-use super::{match_file, new_sql::NewSql};
-use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
 pub mod cache_multi;
 pub mod cacher;
@@ -122,58 +112,6 @@ pub async fn work_group_need_wait(
             }
         }
     }
-}
-
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
-pub(crate) async fn get_file_list(
-    _trace_id: &str,
-    sql: &NewSql,
-    stream_name: &str,
-    stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Vec<FileKey> {
-    let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default()
-            .len()
-            <= 1;
-    let (time_min, time_max) = sql.time_range.unwrap();
-    let file_list = file_list::query(
-        &sql.org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-        is_local,
-    )
-    .await
-    .unwrap_or_default();
-
-    let empty = vec![];
-    let mut files = Vec::with_capacity(file_list.len());
-    for file in file_list {
-        if match_file(
-            stream_name,
-            sql.org_id.as_str(),
-            sql.time_range,
-            &file,
-            false,
-            false,
-            stream_type,
-            partition_keys,
-            sql.equal_items.get(stream_name).unwrap_or(&empty),
-        )
-        .await
-        {
-            files.push(file.to_owned());
-        }
-    }
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    files
 }
 
 pub fn handle_table_response(

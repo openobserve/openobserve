@@ -28,19 +28,20 @@ message FlightSearchRequest {
     string                    stream_type = 4;
     // used for search 
     bytes                            plan = 6;
-    repeated FileKey            file_list = 7;
-    repeated KvItem            equal_keys = 8;
-    repeated string        match_all_keys = 9;
-    int64                     start_time = 10;
-    int64                       end_time = 11;
-    int64                        timeout = 12;
+    repeated int64           file_id_list = 7;
+    repeated IdxFileName    idx_file_list = 8;
+    repeated KvItem            equal_keys = 9;
+    repeated string       match_all_keys = 10;
+    int64                     start_time = 11;
+    int64                       end_time = 12;
+    int64                        timeout = 13;
     // used for super cluster and enterprise
-    bool                is_super_cluster = 13;
-    bool              use_inverted_index = 14;
-    optional string           work_group = 15;
-    optional string           index_type = 16;
-    optional string              user_id = 17;
-    optional string    search_event_type = 18;
+    bool                is_super_cluster = 14;
+    bool              use_inverted_index = 15;
+    optional string           work_group = 16;
+    optional string           index_type = 17;
+    optional string              user_id = 18;
+    optional string    search_event_type = 19;
 }
 
 message KvItem {

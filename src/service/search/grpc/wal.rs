@@ -123,7 +123,6 @@ pub async fn search_parquet(
                     file.meta.max_ts
                 );
                 wal::release_files(&[file.key.clone()]);
-                wal::release_files(&[file.key.clone()]);
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
@@ -229,7 +228,6 @@ pub async fn search_parquet(
     if cfg.common.memory_circuit_breaker_enable {
         if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
             // release all files
-            wal::release_files(&lock_files);
             wal::release_files(&lock_files);
             return Err(e);
         }

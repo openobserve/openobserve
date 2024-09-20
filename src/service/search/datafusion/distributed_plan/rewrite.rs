@@ -33,7 +33,8 @@ use crate::service::search::request::Request;
 pub struct RemoteScanRewriter {
     pub req: Request,
     pub nodes: Vec<Arc<dyn NodeInfo>>,
-    pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+    pub file_id_lists: HashMap<String, Vec<Vec<i64>>>,
+    pub idx_file_list: Vec<FileKey>,
     pub equal_keys: HashMap<String, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
     pub is_leader: bool, // for super cluster
@@ -42,10 +43,12 @@ pub struct RemoteScanRewriter {
 }
 
 impl RemoteScanRewriter {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
-        file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+        file_id_lists: HashMap<String, Vec<Vec<i64>>>,
+        idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         is_leader: bool,
@@ -54,7 +57,8 @@ impl RemoteScanRewriter {
         Self {
             req,
             nodes,
-            file_lists,
+            file_id_lists,
+            idx_file_list,
             equal_keys,
             match_all_keys,
             is_leader,
@@ -78,10 +82,11 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 let input = node.children()[0];
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     input.clone(),
-                    self.file_lists
+                    self.file_id_lists
                         .get(&table_name)
                         .unwrap_or(&empty_files)
                         .clone(),
+                    self.idx_file_list.clone(),
                     self.equal_keys
                         .get(&table_name)
                         .unwrap_or(&empty_keys)
@@ -109,10 +114,11 @@ impl TreeNodeRewriter for RemoteScanRewriter {
 
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     new_input,
-                    self.file_lists
+                    self.file_id_lists
                         .get(&table_name)
                         .unwrap_or(&empty_files)
                         .clone(),
+                    self.idx_file_list.clone(),
                     self.equal_keys
                         .get(&table_name)
                         .unwrap_or(&empty_keys)

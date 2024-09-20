@@ -46,11 +46,6 @@ message SearchRequest {
     optional string search_event_type = 13;
 }
 
-message IdxFileName {
-    string         key         = 1;
-    optional bytes segment_ids = 2;
-}
-
 message SearchResponse {
     Job              job = 1;
     int32           took = 2;

@@ -63,3 +63,8 @@ message FileKey {
     bool           deleted     = 3;
     optional bytes segment_ids = 4;
 }
+
+message IdxFileName {
+    string         key         = 1;
+    optional bytes segment_ids = 2;
+}
