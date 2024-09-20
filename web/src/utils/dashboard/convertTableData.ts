@@ -145,11 +145,23 @@ export const convertTableData = (
     const transposeColumns = searchQueryData[0].map(
       (it: any) => it[transposeColumn] ?? "",
     );
-    console.log("transposeColumns", transposeColumns);
-    columns = transposeColumns.map((it: any) => {
+    const uniqueTransposeColumns: any = [];
+    const columnDuplicationMap: any = {};
+
+    transposeColumns.forEach((col: any, index: any) => {
+      if (!columnDuplicationMap[col]) {
+        uniqueTransposeColumns.push(col);
+        columnDuplicationMap[col] = 1;
+      } else {
+        const uniqueCol = `${col}_${columnDuplicationMap[col]}`;
+        uniqueTransposeColumns.push(uniqueCol);
+        columnDuplicationMap[col] += 1;
+      }
+    });
+
+    columns = uniqueTransposeColumns.map((it: any) => {
       let obj: any = {};
       const isNumber = isSampleValuesNumbers(tableRows, it, 20);
-      console.log("isNumber", isNumber);
 
       obj["name"] = it;
       obj["field"] = it;
@@ -189,25 +201,15 @@ export const convertTableData = (
           );
         };
       }
+
       return obj;
     });
 
-    console.log("columnData", columnData);
-
-    // remove transposeColumn from teh columndata
     columnData = columnData.filter((it: any) => it.alias !== transposeColumn);
 
-    console.log("columnData after filter", columnData);
-
-    tableRows = columnData.map((it: any) => {
-      console.log("it", it);
-      let obj = transposeColumns.reduce(
+    tableRows = columnData.map((it) => {
+      let obj = uniqueTransposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
-          console.log("------------------------");
-          console.log("acc", acc);
-          console.log("curr", curr);
-          console.log("it", it);
-          console.log("it[curr]", searchQueryData[0][reduceIndex][it.alias]);
           acc[curr] = searchQueryData[0][reduceIndex][it.alias] ?? "";
           return acc;
         },
