@@ -56,9 +56,9 @@ pub async fn ingest(
     user_email: &str,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
 ) -> Result<IngestionResponse> {
-    let cfg = config::get_config();
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
+    let cfg = config::get_config();
     let mut need_usage_report = true;
 
     // check stream

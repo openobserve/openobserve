@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
 use tonic::{metadata::MetadataValue, Request, Status};
 
 use crate::common::{
-    infra::{
-        cluster::get_internal_grpc_token,
-        config::{ROOT_USER, USERS},
-    },
+    infra::config::{ROOT_USER, USERS},
     utils::auth::{get_hash, is_root_user},
 };
 

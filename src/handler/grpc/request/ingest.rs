@@ -14,17 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use async_trait::async_trait;
 use config::utils::json;
 use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
 use tonic::{Request, Response, Status};
 
 use crate::service::ingestion::create_log_ingestion_req;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Ingester;
 
-#[async_trait]
+#[tonic::async_trait]
 impl Ingest for Ingester {
     async fn ingest(
         &self,

@@ -190,7 +190,7 @@ async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
         log::debug!("[COMPACTOR] Running check running jobs");
         let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
         if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
-            log::error!("[COMPACTOR] run check running jobs error: {e}",);
+            log::error!("[COMPACTOR] run check running jobs error: {e}");
         }
         time::sleep(time::Duration::from_secs(time as u64)).await;
     }

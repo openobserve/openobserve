@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
@@ -92,7 +92,7 @@ pub async fn get_cached_results(
                     &node_addr
                 );
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
@@ -304,7 +304,7 @@ pub async fn delete_cached_results(path: String) -> bool {
                     &node_addr
                 );
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {

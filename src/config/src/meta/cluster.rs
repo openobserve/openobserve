@@ -13,11 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::meta::search::SearchEventType;
+use crate::{get_config, get_instance_id, meta::search::SearchEventType};
+
+pub trait NodeInfo: Debug + Send + Sync {
+    fn get_grpc_addr(&self) -> String;
+    fn get_auth_token(&self) -> String;
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Node {
@@ -87,6 +92,26 @@ impl Node {
 impl Default for Node {
     fn default() -> Self {
         Node::new()
+    }
+}
+
+impl NodeInfo for Node {
+    fn get_auth_token(&self) -> String {
+        get_internal_grpc_token()
+    }
+
+    fn get_grpc_addr(&self) -> String {
+        self.grpc_addr.clone()
+    }
+}
+
+pub trait IntoArcVec {
+    fn into_arc_vec(self) -> Vec<Arc<dyn NodeInfo>>;
+}
+
+impl IntoArcVec for Vec<Node> {
+    fn into_arc_vec(self) -> Vec<Arc<dyn NodeInfo>> {
+        self.into_iter().map(|n| Arc::new(n) as _).collect()
     }
 }
 
@@ -179,5 +204,15 @@ impl std::fmt::Display for RoleGroup {
             RoleGroup::Interactive => write!(f, "interactive"),
             RoleGroup::Background => write!(f, "background"),
         }
+    }
+}
+
+#[inline]
+pub fn get_internal_grpc_token() -> String {
+    let cfg = get_config();
+    if cfg.grpc.internal_grpc_token.is_empty() {
+        get_instance_id()
+    } else {
+        cfg.grpc.internal_grpc_token.clone()
     }
 }

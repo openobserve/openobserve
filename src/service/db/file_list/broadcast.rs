@@ -19,7 +19,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::{Node, NodeStatus},
+        cluster::{get_internal_grpc_token, Node, NodeStatus},
         stream::FileKey,
     },
 };
@@ -150,7 +150,7 @@ async fn send_to_node(
         }
         let cfg = get_config();
         // connect to the node
-        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
             .expect("parse internal grpc token faile");
         let channel = match get_cached_channel(&node.grpc_addr).await {

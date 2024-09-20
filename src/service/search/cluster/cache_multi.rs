@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use config::{cluster::LOCAL_NODE, get_config};
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
@@ -93,7 +93,7 @@ pub async fn get_cached_results(
                     &node_addr
                 );
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {

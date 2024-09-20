@@ -296,6 +296,7 @@ async fn write_logs(
         .get(stream_name)
         .unwrap()
         .schema()
+        .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let schema_key = latest_schema.hash_key();

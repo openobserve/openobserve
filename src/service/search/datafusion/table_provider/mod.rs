@@ -30,7 +30,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{any::Any, cmp::Ordering, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
@@ -48,7 +48,7 @@ use datafusion::{
         cache::{cache_manager::FileStatisticsCache, cache_unit::DefaultFileStatisticsCache},
         context::SessionState,
     },
-    logical_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType},
+    logical_expr::{utils::conjunction, Expr, SortExpr, TableProviderFilterPushDown, TableType},
     physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
     physical_plan::{
         empty::EmptyExec,
@@ -269,32 +269,22 @@ impl TableProvider for NewListingTable {
             .flatten()
         {
             Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
-            Some(Ok(groups)) => {
-                if groups.len() <= self.options.target_partitions {
-                    let query_limit = state
-                        .config()
-                        .get_extension::<super::ExtLimit>()
-                        .map(|x| x.0)
-                        .unwrap_or(0);
-                    let partition_num =
-                        if query_limit == 0 || query_limit >= config::PARQUET_BATCH_SIZE {
-                            self.options.target_partitions
-                        } else {
-                            config::get_config().limit.cpu_num
-                        };
-                    if partition_num > groups.len() {
-                        partitioned_file_lists = repartition_sorted_groups(groups, partition_num);
-                    } else {
-                        partitioned_file_lists = groups;
-                    }
-                } else {
+            Some(Ok(groups)) => match self.options.target_partitions.cmp(&groups.len()) {
+                Ordering::Equal => {
+                    partitioned_file_lists = groups;
+                }
+                Ordering::Greater => {
+                    partitioned_file_lists =
+                        repartition_sorted_groups(groups, self.options.target_partitions);
+                }
+                Ordering::Less => {
                     log::info!(
                         "attempted to split file groups by statistics, but there were more file groups: {} than target_partitions: {}",
                         groups.len(),
                         self.options.target_partitions
                     )
                 }
-            }
+            },
             None => {} // no ordering required
         };
 
@@ -446,36 +436,33 @@ fn find_max_group_index(groups: &[Vec<PartitionedFile>]) -> usize {
         })
 }
 
-fn create_ordering(schema: &Schema, sort_order: &[Vec<Expr>]) -> Result<Vec<LexOrdering>> {
+fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<LexOrdering>> {
     let mut all_sort_orders = vec![];
 
     for exprs in sort_order {
         // Construct PhysicalSortExpr objects from Expr objects:
         let mut sort_exprs = vec![];
-        for expr in exprs {
-            match expr {
-                Expr::Sort(sort) => match sort.expr.as_ref() {
-                    Expr::Column(col) => match expressions::col(&col.name, schema) {
-                        Ok(expr) => {
-                            sort_exprs.push(PhysicalSortExpr {
-                                expr,
-                                options: SortOptions {
-                                    descending: !sort.asc,
-                                    nulls_first: sort.nulls_first,
-                                },
-                            });
-                        }
-                        // Cannot find expression in the projected_schema, stop iterating
-                        // since rest of the orderings are violated
-                        Err(_) => break,
-                    },
-                    expr => {
-                        return plan_err!(
-                            "Expected single column references in output_ordering, got {expr}"
-                        );
+        for sort in exprs {
+            match &sort.expr {
+                Expr::Column(col) => match expressions::col(&col.name, schema) {
+                    Ok(expr) => {
+                        sort_exprs.push(PhysicalSortExpr {
+                            expr,
+                            options: SortOptions {
+                                descending: !sort.asc,
+                                nulls_first: sort.nulls_first,
+                            },
+                        });
                     }
+                    // Cannot find expression in the projected_schema, stop iterating
+                    // since rest of the orderings are violated
+                    Err(_) => break,
                 },
-                expr => return plan_err!("Expected Expr::Sort in output_ordering, but got {expr}"),
+                expr => {
+                    return plan_err!(
+                        "Expected single column references in output_ordering, got {expr}"
+                    );
+                }
             }
         }
         if !sort_exprs.is_empty() {

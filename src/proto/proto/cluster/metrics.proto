@@ -9,14 +9,13 @@ package cluster;
 import "cluster/common.proto";
 
 service Metrics {
-  rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
-  rpc WalFile (MetricsWalFileRequest) returns (MetricsWalFileResponse) {}
+    rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
+    rpc WalFile (MetricsWalFileRequest) returns (MetricsWalFileResponse) {}
 }
 
 message MetricsQueryRequest {
     Job                         job = 1;
     string                   org_id = 2;
-    SearchType                stype = 3;
     bool                   need_wal = 4;
     MetricsQueryStmt          query = 5;
     int64                   timeout = 8;

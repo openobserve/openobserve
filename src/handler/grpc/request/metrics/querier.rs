@@ -36,7 +36,7 @@ use crate::{
             metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
             MetricsWalFileRequest, MetricsWalFileResponse,
         },
-        request::MetadataMap,
+        MetadataMap,
     },
     service::{promql::search as SearchService, search::match_source},
 };
@@ -99,7 +99,7 @@ impl Metrics for MetricsQuerier {
             .get_ref()
             .filters
             .iter()
-            .map(|f| (f.field.as_str(), f.value.clone()))
+            .map(|f| (f.field.to_string(), f.value.clone()))
             .collect::<Vec<_>>();
         let mut resp = MetricsWalFileResponse::default();
 
@@ -109,6 +109,7 @@ impl Metrics for MetricsQuerier {
             StreamType::Metrics.to_string().as_str(),
             stream_name,
             Some((start_time, end_time)),
+            None,
         )
         .await
         .unwrap_or_default();
@@ -120,6 +121,7 @@ impl Metrics for MetricsQuerier {
                 StreamType::Metrics.to_string().as_str(),
                 stream_name,
                 Some((start_time, end_time)),
+                None,
             )
             .await
             .unwrap_or_default(),

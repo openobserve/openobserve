@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use proto::cluster_rpc::{usage_server::Usage, UsageRequest, UsageResponse};
 use tonic::{Request, Response, Status};
 
 use crate::common::meta::ingestion::IngestionRequest;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct UsageServerImpl;
 
-#[async_trait]
+#[tonic::async_trait]
 impl Usage for UsageServerImpl {
     async fn report_usage(
         &self,

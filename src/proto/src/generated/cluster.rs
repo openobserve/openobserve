@@ -98,6 +98,15 @@ pub struct FileKey {
     #[prost(bytes = "vec", optional, tag = "4")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
+#[derive(Eq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdxFileName {
+    #[prost(string, tag = "1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", optional, tag = "2")]
+    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum StreamType {
@@ -135,43 +144,6 @@ impl StreamType {
             "EnrichmentTables" => Some(Self::EnrichmentTables),
             "FILELIST" => Some(Self::Filelist),
             "INDEX" => Some(Self::Index),
-            _ => None,
-        }
-    }
-}
-/// Search request type
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum SearchType {
-    /// user input search request
-    User = 0,
-    /// cluster dispatch search request
-    Cluster = 1,
-    /// ingester node just search local wal
-    WalOnly = 2,
-    /// super cluster
-    SuperCluster = 3,
-}
-impl SearchType {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            SearchType::User => "USER",
-            SearchType::Cluster => "CLUSTER",
-            SearchType::WalOnly => "WAL_ONLY",
-            SearchType::SuperCluster => "SUPER_CLUSTER",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "USER" => Some(Self::User),
-            "CLUSTER" => Some(Self::Cluster),
-            "WAL_ONLY" => Some(Self::WalOnly),
-            "SUPER_CLUSTER" => Some(Self::SuperCluster),
             _ => None,
         }
     }
@@ -469,8 +441,6 @@ pub struct MetricsQueryRequest {
     pub job: ::core::option::Option<Job>,
     #[prost(string, tag = "2")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(enumeration = "SearchType", tag = "3")]
-    pub stype: i32,
     #[prost(bool, tag = "4")]
     pub need_wal: bool,
     #[prost(message, optional, tag = "5")]
@@ -986,8 +956,6 @@ pub struct SearchRequest {
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
     pub stream_type: ::prost::alloc::string::String,
-    #[prost(enumeration = "SearchType", tag = "4")]
-    pub stype: i32,
     #[prost(message, optional, tag = "5")]
     pub query: ::core::option::Option<SearchQuery>,
     #[prost(enumeration = "AggregateMode", tag = "6")]
@@ -1006,15 +974,6 @@ pub struct SearchRequest {
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "13")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-}
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IdxFileName {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", optional, tag = "2")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -1232,47 +1191,6 @@ pub mod search_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        pub async fn search(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/Search");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "Search"));
-            self.inner.unary(req, path, codec).await
-        }
-        pub async fn cluster_search(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/cluster.Search/ClusterSearch",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Search", "ClusterSearch"));
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn query_status(
             &mut self,
             request: impl tonic::IntoRequest<super::QueryStatusRequest>,
@@ -1357,14 +1275,6 @@ pub mod search_server {
     /// Generated trait containing gRPC methods that should be implemented for use with SearchServer.
     #[async_trait]
     pub trait Search: Send + Sync + 'static {
-        async fn search(
-            &self,
-            request: tonic::Request<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
-        async fn cluster_search(
-            &self,
-            request: tonic::Request<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
         async fn query_status(
             &self,
             request: tonic::Request<super::QueryStatusRequest>,
@@ -1466,94 +1376,6 @@ pub mod search_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/cluster.Search/Search" => {
-                    #[allow(non_camel_case_types)]
-                    struct SearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
-                    for SearchSvc<T> {
-                        type Response = super::SearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::SearchRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Search>::search(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = SearchSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/cluster.Search/ClusterSearch" => {
-                    #[allow(non_camel_case_types)]
-                    struct ClusterSearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
-                    for ClusterSearchSvc<T> {
-                        type Response = super::SearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::SearchRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Search>::cluster_search(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = ClusterSearchSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
                 "/cluster.Search/QueryStatus" => {
                     #[allow(non_camel_case_types)]
                     struct QueryStatusSvc<T: Search>(pub Arc<T>);
@@ -2930,12 +2752,68 @@ pub mod query_cache_server {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewEmptyExecNode {
-    #[prost(message, optional, tag = "1")]
+    #[prost(string, tag = "1")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
     pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
-    #[prost(uint64, repeated, tag = "2")]
+    #[prost(uint64, repeated, tag = "3")]
     pub projection: ::prost::alloc::vec::Vec<u64>,
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag = "4")]
     pub filters: ::prost::alloc::vec::Vec<::datafusion_proto::protobuf::LogicalExprNode>,
-    #[prost(uint64, optional, tag = "4")]
+    #[prost(uint64, optional, tag = "5")]
     pub limit: ::core::option::Option<u64>,
+    #[prost(bool, tag = "6")]
+    pub sorted_by_time: bool,
+}
+/// Search request
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FlightSearchRequest {
+    /// query identifier
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub partition: u32,
+    #[prost(string, tag = "3")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub stream_type: ::prost::alloc::string::String,
+    /// used for search
+    #[prost(bytes = "vec", tag = "6")]
+    pub plan: ::prost::alloc::vec::Vec<u8>,
+    #[prost(int64, repeated, tag = "7")]
+    pub file_id_list: ::prost::alloc::vec::Vec<i64>,
+    #[prost(message, repeated, tag = "8")]
+    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
+    #[prost(message, repeated, tag = "9")]
+    pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
+    #[prost(string, repeated, tag = "10")]
+    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(int64, tag = "11")]
+    pub start_time: i64,
+    #[prost(int64, tag = "12")]
+    pub end_time: i64,
+    #[prost(int64, tag = "13")]
+    pub timeout: i64,
+    /// used for super cluster and enterprise
+    #[prost(bool, tag = "14")]
+    pub is_super_cluster: bool,
+    #[prost(bool, tag = "15")]
+    pub use_inverted_index: bool,
+    #[prost(string, optional, tag = "16")]
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "17")]
+    pub index_type: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "18")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "19")]
+    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KvItem {
+    #[prost(string, tag = "1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub value: ::prost::alloc::string::String,
 }
