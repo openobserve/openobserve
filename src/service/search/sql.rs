@@ -41,9 +41,9 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
-        FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, SetExpr, VisitMut,
-        VisitorMut,
+        BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
+        SetExpr, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -699,6 +699,22 @@ impl VisitorMut for TrackTotalHitsVisitor {
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let SetExpr::Select(select) = query.body.as_mut() {
+            let (field_expr, duplicate_treatment) = if select.distinct.is_some() {
+                match select.projection.first() {
+                    Some(SelectItem::UnnamedExpr(expr)) => (
+                        FunctionArgExpr::Expr(expr.clone()),
+                        Some(DuplicateTreatment::Distinct),
+                    ),
+                    Some(SelectItem::ExprWithAlias { expr, alias: _ }) => (
+                        FunctionArgExpr::Expr(expr.clone()),
+                        Some(DuplicateTreatment::Distinct),
+                    ),
+                    _ => (FunctionArgExpr::Wildcard, None),
+                }
+            } else {
+                (FunctionArgExpr::Wildcard, None)
+            };
+
             select.group_by = GroupByExpr::Expressions(vec![], vec![]);
             select.having = None;
             select.sort_by = vec![];
@@ -707,8 +723,8 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     name: ObjectName(vec![Ident::new("count")]),
                     parameters: FunctionArguments::None,
                     args: FunctionArguments::List(FunctionArgumentList {
-                        args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
-                        duplicate_treatment: None,
+                        args: vec![FunctionArg::Unnamed(field_expr)],
+                        duplicate_treatment,
                         clauses: vec![],
                     }),
                     filter: None,
@@ -718,6 +734,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 }),
                 alias: Ident::new("zo_sql_num"),
             }];
+            select.distinct = None;
             query.order_by = None;
         }
         ControlFlow::Break(())
