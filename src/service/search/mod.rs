@@ -267,6 +267,7 @@ pub async fn search_partition(
     let sql = Sql::new(&query, org_id, stream_type).await?;
 
     let mut files = Vec::new();
+    let mut max_query_range = 0;
     for (stream, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let partition_time_level =
@@ -279,6 +280,7 @@ pub async fn search_partition(
             &stream_settings.partition_keys,
         )
         .await;
+        max_query_range = max(max_query_range, stream_settings.max_query_range);
         files.extend(stream_files);
     }
 
@@ -316,9 +318,7 @@ pub async fn search_partition(
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
         histogram_interval: sql.histogram_interval,
-        // TODO: search_partition with multiple streams
-        // max_query_range: stream_settings.max_query_range,
-        max_query_range: 100,
+        max_query_range,
         partitions: vec![],
     };
 
@@ -932,6 +932,8 @@ pub fn filter_index_fields(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::sql::SqlOperator;
+
     use super::*;
 
     #[test]
@@ -1040,6 +1042,26 @@ mod tests {
         }
     }
 
+    pub fn generate_filter_from_quick_text(
+        data: &[(String, String, SqlOperator)],
+    ) -> Vec<(&str, Vec<String>)> {
+        let quick_text_len = data.len();
+        let mut filters = HashMap::with_capacity(quick_text_len);
+        for i in 0..quick_text_len {
+            let (k, v, op) = &data[i];
+            if op == &SqlOperator::And
+                || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+            {
+                let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+                entry.push(v.to_string());
+            } else {
+                filters.clear();
+                break;
+            }
+        }
+        filters.into_iter().collect::<Vec<(_, _)>>()
+    }
+
     #[test]
     fn test_matches_by_partition_key_with_sql() {
         use config::meta::sql;
@@ -1118,10 +1140,20 @@ mod tests {
                 true,
             ),
         ];
+
         for (tsql, expected) in sqls {
             let meta = sql::Sql::new(tsql).unwrap();
-            let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+            let filter = generate_filter_from_quick_text(&meta.quick_text);
+            assert_eq!(
+                filter_source_by_partition_key(
+                    path,
+                    &filter
+                        .into_iter()
+                        .map(|(f1, f2)| (f1.to_owned(), f2))
+                        .collect::<Vec<(String, Vec<String>)>>()
+                ),
+                expected
+            );
         }
     }
 }
