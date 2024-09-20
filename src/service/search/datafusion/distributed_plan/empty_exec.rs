@@ -15,14 +15,16 @@
 
 use std::{any::Any, sync::Arc};
 
+use arrow_schema::SortOptions;
+use config::get_config;
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{internal_err, Result, Statistics},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        common, memory::MemoryStream, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-        PlanProperties,
+        common, expressions::Column, memory::MemoryStream, DisplayAs, DisplayFormatType,
+        ExecutionMode, ExecutionPlan, PlanProperties,
     },
     prelude::Expr,
 };
@@ -30,32 +32,36 @@ use datafusion::{
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
 pub struct NewEmptyExec {
-    /// The schema for the produced row
-    schema: SchemaRef,
-    /// Number of partitions
-    partitions: usize,
+    name: String,      // table name
+    schema: SchemaRef, // The schema for the produced row
+    partitions: usize, // Number of partitions
     cache: PlanProperties,
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
+    sorted_by_time: bool,
 }
 
 impl NewEmptyExec {
     /// Create a new NewEmptyExec
     pub fn new(
+        name: &str,
         schema: SchemaRef,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
+        sorted_by_time: bool,
     ) -> Self {
-        let cache = Self::compute_properties(Arc::clone(&schema), 1);
+        let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
         NewEmptyExec {
+            name: name.to_string(),
             schema,
             partitions: 1,
             cache,
             projection: projection.cloned(),
             filters: filters.to_owned(),
             limit,
+            sorted_by_time,
         }
     }
 
@@ -78,8 +84,29 @@ impl NewEmptyExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
-        let eq_properties = EquivalenceProperties::new(schema);
+    fn compute_properties(
+        schema: SchemaRef,
+        n_partitions: usize,
+        sorted_by_time: bool,
+    ) -> PlanProperties {
+        let index = schema.index_of(&get_config().common.column_timestamp);
+        let eq_properties = if !sorted_by_time {
+            EquivalenceProperties::new(schema)
+        } else {
+            match index {
+                Ok(index) => {
+                    let ordering = vec![vec![PhysicalSortExpr {
+                        expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
+                        options: SortOptions {
+                            descending: true,
+                            nulls_first: false,
+                        },
+                    }]];
+                    EquivalenceProperties::new_with_orderings(schema, &ordering)
+                }
+                Err(_) => EquivalenceProperties::new(schema),
+            }
+        };
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         PlanProperties::new(
             eq_properties,
@@ -88,6 +115,10 @@ impl NewEmptyExec {
             // Execution Mode
             ExecutionMode::Bounded,
         )
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn projection(&self) -> Option<&Vec<usize>> {
@@ -101,29 +132,24 @@ impl NewEmptyExec {
     pub fn limit(&self) -> Option<usize> {
         self.limit
     }
+
+    pub fn sorted_by_time(&self) -> bool {
+        self.sorted_by_time
+    }
 }
 
 impl DisplayAs for NewEmptyExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
+                let name_string = format!("name={:?}", self.name);
                 let projection_string = format!(
-                    "projection={:?}",
-                    self.projection
-                        .as_ref()
-                        .map(|p| {
-                            p.iter()
-                                .map(|p| {
-                                    format!(
-                                        "{}@{} AS {}",
-                                        self.schema.field(*p).name(),
-                                        p,
-                                        self.schema.field(*p).name()
-                                    )
-                                })
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default()
+                    ", projection={:?}",
+                    self.schema
+                        .fields()
+                        .iter()
+                        .map(|f| f.name())
+                        .collect::<Vec<_>>()
                 );
                 let filters_string = format!(
                     ", filters={:?}",
@@ -135,9 +161,22 @@ impl DisplayAs for NewEmptyExec {
                 let limit_string = self
                     .limit
                     .map_or_else(|| "".to_string(), |l| format!(", limit={}", l));
+                let sorted_by_time_string = if self.sorted_by_time {
+                    ", sorted_by_time=true"
+                } else {
+                    ""
+                };
 
                 write!(f, "NewEmptyExec: ")?;
-                write!(f, "{}{}{}", projection_string, filters_string, limit_string)
+                write!(
+                    f,
+                    "{}{}{}{}{}",
+                    name_string,
+                    projection_string,
+                    filters_string,
+                    limit_string,
+                    sorted_by_time_string
+                )
             }
         }
     }
@@ -197,5 +236,23 @@ impl ExecutionPlan for NewEmptyExec {
             &self.schema,
             None,
         ))
+    }
+}
+
+// add some unit tests here
+#[cfg(test)]
+mod tests {
+    use arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
+
+    #[test]
+    fn test_new_empty_exec() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("test", schema, None, &[], None, false);
+        assert_eq!(exec.name(), "test");
+        assert_eq!(exec.projection(), None);
+        assert_eq!(exec.filters().len(), 0);
+        assert_eq!(exec.limit(), None);
     }
 }

@@ -1,19 +1,50 @@
-  syntax = "proto3";
+syntax = "proto3";
 
-  option java_multiple_files = true;
-  option java_package = "org.openobserve.cluster";
-  option java_outer_classname = "planProto";
-  
-  package cluster;
+option java_multiple_files = true;
+option java_package = "org.openobserve.cluster";
+option java_outer_classname = "planProto";
+
+package cluster;
  
- import "datafusion_common/datafusion_common.proto";
- import "datafusion/datafusion.proto";
- 
- message NewEmptyExecNode {
-   datafusion_common.Schema schema = 1;
-   repeated uint64 projection = 2;
-   repeated datafusion.LogicalExprNode filters = 3;
-   optional uint64 limit = 4;
- }
- 
- 
+import "datafusion_common/datafusion_common.proto";
+import "datafusion/datafusion.proto";
+import "cluster/common.proto";
+
+message NewEmptyExecNode {
+    string                                 name = 1;
+    datafusion_common.Schema             schema = 2;
+    repeated uint64                  projection = 3;
+    repeated datafusion.LogicalExprNode filters = 4;
+    optional uint64                       limit = 5;
+    bool                         sorted_by_time = 6;
+}
+
+// Search request
+message FlightSearchRequest {
+    // query identifier
+    string                       trace_id = 1;
+    uint32                      partition = 2;
+    string                         org_id = 3;
+    string                    stream_type = 4;
+    // used for search 
+    bytes                            plan = 6;
+    repeated int64           file_id_list = 7;
+    repeated IdxFileName    idx_file_list = 8;
+    repeated KvItem            equal_keys = 9;
+    repeated string       match_all_keys = 10;
+    int64                     start_time = 11;
+    int64                       end_time = 12;
+    int64                        timeout = 13;
+    // used for super cluster and enterprise
+    bool                is_super_cluster = 14;
+    bool              use_inverted_index = 15;
+    optional string           work_group = 16;
+    optional string           index_type = 17;
+    optional string              user_id = 18;
+    optional string    search_event_type = 19;
+}
+
+message KvItem {
+    string   key = 1;
+    string value = 2;
+}

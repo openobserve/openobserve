@@ -21,6 +21,7 @@ use config::{
     get_config,
     meta::{
         search,
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -100,8 +101,9 @@ pub async fn search_multi(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let org_id = org_id.into_inner();
     let cfg = get_config();
+
+    let org_id = org_id.into_inner();
     let started_at = Utc::now().timestamp_micros();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone())
@@ -154,19 +156,15 @@ pub async fn search_multi(
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
         rpc_req.org_id = org_id.to_string();
         rpc_req.stream_type = stream_type.to_string();
-        let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req)
-            .await
-        {
-            Ok(v) => v,
+        let stream_name = match resolve_stream_names(&req.query.sql) {
+            Ok(v) => v[0].clone(),
             Err(e) => {
-                return Ok(match e {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
                         StatusCode::INTERNAL_SERVER_ERROR.into(),
                         e.to_string(),
-                    )),
-                });
+                    ),
+                ));
             }
         };
 
@@ -196,7 +194,7 @@ pub async fn search_multi(
                                 OFGA_MODELS
                                     .get(stream_type_str.as_str())
                                     .map_or(stream_type_str.as_str(), |model| model.key),
-                                resp.stream_name
+                                stream_name
                             ),
                             org_id: org_id.clone(),
                             bypass_check: false,
@@ -302,7 +300,7 @@ pub async fn search_multi(
                 report_request_usage_stats(
                     req_stats,
                     &org_id,
-                    &resp.stream_name,
+                    &stream_name,
                     StreamType::Logs,
                     UsageType::Search,
                     num_fn,
@@ -415,6 +413,7 @@ pub async fn _search_partition_multi(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/_search_partition_multi",
@@ -552,10 +551,9 @@ pub async fn around_multi(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-
-    let (org_id, stream_names) = path.into_inner();
     let cfg = get_config();
 
+    let (org_id, stream_names) = path.into_inner();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_names}/_around_multi",

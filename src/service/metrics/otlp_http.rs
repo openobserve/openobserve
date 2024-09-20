@@ -417,6 +417,7 @@ pub async fn metrics_json_handler(
                             .get(local_metric_name)
                             .unwrap()
                             .schema()
+                            .as_ref()
                             .clone()
                             .with_metadata(HashMap::new());
                         let schema_key = schema.hash_key();

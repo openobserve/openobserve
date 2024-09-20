@@ -18,6 +18,7 @@ use config::{
     get_config,
     meta::{
         search::{self, ResponseTook},
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -55,22 +56,21 @@ pub async fn search(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<search::Response, Error> {
-    let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let parsed_sql = match config::meta::sql::Sql::new(&origin_sql) {
-        Ok(v) => v,
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // TODO: cache don't not support multiple stream names
+        Ok(v) => v[0].clone(),
         Err(e) => {
             return Err(Error::Message(e.to_string()));
         }
     };
-
-    let stream_name = &parsed_sql.source;
 
     let mut req = in_req.clone();
     let mut query_fn = req
@@ -205,27 +205,28 @@ pub async fn search(
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
-            let task = tokio::task::spawn(async move {
-                let trace_id = trace_id.clone();
-                req.query.start_time = delta.delta_start_time;
-                req.query.end_time = delta.delta_end_time;
+            let task = tokio::task::spawn(
+                async move {
+                    let trace_id = trace_id.clone();
+                    req.query.start_time = delta.delta_start_time;
+                    req.query.end_time = delta.delta_end_time;
 
-                let cfg = get_config();
-                if cfg.common.result_cache_enabled
-                    && cfg.common.print_key_sql
-                    && c_resp.has_cached_data
-                {
-                    log::info!(
-                        "[trace_id {trace_id}] Query new start time: {}, end time : {}",
-                        req.query.start_time,
-                        req.query.end_time
-                    );
+                    let cfg = get_config();
+                    if cfg.common.result_cache_enabled
+                        && cfg.common.print_key_sql
+                        && c_resp.has_cached_data
+                    {
+                        log::info!(
+                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            req.query.start_time,
+                            req.query.end_time
+                        );
+                    }
+
+                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
                 }
-
-                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
-                    .instrument(enter_span)
-                    .await
-            });
+                .instrument(enter_span),
+            );
             tasks.push(task);
         }
 
@@ -284,7 +285,7 @@ pub async fn search(
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::Logs,
         UsageType::Search,
         num_fn,

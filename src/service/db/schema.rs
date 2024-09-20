@@ -177,7 +177,7 @@ async fn list_stream_schemas(
                     stream_name,
                     stream_type,
                     schema: if fetch_schema {
-                        val.schema().clone()
+                        val.schema().as_ref().clone()
                     } else {
                         Schema::empty()
                     },
