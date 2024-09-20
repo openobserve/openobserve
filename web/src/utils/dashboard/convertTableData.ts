@@ -49,6 +49,7 @@ export const convertTableData = (
   let columnData = [...x, ...y];
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
+  console.log("transposeColumns---------", columnData[0]);
 
   // identify histogram fields for auto and custom sql
   if (panelSchema?.queries[0]?.customQuery === false) {
@@ -86,13 +87,9 @@ export const convertTableData = (
     }
   }
 
-  console.log("columnsData", columnData);
-
   const isTransposeEnabled = panelSchema.config.table_transpose;
-  console.log("isTransposeEnabled", isTransposeEnabled);
   const transposeColumn = columnData[0]?.alias || "";
-  console.log("transposeColumn", transposeColumn);
-
+  const transposeColumnLabel = columnData[0]?.label || "";
   let columns;
 
   if (!isTransposeEnabled) {
@@ -139,12 +136,13 @@ export const convertTableData = (
       }
       return obj;
     });
-    console.log("columns inside if", columnData);
   } else {
     // lets get all columns from a particular field
     const transposeColumns = searchQueryData[0].map(
       (it: any) => it[transposeColumn] ?? "",
     );
+    console.log("transposeColumns---", searchQueryData[0]);
+    
     const uniqueTransposeColumns: any = [];
     const columnDuplicationMap: any = {};
 
@@ -159,55 +157,60 @@ export const convertTableData = (
       }
     });
 
-    columns = uniqueTransposeColumns.map((it: any) => {
-      let obj: any = {};
-      const isNumber = isSampleValuesNumbers(tableRows, it, 20);
-
-      obj["name"] = it;
-      obj["field"] = it;
-      obj["label"] = it;
-      obj["align"] = !isNumber ? "left" : "right";
-      obj["sortable"] = true;
-      // if number then sort by number and use decimal point config option in format
-      if (isNumber) {
-        obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-        obj["format"] = (val: any) => {
-          return !Number.isNaN(val)
-            ? `${
-                formatUnitValue(
-                  getUnitValue(
-                    val,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals ?? 2,
-                  ),
-                ) ?? 0
-              }`
-            : val;
-        };
-      }
-
-      // if current field is histogram field then return formatted date
-      if (histogramFields.includes(it)) {
-        // if current field is histogram field then return formatted date
-        obj["format"] = (val: any) => {
-          return formatDate(
-            toZonedTime(
-              typeof val === "string"
-                ? `${val}Z`
-                : new Date(val)?.getTime() / 1000,
-              store.state.timezone,
-            ),
-          );
-        };
-      }
-
-      return obj;
-    });
-
+    // Filter out the first column but retain the label
     columnData = columnData.filter((it: any) => it.alias !== transposeColumn);
+    console.log("transposeColumns---------", columnData[0]);
+    
+    // Generate label and corresponding transposed data rows
+    columns = [
+      { name: "label", field: "label", label: transposeColumnLabel, align: "left" }, // Add label column with the first column's label
+      ...uniqueTransposeColumns.map((it: any) => {
+        let obj: any = {};
+        const isNumber = isSampleValuesNumbers(tableRows, it, 20);
 
-    tableRows = columnData.map((it) => {
+        obj["name"] = it;
+        obj["field"] = it;
+        obj["label"] = it;
+        obj["align"] = !isNumber ? "left" : "right";
+        obj["sortable"] = true;
+
+        if (isNumber) {
+          obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+          obj["format"] = (val: any) => {
+            return !Number.isNaN(val)
+              ? `${
+                  formatUnitValue(
+                    getUnitValue(
+                      val,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals ?? 2,
+                    ),
+                  ) ?? 0
+                }`
+              : val;
+          };
+        }
+
+        if (histogramFields.includes(it)) {
+          obj["format"] = (val: any) => {
+            return formatDate(
+              toZonedTime(
+                typeof val === "string"
+                  ? `${val}Z`
+                  : new Date(val)?.getTime() / 1000,
+                store.state.timezone,
+              ),
+            );
+          };
+        }
+
+        return obj;
+      }),
+    ];
+
+    // Transpose rows, adding 'label' as the first column
+    tableRows = columnData.map((it: any) => {
       let obj = uniqueTransposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
           acc[curr] = searchQueryData[0][reduceIndex][it.alias] ?? "";
@@ -215,10 +218,10 @@ export const convertTableData = (
         },
         {},
       );
+      obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
   }
-
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
     let responseKeys: any = new Set();
