@@ -249,7 +249,7 @@ pub struct MappingOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pattern: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "matchh")]
+    #[serde(rename = "match")]
     matchh: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<String>,
