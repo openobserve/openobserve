@@ -16,21 +16,28 @@
 use std::{collections::HashSet, ops::ControlFlow, sync::Arc};
 
 use arrow_schema::FieldRef;
+use chrono::Duration;
 use config::{
     get_config,
-    meta::{sql::resolve_stream_names, stream::StreamType},
+    meta::{
+        sql::{resolve_stream_names, Sql as MetaSql},
+        stream::StreamType,
+    },
     utils::sql::AGGREGATE_UDF_LIST,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{
-    errors::Error,
+    errors::{Error, ErrorCodes},
     schema::{
         get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_settings,
         SchemaCache,
     },
 };
+use itertools::Itertools;
+use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
+use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
     ast::{
@@ -43,9 +50,13 @@ use sqlparser::{
 };
 
 use super::request::Request;
-use crate::service::search::sql::{
-    convert_histogram_interval_to_seconds, generate_histogram_interval,
-};
+
+pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
+pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
+pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+
+pub static RE_HISTOGRAM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct NewSql {
@@ -759,4 +770,93 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
         Expr::Function(f) => f.name.to_string().starts_with("match_all"),
         _ => false,
     }
+}
+
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+    if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
+        return "1 hour".to_string();
+    }
+    let time_range = time_range.unwrap();
+    if num > 0 {
+        return format!(
+            "{} second",
+            std::cmp::max(
+                (time_range.1 - time_range.0)
+                    / Duration::try_seconds(1)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+                    / num as i64,
+                1
+            )
+        );
+    }
+
+    let intervals = [
+        (Duration::try_hours(24 * 60), "1 day"),
+        (Duration::try_hours(24 * 30), "12 hour"),
+        (Duration::try_hours(24 * 28), "6 hour"),
+        (Duration::try_hours(24 * 21), "3 hour"),
+        (Duration::try_hours(24 * 15), "2 hour"),
+        (Duration::try_hours(6), "1 hour"),
+        (Duration::try_hours(2), "1 minute"),
+        (Duration::try_hours(1), "30 second"),
+        (Duration::try_minutes(30), "15 second"),
+        (Duration::try_minutes(15), "10 second"),
+    ];
+    for (time, interval) in intervals.iter() {
+        let time = time.unwrap().num_microseconds().unwrap();
+        if (time_range.1 - time_range.0) >= time {
+            return interval.to_string();
+        }
+    }
+    "10 second".to_string()
+}
+
+pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
+    let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
+        return Err(Error::Message("Invalid interval format".to_string()));
+    };
+    let seconds = match unit.to_lowercase().as_str() {
+        "second" | "seconds" => num.parse::<i64>(),
+        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+        _ => {
+            return Err(Error::Message(
+                "Unsupported histogram interval unit".to_string(),
+            ));
+        }
+    };
+    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
+}
+
+pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
+    let meta = match meta {
+        Some(v) => v,
+        None => match MetaSql::new(sql) {
+            Ok(meta) => meta,
+            Err(_) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    sql.to_string(),
+                )));
+            }
+        },
+    };
+    let Some(caps) = RE_WHERE.captures(sql) else {
+        return Ok(None);
+    };
+    let mut where_str = caps.get(1).unwrap().as_str().to_string();
+    if !meta.group_by.is_empty() {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" group ").unwrap()].to_string();
+    } else if meta.having {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
+    } else if !meta.order_by.is_empty() {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
+    } else if meta.limit > 0 || where_str.to_lowercase().ends_with(" limit 0") {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
+    } else if meta.offset > 0 {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
+    }
+    Ok(Some(where_str))
 }

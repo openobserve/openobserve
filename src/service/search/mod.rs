@@ -73,7 +73,6 @@ pub(crate) mod datafusion;
 pub(crate) mod grpc;
 pub(crate) mod new_sql;
 pub(crate) mod request;
-pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod utlis;

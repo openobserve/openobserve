@@ -96,10 +96,10 @@ pub async fn search(
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(
-        &sql.stream_names,
-        &sql.schemas,
         &sql.org_id,
         sql.stream_type,
+        &sql.stream_names,
+        &sql.schemas,
         sql.time_range,
     )
     .await?;
@@ -111,10 +111,16 @@ pub async fn search(
         file_id_list_vec.len(),
         file_id_list_took,
     );
+    let mut scan_stats = ScanStats {
+        files: file_id_list_vec.len() as i64,
+        original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        ..Default::default()
+    };
 
     // 2. get inverted index file list
-    let (_use_inverted_index, idx_file_list, _idx_scan_size, idx_took) =
+    let (_use_inverted_index, idx_file_list, idx_scan_size, idx_took) =
         get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
+    scan_stats.idx_scan_size = idx_scan_size as i64;
 
     // 3. get nodes
     let node_group = req
@@ -159,15 +165,12 @@ pub async fn search(
         .with_label_values(&[&sql.org_id])
         .inc();
 
-    // TODO: split it to two function for enterprise and non enterprise
     // release lock when search done or get error
-    #[cfg(feature = "enterprise")]
-    let user_id = req.user_id.clone();
     let trace_id_move = trace_id.to_string();
+    #[cfg(not(feature = "enterprise"))]
     let _defer = AsyncDefer::new({
         async move {
             // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
             let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
                 .await
                 .map_err(|e| {
@@ -176,7 +179,16 @@ pub async fn search(
                     );
                     Error::Message(e.to_string())
                 });
-            #[cfg(feature = "enterprise")]
+            log::info!("[trace_id {trace_id_move}] release lock in flight search");
+        }
+    });
+
+    #[cfg(feature = "enterprise")]
+    let user_id = req.user_id.clone();
+    #[cfg(feature = "enterprise")]
+    let _defer = AsyncDefer::new({
+        async move {
+            // search done, release lock
             let _ = work_group
                 .as_ref()
                 .unwrap()
@@ -188,36 +200,23 @@ pub async fn search(
                     );
                     e.to_string();
                 });
-            #[cfg(not(feature = "enterprise"))]
-            log::info!("[trace_id {trace_id_move}] release lock in flight search");
-            #[cfg(feature = "enterprise")]
             log::info!("[trace_id {trace_id_move}] release work group in flight search");
         }
     });
 
     // 5. partition file list
-    let scan_original_size = file_id_list_vec
-        .iter()
-        .map(|f| f.original_size)
-        .sum::<i64>();
-    let scan_file_num = file_id_list_vec.len();
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, node_group).await?;
 
     #[cfg(feature = "enterprise")]
-    {
-        let records = 0;
-        let compressed_size = 0;
-        let mut original_size = scan_original_size + _idx_scan_size as i64;
-        super::super::SEARCH_SERVER
-            .add_file_stats(
-                trace_id,
-                scan_file_num as i64,
-                records,
-                original_size,
-                compressed_size,
-            )
-            .await;
-    }
+    super::super::SEARCH_SERVER
+        .add_file_stats(
+            trace_id,
+            scan_stats.files,
+            scan_stats.records,
+            scan_stats.original_size + scan_stats.idx_scan_size,
+            scan_stats.compressed_size,
+        )
+        .await;
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -723,10 +722,10 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
 
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]
 pub async fn get_file_id_lists(
-    stream_names: &[String],
-    schemas: &HashMap<String, Arc<SchemaCache>>,
     org_id: &str,
     stream_type: StreamType,
+    stream_names: &[String],
+    schemas: &HashMap<String, Arc<SchemaCache>>,
     time_range: Option<(i64, i64)>,
 ) -> Result<HashMap<String, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
@@ -738,7 +737,7 @@ pub async fn get_file_id_lists(
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         // get file list
         let file_id_list =
-            get_file_id_list(name, org_id, stream_type, time_range, partition_time_level).await;
+            get_file_id_list(org_id, stream_type, name, time_range, partition_time_level).await;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
@@ -746,9 +745,9 @@ pub async fn get_file_id_lists(
 
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_list", skip_all)]
 pub(crate) async fn get_file_id_list(
-    stream_name: &str,
     org_id: &str,
     stream_type: StreamType,
+    stream_name: &str,
     time_range: Option<(i64, i64)>,
     time_level: PartitionTimeLevel,
 ) -> Vec<FileId> {
@@ -793,6 +792,7 @@ async fn get_inverted_index_file_lists(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
         use_inverted_index
     );
+
     if !use_inverted_index {
         return Ok((false, vec![], 0, 0));
     }
@@ -816,7 +816,7 @@ async fn get_inverted_index_file_lists(
         idx_took,
     );
 
-    Ok((use_inverted_index, idx_file_list, idx_scan_size, idx_took))
+    Ok((true, idx_file_list, idx_scan_size, idx_took))
 }
 
 pub async fn get_inverted_index_file_list(

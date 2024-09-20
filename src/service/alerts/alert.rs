@@ -48,7 +48,7 @@ use crate::{
     service::{
         alerts::{build_sql, destinations},
         db,
-        search::sql::RE_ONLY_SELECT,
+        search::new_sql::RE_ONLY_SELECT,
     },
 };
 

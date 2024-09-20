@@ -35,8 +35,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     cluster::flight::{
-        check_work_group, filter_index_fields, get_file_list, get_file_list_by_inverted_index,
-        get_online_querier_nodes, partition_filt_list,
+        check_work_group, get_file_id_list, get_inverted_index_file_list, get_online_querier_nodes,
+        partition_filt_list,
     },
     datafusion::{
         distributed_plan::{
@@ -92,7 +92,7 @@ pub async fn search(
     let mut visitor = NewEmptyExecVisitor::default();
     if physical_plan.visit(&mut visitor).is_err() || visitor.get_data().is_none() {
         return Err(Error::Message(
-            "super cluster follower leader: physical plan visit error: there is no EmptyTable"
+            "flight->follower_leader: physical plan visit error: there is no EmptyTable"
                 .to_string(),
         ));
     }
@@ -111,74 +111,45 @@ pub async fn search(
         schema_latest_map.insert(field.name(), field);
     }
 
-    // construct partition filters
-    let search_partition_keys: Option<Vec<(String, String)>> = flight_request
-        .equal_keys
-        .iter()
-        .filter_map(|v| {
-            if schema_latest_map.contains_key(&v.key) {
-                Some((v.key.to_string(), v.value.to_string()))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>()
-        .into();
-
     let stream_settings = unwrap_stream_settings(schema_latest.as_ref()).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, req.stream_type);
-    // get file list
-    let mut file_list = get_file_list(
-        stream_name,
+
+    // 1. get file id list
+    let file_id_list = get_file_id_list(
         &req.org_id,
         req.stream_type,
+        stream_name,
         req.time_range,
-        &search_partition_keys.unwrap_or_default(),
         partition_time_level,
-        &stream_settings.partition_keys,
     )
     .await;
 
-    let file_list_vec = file_list.iter().collect::<Vec<_>>();
-    let file_list_took = start.elapsed().as_millis() as usize;
+    let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
+    let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] super cluster follower leader: get file_list time_range: ({}, {}), num: {}, took: {} ms",
-        flight_request.start_time,
-        flight_request.end_time,
-        file_list_vec.len(),
-        file_list_took,
+        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, num: {}, took: {} ms",
+        (flight_request.start_time, flight_request.end_time),
+        file_id_list_vec.len(),
+        file_id_list_took,
     );
-
-    // check inverted index
-    let cfg = config::get_config();
-    let inverted_index_type = if req.inverted_index_type.is_none()
-        || req.inverted_index_type.as_ref().unwrap().is_empty()
-    {
-        cfg.common.inverted_index_search_format.clone()
-    } else {
-        req.inverted_index_type.as_ref().unwrap().to_string()
+    let mut scan_stats = ScanStats {
+        files: file_id_list_vec.len() as i64,
+        original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        ..Default::default()
     };
-    let use_inverted_index = req.use_inverted_index
-        && (inverted_index_type == "parquet" || inverted_index_type == "both");
-    log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
-        use_inverted_index
-    );
 
-    let mut idx_scan_size = 0;
-    if use_inverted_index {
-        (file_list, idx_scan_size) = get_file_list_from_inverted_index(
+    // 2. get inverted index file list
+    let (_use_inverted_index, idx_file_list, idx_scan_size, _idx_took) =
+        get_inverted_index_file_lists(
             &trace_id,
             &req,
             stream_name,
             &flight_request.equal_keys,
             &flight_request.match_all_keys,
-            &file_list,
         )
         .await?;
-    }
-    let scan_stats = calc_scan_stats(&file_list, idx_scan_size);
+    scan_stats.idx_scan_size = idx_scan_size as i64;
 
     // get nodes
     let node_group = req
@@ -194,14 +165,13 @@ pub async fn search(
     }
 
     // check work group
-    let file_list_vec = file_list.iter().collect::<Vec<_>>();
     let (_took_wait, work_group_str, work_group) = check_work_group(
         &req,
         &trace_id,
         &nodes,
-        &file_list_vec,
+        &file_id_list_vec,
         start,
-        file_list_took,
+        file_id_list_took,
     )
     .await?;
     // add work_group
@@ -228,7 +198,18 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_list, &nodes, node_group).await?;
+    let partition_file_lists = partition_filt_list(file_id_list, &nodes, node_group).await?;
+
+    // update search session scan stats
+    super::super::SEARCH_SERVER
+        .add_file_stats(
+            &trace_id,
+            scan_stats.files,
+            scan_stats.records,
+            scan_stats.original_size + scan_stats.idx_scan_size,
+            scan_stats.compressed_size,
+        )
+        .await;
 
     let context = tracing::Span::current().context();
     // add sort preserving merge node to preserving the order
@@ -237,6 +218,7 @@ pub async fn search(
         let remote_scan_exec = Arc::new(RemoteScanExec::new(
             physical_plan,
             partition_file_lists,
+            idx_file_list,
             flight_request.equal_keys.clone(),
             flight_request.match_all_keys.clone(),
             false,
@@ -249,6 +231,7 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             partition_file_lists,
+            idx_file_list,
             flight_request.equal_keys.clone(),
             flight_request.match_all_keys.clone(),
             false,
@@ -258,22 +241,41 @@ pub async fn search(
         ));
     }
 
-    log::info!(
-        "[trace_id {trace_id}] super cluster follower leader: generate physical plan finish",
-    );
+    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);
 
     Ok((ctx, physical_plan, defer, scan_stats))
 }
 
-// TODO: unify this impl with the one in cluster/flight.rs
-async fn get_file_list_from_inverted_index(
+#[tracing::instrument(
+    name = "service:search:super_cluster:follower:get_inverted_index_file_lists",
+    skip_all
+)]
+async fn get_inverted_index_file_lists(
     trace_id: &str,
     req: &Request,
     stream_name: &str,
     equal_terms: &[KvItem],
     match_terms: &[String],
-    file_list: &[FileKey],
-) -> Result<(Vec<FileKey>, usize)> {
+) -> Result<(bool, Vec<FileKey>, usize, usize)> {
+    let cfg = config::get_config();
+    let inverted_index_type = if req.inverted_index_type.is_none()
+        || req.inverted_index_type.as_ref().unwrap().is_empty()
+    {
+        cfg.common.inverted_index_search_format.clone()
+    } else {
+        req.inverted_index_type.as_ref().unwrap().to_string()
+    };
+    let use_inverted_index = req.use_inverted_index
+        && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    log::info!(
+        "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
+        use_inverted_index
+    );
+
+    if !use_inverted_index {
+        return Ok((false, vec![], 0, 0));
+    }
+
     // construct partition filters
     let equal_terms: Vec<(String, String)> = equal_terms
         .iter()
@@ -283,9 +285,7 @@ async fn get_file_list_from_inverted_index(
     let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&schema);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let index_terms = filter_index_fields(&equal_terms, &index_fields);
-
-    log::info!("[trace_id {trace_id}] super cluster follower leader: use_inverted_index true");
+    let index_terms = super::super::filter_index_fields(&equal_terms, &index_fields);
 
     // construct SearchQuery for inverted index search
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
@@ -296,40 +296,18 @@ async fn get_file_list_from_inverted_index(
     };
 
     // use inverted index to filter file list
-    let file_list_vec = file_list.iter().collect::<Vec<_>>();
     let index_terms = generate_filter_from_equal_items(&index_terms);
-    let (stream_file_list, idx_scan_size, idx_took) = get_file_list_by_inverted_index(
-        req.clone(),
-        query,
-        stream_name,
-        &file_list_vec,
-        match_terms,
-        &index_terms,
-    )
-    .await?;
+    let (idx_file_list, idx_scan_size, idx_took) =
+        get_inverted_index_file_list(req.clone(), query, stream_name, match_terms, &index_terms)
+            .await?;
 
     log::info!(
-        "[trace_id {trace_id}] super cluster follower leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
         req.time_range,
-        stream_file_list.len(),
+        idx_file_list.len(),
         idx_scan_size,
         idx_took,
     );
 
-    Ok((stream_file_list, idx_scan_size))
-}
-
-fn calc_scan_stats(file_list_vec: &[FileKey], idx_scan_size: usize) -> ScanStats {
-    // calculate records, original_size, compressed_size
-    let mut scan_stats = ScanStats::new();
-    scan_stats.files = file_list_vec.len() as i64;
-    for file in file_list_vec.iter() {
-        let file_meta = &file.meta;
-        scan_stats.records += file_meta.records;
-        scan_stats.original_size += file_meta.original_size;
-        scan_stats.compressed_size += file_meta.compressed_size;
-    }
-    scan_stats.original_size += idx_scan_size as i64;
-    scan_stats.idx_scan_size = idx_scan_size as i64;
-    scan_stats
+    Ok((true, idx_file_list, idx_scan_size, idx_took))
 }

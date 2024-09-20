@@ -815,7 +815,7 @@ async fn values_v1(
     };
 
     // pick up where clause from sql
-    let where_str = match SearchService::sql::pickup_where(&query_sql, None) {
+    let where_str = match SearchService::new_sql::pickup_where(&query_sql, None) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Err(Error::other(e));
