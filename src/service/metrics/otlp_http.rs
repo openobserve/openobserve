@@ -417,6 +417,7 @@ pub async fn metrics_json_handler(
                             .get(local_metric_name)
                             .unwrap()
                             .schema()
+                            .as_ref()
                             .clone()
                             .with_metadata(HashMap::new());
                         let schema_key = schema.hash_key();
@@ -456,7 +457,9 @@ pub async fn metrics_json_handler(
                             if let Some(alerts) = stream_alerts_map.get(&key) {
                                 let mut trigger_alerts: TriggerAlertData = Vec::new();
                                 for alert in alerts {
-                                    if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
+                                    if let Ok((Some(v), _)) =
+                                        alert.evaluate(Some(val_map), None).await
+                                    {
                                         trigger_alerts.push((alert.clone(), v));
                                     }
                                 }

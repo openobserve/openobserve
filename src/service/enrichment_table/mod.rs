@@ -182,6 +182,7 @@ pub async fn save_enrichment_data(
         .get(stream_name)
         .unwrap()
         .schema()
+        .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let schema_key = schema.hash_key();

@@ -31,13 +31,14 @@ use datafusion_proto::{
     protobuf::proto_error,
 };
 use prost::Message;
+use proto::cluster_rpc;
 
-use super::{super::cluster_rpc, emptyexec::NewEmptyExec};
+use super::empty_exec::NewEmptyExec;
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[allow(dead_code)]
 #[derive(Debug)]
-struct EmptyExecPhysicalExtensionCodec;
+pub struct EmptyExecPhysicalExtensionCodec;
 
 impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
     fn try_decode(
@@ -70,10 +71,12 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             )
         };
         Ok(Arc::new(NewEmptyExec::new(
+            &proto.name,
             schema,
             projection.as_ref(),
             &filters,
             proto.limit.map(|v| v as usize),
+            proto.sorted_by_time,
         )))
     }
 
@@ -84,6 +87,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
         let extension_codec = DefaultLogicalExtensionCodec {};
         let filters = serialize_exprs(node.filters(), &extension_codec)?;
         let proto = cluster_rpc::NewEmptyExecNode {
+            name: node.name().to_string(),
             schema: Some(node.schema().as_ref().try_into()?),
             projection: match node.projection() {
                 Some(v) => v.iter().map(|v| *v as u64).collect(),
@@ -91,6 +95,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             },
             filters,
             limit: node.limit().map(|v| v as u64),
+            sorted_by_time: node.sorted_by_time(),
         };
         proto.encode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -105,8 +110,8 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
 /// until one works
 #[allow(dead_code)]
 #[derive(Debug)]
-struct ComposedPhysicalExtensionCodec {
-    codecs: Vec<Arc<dyn PhysicalExtensionCodec>>,
+pub struct ComposedPhysicalExtensionCodec {
+    pub codecs: Vec<Arc<dyn PhysicalExtensionCodec>>,
 }
 
 impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
@@ -173,10 +178,12 @@ mod tests {
     async fn test_datafusion_codec() -> Result<()> {
         let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
+            "test",
             Arc::new(schema),
             Some(&vec![0]),
             &[],
             Some(10),
+            false,
         ));
 
         // encode
@@ -192,6 +199,7 @@ mod tests {
         let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 
         // check
+        assert_eq!(plan.name(), plan2.name());
         assert_eq!(plan.schema(), plan2.schema());
         assert_eq!(plan.projection(), plan2.projection());
         assert_eq!(plan.filters(), plan2.filters());

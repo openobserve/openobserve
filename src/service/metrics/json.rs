@@ -254,6 +254,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             .get(&stream_name)
             .unwrap()
             .schema()
+            .as_ref()
             .clone()
             .with_metadata(HashMap::new());
         let schema_key = schema.hash_key();

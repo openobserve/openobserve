@@ -294,7 +294,6 @@ pub async fn merge_by_stream(
         partition_time_level,
         partition_offset_start,
         partition_offset_end,
-        true,
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
@@ -318,7 +317,6 @@ pub async fn merge_by_stream(
             partition_time_level,
             lookback_offset_start,
             lookback_offset_end,
-            true,
         )
         .await
         .map_err(|e| anyhow::anyhow!("query lookback file list failed: {}", e))?;
@@ -662,7 +660,7 @@ pub async fn merge_files(
         let schema_latest = SchemaCache::new(schema_latest);
         let schema_latest =
             generate_schema_for_defined_schema_fields(&schema_latest, &defined_schema_fields);
-        Arc::new(schema_latest.schema().clone())
+        schema_latest.schema().clone()
     } else {
         Arc::new(schema_latest)
     };

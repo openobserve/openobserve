@@ -85,6 +85,7 @@ pub async fn logs_json_handler(
 ) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
 
     // check stream
     let stream_name = match in_stream_name {
@@ -93,7 +94,6 @@ pub async fn logs_json_handler(
     };
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
-    let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 

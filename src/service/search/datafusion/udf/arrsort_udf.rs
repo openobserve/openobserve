@@ -55,7 +55,7 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
         ));
     }
     let args = ColumnarValue::values_to_arrays(args)?;
-    log::debug!("Got the args: {:#?}", args);
+    // log::debug!("Got the args: {:#?}", args);
 
     // 1. cast argument to a string array. These casts MUST be aligned with the signature or this
     //    function panics!

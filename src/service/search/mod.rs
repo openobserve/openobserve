@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashSet, sync::Arc};
+use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col;
@@ -23,39 +23,46 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
-        stream::{FileKey, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, sql::is_aggregate_query, str::find},
-    FxIndexSet,
+    utils::{
+        base64,
+        sql::is_aggregate_query,
+        str::{find, StringExt},
+    },
 };
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+    },
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
+use sql::Sql;
+use tokio::runtime::Runtime;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::get_cached_channel,
-    o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
+    config::meta::cluster::get_internal_grpc_token,
+    o2_enterprise::enterprise::search::TaskStatus,
+    std::collections::HashSet,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
-    tracing::{info_span, Instrument},
+    tracing::info_span,
 };
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        meta::{ingestion::ORIGINAL_DATA_COL_NAME, stream::StreamParams},
-    },
+    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
@@ -64,7 +71,11 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod request;
 pub(crate) mod sql;
+#[cfg(feature = "enterprise")]
+pub(crate) mod super_cluster;
+pub(crate) mod utlis;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
@@ -77,7 +88,16 @@ pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
-#[tracing::instrument(name = "service:search:enter", skip(in_req))]
+pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .thread_name("datafusion_runtime")
+        .worker_threads(config::get_config().limit.cpu_num)
+        .enable_all()
+        .build()
+        .unwrap()
+});
+
+#[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -88,6 +108,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
     let cfg = get_config();
+
     let trace_id = if trace_id.is_empty() {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
@@ -108,7 +129,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 trace_id.clone(),
-                TaskStatus::new(
+                TaskStatus::new_leader(
                     vec![],
                     true,
                     user_id.clone(),
@@ -122,36 +143,33 @@ pub async fn search(
             .await;
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    let req_regions = vec![];
+    #[cfg(not(feature = "enterprise"))]
+    let req_clusters = vec![];
     #[cfg(feature = "enterprise")]
     let req_regions = in_req.regions.clone();
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
-    #[cfg(feature = "enterprise")]
-    let local_cluster_search = req_regions == vec!["local"]
-        && !req_clusters.is_empty()
-        && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
-    let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
-    req.job.as_mut().unwrap().trace_id = trace_id.clone();
-    req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::Cluster as _;
-    req.stream_type = stream_type.to_string();
-    req.user_id = user_id.clone();
+    let query: SearchQuery = in_req.query.clone().into();
+    let req_query = query.clone();
+    let request = crate::service::search::request::Request::new(
+        trace_id.clone(),
+        org_id.to_string(),
+        stream_type,
+        in_req.timeout,
+        user_id.clone(),
+        Some((query.start_time, query.end_time)),
+        in_req.search_type.map(|v| v.to_string()),
+        in_req.index_type.optinal(),
+    );
 
-    let req_query = req.clone().query.unwrap();
-
-    let handle = tokio::task::spawn(async move {
-        #[cfg(feature = "enterprise")]
-        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req, req_regions, req_clusters).await
-        } else {
-            cluster::http::search(req).await
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            cluster::http::search(req).await
-        }
-    });
+    let span = tracing::span::Span::current();
+    let handle = tokio::task::spawn(
+        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+            .instrument(span),
+    );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => Err(e),
@@ -246,30 +264,30 @@ pub async fn search_partition(
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let search_req = cluster_rpc::SearchRequest {
-        org_id: org_id.to_string(),
-        stream_type: stream_type.to_string(),
-        query: Some(query),
-        ..Default::default()
-    };
-    let meta = sql::Sql::new(&search_req).await?;
+    let sql = Sql::new(&query, org_id, stream_type).await?;
 
-    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let files = cluster::get_file_list(
-        trace_id,
-        &meta,
-        stream_type,
-        partition_time_level,
-        &stream_settings.partition_keys,
-    )
-    .await;
+    let mut files = Vec::new();
+    let mut max_query_range = 0;
+    for (stream, schema) in sql.schemas.iter() {
+        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
+        let partition_time_level =
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        let stream_files = get_file_list(
+            &sql,
+            stream,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
+        )
+        .await;
+        max_query_range = max(max_query_range, stream_settings.max_query_range);
+        files.extend(stream_files);
+    }
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
-        meta.meta.time_range,
+        (req.start_time, req.end_time),
         files.len(),
         file_list_took,
     );
@@ -299,8 +317,8 @@ pub async fn search_partition(
         records: records as usize,
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
-        histogram_interval: meta.histogram_interval,
-        max_query_range: stream_settings.max_query_range,
+        histogram_interval: sql.histogram_interval,
+        max_query_range,
         partitions: vec![],
     };
 
@@ -319,7 +337,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
+    let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
     if ts_column.is_none() || apply_over_hits {
         resp.partitions.push([req.start_time, req.end_time]);
         return Ok(resp);
@@ -330,7 +348,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        min_step *= meta.histogram_interval.unwrap_or(1);
+        min_step *= sql.histogram_interval.unwrap_or(1);
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
@@ -363,7 +381,7 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
-    if let Some((field, sort)) = meta.meta.order_by.first() {
+    if let Some((field, sort)) = sql.order_by.first() {
         if field == &ts_column.unwrap() && !sort {
             partitions.reverse();
         }
@@ -408,7 +426,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     )
                 });
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
@@ -566,12 +584,12 @@ pub async fn cancel_query(
                     )
                 });
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
                     log::error!(
-                        "search->cancel_query: node: {}, connect err: {:?}",
+                        "grpc_cancel_query: node: {}, connect err: {:?}",
                         &node.grpc_addr,
                         err
                     );
@@ -644,10 +662,59 @@ pub async fn cancel_query(
 }
 
 /// match a source is a valid file or not
+#[allow(clippy::too_many_arguments)]
+pub async fn match_file(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+    source: &FileKey,
+    match_min_ts_only: bool,
+    is_wal: bool,
+    partition_keys: &[StreamPartition],
+    equal_items: &[(String, String)],
+) -> bool {
+    let mut filters = generate_filter_from_equal_items(equal_items);
+    let partition_keys: HashMap<&String, &StreamPartition> =
+        partition_keys.iter().map(|v| (&v.field, v)).collect();
+    for (key, value) in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(key) {
+            for val in value.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
+    match_source(
+        StreamParams::new(org_id, stream_name, stream_type),
+        time_range,
+        filters.as_slice(),
+        source,
+        is_wal,
+        match_min_ts_only,
+    )
+    .await
+}
+
+/// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
+/// after [("a", ["3", "4"]), ("b", ["5", "6"])]
+pub fn generate_filter_from_equal_items(
+    equal_items: &[(String, String)],
+) -> Vec<(String, Vec<String>)> {
+    let mut filters: HashMap<String, Vec<String>> = HashMap::new();
+    for (field, value) in equal_items {
+        filters
+            .entry(field.to_string())
+            .or_default()
+            .push(value.to_string());
+    }
+    filters.into_iter().collect()
+}
+
+/// match a source is a valid file or not
 pub async fn match_source(
     stream: StreamParams,
     time_range: Option<(i64, i64)>,
-    filters: &[(&str, Vec<String>)],
+    filters: &[(String, Vec<String>)],
     source: &FileKey,
     is_wal: bool,
     match_min_ts_only: bool,
@@ -712,7 +779,7 @@ pub async fn match_source(
 }
 
 /// match a source is a needed file or not, return true if needed
-fn filter_source_by_partition_key(source: &str, filters: &[(&str, Vec<String>)]) -> bool {
+fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
     !filters.iter().any(|(k, v)| {
         let field = format_partition_key(&format!("{k}="));
         find(source, &format!("/{field}"))
@@ -768,6 +835,30 @@ pub async fn search_partition_multi(
     Ok(res)
 }
 
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
+async fn get_file_list(
+    sql: &Sql,
+    stream_name: &str,
+    stream_type: StreamType,
+    time_level: PartitionTimeLevel,
+    partition_keys: &[StreamPartition],
+) -> Vec<FileKey> {
+    let (time_min, time_max) = sql.time_range.unwrap();
+    let mut files = super::file_list::query(
+        &sql.org_id,
+        stream_name,
+        stream_type,
+        time_level,
+        time_min,
+        time_max,
+    )
+    .await
+    .unwrap_or_default();
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    files
+}
+
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
@@ -780,138 +871,6 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
             }
         }
     }
-}
-
-// generate parquet file search schema
-fn generate_search_schema(
-    sql: &Arc<sql::Sql>,
-    schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-    let mut new_fields = Vec::new();
-
-    for field in generate_used_fields_in_query(sql).iter() {
-        let group_field = schema.field_with_name(field).ok();
-        let latest_field = schema_latest_map.get(field).map(|f| f.as_ref());
-
-        match (group_field, latest_field) {
-            // When group_field is None and latest_field is Some, clone latest_field
-            (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
-
-            // When both group_field and latest_field are Some, compare their data types
-            (Some(group_field), Some(latest_field)) => {
-                if group_field.data_type() != latest_field.data_type() {
-                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
-                }
-                new_fields.push(Arc::new(group_field.clone()));
-            }
-
-            // should we return error
-            _ => {}
-        }
-    }
-
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-
-    let mut schema = Schema::new(new_fields);
-    let timestamp = &get_config().common.column_timestamp;
-    if schema.field_with_name(timestamp).is_err() {
-        // self add timestamp column if no exist
-        let field = Arc::new(Field::new(timestamp, DataType::Int64, false));
-        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
-    }
-
-    Ok((Arc::new(schema), diff_fields))
-}
-
-// generate parquet file search schema
-fn generate_select_start_search_schema(
-    sql: &Arc<sql::Sql>,
-    schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-    defined_schema_fields: &[String],
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    let schema_fields_map = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-    for field in schema.fields().iter() {
-        if let Some(f) = schema_latest_map.get(field.name()) {
-            if f.data_type() != field.data_type() {
-                diff_fields.insert(field.name().clone(), f.data_type().clone());
-            }
-        }
-    }
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-    // add not exists field in group schema but used in sql
-    let mut new_fields = Vec::new();
-    for field in generate_used_fields_in_query(sql).iter() {
-        if schema_fields_map.get(field).is_none() {
-            if let Some(field) = schema_latest_map.get(field) {
-                new_fields.push(Arc::new(field.as_ref().clone()));
-            }
-        }
-    }
-    let cfg = get_config();
-    let mut new_schema_fields = if !defined_schema_fields.is_empty() {
-        let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-        if !fields.contains(&cfg.common.column_timestamp) {
-            fields.insert(cfg.common.column_timestamp.to_string());
-        }
-        if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
-            fields.insert(cfg.common.column_all.to_string());
-        }
-        let new_fields = fields
-            .iter()
-            .filter_map(|f| match schema_fields_map.get(f) {
-                Some(f) => Some((*f).clone()),
-                None => schema_latest_map.get(f).map(|f| (*f).clone()),
-            })
-            .collect::<Vec<_>>();
-        new_fields
-    } else if !new_fields.is_empty() {
-        let mut merged_fields = schema.fields().to_vec();
-        // can extend directly b/c none of the `new_fields` is present in schema, checked above
-        merged_fields.extend(new_fields);
-        merged_fields
-    } else {
-        schema.fields().to_vec()
-    };
-
-    // skip selecting "_original" column if `SELECT * ...`
-    new_schema_fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
-
-    Ok((Arc::new(Schema::new(new_schema_fields)), diff_fields))
-}
-
-fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {
-    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
-
-    // note field name maybe equal to alias name
-    let used_fields: FxIndexSet<_> = sql
-        .meta
-        .group_by
-        .iter()
-        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
-        .filter(|f| !alias_map.contains(*f))
-        .chain(&sql.meta.fields)
-        .cloned()
-        .collect();
-
-    used_fields.into_iter().collect()
 }
 
 // generate parquet file search schema
@@ -933,8 +892,48 @@ fn generate_search_schema_diff(
     Ok(diff_fields)
 }
 
+pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
+    // parquet format inverted index only support single table
+    if sql.stream_names.len() != 1 {
+        return (false, vec![]);
+    }
+
+    let cfg = get_config();
+    let index_terms = if sql.equal_items.len() == 1 {
+        let schema = sql.schemas.values().next().unwrap().schema();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema);
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
+    } else {
+        vec![]
+    };
+
+    let use_inverted_index = sql.stream_type != StreamType::Index
+        && sql.use_inverted_index
+        && cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && (sql.match_items.is_some() || !index_terms.is_empty());
+
+    (use_inverted_index, index_terms)
+}
+
+pub fn filter_index_fields(
+    items: &[(String, String)],
+    index_fields: &[String],
+) -> Vec<(String, String)> {
+    let mut result = Vec::new();
+    for item in items {
+        if index_fields.contains(&item.0) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
+    use config::meta::sql::SqlOperator;
+
     use super::*;
 
     #[test]
@@ -942,77 +941,98 @@ mod tests {
         let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
         let filters = vec![
             (vec![], true),
-            (vec![("kuberneteshost", vec!["gke-dev1".to_string()])], true),
             (
-                vec![("kuberneteshost", vec!["gke-dev2".to_string()])],
+                vec![("kuberneteshost".to_string(), vec!["gke-dev1".to_string()])],
+                true,
+            ),
+            (
+                vec![("kuberneteshost".to_string(), vec!["gke-dev2".to_string()])],
                 false,
             ),
             (
                 vec![(
-                    "kuberneteshost",
+                    "kuberneteshost".to_string(),
                     vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                 )],
                 true,
             ),
             (
-                vec![("some_other_key", vec!["no-matter".to_string()])],
+                vec![("some_other_key".to_string(), vec!["no-matter".to_string()])],
                 true,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev1".to_string()]),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 true,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev1".to_string()]),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev2".to_string()]),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev2".to_string()]),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 true,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("some_other_key", vec!["no-matter".to_string()]),
+                    ("some_other_key".to_string(), vec!["no-matter".to_string()]),
                 ],
                 true,
             ),
@@ -1020,6 +1040,26 @@ mod tests {
         for (filter, expected) in filters {
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
         }
+    }
+
+    pub fn generate_filter_from_quick_text(
+        data: &[(String, String, SqlOperator)],
+    ) -> Vec<(&str, Vec<String>)> {
+        let quick_text_len = data.len();
+        let mut filters = HashMap::with_capacity(quick_text_len);
+        for i in 0..quick_text_len {
+            let (k, v, op) = &data[i];
+            if op == &SqlOperator::And
+                || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+            {
+                let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+                entry.push(v.to_string());
+            } else {
+                filters.clear();
+                break;
+            }
+        }
+        filters.into_iter().collect::<Vec<(_, _)>>()
     }
 
     #[test]
@@ -1100,10 +1140,20 @@ mod tests {
                 true,
             ),
         ];
+
         for (tsql, expected) in sqls {
             let meta = sql::Sql::new(tsql).unwrap();
-            let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+            let filter = generate_filter_from_quick_text(&meta.quick_text);
+            assert_eq!(
+                filter_source_by_partition_key(
+                    path,
+                    &filter
+                        .into_iter()
+                        .map(|(f1, f2)| (f1.to_owned(), f2))
+                        .collect::<Vec<(String, Vec<String>)>>()
+                ),
+                expected
+            );
         }
     }
 }

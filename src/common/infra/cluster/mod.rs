@@ -17,7 +17,7 @@ use std::{cmp::min, collections::HashMap, ops::Bound, sync::Arc, time::Duration}
 
 use config::{
     cluster::*,
-    get_config, get_instance_id,
+    get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
@@ -153,16 +153,6 @@ pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>
     drop(r);
     map.insert("flatten_compactor".to_string(), node_map);
     map
-}
-
-#[inline]
-pub fn get_internal_grpc_token() -> String {
-    let cfg = get_config();
-    if cfg.grpc.internal_grpc_token.is_empty() {
-        get_instance_id()
-    } else {
-        cfg.grpc.internal_grpc_token.clone()
-    }
 }
 
 /// Register and keepalive the node to cluster

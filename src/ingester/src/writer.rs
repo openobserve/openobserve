@@ -94,6 +94,7 @@ pub async fn read_from_memtable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
+    _partition_keys: Option<Vec<(String, String)>>,
 ) -> Result<Vec<ReadRecordBatchEntry>> {
     let key = WriterKey::new(org_id, stream_type);
     let hash_id = gxhash::new().sum64(stream_name);

@@ -129,8 +129,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn scan_wal_files(
     worker_tx: tokio::sync::mpsc::Sender<(String, Vec<FileKey>)>,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
     let pattern = wal_dir.join("files/");
 
@@ -590,10 +591,10 @@ async fn merge_files(
         .defined_schema_fields
         .unwrap_or_default();
     let schema = if !defined_schema_fields.is_empty() {
-        let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
+        let latest_schema = SchemaCache::new_from_arc(latest_schema.clone());
         let latest_schema =
             generate_schema_for_defined_schema_fields(&latest_schema, &defined_schema_fields);
-        Arc::new(latest_schema.schema().clone())
+        latest_schema.schema().clone()
     } else {
         latest_schema.clone()
     };
@@ -790,11 +791,7 @@ pub(crate) async fn generate_index_on_ingester(
         };
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
-            bloom_filter_fields: vec![
-                "field".to_string(),
-                "term".to_string(),
-                "file_name".to_string(),
-            ],
+            bloom_filter_fields: vec!["term".to_string()],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();

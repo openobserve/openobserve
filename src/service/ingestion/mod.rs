@@ -100,7 +100,7 @@ pub fn apply_vrl_fn(
     vrl_runtime: &VRLResultResolver,
     row: &Value,
     org_id: &str,
-    stream_name: &str,
+    stream_name: &[String],
 ) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
@@ -119,7 +119,7 @@ pub fn apply_vrl_fn(
             Ok(val) => val,
             Err(err) => {
                 log::error!(
-                    "{}/{} vrl failed at processing result {:?}. Returning original row.",
+                    "{}/{:?} vrl failed at processing result {:?}. Returning original row.",
                     org_id,
                     stream_name,
                     err,
@@ -129,7 +129,7 @@ pub fn apply_vrl_fn(
         },
         Err(err) => {
             log::error!(
-                "{}/{} vrl runtime failed at getting result {:?}. Returning original row.",
+                "{}/{:?} vrl runtime failed at getting result {:?}. Returning original row.",
                 org_id,
                 stream_name,
                 err,
@@ -249,41 +249,56 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             end_time: 0,
             retries: 0,
             error: None,
+            success_response: None,
         };
-        if let Err(e) = alert.send_notification(val).await {
-            log::error!("Failed to send notification: {}", e);
-            trigger_data_stream.status = TriggerDataStatus::Failed;
-            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
-        } else if alert.trigger_condition.silence > 0 {
-            log::debug!(
-                "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
-                &alert.org_id,
-                &alert.stream_type,
-                &alert.stream_name,
-                &alert.name
-            );
-
-            let next_run_at = Utc::now().timestamp_micros()
-                + Duration::try_minutes(alert.trigger_condition.silence)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap();
-            // After the notification is sent successfully, we need to update
-            // the silence period of the trigger
-            if let Err(e) = db::scheduler::update_trigger(db::scheduler::Trigger {
-                org: alert.org_id.to_string(),
-                module: db::scheduler::TriggerModule::Alert,
-                module_key,
-                is_silenced: true,
-                is_realtime: true,
-                next_run_at,
-                ..Default::default()
-            })
-            .await
-            {
-                log::error!("Failed to update trigger: {}", e);
+        match alert.send_notification(val, now, None).await {
+            Err(e) => {
+                log::error!("Failed to send notification: {}", e);
+                trigger_data_stream.status = TriggerDataStatus::Failed;
+                trigger_data_stream.error =
+                    Some(format!("error sending notification for alert: {e}"));
             }
-            trigger_data_stream.next_run_at = next_run_at;
+            Ok((success_msg, error_msg)) => {
+                let success_msg = success_msg.trim().to_owned();
+                let error_msg = error_msg.trim().to_owned();
+                if !error_msg.is_empty() {
+                    trigger_data_stream.error = Some(error_msg);
+                }
+                if !success_msg.is_empty() {
+                    trigger_data_stream.success_response = Some(success_msg);
+                }
+                if alert.trigger_condition.silence > 0 {
+                    log::debug!(
+                        "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
+                        &alert.org_id,
+                        &alert.stream_type,
+                        &alert.stream_name,
+                        &alert.name
+                    );
+
+                    let next_run_at = Utc::now().timestamp_micros()
+                        + Duration::try_minutes(alert.trigger_condition.silence)
+                            .unwrap()
+                            .num_microseconds()
+                            .unwrap();
+                    // After the notification is sent successfully, we need to update
+                    // the silence period of the trigger
+                    if let Err(e) = db::scheduler::update_trigger(db::scheduler::Trigger {
+                        org: alert.org_id.to_string(),
+                        module: db::scheduler::TriggerModule::Alert,
+                        module_key,
+                        is_silenced: true,
+                        is_realtime: true,
+                        next_run_at,
+                        ..Default::default()
+                    })
+                    .await
+                    {
+                        log::error!("Failed to update trigger: {}", e);
+                    }
+                    trigger_data_stream.next_run_at = next_run_at;
+                }
+            }
         }
         trigger_data_stream.end_time = Utc::now().timestamp_micros();
         // Let all the alerts send notifications first
@@ -390,7 +405,13 @@ pub fn apply_stream_functions(
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
-            value = apply_vrl_fn(runtime, vrl_runtime, &value, org_id, stream_name);
+            value = apply_vrl_fn(
+                runtime,
+                vrl_runtime,
+                &value,
+                org_id,
+                &[stream_name.to_string()],
+            );
         }
     }
     flatten::flatten_with_level(value, get_config().limit.ingest_flatten_level)

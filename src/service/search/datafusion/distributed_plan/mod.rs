@@ -23,7 +23,10 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 
+pub mod codec;
 pub mod empty_exec;
+pub mod remote_scan;
+pub mod rewrite;
 
 pub struct NewEmptyExecVisitor {
     data: Option<Arc<dyn ExecutionPlan>>,

@@ -16,14 +16,14 @@
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
-use tonic::{codegen::*, Response, Status};
+use tonic::{Response, Status};
 
 use crate::service::traces::{handle_trace_request, RequestType};
 
 #[derive(Default)]
-pub struct TraceServer {}
+pub struct TraceServer;
 
-#[async_trait]
+#[tonic::async_trait]
 impl TraceService for TraceServer {
     async fn export(
         &self,

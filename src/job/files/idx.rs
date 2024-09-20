@@ -20,7 +20,6 @@ use config::{
     FILE_EXT_PARQUET,
 };
 use infra::storage;
-use tokio::task;
 
 use crate::common::utils::stream::populate_file_meta;
 
@@ -96,21 +95,11 @@ pub(crate) async fn write_parquet_index_to_disk(
     );
 
     let store_file_name = new_idx_file_name.clone();
-    match task::spawn_blocking(move || async move {
-        storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await
-    })
-    .await
-    {
-        Ok(output) => match output.await {
-            Ok(_) => {
-                log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
-                Ok((new_idx_file_name, file_meta, stream_type))
-            }
-            Err(err) => {
-                log::error!("[JOB] disk file upload error: {:?}", err);
-                Err(anyhow::anyhow!(err))
-            }
-        },
+    match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
+        Ok(_) => {
+            log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
+            Ok((new_idx_file_name, file_meta, stream_type))
+        }
         Err(err) => {
             log::error!("[JOB] disk file upload error: {:?}", err);
             Err(anyhow::anyhow!(err))

@@ -33,7 +33,6 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 
-#[derive(Debug)]
 pub(crate) struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
@@ -95,6 +94,7 @@ impl TableProvider for NewMemTable {
                 memory_exec
             });
         }
+
         let projected_schema = project_schema(&self.schema(), projection)?;
         let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
             Vec::with_capacity(projected_schema.fields().len());

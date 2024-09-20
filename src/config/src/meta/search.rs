@@ -35,15 +35,8 @@ pub enum StorageType {
 pub struct Session {
     pub id: String,
     pub storage_type: StorageType,
-    pub search_type: SearchType,
     pub work_group: Option<String>,
     pub target_partitions: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SearchType {
-    Normal,
-    Aggregation,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -614,16 +607,35 @@ impl From<Request> for cluster_rpc::SearchRequest {
         cluster_rpc::SearchRequest {
             job: Some(job),
             org_id: "".to_string(),
-            stype: cluster_rpc::SearchType::User.into(),
             agg_mode: cluster_rpc::AggregateMode::Final.into(),
             query: Some(req_query),
-            file_list: vec![],
+            file_ids: vec![],
+            idx_files: vec![],
             stream_type: "".to_string(),
             timeout: req.timeout,
             work_group: "".to_string(),
             user_id: None,
             search_event_type: req.search_type.map(|event| event.to_string()),
             index_type: req.index_type.clone(),
+        }
+    }
+}
+
+impl From<Query> for cluster_rpc::SearchQuery {
+    fn from(query: Query) -> Self {
+        cluster_rpc::SearchQuery {
+            sql: query.sql.clone(),
+            quick_mode: query.quick_mode,
+            query_type: query.query_type.clone(),
+            from: query.from as i32,
+            size: query.size as i32,
+            start_time: query.start_time,
+            end_time: query.end_time,
+            sort_by: query.sort_by.unwrap_or_default(),
+            track_total_hits: query.track_total_hits,
+            uses_zo_fn: query.uses_zo_fn,
+            query_fn: query.query_fn.unwrap_or_default(),
+            skip_wal: query.skip_wal,
         }
     }
 }
