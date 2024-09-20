@@ -59,7 +59,7 @@ pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
-pub struct NewSql {
+pub struct Sql {
     pub sql: String,
     pub org_id: String,
     pub stream_type: StreamType,
@@ -79,8 +79,8 @@ pub struct NewSql {
     pub use_inverted_index: bool, // if can use inverted index
 }
 
-impl NewSql {
-    pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<NewSql, Error> {
+impl Sql {
+    pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<Sql, Error> {
         Self::new(query, &req.org_id, req.stream_type).await
     }
 
@@ -88,7 +88,7 @@ impl NewSql {
         query: &SearchQuery,
         org_id: &str,
         stream_type: StreamType,
-    ) -> Result<NewSql, Error> {
+    ) -> Result<Sql, Error> {
         let sql = query.sql.clone();
         let limit = query.size as i64;
         let offset = query.from as i64;
@@ -175,7 +175,7 @@ impl NewSql {
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
-        Ok(NewSql {
+        Ok(Sql {
             sql: statement.to_string(),
             org_id: org_id.to_string(),
             stream_type,
@@ -197,7 +197,7 @@ impl NewSql {
     }
 }
 
-impl std::fmt::Display for NewSql {
+impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

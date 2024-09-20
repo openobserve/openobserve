@@ -40,11 +40,11 @@ use infra::{
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
     },
 };
-use new_sql::NewSql;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
+use sql::Sql;
 use tokio::runtime::Runtime;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
@@ -71,8 +71,8 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
-pub(crate) mod new_sql;
 pub(crate) mod request;
+pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod utlis;
@@ -264,7 +264,7 @@ pub async fn search_partition(
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let sql = NewSql::new(&query, org_id, stream_type).await?;
+    let sql = Sql::new(&query, org_id, stream_type).await?;
 
     let mut files = Vec::new();
     for (stream, schema) in sql.schemas.iter() {
@@ -837,7 +837,7 @@ pub async fn search_partition_multi(
 
 #[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
 async fn get_file_list(
-    sql: &NewSql,
+    sql: &Sql,
     stream_name: &str,
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
@@ -892,7 +892,7 @@ fn generate_search_schema_diff(
     Ok(diff_fields)
 }
 
-pub fn is_use_inverted_index(sql: &Arc<NewSql>) -> (bool, Vec<(String, String)>) {
+pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
     // parquet format inverted index only support single table
     if sql.stream_names.len() != 1 {
         return (false, vec![]);

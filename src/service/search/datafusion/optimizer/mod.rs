@@ -37,14 +37,14 @@ use infra::schema::get_stream_setting_fts_fields;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
-use crate::service::search::new_sql::NewSql;
+use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
 
-pub fn generate_optimizer_rules(sql: &NewSql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
+pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
             Some(sql.limit as usize)

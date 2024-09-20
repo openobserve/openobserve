@@ -32,7 +32,7 @@ use datafusion::{
 };
 
 use crate::service::search::{
-    datafusion::udf::histogram_udf::HISTOGRAM_UDF_NAME, new_sql::generate_histogram_interval,
+    datafusion::udf::histogram_udf::HISTOGRAM_UDF_NAME, sql::generate_histogram_interval,
 };
 
 /// Optimization rule that rewrite histogram to date_bin()

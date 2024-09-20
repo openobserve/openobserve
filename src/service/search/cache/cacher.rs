@@ -32,7 +32,7 @@ use crate::{
             result_utils::{get_ts_value, round_down_to_nearest_minute},
             MultiCachedQueryResponse,
         },
-        new_sql::{generate_histogram_interval, NewSql, RE_HISTOGRAM, RE_SELECT_FROM},
+        sql::{generate_histogram_interval, Sql, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
 
@@ -57,7 +57,7 @@ pub async fn check_cache(
     let query = rpc_req.clone().query.unwrap();
     let org_id = rpc_req.org_id.clone();
     let stream_type = StreamType::from(rpc_req.stream_type.as_str());
-    let sql = match NewSql::new(&query, &org_id, stream_type).await {
+    let sql = match Sql::new(&query, &org_id, stream_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
@@ -534,7 +534,7 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-pub fn get_ts_col(parsed_sql: &NewSql, ts_col: &str, is_aggregate: bool) -> Option<String> {
+pub fn get_ts_col(parsed_sql: &Sql, ts_col: &str, is_aggregate: bool) -> Option<String> {
     for (original, alias) in &parsed_sql.aliases {
         if original.contains("histogram") {
             return Some(alias.clone());

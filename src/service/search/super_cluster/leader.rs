@@ -35,8 +35,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::{
     cluster::flight::{generate_context, register_table},
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
-    new_sql::NewSql,
     request::Request,
+    sql::Sql,
     utlis::ScanStatsVisitor,
     DATAFUSION_RUNTIME,
 };
@@ -49,7 +49,7 @@ use crate::service::search::{
 )]
 pub async fn search(
     trace_id: &str,
-    sql: Arc<NewSql>,
+    sql: Arc<Sql>,
     mut req: Request,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
@@ -153,7 +153,7 @@ pub async fn search(
 async fn run_datafusion(
     trace_id: String,
     req: Request,
-    sql: Arc<NewSql>,
+    sql: Arc<Sql>,
     nodes: Vec<Arc<dyn NodeInfo>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats)> {
     let cfg = get_config();

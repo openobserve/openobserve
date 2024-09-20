@@ -30,7 +30,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::functions::VRLResultResolver,
-    service::search::{cluster::flight, new_sql::NewSql, request::Request},
+    service::search::{cluster::flight, request::Request, sql::Sql},
 };
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
@@ -46,7 +46,7 @@ pub async fn search(
     let track_total_hits = query.track_total_hits;
 
     // handle request time range
-    let meta = NewSql::new_from_req(&req, &query).await?;
+    let meta = Sql::new_from_req(&req, &query).await?;
     let sql = Arc::new(meta);
 
     // set this value to null & use it later on results ,

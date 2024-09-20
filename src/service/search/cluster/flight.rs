@@ -56,8 +56,8 @@ use crate::{
             table_provider::empty_table::NewEmptyTable,
         },
         generate_filter_from_equal_items,
-        new_sql::NewSql,
         request::Request,
+        sql::Sql,
         utlis::{AsyncDefer, ScanStatsVisitor},
         DATAFUSION_RUNTIME,
     },
@@ -71,7 +71,7 @@ use crate::{
 )]
 pub async fn search(
     trace_id: &str,
-    sql: Arc<NewSql>,
+    sql: Arc<Sql>,
     mut req: Request,
     query: SearchQuery,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
@@ -306,7 +306,7 @@ pub async fn search(
 pub async fn run_datafusion(
     trace_id: String,
     req: Request,
-    sql: Arc<NewSql>,
+    sql: Arc<Sql>,
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<String, Vec<Vec<i64>>>,
     idx_file_list: Vec<FileKey>,
@@ -684,7 +684,7 @@ pub(crate) async fn partition_file_by_hash(
 
 pub async fn generate_context(
     req: &Request,
-    sql: &Arc<NewSql>,
+    sql: &Arc<Sql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
     let optimizer_rules = generate_optimizer_rules(sql);
@@ -703,7 +703,7 @@ pub async fn generate_context(
     Ok(ctx)
 }
 
-pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
+pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
     for (stream_name, schema) in &sql.schemas {
         let schema = schema
             .schema()
@@ -774,7 +774,7 @@ pub(crate) async fn get_file_id_list(
 async fn get_inverted_index_file_lists(
     trace_id: &str,
     req: &Request,
-    sql: &Arc<NewSql>,
+    sql: &Arc<Sql>,
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
