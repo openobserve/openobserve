@@ -50,6 +50,7 @@ use sqlparser::{
 };
 
 use super::request::Request;
+use crate::common::meta::ingestion::ORIGINAL_DATA_COL_NAME;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -229,7 +230,17 @@ fn generate_select_star_schema(
         let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
         // check if it is user defined schema
         if defined_schema_fields.is_empty() {
-            used_schemas.insert(name, schema);
+            if schema.contains_field(ORIGINAL_DATA_COL_NAME) {
+                // skip selecting "_original" column if `SELECT * ...`
+                let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
+                fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+                let schema = Arc::new(SchemaCache::new(
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
+                ));
+                used_schemas.insert(name, schema);
+            } else {
+                used_schemas.insert(name, schema);
+            }
         } else {
             used_schemas.insert(
                 name,
