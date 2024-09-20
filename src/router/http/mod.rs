@@ -163,12 +163,10 @@ async fn dispatch(
         let client = awc::Client::builder()
             .timeout(std::time::Duration::from_secs(cfg.route.timeout))
             .disable_redirects()
-            .add_default_header((awc::http::header::CONNECTION, "close"))
             .finish();
-        client
-            .request_from(new_url.value.clone(), req.head())
-            .send_stream(payload)
-            .await
+        let req = client.request_from(new_url.value.clone(), req.head());
+        let req = req.insert_header((awc::http::header::CONNECTION, "close"));
+        req.send_stream(payload).await
     } else {
         client
             .request_from(new_url.value.clone(), req.head())
