@@ -33,7 +33,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
-    cluster::flight::{generate_context, is_use_inverted_index, register_table},
+    cluster::flight::{generate_context, register_table},
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     new_sql::NewSql,
     request::Request,
@@ -73,7 +73,7 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
 
-    let (use_inverted_index, _) = is_use_inverted_index(&sql);
+    let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
     req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
@@ -215,6 +215,7 @@ async fn run_datafusion(
         req,
         nodes,
         HashMap::new(),
+        Vec::new(),
         partition_keys,
         match_all_keys,
         true,
@@ -233,6 +234,7 @@ async fn run_datafusion(
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             rewrite.file_lists.get(table_name).unwrap().clone(),
+            rewrite.idx_file_list.clone(),
             rewrite
                 .equal_keys
                 .get(table_name)

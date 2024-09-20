@@ -46,7 +46,7 @@ use tracing::Instrument;
 use crate::service::{
     db, file_list,
     search::{
-        cluster::flight::filter_index_fields, datafusion::exec, generate_filter_from_equal_items,
+       datafusion::exec, generate_filter_from_equal_items,
         generate_search_schema_diff, sql::Sql,
     },
 };
@@ -506,7 +506,7 @@ async fn filter_file_list_by_inverted_index(
     let schema = infra::schema::get(&query.org_id, &query.stream_name, query.stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&schema);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let index_terms_orig = filter_index_fields(&equal_terms, &index_fields);
+    let index_terms_orig = super::super::filter_index_fields(&equal_terms, &index_fields);
     let index_terms = generate_filter_from_equal_items(&index_terms_orig);
 
     // Cache the corresponding Index files

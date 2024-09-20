@@ -40,10 +40,7 @@ use infra::{
     dist_lock,
     errors::{Error, Result},
     file_list::FileId,
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-        SchemaCache,
-    },
+    schema::{unwrap_partition_time_level, unwrap_stream_settings, SchemaCache},
 };
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
@@ -147,7 +144,7 @@ pub async fn search(
         &req,
         trace_id,
         &nodes,
-        &file_list_vec,
+        &file_id_list_vec,
         start,
         file_list_took,
     )
@@ -199,21 +196,22 @@ pub async fn search(
     });
 
     // 5. partition file list
+    let scan_original_size = file_id_list_vec
+        .iter()
+        .map(|f| f.original_size)
+        .sum::<i64>();
+    let scan_file_num = file_id_list_vec.len();
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, node_group).await?;
 
     #[cfg(feature = "enterprise")]
     {
         let records = 0;
         let compressed_size = 0;
-        let mut original_size = 0;
-        for file in file_id_list.iter() {
-            original_size += file.original_size;
-        }
-        original_size += idx_scan_size as i64;
+        let mut original_size = scan_original_size + _idx_scan_size as i64;
         super::super::SEARCH_SERVER
             .add_file_stats(
                 trace_id,
-                file_id_list.len() as i64,
+                scan_file_num as i64,
                 records,
                 original_size,
                 compressed_size,
@@ -465,7 +463,7 @@ pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
     nodes: &[Node],
-    file_list_vec: &[&FileKey],
+    file_id_list_vec: &[&FileId],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
 ) -> Result<(
@@ -479,7 +477,7 @@ pub async fn check_work_group(
 
     // 1. get work group
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-        o2_enterprise::enterprise::search::work_group::predict(nodes, file_list_vec),
+        o2_enterprise::enterprise::search::work_group::predict(nodes, file_id_list_vec),
     );
 
     super::super::SEARCH_SERVER
@@ -723,19 +721,6 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
     Ok(())
 }
 
-pub fn filter_index_fields(
-    items: &[(String, String)],
-    index_fields: &[String],
-) -> Vec<(String, String)> {
-    let mut result = Vec::new();
-    for item in items {
-        if index_fields.contains(&item.0) {
-            result.push(item.clone());
-        }
-    }
-    result
-}
-
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]
 pub async fn get_file_id_lists(
     stream_names: &[String],
@@ -801,7 +786,7 @@ async fn get_inverted_index_file_lists(
     } else {
         req.inverted_index_type.as_ref().unwrap().to_string()
     };
-    let (use_inverted_index, index_terms) = is_use_inverted_index(sql);
+    let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_inverted_index =
         use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
     log::info!(
@@ -1006,29 +991,4 @@ fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     println!("leader physical plan {stage} rewrite");
     println!("+---------------------------+----------+");
     println!("{}", plan);
-}
-
-fn is_use_inverted_index(sql: &Arc<NewSql>) -> (bool, Vec<(String, String)>) {
-    // parquet format inverted index only support single table
-    if sql.stream_names.len() != 1 {
-        return (false, vec![]);
-    }
-
-    let cfg = get_config();
-    let index_terms = if sql.equal_items.len() == 1 {
-        let schema = sql.schemas.values().next().unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let index_fields = get_stream_setting_index_fields(&stream_settings);
-        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
-    } else {
-        vec![]
-    };
-
-    let use_inverted_index = sql.stream_type != StreamType::Index
-        && sql.use_inverted_index
-        && cfg.common.inverted_index_enabled
-        && !cfg.common.feature_query_without_index
-        && (sql.match_items.is_some() || !index_terms.is_empty());
-
-    (use_inverted_index, index_terms)
 }
