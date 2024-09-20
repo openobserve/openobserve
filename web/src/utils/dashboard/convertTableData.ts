@@ -49,7 +49,41 @@ export const convertTableData = (
   let columnData = [...x, ...y];
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
-  console.log("transposeColumns---------", columnData[0]);
+  console.log("transposeColumns---------", columnData[0], columnData);
+
+  // use all response keys if tableDynamicColumns is true
+  if (panelSchema?.config?.table_dynamic_columns == true) {
+    let responseKeys: any = new Set();
+
+    // insert all keys of searchQueryData into responseKeys
+    tableRows?.forEach((row: any) => {
+      Object.keys(row).forEach((key) => {
+        responseKeys?.add(key);
+      });
+    });
+
+    // set to array
+    responseKeys = Array.from(responseKeys);
+
+    // remove x and y keys
+    const xAxisKeys = x.map((key: any) => key.alias);
+    const yAxisKeys = y.map((key: any) => key.alias);
+    responseKeys = responseKeys?.filter(
+      (key: any) => !xAxisKeys.includes(key) && !yAxisKeys.includes(key),
+    );
+
+    // create panelSchema fields object
+    responseKeys = responseKeys.map((key: any) => ({
+      label: key,
+      alias: key,
+      column: key,
+      color: null,
+      isDerived: false,
+    }));
+
+    // add responseKeys to columnData
+    columnData = [...columnData, ...responseKeys];
+  }
 
   // identify histogram fields for auto and custom sql
   if (panelSchema?.queries[0]?.customQuery === false) {
@@ -219,65 +253,6 @@ export const convertTableData = (
         {},
       );
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
-      return obj;
-    });
-  }
-  // use all response keys if tableDynamicColumns is true
-  if (panelSchema?.config?.table_dynamic_columns == true) {
-    let responseKeys: any = new Set();
-
-    // insert all keys of searchQueryData into responseKeys
-    tableRows.forEach((row: any) => {
-      Object.keys(row).forEach((key) => {
-        responseKeys.add(key);
-      });
-    });
-
-    // set to array
-    responseKeys = Array.from(responseKeys);
-
-    columns = responseKeys.map((it: any) => {
-      let obj: any = {};
-      const isNumber = isSampleValuesNumbers(tableRows, it, 20);
-
-      obj["name"] = it;
-      obj["field"] = it;
-      obj["label"] = it;
-      obj["align"] = !isNumber ? "left" : "right";
-      obj["sortable"] = true;
-      // if number then sort by number and use decimal point config option in format
-      if (isNumber) {
-        obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-        obj["format"] = (val: any) => {
-          return !Number.isNaN(val)
-            ? `${
-                formatUnitValue(
-                  getUnitValue(
-                    val,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals ?? 2,
-                  ),
-                ) ?? 0
-              }`
-            : val;
-        };
-      }
-
-      // if current field is histogram field then return formatted date
-      if (histogramFields.includes(it)) {
-        // if current field is histogram field then return formatted date
-        obj["format"] = (val: any) => {
-          return formatDate(
-            toZonedTime(
-              typeof val === "string"
-                ? `${val}Z`
-                : new Date(val)?.getTime() / 1000,
-              store.state.timezone,
-            ),
-          );
-        };
-      }
       return obj;
     });
   }
