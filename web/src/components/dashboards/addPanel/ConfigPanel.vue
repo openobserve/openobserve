@@ -905,6 +905,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+      <ValueMapping />
+
+      <div class="space"></div>
       <MarkLineConfig
         v-if="
           [
@@ -1013,6 +1016,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -1020,6 +1024,7 @@ import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 export default defineComponent({
   components: {
     Drilldown,
+    ValueMapping,
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,

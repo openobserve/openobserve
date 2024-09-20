@@ -1,0 +1,138 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http:www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License. 
+-->
+
+<!-- eslint-disable vue/no-unused-components -->
+<template>
+  <div>
+    <div class="q-mb-sm" style="font-weight: 600">
+      <span>Value Mapping</span>
+      <q-btn
+        no-caps
+        padding="xs"
+        class=""
+        size="sm"
+        flat
+        icon="info_outline"
+        data-test="dashboard-addpanel-config-drilldown-info"
+      >
+        <!-- <q-tooltip
+          class="bg-grey-8"
+          anchor="bottom middle"
+          self="top middle"
+          max-width="250px"
+        >
+          Change Display Value or Cell Color
+        </q-tooltip> -->
+      </q-btn>
+    </div>
+    <!-- <div
+      v-for="(data, index) in dashboardPanelData.data.config.drilldown"
+      :key="JSON.stringify(data) + index"
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+        "
+      >
+        <div
+          @click="onDrilldownClick(index)"
+          style="
+            cursor: pointer;
+            padding-left: 10px;
+            width: 250px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          "
+          :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
+        >
+          {{ index + 1 }}. {{ data.name }}
+        </div>
+        <q-icon
+          class="q-mr-xs"
+          size="15px"
+          name="close"
+          style="cursor: pointer"
+          @click="removeDrilldownByIndex(index)"
+          :data-test="`dashboard-addpanel-config-drilldown-remove-${index}`"
+        />
+      </div>
+    </div> -->
+    <q-btn
+      @click="openValueMappingPopUp"
+      style="cursor: pointer; padding: 0px 5px"
+      :label="
+        dashboardPanelData.data.config.mappings.length
+          ? ' Edit Value Mapping'
+          : ' Add Value Mapping'
+      "
+      no-caps
+      data-test="dashboard-addpanel-config-drilldown-add-btn"
+    />
+    <q-dialog v-model="showValueMappingPopUp">
+      <ValueMappingPopUp
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+      />
+    </q-dialog>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, inject, ref } from "vue";
+import { useStore } from "vuex";
+import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import ValueMappingPopUp from "./ValueMappingPopUp.vue";
+import { onBeforeMount } from "vue";
+
+export default defineComponent({
+  name: "ValueMapping",
+  components: { ValueMappingPopUp },
+  props: [],
+  setup() {
+    const store = useStore();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
+
+    const showValueMappingPopUp = ref(false);
+
+    const openValueMappingPopUp = () => {
+      showValueMappingPopUp.value = true;
+    };
+
+    onBeforeMount(() => {
+      // Ensure that the drilldown object is initialized in config
+      if (!dashboardPanelData.data.config.mappings) {
+        dashboardPanelData.data.config.mappings = [];
+      }
+    });
+
+    return {
+      store,
+      dashboardPanelData,
+      showValueMappingPopUp,
+      openValueMappingPopUp,
+    };
+  },
+});
+</script>
+
+<style lang="scss" scoped></style>

@@ -30,6 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-panel-table"
     @row-click="(...args: any) => $emit('row-click', ...args)"
   >
+    <template v-slot:body-cell="props">
+      <q-td
+        :props="props"
+        :style="
+          getStyle(props, [
+            { value: 'ziox', hex: '#eb4034' },
+            { value: 'monitoring', hex: '#080808' },
+          ])
+        "
+      >
+        {{ props.value }}
+      </q-td>
+    </template>
   </q-table>
 </template>
 
@@ -50,6 +63,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
       default: false,
+    },
+    valueMapping: {
+      required: false,
+      type: Object,
+      default: () => [],
     },
   },
   emits: ["row-click"],
@@ -110,12 +128,36 @@ export default defineComponent({
         showErrorNotification("Browser denied file download...");
       }
     };
+
+    const getStyle = (props: any, values: any) => {
+      const value = props.value;
+      const foundValue = values.find((v: any) => v.value == value);
+      if (foundValue) {
+        const hex = foundValue.hex;
+        const isDark = isDarkColor(hex);
+        console.log(hex, isDark);
+
+        return `background-color: ${hex}; color: ${isDark ? "#ffffff" : "#000000"}`;
+      }
+      return "";
+    };
+
+    const isDarkColor = (hex: any) => {
+      const result: any = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      const r = parseInt(result[1], 16);
+      const g = parseInt(result[2], 16);
+      const b = parseInt(result[3], 16);
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return luminance < 0.5;
+    };
+
     return {
       pagination: ref({
         rowsPerPage: 0,
       }),
       downloadTableAsCSV,
       tableRef,
+      getStyle,
     };
   },
 });
