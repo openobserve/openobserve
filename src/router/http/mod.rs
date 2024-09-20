@@ -164,9 +164,11 @@ async fn dispatch(
             .timeout(std::time::Duration::from_secs(cfg.route.timeout))
             .disable_redirects()
             .finish();
-        let req = client.request_from(new_url.value.clone(), req.head());
-        let req = req.insert_header((awc::http::header::CONNECTION, "close"));
-        req.send_stream(payload).await
+        client
+            .request_from(new_url.value.clone(), req.head())
+            .insert_header((awc::http::header::CONNECTION, "close"))
+            .send_stream(payload)
+            .await
     } else {
         client
             .request_from(new_url.value.clone(), req.head())
