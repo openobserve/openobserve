@@ -352,7 +352,7 @@ pub async fn search_partition(
         step = step - step % min_step;
     }
 
-    // generate partitions
+    // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
