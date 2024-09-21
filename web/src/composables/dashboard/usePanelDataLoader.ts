@@ -486,6 +486,9 @@ export const usePanelDataLoader = (
             // partition array from api response
             const partitionArr = res?.data?.partitions ?? [];
 
+            // always sort partitions in descending order
+            partitionArr.sort((a: any, b: any) => a[0] - b[0]);
+
             // max_query_range for current query stream
             const max_query_range = res?.data?.max_query_range ?? 0;
 
