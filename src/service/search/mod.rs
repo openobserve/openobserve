@@ -392,16 +392,12 @@ pub async fn search_partition(
         partitions.push([req.start_time, req.end_time]);
     }
 
-    // Default query is DESC order, we need to reverse partitions
-    let mut need_reverse = true;
+    // We need to reverse partitions if query is ASC order
     if let Some((field, order_by)) = sql.order_by.first() {
         if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
             resp.order_by = OrderBy::Asc;
-            need_reverse = false;
+            partitions.reverse();
         }
-    }
-    if need_reverse {
-        partitions.reverse();
     }
 
     resp.partitions = partitions;
