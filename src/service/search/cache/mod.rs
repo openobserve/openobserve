@@ -116,7 +116,22 @@ pub async fn search(
         )
         .await
     } else {
-        MultiCachedQueryResponse::default()
+        let query = rpc_req.clone().query.unwrap();
+        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+            Ok(v) => {
+                let ts_column = cacher::get_ts_col(&v, &cfg.common.column_timestamp, is_aggregate)
+                    .unwrap_or_default();
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {:?}", e);
+                MultiCachedQueryResponse::default()
+            }
+        }
     };
 
     // No cache data present, add delta for full query
