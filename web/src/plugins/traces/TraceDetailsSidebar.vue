@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center q-px-sm hearder_bg border border-bottom border-top"
+    class="flex justify-start items-center q-px-sm header_bg border border-bottom border-top"
     :style="{ height: '30px' }"
   >
     <div :style="{ width: 'calc(100% - 22px)' }" class="q-pb-none ellipsis">
@@ -743,7 +743,7 @@ export default defineComponent({
   overflow-x: hidden;
 }
 
-.hearder_bg {
+.header_bg {
   border-top: 1px solid $border-color;
   background-color: color-mix(in srgb, currentColor 5%, transparent);
 }

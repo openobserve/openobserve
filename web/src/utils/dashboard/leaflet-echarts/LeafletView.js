@@ -121,7 +121,7 @@ const LeafletView = {
     if(!renderOnMoving && !this._moveEndHandler) {
       const moveEndHandler = function(e) {
         setTimeout(function() {
-          lmapModel.setEChartsLayerVisiblity(true);
+          lmapModel.setEChartsLayerVisibility(true);
         }, !largeMode ? 0 : 20);
       };
       this._moveEndHandler = moveEndHandler;
@@ -136,9 +136,9 @@ const LeafletView = {
 
     if (!renderOnMoving) {
       const moveStartHandler = function() {
-        lmapModel.setEChartsLayerVisiblity(false);
+        lmapModel.setEChartsLayerVisibility(false);
         setTimeout(function() {
-          lmapModel.setEChartsLayerVisiblity(true);
+          lmapModel.setEChartsLayerVisibility(true);
         }, 500);
       };
       this._moveStartHandler = moveStartHandler;

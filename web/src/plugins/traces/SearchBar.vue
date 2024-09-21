@@ -363,7 +363,7 @@ export default defineComponent({
       if (value.valueType === "relative") emit("searchdata");
     };
 
-    const udpateQuery = () => {
+    const updateQuery = () => {
       // alert(searchObj.data.query);
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(searchObj.data.query);
@@ -446,7 +446,7 @@ export default defineComponent({
       refreshTimeChange,
       updateQueryValue,
       updateDateTime,
-      udpateQuery,
+      updateQuery,
       downloadLogs,
       setEditorValue,
       autoCompleteKeywords,

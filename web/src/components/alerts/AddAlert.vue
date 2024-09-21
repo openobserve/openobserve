@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-list dense>
                       <q-item
                         tag="label"
-                        :data-test="`add-alert-detination-${option.opt}-select-item`"
+                        :data-test="`add-alert-destination-${option.opt}-select-item`"
                       >
                         <q-item-section avatar>
                           <q-checkbox
@@ -634,7 +634,7 @@ export default defineComponent({
       return formData.value.stream_type && formData.value.stream_name;
     });
 
-    const updateCondtions = (e: any) => {
+    const updateConditions = (e: any) => {
       try {
         const ast = parser.astify(e.target.value);
         if (ast) sqlAST.value = ast;
@@ -827,7 +827,7 @@ export default defineComponent({
       }
     };
 
-    const getFromattedCondition = (
+    const getFormattedCondition = (
       column: string,
       operator: string,
       value: number | string,
@@ -875,7 +875,7 @@ export default defineComponent({
                 ? condition.value
                 : `'${condition.value}'`;
 
-            return getFromattedCondition(
+            return getFormattedCondition(
               condition.column,
               condition.operator,
               value,
@@ -1202,7 +1202,7 @@ export default defineComponent({
       selectedRelativePeriod,
       relativePeriods,
       editorUpdate,
-      updateCondtions,
+      updateConditions,
       updateStreamFields,
       updateEditorContent,
       triggerCols,

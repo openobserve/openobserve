@@ -475,7 +475,7 @@ export const vrlThemeDefinition = {
     },
     {
       foreground: "032f62",
-      token: "string.regexp string.regexp.arbitrary-repitition",
+      token: "string.regexp string.regexp.arbitrary-repetition",
     },
     {
       foreground: "22863a",

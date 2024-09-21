@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column oveflow-hidden full-height">
+  <div class="col column overflow-hidden full-height">
     <div
       class="search-list full-height"
       ref="searchListContainer"
@@ -342,7 +342,7 @@ export default defineComponent({
 
       this.searchObj.data.stream.selectedFields = selectedFields;
 
-      this.searchObj.organizationIdetifier =
+      this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
@@ -468,7 +468,7 @@ export default defineComponent({
       } else {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
       filterHitsColumns();

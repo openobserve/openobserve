@@ -340,7 +340,7 @@ export default defineComponent({
         //   this.searchObj.data.resultGrid.currentPage + 1;
         this.searchObj.loading = true;
 
-        // As page count request was getting fired on chaning date records per page instead of histogram,
+        // As page count request was getting fired on changing date records per page instead of histogram,
         // so added this condition to avoid that
         this.searchObj.meta.refreshHistogram = true;
 
@@ -514,7 +514,7 @@ export default defineComponent({
           queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
         if (queryParams.type === "trace_explorer") {
-          searchObj.organizationIdetifier = queryParams.org_identifier;
+          searchObj.organizationIdentifier = queryParams.org_identifier;
           searchObj.data.stream.selectedStream.value = queryParams.stream;
           searchObj.data.stream.streamType = queryParams.stream_type;
           resetSearchObj();
@@ -538,7 +538,7 @@ export default defineComponent({
         }
 
         if (
-          searchObj.organizationIdetifier !=
+          searchObj.organizationIdentifier !=
             store.state.selectedOrganization.identifier &&
           searchObj.loading == false
         ) {
@@ -566,7 +566,7 @@ export default defineComponent({
           await getRegionInfo();
         }
 
-        searchObj.organizationIdetifier =
+        searchObj.organizationIdentifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
         if (searchObj.loading == false) {
@@ -737,12 +737,12 @@ export default defineComponent({
 
           searchObj.data.editorValue = searchObj.data.query;
 
-          searchBarRef.value.udpateQuery();
+          searchBarRef.value.updateQuery();
 
           searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
         } else {
           searchObj.data.query = "";
-          searchBarRef.value.udpateQuery();
+          searchBarRef.value.updateQuery();
         }
       } catch (e) {
         console.log("Logs : Error in setQuery");
@@ -853,7 +853,7 @@ export default defineComponent({
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
 
-        searchBarRef.value.udpateQuery();
+        searchBarRef.value.updateQuery();
 
         searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
       }

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         v-if="
           collapsibleIcon === 'show' &&
-          seachCollapseImage == 'collapse_sidebar_icon'
+          searchCollapseImage == 'collapse_sidebar_icon'
         "
         :icon="'img:' + getImageURL('images/common/collapse_sidebar_icon.svg')"
         class="q-mr-sm"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         v-if="
           collapsibleIcon === 'show' &&
-          seachCollapseImage == 'expand_sidebar_icon'
+          searchCollapseImage == 'expand_sidebar_icon'
         "
         :icon="'img:' + getImageURL('images/common/expand_sidebar_icon.svg')"
         class="q-mr-sm"
@@ -155,7 +155,7 @@ export default defineComponent({
     const router = useRouter();
     const maxRecords = ref(props.maxRecordToReturn);
     const store = useStore();
-    const seachCollapseImage: any = ref("collapse_sidebar_icon");
+    const searchCollapseImage: any = ref("collapse_sidebar_icon");
 
     const changePagination = (val: any) => {
       emit("update:changeRecordPerPage", val);
@@ -178,7 +178,7 @@ export default defineComponent({
       router,
       maxRecords,
       toggleSidePanel,
-      seachCollapseImage,
+      searchCollapseImage,
       changePagination,
       changeMaxRecordToReturn,
       getImageURL,
@@ -193,9 +193,9 @@ export default defineComponent({
     sidebarIcon(newVal: any, oldVal: any) {
       if (newVal != oldVal && this.router.currentRoute.value.name == "logs") {
         if (this.store.state.searchCollapsibleSection == 0) {
-          this.seachCollapseImage = "expand_sidebar_icon";
+          this.searchCollapseImage = "expand_sidebar_icon";
         } else {
-          this.seachCollapseImage = "collapse_sidebar_icon";
+          this.searchCollapseImage = "collapse_sidebar_icon";
         }
       }
     },

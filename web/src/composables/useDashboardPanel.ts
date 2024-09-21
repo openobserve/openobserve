@@ -1902,7 +1902,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             selector += `approx_percentile_cont(${field?.column}, 0.99)`;
             break;
           case "histogram": {
-            // if inteval is not null, then use it
+            // if interval is not null, then use it
             if (field?.args && field?.args?.length && field?.args[0].value) {
               selector += `${field?.aggregationFunction}(${field?.column}, '${field?.args[0]?.value}')`;
             } else {

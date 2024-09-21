@@ -154,7 +154,7 @@ export default defineComponent({
       emit("change:date-time", value);
     };
 
-    const udpateQuery = () => {
+    const updateQuery = () => {
       // alert(searchObj.data.query);
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(props.queryData.query);
@@ -212,7 +212,7 @@ export default defineComponent({
       refreshTimes: searchObj.config.refreshTimes,
       updateQueryValue,
       updateDateTime,
-      udpateQuery,
+      updateQuery,
       downloadLogs,
       resetEditorLayout,
       functionModel,

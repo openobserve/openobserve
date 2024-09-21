@@ -223,15 +223,15 @@ it("should display correct results when fast mode on", () => {
       force: true,
     });
     logstests.addFeildandSubValue();
-    logstests.addsubFeildValue();
+    logstests.addsubFieldValue();
     //click on the field
     // get the data from the value variable
     cy.wait("@value", { timeout: 5000 })
       .its("response.statusCode")
       .should("eq", 200);
-    logstests.addsubFeildValue();
+    logstests.addsubFieldValue();
     cy.get("@value").its("response.body.hits").should("be.an", "array");
-    logstests.clickFeildSubvalue();
+    logstests.clickFieldSubvalue();
     cy.wait(2000);
     logstests.valueAddedOnPlusClick();
     cy.intercept("GET", logData.ValueQuery).as("value");

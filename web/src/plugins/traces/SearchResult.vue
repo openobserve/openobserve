@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column oveflow-hidden">
+  <div class="col column overflow-hidden">
     <div class="search-list" style="width: 100%">
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
@@ -96,7 +96,7 @@ export default defineComponent({
       );
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
-      this.searchObj.organizationIdetifier =
+      this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },

@@ -186,7 +186,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
     await page.waitForTimeout(2000)
-    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-update-pipeline"]`).click();
     await page.waitForTimeout(2000)
 
   // Locate the function node and pipeline chart
@@ -247,7 +247,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
     await page.waitForTimeout(2000)
-    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-update-pipeline"]`).click();
     await page.waitForTimeout(2000)
 
   // Locate the function node and pipeline chart
@@ -295,8 +295,8 @@ test.describe("Pipeline testcases", () => {
     // await page.waitForSelector(':text("e2e_automate")')
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
-    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`)
-    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-update-pipeline"]`)
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-update-pipeline"]`).click();
     await page.waitForTimeout(2000)
 
   // Locate the function node and pipeline chart
@@ -353,7 +353,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
     await page.waitForTimeout(2000)
-    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-update-pipeline"]`).click();
     await page.waitForTimeout(2000)
 
   // Locate the function node and pipeline chart
