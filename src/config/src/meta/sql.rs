@@ -16,7 +16,7 @@
 use chrono::DateTime;
 use datafusion::{catalog_common::resolve_table_references, sql::parser::DFParser};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{
         BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, FunctionArguments,
@@ -31,6 +31,14 @@ use crate::get_config;
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OrderBy {
+    #[default]
+    Desc,
+    Asc,
+}
 
 /// get stream name from a sql
 pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
@@ -49,11 +57,11 @@ pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
-    pub fields: Vec<String>,           // projection, select, fields
-    pub selection: Option<SqlExpr>,    // where
-    pub source: String,                // table
-    pub order_by: Vec<(String, bool)>, // desc: true / false
-    pub group_by: Vec<String>,         // field
+    pub fields: Vec<String>,              // projection, select, fields
+    pub selection: Option<SqlExpr>,       // where
+    pub source: String,                   // table
+    pub order_by: Vec<(String, OrderBy)>, // desc
+    pub group_by: Vec<String>,            // field
     pub having: bool,
     pub offset: i64,
     pub limit: i64,
@@ -260,12 +268,19 @@ impl<'a> TryFrom<Source<'a>> for String {
     }
 }
 
-impl<'a> TryFrom<Order<'a>> for (String, bool) {
+impl<'a> TryFrom<Order<'a>> for (String, OrderBy) {
     type Error = anyhow::Error;
 
     fn try_from(order: Order) -> Result<Self, Self::Error> {
         match &order.0.expr {
-            SqlExpr::Identifier(id) => Ok((id.value.to_string(), !order.0.asc.unwrap_or(true))),
+            SqlExpr::Identifier(id) => Ok((
+                id.value.to_string(),
+                if order.0.asc.unwrap_or_default() {
+                    OrderBy::Asc
+                } else {
+                    OrderBy::Desc
+                },
+            )),
             expr => Err(anyhow::anyhow!(
                 "We only support identifier for order by, got {expr}"
             )),
@@ -1001,7 +1016,7 @@ mod tests {
         assert_eq!(sql.source, table);
         assert_eq!(sql.limit, 5);
         assert_eq!(sql.offset, 10);
-        assert_eq!(sql.order_by, vec![("c".into(), true)]);
+        assert_eq!(sql.order_by, vec![("c".into(), OrderBy::Desc)]);
         assert_eq!(sql.fields, vec!["a", "b", "c"]);
     }
 
@@ -1016,7 +1031,7 @@ mod tests {
         assert_eq!(local_sql.source, table);
         assert_eq!(local_sql.limit, 5);
         assert_eq!(local_sql.offset, 10);
-        assert_eq!(local_sql.order_by, vec![("c".into(), true)]);
+        assert_eq!(local_sql.order_by, vec![("c".into(), OrderBy::Desc)]);
         assert_eq!(local_sql.fields, vec!["a", "b", "c"]);
     }
 
