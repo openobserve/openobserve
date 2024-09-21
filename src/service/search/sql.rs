@@ -19,7 +19,7 @@ use chrono::Duration;
 use config::{
     get_config,
     meta::{
-        sql::{Sql as MetaSql, SqlOperator},
+        sql::{OrderBy, Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
     utils::sql::is_aggregate_query,
@@ -276,18 +276,18 @@ impl Sql {
                     && !origin_sql.to_lowercase().contains("distinct"))
             {
                 let sort_by = if req_query.sort_by.is_empty() {
-                    meta.order_by = vec![(cfg.common.column_timestamp.to_string(), true)];
+                    meta.order_by = vec![(cfg.common.column_timestamp.to_string(), OrderBy::Desc)];
                     format!("{} DESC", cfg.common.column_timestamp)
                 } else {
                     if req_query.sort_by.to_uppercase().ends_with(" DESC") {
                         meta.order_by = vec![(
                             req_query.sort_by[0..req_query.sort_by.len() - 5].to_string(),
-                            true,
+                            OrderBy::Desc,
                         )];
                     } else if req_query.sort_by.to_uppercase().ends_with(" ASC") {
                         meta.order_by = vec![(
                             req_query.sort_by[0..req_query.sort_by.len() - 4].to_string(),
-                            false,
+                            OrderBy::Asc,
                         )];
                     }
                     req_query.sort_by.clone()

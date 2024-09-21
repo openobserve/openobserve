@@ -366,6 +366,7 @@ pub struct SearchPartitionResponse {
     pub histogram_interval: Option<i64>, // seconds, for histogram
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
+    pub order_by: super::sql::OrderBy,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
