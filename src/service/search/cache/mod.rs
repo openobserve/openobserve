@@ -116,7 +116,13 @@ pub async fn search(
         )
         .await
     } else {
-        MultiCachedQueryResponse::default()
+        let ts_column = cacher::get_ts_col(&parsed_sql, &cfg.common.column_timestamp, is_aggregate)
+            .unwrap_or_default();
+
+        MultiCachedQueryResponse {
+            ts_column,
+            ..Default::default()
+        }
     };
 
     // No cache data present, add delta for full query
