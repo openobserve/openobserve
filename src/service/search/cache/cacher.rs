@@ -17,7 +17,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use config::{
     get_config,
-    meta::search::Response,
+    meta::{search::Response, sql::OrderBy},
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -134,7 +134,7 @@ pub async fn check_cache(
     if !order_by.is_empty() {
         for (field, order) in &order_by {
             if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
-                is_descending = *order;
+                is_descending = order == &OrderBy::Desc;
                 break;
             }
         }

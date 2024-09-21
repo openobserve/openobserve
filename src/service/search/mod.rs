@@ -23,6 +23,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
+        sql::OrderBy,
         stream::{FileKey, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -302,6 +303,7 @@ pub async fn search_partition(
         histogram_interval: meta.histogram_interval,
         max_query_range: stream_settings.max_query_range,
         partitions: vec![],
+        order_by: OrderBy::Desc,
     };
 
     // check for vrl
@@ -363,11 +365,19 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
-    if let Some((field, sort)) = meta.meta.order_by.first() {
-        if field == &ts_column.unwrap() && !sort {
-            partitions.reverse();
+
+    // Default query is DESC order, we need to reverse partitions
+    let mut need_reverse = true;
+    if let Some((field, order_by)) = meta.meta.order_by.first() {
+        if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+            resp.order_by = OrderBy::Asc;
+            need_reverse = false;
         }
     }
+    if need_reverse {
+        partitions.reverse();
+    }
+
     resp.partitions = partitions;
     Ok(resp)
 }

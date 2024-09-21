@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::{
         search::{SearchType, Session as SearchSession, StorageType},
+        sql::OrderBy,
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{
@@ -89,7 +90,7 @@ pub async fn sql(
     // only sort by timestamp desc
     let sort_by_timestamp_desc = sql.meta.order_by.len() == 1
         && sql.meta.order_by[0].0 == cfg.common.column_timestamp
-        && sql.meta.order_by[0].1;
+        && sql.meta.order_by[0].1 == OrderBy::Desc;
 
     let mut ctx = prepare_datafusion_context(
         session.work_group.clone(),
@@ -837,13 +838,14 @@ pub async fn register_table(
     files: &[FileKey],
     rules: HashMap<String, DataType>,
     without_optimizer: bool,
-    sort_key: &[(String, bool)],
+    sort_key: &[(String, OrderBy)],
     limit: Option<usize>,
 ) -> Result<SessionContext> {
     let cfg = get_config();
     // only sort by timestamp desc
-    let sort_by_timestamp_desc =
-        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+    let sort_by_timestamp_desc = sort_key.len() == 1
+        && sort_key[0].0 == cfg.common.column_timestamp
+        && sort_key[0].1 == OrderBy::Desc;
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
@@ -870,7 +872,7 @@ pub async fn create_parquet_table(
     schema: Arc<Schema>,
     files: &[FileKey],
     rules: HashMap<String, DataType>,
-    sort_key: &[(String, bool)],
+    sort_key: &[(String, OrderBy)],
 ) -> Result<NewListingTable> {
     let cfg = get_config();
     let target_partitions = if session.target_partitions == 0 {
@@ -880,8 +882,9 @@ pub async fn create_parquet_table(
     };
 
     // only sort by timestamp desc
-    let sort_by_timestamp_desc =
-        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+    let sort_by_timestamp_desc = sort_key.len() == 1
+        && sort_key[0].0 == cfg.common.column_timestamp
+        && sort_key[0].1 == OrderBy::Desc;
 
     // Configure listing options
     let file_format = ParquetFormat::default();

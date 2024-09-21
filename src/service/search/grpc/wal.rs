@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, SearchType, StorageType},
+        sql::OrderBy,
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
     utils::{
@@ -368,7 +369,7 @@ pub async fn search_memtable(
     // only sort by timestamp desc
     let sort_by_timestamp_desc = sql.meta.order_by.len() == 1
         && sql.meta.order_by[0].0 == cfg.common.column_timestamp
-        && sql.meta.order_by[0].1;
+        && sql.meta.order_by[0].1 == OrderBy::Desc;
 
     let mut tables = Vec::new();
     for (schema, mut record_batches) in batch_groups {
