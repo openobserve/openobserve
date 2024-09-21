@@ -23,6 +23,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
+        sql::OrderBy,
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -349,6 +350,7 @@ pub async fn search_partition(
         histogram_interval: sql.histogram_interval,
         max_query_range,
         partitions: vec![],
+        order_by: OrderBy::Desc,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -376,7 +378,7 @@ pub async fn search_partition(
         step = step - step % min_step;
     }
 
-    // generate partitions
+    // Generate partitions by ASC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
@@ -389,11 +391,18 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
-    if let Some((field, sort)) = sql.order_by.first() {
-        if field == &ts_column.unwrap() && !sort {
-            partitions.reverse();
+
+    // Default query is DESC order, we need to reverse partitions
+    let mut need_reverse = true;
+    if let Some((field, order_by)) = sql.order_by.first() {
+        if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+            need_reverse = false;
         }
     }
+    if need_reverse {
+        partitions.reverse();
+    }
+
     resp.partitions = partitions;
     Ok(resp)
 }
