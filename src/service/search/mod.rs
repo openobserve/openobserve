@@ -396,6 +396,7 @@ pub async fn search_partition(
     let mut need_reverse = true;
     if let Some((field, order_by)) = sql.order_by.first() {
         if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+            resp.order_by = OrderBy::Asc;
             need_reverse = false;
         }
     }
