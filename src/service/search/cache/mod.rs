@@ -261,7 +261,7 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
-    if is_aggregate && c_resp.histogram_interval > -1 {
+    if is_aggregate && res.histogram_interval.is_none() && !c_resp.ts_column.is_empty() && c_resp.histogram_interval > -1 {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
