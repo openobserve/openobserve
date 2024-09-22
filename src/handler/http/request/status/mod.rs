@@ -131,7 +131,7 @@ struct Rum {
     path = "/healthz",
     tag = "Meta",
     responses(
-        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
     )
 )]
 #[get("/healthz")]
@@ -146,8 +146,8 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     path = "/schedulez",
     tag = "Meta",
     responses(
-        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
-        (status = 404, description="Staus Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
+        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
+        (status = 404, description="Status Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
     )
 )]
 #[get("/schedulez")]
@@ -339,7 +339,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
     }
-    let status = "succcessfully reloaded config";
+    let status = "successfully reloaded config";
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {

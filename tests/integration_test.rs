@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     async fn e2e_test() {
-        // make sure data dir is deleted before we run integ tests
+        // make sure data dir is deleted before we run integration tests
         fs::remove_dir_all("./data")
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
@@ -1014,7 +1014,7 @@ mod tests {
     async fn e2e_post_metrics() {
         let auth = setup();
 
-        let loc_lable: Vec<prometheus_rpc::Label> = vec![
+        let loc_label: Vec<prometheus_rpc::Label> = vec![
             prometheus_rpc::Label {
                 name: "__name__".to_string(),
                 value: "grafana_api_dashboard_save_milliseconds_count".to_string(),
@@ -1054,7 +1054,7 @@ mod tests {
         let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
         let ts = prometheus_rpc::TimeSeries {
-            labels: loc_lable,
+            labels: loc_label,
             samples: loc_samples,
             exemplars: loc_exemp,
             histograms: loc_hist,

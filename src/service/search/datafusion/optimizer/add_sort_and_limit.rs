@@ -32,13 +32,13 @@ use datafusion::{
 pub struct AddSortAndLimitRule {
     #[allow(dead_code)]
     limit: usize,
-    offest: usize,
+    offset: usize,
 }
 
 impl AddSortAndLimitRule {
     #[allow(missing_docs)]
-    pub fn new(limit: usize, offest: usize) -> Self {
-        Self { limit, offest }
+    pub fn new(limit: usize, offset: usize) -> Self {
+        Self { limit, offset }
     }
 }
 
@@ -92,7 +92,7 @@ impl OptimizerRule for AddSortAndLimitRule {
                     let plan = generate_limit_plan(
                         Arc::new(LogicalPlan::Sort(sort)),
                         self.limit,
-                        self.offest,
+                        self.offset,
                     );
                     (Transformed::yes(plan), None)
                 }
@@ -103,13 +103,13 @@ impl OptimizerRule for AddSortAndLimitRule {
                         Transformed::yes(generate_limit_plan(
                             Arc::new(plan),
                             self.limit,
-                            self.offest,
+                            self.offset,
                         )),
                         None,
                     )
                 } else {
                     let (plan, schema) =
-                        generate_limit_and_sort_plan(Arc::new(plan), self.limit, self.offest);
+                        generate_limit_and_sort_plan(Arc::new(plan), self.limit, self.offset);
                     (Transformed::yes(plan), schema)
                 }
             }

@@ -185,7 +185,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .expect("file list remote calculate stats failed");
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                    return Err(anyhow::anyhow!(
+                        "unsupported reset component: {}",
+                        component
+                    ));
                 }
             }
         }
@@ -204,7 +207,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     }
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {component}"));
+                    return Err(anyhow::anyhow!("unsupported reset component: {component}"));
                 }
             }
         }
@@ -265,7 +268,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::schema::run().await?
         }
         _ => {
-            return Err(anyhow::anyhow!("unsupport sub command: {name}"));
+            return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }
     }
 

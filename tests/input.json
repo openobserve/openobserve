@@ -117,11 +117,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -403,11 +403,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -689,11 +689,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -975,11 +975,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -1261,11 +1261,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -1547,11 +1547,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -1833,11 +1833,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -2119,11 +2119,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -2405,11 +2405,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -2691,11 +2691,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -2977,11 +2977,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -3263,11 +3263,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -3549,11 +3549,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -3835,11 +3835,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
@@ -4121,11 +4121,11 @@
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "1KM Time Trial", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Bronze", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "FLAMENG, L\u00e9on", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Gold", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "MASSON, Paul", "Country": "FRA", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
-{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Indivual", "Medal": "Silver", "Season": "summer"}
+{"Year": 1896, "City": "Athens", "Sport": "Cycling", "Discipline": "Cycling Track", "Athlete": "NIKOLOPOULOS, Stamatios", "Country": "GRE", "Gender": "Men", "Event": "Sprint Individual", "Medal": "Silver", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Fencing", "Discipline": "Fencing", "Athlete": "PIERRAKOS-MAVROMICHALIS, Perikles", "Country": "GRE", "Gender": "Men", "Event": "Foil Individual", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
