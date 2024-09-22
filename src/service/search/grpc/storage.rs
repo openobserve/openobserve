@@ -584,7 +584,7 @@ async fn filter_file_list_by_inverted_index(
 
 /// Fetches the file from cache if it exists, otherwise fetch from storage
 async fn fetch_file(file_name: &str) -> anyhow::Result<Vec<u8>> {
-    // first get from meory cache
+    // first get from memory cache
     if file_data::memory::exist(file_name).await {
         return file_data::memory::get(file_name, None)
             .await

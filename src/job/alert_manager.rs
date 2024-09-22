@@ -51,7 +51,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
         let cluster_name = config::get_cluster_name();
-        // regester to super cluster
+        // register to super cluster
         o2_enterprise::enterprise::super_cluster::kv::alert_manager::register_job_cluster(
             &cluster_name,
         )

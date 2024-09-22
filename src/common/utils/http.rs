@@ -243,7 +243,7 @@ mod tests {
     /// Test logic for IP parsing
     #[test]
     fn test_ip_parsing() {
-        let valid_addressses = vec![
+        let valid_addresses = vec![
             "127.0.0.1",
             "127.0.0.1:8080",
             "::1",
@@ -252,7 +252,7 @@ mod tests {
             "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
         ];
 
-        let parsed_addresses: Vec<IpAddr> = valid_addressses
+        let parsed_addresses: Vec<IpAddr> = valid_addresses
             .iter()
             .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
             .collect();
@@ -260,7 +260,7 @@ mod tests {
         assert!(
             parsed_addresses
                 .iter()
-                .zip(valid_addressses)
+                .zip(valid_addresses)
                 .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
                 .fold(true, |acc, x| { acc | x })
         );
