@@ -195,17 +195,19 @@ async fn recursive_process_multiple_metas(
                 matching_cache_meta.start_time,
                 matching_cache_meta.end_time
             );
-            results.push(CachedQueryResponse {
-                cached_response,
-                deltas: vec![],
-                has_cached_data: true,
-                cache_query_response: true,
-                response_start_time: matching_cache_meta.start_time,
-                response_end_time: matching_cache_meta.end_time,
-                ts_column: cache_req.ts_column.to_string(),
-                is_descending: cache_req.is_descending,
-                limit: -1,
-            });
+            if !cached_response.hits.is_empty() {
+                results.push(CachedQueryResponse {  
+                    cached_response,
+                    deltas: vec![],
+                    has_cached_data: true,
+                    cache_query_response: true,
+                    response_start_time: matching_cache_meta.start_time,
+                    response_end_time: matching_cache_meta.end_time,
+                    ts_column: cache_req.ts_column.to_string(),
+                    is_descending: cache_req.is_descending,
+                    limit: -1,
+                });
+            }
         }
         // Filter out the largest meta and call recursively with non-overlapping metas
         let remaining_metas: Vec<ResultCacheMeta> = sorted_metas
