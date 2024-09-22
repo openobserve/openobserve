@@ -138,7 +138,7 @@ pub async fn check_cache(
             }
         }
     }
-    if is_aggregate && order_by.is_empty() {
+    if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
     let mut multi_resp = MultiCachedQueryResponse::default();
