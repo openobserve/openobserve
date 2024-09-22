@@ -188,24 +188,26 @@ async fn recursive_process_multiple_metas(
             if cache_req.discard_interval < 0 {
                 matching_cache_meta.end_time = discard_ts;
             }
-
-            log::info!(
-                "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {}",
-                query_key,
-                matching_cache_meta.start_time,
-                matching_cache_meta.end_time
-            );
-            results.push(CachedQueryResponse {
-                cached_response,
-                deltas: vec![],
-                has_cached_data: true,
-                cache_query_response: true,
-                response_start_time: matching_cache_meta.start_time,
-                response_end_time: matching_cache_meta.end_time,
-                ts_column: cache_req.ts_column.to_string(),
-                is_descending: cache_req.is_descending,
-                limit: -1,
-            });
+            if !cached_response.hits.is_empty() {
+                log::info!(
+                    "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} , len {}",
+                    query_key,
+                    matching_cache_meta.start_time,
+                    matching_cache_meta.end_time,
+                    cached_response.hits.len()
+                );
+                results.push(CachedQueryResponse {
+                    cached_response,
+                    deltas: vec![],
+                    has_cached_data: true,
+                    cache_query_response: true,
+                    response_start_time: matching_cache_meta.start_time,
+                    response_end_time: matching_cache_meta.end_time,
+                    ts_column: cache_req.ts_column.to_string(),
+                    is_descending: cache_req.is_descending,
+                    limit: -1,
+                });
+            }
         }
         // Filter out the largest meta and call recursively with non-overlapping metas
         let remaining_metas: Vec<ResultCacheMeta> = sorted_metas
