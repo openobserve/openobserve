@@ -188,15 +188,15 @@ async fn recursive_process_multiple_metas(
             if cache_req.discard_interval < 0 {
                 matching_cache_meta.end_time = discard_ts;
             }
-
-            log::info!(
-                "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {}",
-                query_key,
-                matching_cache_meta.start_time,
-                matching_cache_meta.end_time
-            );
             if !cached_response.hits.is_empty() {
-                results.push(CachedQueryResponse {  
+                log::info!(
+                    "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} and len {}",
+                    query_key,
+                    matching_cache_meta.start_time,
+                    matching_cache_meta.end_time,
+                    cached_response.hits.len()
+                );
+                results.push(CachedQueryResponse {
                     cached_response,
                     deltas: vec![],
                     has_cached_data: true,
