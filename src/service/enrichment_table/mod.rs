@@ -208,7 +208,7 @@ pub async fn save_enrichment_data(
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
-    // notifiy update
+    // notify update
     if stream_schema.has_fields {
         if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
             log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");

@@ -20,7 +20,7 @@ use chrono::Duration;
 use config::{
     get_config,
     meta::{
-        sql::{resolve_stream_names, Sql as MetaSql},
+        sql::{resolve_stream_names, OrderBy, Sql as MetaSql},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
@@ -41,15 +41,16 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
-        FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, SetExpr, VisitMut,
-        VisitorMut,
+        BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
+        SetExpr, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
 use super::request::Request;
+use crate::common::meta::ingestion::ORIGINAL_DATA_COL_NAME;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -73,7 +74,7 @@ pub struct Sql {
     pub offset: i64,
     pub time_range: Option<(i64, i64)>,
     pub group_by: Vec<String>,
-    pub order_by: Vec<(String, bool)>,
+    pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub sorted_by_time: bool,     // if only order by _timestamp
     pub use_inverted_index: bool, // if can use inverted index
@@ -135,11 +136,11 @@ impl Sql {
             && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
-            order_by.push((get_config().common.column_timestamp.clone(), false));
+            order_by.push((get_config().common.column_timestamp.clone(), OrderBy::Desc));
         }
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == get_config().common.column_timestamp
-            && !order_by[0].1;
+            && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
         // 4. get match_all() value
@@ -229,7 +230,17 @@ fn generate_select_star_schema(
         let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
         // check if it is user defined schema
         if defined_schema_fields.is_empty() {
-            used_schemas.insert(name, schema);
+            if schema.contains_field(ORIGINAL_DATA_COL_NAME) {
+                // skip selecting "_original" column if `SELECT * ...`
+                let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
+                fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+                let schema = Arc::new(SchemaCache::new(
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
+                ));
+                used_schemas.insert(name, schema);
+            } else {
+                used_schemas.insert(name, schema);
+            }
         } else {
             used_schemas.insert(
                 name,
@@ -298,13 +309,13 @@ fn generate_schema_fields(
 }
 
 /// visit a sql to get all columns
-/// TODO: handle subquery without (table.field_name) perfix
+/// TODO: handle subquery without (table.field_name) prefix
 struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
     columns_alias: HashSet<(String, String)>,
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
     group_by: Vec<String>,
-    order_by: Vec<(String, bool)>, // field_name, asc
+    order_by: Vec<(String, OrderBy)>, // field_name, order_by
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
@@ -378,7 +389,14 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
                 order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
-                    self.order_by.push((expr_name, order.asc.unwrap_or(true)));
+                    self.order_by.push((
+                        expr_name,
+                        if order.asc.unwrap_or_default() {
+                            OrderBy::Asc
+                        } else {
+                            OrderBy::Desc
+                        },
+                    ));
                 }
             }
         }
@@ -688,6 +706,22 @@ impl VisitorMut for TrackTotalHitsVisitor {
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let SetExpr::Select(select) = query.body.as_mut() {
+            let (field_expr, duplicate_treatment) = if select.distinct.is_some() {
+                match select.projection.first() {
+                    Some(SelectItem::UnnamedExpr(expr)) => (
+                        FunctionArgExpr::Expr(expr.clone()),
+                        Some(DuplicateTreatment::Distinct),
+                    ),
+                    Some(SelectItem::ExprWithAlias { expr, alias: _ }) => (
+                        FunctionArgExpr::Expr(expr.clone()),
+                        Some(DuplicateTreatment::Distinct),
+                    ),
+                    _ => (FunctionArgExpr::Wildcard, None),
+                }
+            } else {
+                (FunctionArgExpr::Wildcard, None)
+            };
+
             select.group_by = GroupByExpr::Expressions(vec![], vec![]);
             select.having = None;
             select.sort_by = vec![];
@@ -696,8 +730,8 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     name: ObjectName(vec![Ident::new("count")]),
                     parameters: FunctionArguments::None,
                     args: FunctionArguments::List(FunctionArgumentList {
-                        args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
-                        duplicate_treatment: None,
+                        args: vec![FunctionArg::Unnamed(field_expr)],
+                        duplicate_treatment,
                         clauses: vec![],
                     }),
                     filter: None,
@@ -707,6 +741,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 }),
                 alias: Ident::new("zo_sql_num"),
             }];
+            select.distinct = None;
             query.order_by = None;
         }
         ControlFlow::Break(())

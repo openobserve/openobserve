@@ -353,7 +353,7 @@ pub async fn merge_by_stream(
     // collect stream stats
     let mut stream_stats = StreamStats::default();
 
-    // use mutiple threads to merge
+    // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
     for (prefix, files_with_size) in partition_files_with_size.into_iter() {
@@ -688,7 +688,7 @@ pub async fn merge_files(
             if schema_ver_id == schema_latest_id {
                 continue;
             }
-            // cacluate the diff between latest schema and current schema
+            // calculate the diff between latest schema and current schema
             let schema = schema_versions[schema_ver_id]
                 .clone()
                 .with_metadata(HashMap::new());

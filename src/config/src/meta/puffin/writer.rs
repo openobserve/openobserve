@@ -62,7 +62,7 @@ impl<W> PuffinBytesWriter<W> {
             .offset(self.written_bytes as _)
             .length(size as _)
             .build()
-            .expect("Missing required fileds")
+            .expect("Missing required fields")
     }
 }
 

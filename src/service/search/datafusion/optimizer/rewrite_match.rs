@@ -141,6 +141,11 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         });
                         expr_list.push(new_expr);
                     }
+                    if expr_list.is_empty() {
+                        return Err(DataFusionError::Internal(
+                            infra::errors::ErrorCodes::FullTextSearchFieldNotFound.to_string(),
+                        ));
+                    }
                     let new_expr = disjunction(expr_list).unwrap();
                     Ok(Transformed::yes(new_expr))
                 } else {

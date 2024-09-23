@@ -516,17 +516,17 @@ pub async fn send_email_notification(
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
     }
 
-    let mut recepients = vec![];
-    for recepient in &dest.emails {
-        recepients.push(recepient);
+    let mut recipients = vec![];
+    for recipient in &dest.emails {
+        recipients.push(recipient);
     }
 
     let mut email = Message::builder()
         .from(cfg.smtp.smtp_from_email.parse()?)
         .subject(format!("Openobserve Alert - {}", alert_name));
 
-    for recepient in recepients {
-        email = email.to(recepient.parse()?);
+    for recipient in recipients {
+        email = email.to(recipient.parse()?);
     }
 
     if !cfg.smtp.smtp_reply_to.is_empty() {

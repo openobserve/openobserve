@@ -223,7 +223,7 @@ fn vector_and(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) 
     Ok(Value::Vector(output))
 }
 
-fn vector_arithmatic_operators(
+fn vector_arithmetic_operators(
     expr: &BinaryExpr,
     left: &[InstantValue],
     right: &[InstantValue],
@@ -352,6 +352,6 @@ pub fn vector_bin_op(
         token::T_LAND => vector_and(expr, left, right),
         token::T_LOR => vector_or(expr, left, right),
         token::T_LUNLESS => vector_unless(expr, left, right),
-        _ => vector_arithmatic_operators(expr, left, right),
+        _ => vector_arithmetic_operators(expr, left, right),
     }
 }

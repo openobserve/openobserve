@@ -284,7 +284,7 @@ pub async fn metrics_json_handler(
                         continue;
                     };
 
-                    // udpate schema metadata
+                    // update schema metadata
                     if !schema_exists.has_metadata {
                         if let Err(e) =
                             update_setting(org_id, metric_name, StreamType::Metrics, prom_meta)

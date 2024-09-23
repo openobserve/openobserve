@@ -27,7 +27,7 @@ pub fn find(haystack: &str, needle: &str) -> bool {
 
 pub trait StringExt {
     fn find(&self, needle: &str) -> bool;
-    fn optinal(&self) -> Option<String>;
+    fn optional(&self) -> Option<String>;
 }
 
 impl StringExt for String {
@@ -36,7 +36,7 @@ impl StringExt for String {
         find(self, needle)
     }
 
-    fn optinal(&self) -> Option<String> {
+    fn optional(&self) -> Option<String> {
         if self.is_empty() {
             None
         } else {

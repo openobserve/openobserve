@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn complex_key_format() {
-        let datas = [
+        let data = [
             (
                 json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}}),
                 json!({"key": "value", "nested_key_key": "value", "nested_key_foo": "bar"}),
@@ -359,7 +359,7 @@ mod tests {
                 json!({"a_a_1": "[1,[3,4],5]", "a_a_2": 6}),
             ),
         ];
-        for (input, expected) in datas.into_iter() {
+        for (input, expected) in data.into_iter() {
             assert_eq!(flatten(input).unwrap(), expected);
         }
     }

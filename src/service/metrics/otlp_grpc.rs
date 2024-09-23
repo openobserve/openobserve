@@ -205,7 +205,7 @@ pub async fn handle_grpc_request(
                     None => vec![],
                 };
 
-                // udpate schema metadata
+                // update schema metadata
                 if !schema_exists.has_metadata {
                     if let Err(e) =
                         update_setting(org_id, metric_name, StreamType::Metrics, prom_meta).await

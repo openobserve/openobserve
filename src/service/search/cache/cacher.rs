@@ -17,7 +17,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use config::{
     get_config,
-    meta::{search::Response, stream::StreamType},
+    meta::{search::Response, sql::OrderBy, stream::StreamType},
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -119,7 +119,7 @@ pub async fn check_cache(
             } else {
                 sql.time_range
             };
-        handle_historgram(origin_sql, q_time_range);
+        handle_histogram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; //in microseconds
     }
@@ -133,12 +133,12 @@ pub async fn check_cache(
     if !order_by.is_empty() {
         for (field, order) in &order_by {
             if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
-                is_descending = *order;
+                is_descending = order == &OrderBy::Desc;
                 break;
             }
         }
     }
-    if is_aggregate && order_by.is_empty() {
+    if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
     let mut multi_resp = MultiCachedQueryResponse::default();
@@ -589,7 +589,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_historgram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
+fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
     let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
     let attrs = caps
         .get(1)

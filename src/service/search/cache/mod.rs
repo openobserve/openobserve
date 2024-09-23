@@ -116,7 +116,22 @@ pub async fn search(
         )
         .await
     } else {
-        MultiCachedQueryResponse::default()
+        let query = rpc_req.clone().query.unwrap();
+        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+            Ok(v) => {
+                let ts_column = cacher::get_ts_col(&v, &cfg.common.column_timestamp, is_aggregate)
+                    .unwrap_or_default();
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {:?}", e);
+                MultiCachedQueryResponse::default()
+            }
+        }
     };
 
     // No cache data present, add delta for full query
@@ -256,7 +271,11 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
-    if is_aggregate && c_resp.histogram_interval > -1 {
+    if is_aggregate
+        && res.histogram_interval.is_none()
+        && !c_resp.ts_column.is_empty()
+        && c_resp.histogram_interval > -1
+    {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 

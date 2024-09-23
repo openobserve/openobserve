@@ -51,7 +51,7 @@ pub(crate) fn get_request_columns_limit_error(
     num_fields: usize,
 ) -> anyhow::Error {
     anyhow::anyhow!(
-        "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_cloumns>",
+        "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_columns>",
         get_config().limit.req_cols_per_record_limit
     )
 }
