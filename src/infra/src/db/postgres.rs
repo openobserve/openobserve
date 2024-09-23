@@ -26,6 +26,7 @@ use sqlx::{
 };
 use tokio::sync::mpsc;
 
+use super::{cache_indices_pg, DBIndex, INDICES};
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
@@ -526,6 +527,7 @@ impl super::Db for PostgresDb {
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
+    let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
 
     // create table
     _ = sqlx::query(
@@ -553,13 +555,30 @@ CREATE TABLE IF NOT EXISTS meta
     }
 
     // create table index
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
+    if !indices.contains(&DBIndex {
+        name: "meta_module_idx".into(),
+        table: "meta".into(),
+    }) {
+        create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
+    }
+    if !indices.contains(&DBIndex {
+        name: "meta_module_key1_idx".into(),
+        table: "meta".into(),
+    }) {
+        create_index_item(
+            "CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);",
+        )
         .await?;
-    create_index_item(
+    }
+    if !indices.contains(&DBIndex {
+        name: "meta_module_start_dt_idx".into(),
+        table: "meta".into(),
+    }) {
+        create_index_item(
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
     )
     .await?;
+    }
 
     Ok(())
 }
@@ -576,6 +595,8 @@ async fn create_index_item(sql: &str) -> Result<()> {
 async fn add_start_dt_column() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
+    let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
+
     if let Err(e) = sqlx::query(
         r#"ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;"#,
     )
@@ -590,7 +611,11 @@ async fn add_start_dt_column() -> Result<()> {
     }
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
-    if let Err(e) = sqlx::query(
+    if indices.contains(&DBIndex {
+        name: "meta_module_start_dt_idx".into(),
+        table: "meta".into(),
+    }) {
+        if let Err(e) = sqlx::query(
         r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);"#
     )
     .execute(&mut *tx)
@@ -601,18 +626,24 @@ async fn add_start_dt_column() -> Result<()> {
         }
         return Err(e.into());
     }
-    if let Err(e) = sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
-        .execute(&mut *tx)
-        .await
-    {
-        log::error!(
-            "[POSTGRES] Error in dropping index meta_module_key2_idx: {}",
-            e
-        );
-        if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+    }
+    if indices.contains(&DBIndex {
+        name: "meta_module_key2_idx".into(),
+        table: "meta".into(),
+    }) {
+        if let Err(e) = sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+            .execute(&mut *tx)
+            .await
+        {
+            log::error!(
+                "[POSTGRES] Error in dropping index meta_module_key2_idx: {}",
+                e
+            );
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+            }
+            return Err(e.into());
         }
-        return Err(e.into());
     }
 
     if let Err(e) = tx.commit().await {

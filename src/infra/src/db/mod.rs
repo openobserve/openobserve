@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
+use sqlx::{MySql, Pool, Postgres, Sqlite};
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::errors::{DbError, Error, Result};
@@ -35,6 +36,7 @@ pub static NO_NEED_WATCH: bool = false;
 static DEFAULT: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub async fn get_db() -> &'static Box<dyn Db> {
     DEFAULT.get_or_init(default).await
@@ -232,6 +234,54 @@ pub struct MetaRecord {
     pub key2: String,
     pub start_dt: i64,
     pub value: String,
+}
+
+#[derive(Hash, Clone, Eq, PartialEq)]
+struct DBIndex {
+    name: String,
+    table: String,
+}
+
+async fn cache_indices_mysql(pool: &Pool<MySql>) -> HashSet<DBIndex> {
+    let sql = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
+    let res = sqlx::query_as::<_, (String, String)>(&sql)
+        .fetch_all(pool)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
+}
+
+async fn cache_indices_pg(pool: &Pool<Postgres>) -> HashSet<DBIndex> {
+    let sql = r#"SELECT indexname, tablename FROM pg_indexes;"#;
+    let res = sqlx::query_as::<_, (String, String)>(&sql)
+        .fetch_all(pool)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
+}
+
+async fn cache_indices_sqlite(pool: &Pool<Sqlite>) -> HashSet<DBIndex> {
+    let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
+    let res = sqlx::query_as::<_, (String, String)>(&sql)
+        .fetch_all(pool)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
 }
 
 #[cfg(test)]

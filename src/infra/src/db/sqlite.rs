@@ -29,6 +29,7 @@ use sqlx::{
 };
 use tokio::sync::{mpsc, Mutex, RwLock};
 
+use super::{cache_indices_sqlite, DBIndex, INDICES};
 use crate::{
     db::{Event, EventData},
     errors::*,
@@ -685,6 +686,7 @@ impl super::Db for SqliteDb {
 async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
+    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&*client)).await;
     // create table
     sqlx::query(
         r#"
@@ -706,35 +708,39 @@ CREATE TABLE IF NOT EXISTS meta
     add_start_dt_column(&client).await?;
 
     // create table index
-    sqlx::query(
-        r#"
-CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
-CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
-        "#,
-    )
-    .execute(&*client)
-    .await?;
-
-    match sqlx::query(
-        r#"
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);
-        "#,
-    )
-    .execute(&*client)
-    .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!(
-                "[SQLITE] create meta_module_start_dt_idx index error: {}",
-                e
-            );
-        }
+    if !indices.contains(&DBIndex {
+        name: "meta_module_idx".into(),
+        table: "meta".into(),
+    }) {
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);"#)
+            .execute(&*client)
+            .await?;
     }
+    if !indices.contains(&DBIndex {
+        name: "meta_module_key1_idx".into(),
+        table: "meta".into(),
+    }) {
+        sqlx::query(r#"CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);"#)
+            .execute(&*client)
+            .await?;
+    }
+
+    if !indices.contains(&DBIndex {
+        name: "meta_module_start_dt_idx".into(),
+        table: "meta".into(),
+    }) {
+        sqlx::query(
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);"#,
+        )
+        .execute(&*client)
+        .await?;
+    }
+
     Ok(())
 }
 
 async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
+    let indices = INDICES.get_or_init(|| cache_indices_sqlite(client)).await;
     // Attempt to add the column, ignoring the error if the column already exists
     if let Err(e) =
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
@@ -749,15 +755,24 @@ async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
     }
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
-    sqlx::query(
+    if !indices.contains(&DBIndex {
+        name: "meta_module_start_dt_idx".into(),
+        table: "meta".into(),
+    }) {
+        sqlx::query(
             r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);"#
         )
         .execute(client)
         .await?;
-    sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
-        .execute(client)
-        .await?;
-
+    }
+    if indices.contains(&DBIndex {
+        name: "meta_module_key2_idx".into(),
+        table: "meta".into(),
+    }) {
+        sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+            .execute(client)
+            .await?;
+    }
     Ok(())
 }
 
