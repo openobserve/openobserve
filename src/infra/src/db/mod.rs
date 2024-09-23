@@ -36,7 +36,7 @@ pub static NO_NEED_WATCH: bool = false;
 static DEFAULT: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
-static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
+pub static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub async fn get_db() -> &'static Box<dyn Db> {
     DEFAULT.get_or_init(default).await
@@ -237,12 +237,12 @@ pub struct MetaRecord {
 }
 
 #[derive(Hash, Clone, Eq, PartialEq)]
-struct DBIndex {
-    name: String,
-    table: String,
+pub struct DBIndex {
+    pub name: String,
+    pub table: String,
 }
 
-async fn cache_indices_mysql(pool: &Pool<MySql>) -> HashSet<DBIndex> {
+pub async fn cache_indices_mysql(pool: &Pool<MySql>) -> HashSet<DBIndex> {
     let sql = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
     let res = sqlx::query_as::<_, (String, String)>(&sql)
         .fetch_all(pool)
@@ -256,7 +256,7 @@ async fn cache_indices_mysql(pool: &Pool<MySql>) -> HashSet<DBIndex> {
     }
 }
 
-async fn cache_indices_pg(pool: &Pool<Postgres>) -> HashSet<DBIndex> {
+pub async fn cache_indices_pg(pool: &Pool<Postgres>) -> HashSet<DBIndex> {
     let sql = r#"SELECT indexname, tablename FROM pg_indexes;"#;
     let res = sqlx::query_as::<_, (String, String)>(&sql)
         .fetch_all(pool)
@@ -270,7 +270,7 @@ async fn cache_indices_pg(pool: &Pool<Postgres>) -> HashSet<DBIndex> {
     }
 }
 
-async fn cache_indices_sqlite(pool: &Pool<Sqlite>) -> HashSet<DBIndex> {
+pub async fn cache_indices_sqlite(pool: &Pool<Sqlite>) -> HashSet<DBIndex> {
     let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
     let res = sqlx::query_as::<_, (String, String)>(&sql)
         .fetch_all(pool)
