@@ -56,8 +56,7 @@ impl PhysicalOptimizerRule for JoinReorderRule {
 }
 
 fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn ExecutionPlan>>> {
-    if plan.name() == "HashJoinExec" {
-        let hash_join = plan.as_any().downcast_ref::<HashJoinExec>().unwrap();
+    if let Some(hash_join) = plan.as_any().downcast_ref::<HashJoinExec>() {
         let left = hash_join.left();
         let right = hash_join.right();
         if !is_agg_exec(left) && is_agg_exec(right) {
