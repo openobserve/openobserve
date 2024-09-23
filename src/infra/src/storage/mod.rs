@@ -100,7 +100,12 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
                     log::debug!("Deleted object: {}", file);
                 }
                 Err(e) => {
-                    log::error!("Failed to delete object: {:?}", e);
+                    // TODO: need a better solution for identifying the error
+                    if file.ends_with(".puffin") {
+                        // ignore puffin file deletion error
+                    } else {
+                        log::error!("Failed to delete object: {:?}", e);
+                    }
                 }
             }
         })
