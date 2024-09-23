@@ -85,7 +85,7 @@ export default defineComponent({
     const height = computed({
       get: () => props.layout.h,
       set: (value) => {
-        emit("update:layout", { ...props.layout, h: value });
+        emit("update:layout", { ...props.layout, h: Number(value) });
       },
     });
 
