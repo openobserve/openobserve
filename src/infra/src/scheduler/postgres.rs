@@ -20,7 +20,7 @@ use sqlx::Row;
 
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
-    db::{self, postgres::CLIENT},
+    db::{self, cache_indices_pg, postgres::CLIENT, DBIndex, INDICES},
     errors::{DbError, Error, Result},
 };
 
@@ -78,14 +78,30 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     async fn create_table_index(&self) -> Result<()> {
         let pool = CLIENT.clone();
+        let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
 
         let queries = vec![
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
+            (
+                "scheduled_jobs_key_idx",
+                "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
+            ),
+            (
+                "scheduled_jobs_org_key_idx",
+                "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
+            ),
+            (
+                "scheduled_jobs_org_module_key_idx",
+                "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
+            ),
         ];
 
-        for query in queries {
+        for (idx, query) in queries {
+            if indices.contains(&DBIndex {
+                name: idx.into(),
+                table: "scheduled_jobs".into(),
+            }) {
+                continue;
+            }
             if let Err(e) = sqlx::query(query).execute(&pool).await {
                 log::error!("[POSTGRES] create table scheduled_jobs index error: {}", e);
                 return Err(e.into());

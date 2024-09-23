@@ -21,8 +21,7 @@ use sqlx::{Pool, Row, Sqlite};
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
     db::{
-        self,
-        sqlite::{CLIENT_RO, CLIENT_RW},
+        self, cache_indices_sqlite, sqlite::{CLIENT_RO, CLIENT_RW}, DBIndex, INDICES
     },
     errors::{DbError, Error, Result},
 };
@@ -78,13 +77,26 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     async fn create_table_index(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
+        let indices = INDICES.get_or_init(|| cache_indices_sqlite(&*client)).await;
         let queries = vec![
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
+            (
+                "scheduled_jobs_key_idx",
+                "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
+            ),
+            (
+                "scheduled_jobs_org_key_idx",
+                "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
+            ),
+            (
+                "scheduled_jobs_org_module_key_idx",
+                "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
+            ),
         ];
 
-        for query in queries {
+        for (idx,query) in queries {
+            if indices.contains(&DBIndex{name:idx.into(),table:"scheduled_jobs".into()}){
+                continue;
+            }
             sqlx::query(query).execute(&*client).await?;
         }
         Ok(())
