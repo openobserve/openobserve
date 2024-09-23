@@ -17,7 +17,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>Value Mapping</span>
+      <span>Value Mappings</span>
       <q-btn
         no-caps
         padding="xs"
