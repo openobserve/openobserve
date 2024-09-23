@@ -124,7 +124,7 @@ pub async fn create_table_index() -> Result<()> {
 
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&*client)).await;
+    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&client)).await;
     for (idx, sql) in sqls {
         if indices.contains(&DBIndex {
             name: idx.into(),

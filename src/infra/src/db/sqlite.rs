@@ -686,7 +686,7 @@ impl super::Db for SqliteDb {
 async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&*client)).await;
+    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&client)).await;
     // create table
     sqlx::query(
         r#"

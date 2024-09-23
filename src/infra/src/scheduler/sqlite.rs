@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     async fn create_table_index(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let indices = INDICES.get_or_init(|| cache_indices_sqlite(&*client)).await;
+        let indices = INDICES.get_or_init(|| cache_indices_sqlite(&client)).await;
         let queries = vec![
             (
                 "scheduled_jobs_key_idx",
