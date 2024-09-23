@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <RenderDashboardCharts
         v-if="selectedDate"
+        ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
@@ -215,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         @refreshPanelRequest="refreshPanelRequest"
+        @openLayoutConfig="openLayoutConfig"
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
@@ -229,6 +231,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
       >
         <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
+
+      <q-dialog
+        v-model="selectedPanelConfig.show"
+        position="right"
+        full-height
+        maximized
+      >
+        <PanelLayoutSettings
+          :layout="selectedPanelConfig.data.layout"
+          @update:layout="onLayoutUpdate"
+        />
       </q-dialog>
 
       <q-dialog
@@ -286,6 +300,7 @@ import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -301,6 +316,7 @@ export default defineComponent({
     DashboardSettings,
     RenderDashboardCharts,
     ScheduledDashboards,
+    PanelLayoutSettings,
   },
   setup() {
     const { t } = useI18n();
@@ -330,6 +346,8 @@ export default defineComponent({
     const folderId = computed(() => route.query.folder);
 
     const tabId = computed(() => route.query.tab);
+
+    const renderDashboardChartsRef = ref(null);
 
     onBeforeMount(async () => {
       await importMoment();
@@ -391,6 +409,11 @@ export default defineComponent({
 
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
+
+    const selectedPanelConfig = ref({
+      data: null,
+      show: false,
+    });
 
     // selected tab
     const selectedTabId: any = ref(route.query.tab ?? null);
@@ -535,6 +558,48 @@ export default defineComponent({
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
+    };
+
+    const openLayoutConfig = (id: string) => {
+      selectedPanelConfig.value.show = true;
+
+      console.log("Selected tab id", selectedTabId.value);
+
+      currentDashboardData.data.tabs.forEach((tab: any) => {
+        if (tab.tabId === selectedTabId.value) {
+          console.log("Selected tab", tab);
+          tab.panels.forEach((panel: any) => {
+            console.log("Panel", panel);
+            if (panel.id === id) {
+              selectedPanelConfig.value.data = panel;
+            }
+          });
+        }
+      });
+    };
+
+    const onLayoutUpdate = async (layout) => {
+      currentDashboardData.data.tabs.forEach((tab: any) => {
+        if (tab.tabId === selectedTabId.value) {
+          console.log("Selected tab", tab);
+          tab.panels.forEach((panel: any) => {
+            console.log("Panel", panel);
+            if (panel.id === selectedPanelConfig.value.data.id) {
+              panel.layout = layout;
+            }
+          });
+        }
+      });
+
+      await nextTick();
+
+      renderDashboardChartsRef.value?.layoutUpdate();
+
+      await setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+      }, 1000);
+
+      console.log("Layout updated", layout);
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
@@ -892,9 +957,12 @@ export default defineComponent({
       arePanelsLoading,
       cancelQuery,
       traceIdRef,
-      searchRequestTraceIds,
       handleEmittedData,
       config,
+      openLayoutConfig,
+      selectedPanelConfig,
+      onLayoutUpdate,
+      renderDashboardChartsRef,
     };
   },
 });

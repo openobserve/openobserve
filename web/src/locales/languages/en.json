@@ -649,7 +649,8 @@
     "updateFolder": "Update Folder",
     "scheduledReports": "Scheduled Reports",
     "newReport": "New Report",
-    "scheduledDashboards": "Scheduled Dashboards"
+    "scheduledDashboards": "Scheduled Dashboards",
+    "panelHeight": "Panel Height"
   },
   "panel": {
     "header": "Panel",
