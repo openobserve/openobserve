@@ -185,8 +185,7 @@ async fn run_datafusion(
 
     if cfg.common.print_key_sql {
         let plan = displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
+            .indent(false)
             .to_string();
         println!("+---------------------------+----------+");
         println!("leader physical plan before rewrite");
@@ -250,8 +249,7 @@ async fn run_datafusion(
 
     if cfg.common.print_key_sql {
         let plan = displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
+            .indent(false)
             .to_string();
         println!("+---------------------------+----------+");
         println!("leader physical plan after rewrite");

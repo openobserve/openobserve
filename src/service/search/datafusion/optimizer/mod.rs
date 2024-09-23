@@ -41,6 +41,7 @@ use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
+pub mod join_reorder;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
 
