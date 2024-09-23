@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div
-    style="padding: 0px 10px; min-width: 30%"
+    style="padding: 0px 10px; min-width: 70%"
     class="scroll o2-input"
     data-test="dashboard-value-mapping-popup"
   >
@@ -28,7 +28,7 @@
         <span>Value Mappings</span>
       </div>
     </div>
-    <div>
+    <div class="tw-mb-4">
       <div>
         <draggable
           v-model="dashboardPanelData.data.config.mappings"
@@ -46,14 +46,25 @@
                 name="drag_indicator"
                 color="grey-13"
                 class="'q-mr-xs"
-                data-test="dashboard-tab-settings-drag-handle"
+                data-test="dashboard-addpanel-config-value-mapping-drag-handle"
               />
             </div>
             <div class="draggable-content">
-              <input
-                v-model="mapping.name"
-                class="edit-input"
-                data-test="dashboard-tab-settings-tab-name-edit"
+              <q-select
+                v-model="mapping.type"
+                :options="mappingTypes"
+                label="Type"
+                class="tw-w-40 showLabelOnTop"
+                stack-label
+                emit-value
+                data-test="dashboard-addpanel-config-value-mapping-type-select"
+              />
+              <q-input
+                v-if="mapping.type === 'value'"
+                v-model="mapping.value"
+                label="Value"
+                class="showLabelOnTop"
+                data-test="dashboard-addpanel-config-value-mapping-name-edit"
               />
 
               <span class="q-ml-lg">
@@ -66,9 +77,8 @@
                   size="sm"
                   round
                   flat
-                  data-test="dashboard-tab-settings-tab-delete-btn"
-                  ></q-btn>
-                  <!-- @click.stop="deleteItem(mapping.tabId)" -->
+                  data-test="dashboard-addpanel-config-value-mapping-delete-btn"
+                ></q-btn>
               </span>
             </div>
           </div>
@@ -162,4 +172,25 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.draggable-row {
+  display: flex;
+  border-bottom: 1px solid #cccccc70;
+  margin-bottom: 8px;
+  cursor: move;
+}
+
+.draggable-handle {
+  flex: 0 0 30px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.draggable-content {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  box-sizing: border-box;
+}
+</style>
