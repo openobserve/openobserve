@@ -672,6 +672,7 @@ export const convertSQLData = async (
           width: 100,
           margin:
             18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5,
+          rotate: panelSchema.config?.axis_label_rotation || 0,
         },
         splitLine: {
           show: true,
@@ -756,6 +757,9 @@ export const convertSQLData = async (
     },
     series: [],
   };
+
+  console.log("options", options);
+
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
 
   // Now set the series values as per the chart data
@@ -979,6 +983,11 @@ export const convertSQLData = async (
           //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          label: {
+            show: true,
+            position: "top",
+            rotate: 10,
+          },
           // markLine if exist
           markLine: {
             silent: true,
@@ -1009,6 +1018,9 @@ export const convertSQLData = async (
             silent: true,
             animation: false,
             data: getMarkLineData(panelSchema),
+          },label: {
+            show: true,
+            position: "top",
           },
           data: getAxisDataFromKey(key),
           barMinHeight: 1,
