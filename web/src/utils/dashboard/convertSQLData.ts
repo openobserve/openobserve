@@ -1053,6 +1053,11 @@ export const convertSQLData = async (
           //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          label: {
+            show: true,
+            position: "top",
+            rotate: 10,
+          },
           // markLine if exist
           markLine: {
             silent: true,
@@ -1093,6 +1098,9 @@ export const convertSQLData = async (
             silent: true,
             animation: false,
             data: getMarkLineData(panelSchema),
+          },label: {
+            show: true,
+            position: "top",
           },
           data: getAxisDataFromKey(key),
           barMinHeight: 1,
