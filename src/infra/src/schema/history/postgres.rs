@@ -18,7 +18,7 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::postgres::CLIENT,
+    db::{cache_indices_pg, postgres::CLIENT, DBIndex, INDICES},
     errors::{Error, Result},
 };
 
@@ -107,23 +107,30 @@ CREATE TABLE IF NOT EXISTS schema_history
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
+    let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
     let sqls = vec![
         (
-            "schema_history",
+            "schema_history_org_idx",
             "CREATE INDEX IF NOT EXISTS schema_history_org_idx on schema_history (org);",
         ),
         (
-            "schema_history",
+            "schema_history_stream_idx",
             "CREATE INDEX IF NOT EXISTS schema_history_stream_idx on schema_history (org, stream_type, stream_name);",
         ),
         (
-            "schema_history",
+            "schema_history_stream_version_idx",
             "CREATE UNIQUE INDEX IF NOT EXISTS schema_history_stream_version_idx on schema_history (org, stream_type, stream_name, start_dt);",
         ),
     ];
-    for (table, sql) in sqls {
+    for (idx, sql) in sqls {
+        if indices.contains(&DBIndex {
+            name: idx.into(),
+            table: "schema_history".into(),
+        }) {
+            continue;
+        }
         if let Err(e) = sqlx::query(sql).execute(&pool).await {
-            log::error!("[POSTGRES] create table {} index error: {}", table, e);
+            log::error!("[POSTGRES] create table schema_history index error: {}", e);
             return Err(e.into());
         }
     }
