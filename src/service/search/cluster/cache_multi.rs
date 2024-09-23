@@ -226,11 +226,11 @@ pub async fn get_cached_results(
         all_results.extend(res);
     }
     let mut results = Vec::new();
-    recursive_process_muliple_metas(&all_results, cache_req.clone(), &mut results);
+    recursive_process_multiple_metas(&all_results, cache_req.clone(), &mut results);
     results
 }
 
-fn recursive_process_muliple_metas(
+fn recursive_process_multiple_metas(
     cache_metas: &[CachedQueryResponse],
     cache_req: CacheQueryRequest,
     results: &mut Vec<CachedQueryResponse>,
@@ -278,7 +278,7 @@ fn recursive_process_muliple_metas(
         if remaining_metas.is_empty() {
             return;
         }
-        recursive_process_muliple_metas(&remaining_metas, cache_req, results);
+        recursive_process_multiple_metas(&remaining_metas, cache_req, results);
     }
 }
 

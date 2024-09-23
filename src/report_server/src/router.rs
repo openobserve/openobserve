@@ -66,7 +66,7 @@ pub async fn send_report(
     };
 
     let cfg = config::get_config();
-    let report_type = if report.email_details.recepients.is_empty() {
+    let report_type = if report.email_details.recipients.is_empty() {
         ReportType::Cache
     } else {
         ReportType::PDF
@@ -115,7 +115,7 @@ pub async fn send_report(
             "report sent to emails successfully".into(),
         ))),
         Err(e) => {
-            log::error!("Error sending emails to recepients: {e}");
+            log::error!("Error sending emails to recipients: {e}");
             Ok(ActixHttpResponse::InternalServerError()
                 .json(HttpResponse::internal_server_error(e.to_string())))
         }

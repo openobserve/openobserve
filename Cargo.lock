@@ -6779,6 +6779,7 @@ dependencies = [
  "log",
  "once_cell",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
 ]

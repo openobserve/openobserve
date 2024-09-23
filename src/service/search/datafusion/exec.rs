@@ -55,6 +55,7 @@ use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGr
 
 use super::{
     file_type::{FileType, GetExt},
+    optimizer::join_reorder::JoinReorderRule,
     storage::file_list,
     table_provider::NewListingTable,
     udf::transform_udf::get_all_transform,
@@ -338,6 +339,7 @@ pub async fn prepare_datafusion_context(
             .with_runtime_env(runtime_env)
             .with_default_features()
             .with_optimizer_rules(optimizer_rules)
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();
         Ok(SessionContext::new_with_state(state))
     } else {

@@ -73,7 +73,7 @@ pub fn clear(trace_id: &str) {
     drop(w);
 
     // Remove all segment data for the given trace_id
-    // here we can resue the keys, because they are the same
+    // here we can reuse the keys, because they are the same
     let mut w = SEGMENTS.write();
     for key in keys.iter() {
         w.remove(key);

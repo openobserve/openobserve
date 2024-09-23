@@ -168,7 +168,7 @@ pub async fn update_trigger(trigger: Trigger) -> Result<()> {
 /// - trigger.status == "Waiting"
 ///
 /// `concurrency` - Defines the maximum number of jobs to pull at a time.
-/// `timeout` - Used to set the maximum time duration the job executation can take.
+/// `timeout` - Used to set the maximum time duration the job execution can take.
 ///     This is used to calculate the `end_time` of the trigger.
 #[inline]
 pub async fn pull(

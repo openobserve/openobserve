@@ -41,6 +41,7 @@ use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
+pub mod join_reorder;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
 
@@ -54,7 +55,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     } else {
         None
     };
-    let offest = sql.offset as usize;
+    let offset = sql.offset as usize;
     let (start_time, end_time) = sql.time_range.unwrap();
 
     // get full text search fields
@@ -105,7 +106,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // *********** custom rules ***********
     rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
     if let Some(limit) = limit {
-        rules.push(Arc::new(AddSortAndLimitRule::new(limit, offest)));
+        rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
     // ************************************
