@@ -23,6 +23,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
+        sql::OrderBy,
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -162,7 +163,7 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
-        in_req.index_type.optinal(),
+        in_req.index_type.optional(),
     );
 
     let span = tracing::span::Span::current();
@@ -266,22 +267,43 @@ pub async fn search_partition(
     };
     let sql = Sql::new(&query, org_id, stream_type).await?;
 
+    // check for vrl
+    let apply_over_hits = match req.query_fn.as_ref() {
+        None => false,
+        Some(v) => {
+            if v.is_empty() {
+                false
+            } else {
+                let v = base64::decode_url(v).unwrap_or(v.to_string());
+                RESULT_ARRAY.is_match(&v)
+            }
+        }
+    };
+
+    // if there is no _timestamp field in the query, return single partitions
+    let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
+    let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
+
+    let skip_get_file_list = ts_column.is_none() || apply_over_hits;
+
     let mut files = Vec::new();
     let mut max_query_range = 0;
     for (stream, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-        let stream_files = get_file_list(
-            &sql,
-            stream,
-            stream_type,
-            partition_time_level,
-            &stream_settings.partition_keys,
-        )
-        .await;
-        max_query_range = max(max_query_range, stream_settings.max_query_range);
-        files.extend(stream_files);
+        if !skip_get_file_list {
+            let stream_files = get_file_list(
+                &sql,
+                stream,
+                stream_type,
+                partition_time_level,
+                &stream_settings.partition_keys,
+            )
+            .await;
+            max_query_range = max(max_query_range, stream_settings.max_query_range);
+            files.extend(stream_files);
+        }
     }
 
     let file_list_took = start.elapsed().as_millis() as usize;
@@ -291,6 +313,14 @@ pub async fn search_partition(
         files.len(),
         file_list_took,
     );
+
+    if skip_get_file_list {
+        let mut response = search::SearchPartitionResponse::default();
+        response.partitions.push([req.start_time, req.end_time]);
+        response.max_query_range = max_query_range;
+        response.histogram_interval = sql.histogram_interval;
+        return Ok(response);
+    };
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -320,27 +350,7 @@ pub async fn search_partition(
         histogram_interval: sql.histogram_interval,
         max_query_range,
         partitions: vec![],
-    };
-
-    // check for vrl
-    let apply_over_hits = match req.query_fn.as_ref() {
-        None => false,
-        Some(v) => {
-            if v.is_empty() {
-                false
-            } else {
-                let v = base64::decode_url(v).unwrap_or(v.to_string());
-                RESULT_ARRAY.is_match(&v)
-            }
-        }
-    };
-
-    // if there is no _timestamp field in the query, return single partitions
-    let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
-    if ts_column.is_none() || apply_over_hits {
-        resp.partitions.push([req.start_time, req.end_time]);
-        return Ok(resp);
+        order_by: OrderBy::Desc,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -368,7 +378,7 @@ pub async fn search_partition(
         step = step - step % min_step;
     }
 
-    // generate partitions
+    // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
@@ -381,11 +391,15 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
-    if let Some((field, sort)) = sql.order_by.first() {
-        if field == &ts_column.unwrap() && !sort {
+
+    // We need to reverse partitions if query is ASC order
+    if let Some((field, order_by)) = sql.order_by.first() {
+        if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+            resp.order_by = OrderBy::Asc;
             partitions.reverse();
         }
     }
+
     resp.partitions = partitions;
     Ok(resp)
 }
@@ -878,7 +892,7 @@ fn generate_search_schema_diff(
     schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, Error> {
-    // cacluate the diff between latest schema and group schema
+    // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
