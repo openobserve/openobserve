@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="q-pa-none"
+    class="q-pa-none !tw-w-[300px]"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
@@ -53,11 +53,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
           type="number"
-          :rules="[(val: any) => !!val || t('common.nameRequired')]"
+          :rules="[
+            (val: any) => {
+              if (val === null || val === undefined || val === '') {
+                return t('common.required'); // If value is empty or null
+              }
+              return val > 0 ? true : 'Value must be greater than 0'; // Ensure value is greater than 0
+            },
+          ]"
           style="min-width: 220px"
         />
 
-        <div>Approximately {{ getRowCount }} table rows will be displayed</div>
+        <div class="tw-text-[12px]">
+          Approximately
+          <span class="tw-font-bold">{{ getRowCount }}</span> table rows will be
+          displayed
+        </div>
 
         <q-icon
           name="info_outline"
@@ -128,8 +139,9 @@ export default defineComponent({
       // 24 is the height of toolbar
       // 28 is the height of table header
       // 28.5 is the height of each row
+      // 33 is the height of pagination
       const count = Number(
-        Math.ceil((updatedLayout.value.h * 30 - (28 + 24)) / 28.5),
+        Math.ceil((updatedLayout.value.h * 30 - (28 + 24 + 33)) / 28.5),
       );
 
       if (count < 0) return 0;
