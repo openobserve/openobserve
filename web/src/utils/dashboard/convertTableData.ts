@@ -201,7 +201,7 @@ export const convertTableData = (
           let underscorePart = "";
 
           // If underscore is found, split the value and retain the underscore part
-          if (val.includes("_")) {
+          if (typeof val === "string" && val.includes("_")) {
             const parts = val.split("_");
             baseVal = parts[0]; // The date part (e.g., "2024-09-23T08:12:00")
             underscorePart = `_${parts[1]}`; // The underscore and suffix part (e.g., "_1")
