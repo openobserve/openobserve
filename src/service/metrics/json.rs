@@ -40,7 +40,7 @@ use crate::{
     },
     service::{
         db, format_stream_name,
-        ingestion::{get_wal_time_key, write_file},
+        ingestion::{get_write_partition_key, write_file},
         schema::check_for_schema,
         usage::report_request_usage_stats,
     },
@@ -258,7 +258,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             .clone()
             .with_metadata(HashMap::new());
         let schema_key = schema.hash_key();
-        let hour_key = get_wal_time_key(
+        let hour_key = get_write_partition_key(
             timestamp,
             &partition_keys,
             partition_time_level,

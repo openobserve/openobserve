@@ -343,7 +343,7 @@ pub async fn handle_grpc_request(
                         .with_metadata(HashMap::new());
                     let schema_key = schema.hash_key();
                     // get hour key
-                    let hour_key = crate::service::ingestion::get_wal_time_key(
+                    let hour_key = crate::service::ingestion::get_write_partition_key(
                         timestamp,
                         &partition_keys,
                         partition_time_level,
