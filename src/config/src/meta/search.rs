@@ -16,13 +16,10 @@
 use std::str::FromStr;
 
 use proto::cluster_rpc;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Deserializer, Serialize };
 use utoipa::ToSchema;
 
-use crate::{
-    ider,
-    utils::{base64, json},
-};
+use crate::{ ider, utils::{ base64, json } };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
@@ -394,7 +391,8 @@ impl SearchHistoryRequest {
         self.validate()?;
 
         // Create the query
-        let query = search_history_utils::SearchHistoryQueryBuilder::new()
+        let query = search_history_utils::SearchHistoryQueryBuilder
+            ::new()
             .with_org_id(&self.org_id)
             .with_stream_type(&self.stream_type)
             .with_stream_name(&self.stream_name)
@@ -728,9 +726,23 @@ pub struct MultiSearchPartitionResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct SqlQuery {
+    pub sql: String,
+    #[serde(default)]
+    pub start_time: Option<i64>,
+    #[serde(default)]
+    pub end_time: Option<i64>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
+    #[serde(default)]
+    pub is_old_format: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct MultiStreamRequest {
-    pub sql: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_sql")]
+    pub sql: Vec<SqlQuery>, // Use the new struct for SQL queries
     #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
@@ -762,25 +774,65 @@ pub struct MultiStreamRequest {
     pub search_type: Option<SearchEventType>,
     #[serde(default)]
     pub index_type: String, // parquet(default) or fst
+    #[serde(default)]
+    pub per_query_response: bool,
+}
+
+fn deserialize_sql<'de, D>(deserializer: D) -> Result<Vec<SqlQuery>, D::Error>
+    where D: Deserializer<'de>
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SqlOrSqlQuery {
+        OldFormat(String),
+        NewFormat(SqlQuery),
+    }
+
+    let v: Vec<SqlOrSqlQuery> = Vec::deserialize(deserializer)?;
+
+    // Convert old format into the new format
+    let result: Vec<SqlQuery> = v
+        .into_iter()
+        .map(|item| {
+            match item {
+                SqlOrSqlQuery::OldFormat(sql) =>
+                    SqlQuery {
+                        sql,
+                        start_time: None,
+                        end_time: None,
+                        query_fn: None,
+                        is_old_format: true,
+                    },
+                SqlOrSqlQuery::NewFormat(query) => query,
+            }
+        })
+        .collect();
+
+    Ok(result)
 }
 
 impl MultiStreamRequest {
     pub fn to_query_req(&mut self) -> Vec<Request> {
         let mut res = vec![];
         for query in &self.sql {
+            let query_fn = if query.is_old_format {
+                self.query_fn.clone()
+            } else {
+                query.query_fn.clone()
+            };
             res.push(Request {
                 query: Query {
-                    sql: query.to_string(),
+                    sql: query.sql.clone(),
                     from: self.from,
                     size: self.size,
-                    start_time: self.start_time,
-                    end_time: self.end_time,
+                    start_time: query.start_time.unwrap_or(self.start_time),
+                    end_time: query.end_time.unwrap_or(self.end_time),
                     sort_by: self.sort_by.clone(),
                     quick_mode: self.quick_mode,
                     query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
-                    query_fn: self.query_fn.clone(),
+                    query_fn,
                     skip_wal: self.skip_wal,
                 },
                 regions: self.regions.clone(),
@@ -813,7 +865,8 @@ mod tests {
 
     #[test]
     fn test_request_encoding() {
-        let req = json::json!(
+        let req =
+            json::json!(
             {
                 "query": {
                     "sql": "c2VsZWN0ICogZnJvbSB0ZXN0",
@@ -833,7 +886,8 @@ mod tests {
 
     #[test]
     fn test_request_no_encoding() {
-        let req = json::json!(
+        let req =
+            json::json!(
             {
                 "query": {
                     "sql": "select * from test",
@@ -986,10 +1040,7 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_stream_type(&Some("logs".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'"
-            );
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'");
         }
 
         #[test]
@@ -997,10 +1048,7 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_stream_name(&Some("streamA".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'"
-            );
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'");
         }
 
         #[test]
@@ -1008,10 +1056,7 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_user_email(&Some("user123@gmail.com".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'"
-            );
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'");
         }
 
         #[test]
@@ -1019,10 +1064,7 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_trace_id(&Some("trace123".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'"
-            );
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'");
         }
 
         #[test]
@@ -1035,7 +1077,8 @@ mod search_history_utils {
                 .with_trace_id(&Some("trace123".to_string()))
                 .build(SEARCH_STREAM_NAME);
 
-            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            let expected_query =
+                "SELECT * FROM usage WHERE 1=1 \
             AND org_id = 'org123' \
             AND stream_type = 'logs' \
             AND stream_name = 'streamA' \
@@ -1052,7 +1095,8 @@ mod search_history_utils {
                 .with_user_email(&Some("user123@gmail.com".to_string()))
                 .build(SEARCH_STREAM_NAME);
 
-            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            let expected_query =
+                "SELECT * FROM usage WHERE 1=1 \
             AND org_id = 'org123' \
             AND user_email = 'user123@gmail.com'";
 
