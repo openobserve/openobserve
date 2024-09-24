@@ -235,7 +235,17 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             // Check for the cron timestamp after the silence period
             new_trigger.next_run_at = schedule.after(&silence).next().unwrap().timestamp_micros();
         } else {
-            new_trigger.next_run_at += Duration::try_minutes(alert.trigger_condition.silence)
+            // When the silence period is less than the frequency, the alert runs after the silence
+            // period completely ignoring the frequency. So, if frequency is 60 mins and
+            // silence is 10 mins, the condition is satisfied, in that case, the alert
+            // will run after 10 mins of silence period. To avoid this scenario, we
+            // should use the max of (frequency, silence) as the next_run_at.
+            // Silence period is in minutes, and the frequency is in seconds.
+            let next_run_in_seconds = std::cmp::max(
+                alert.trigger_condition.silence * 60,
+                alert.trigger_condition.frequency,
+            );
+            new_trigger.next_run_at += Duration::try_seconds(next_run_in_seconds)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
