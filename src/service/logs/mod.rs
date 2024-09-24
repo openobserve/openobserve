@@ -48,7 +48,7 @@ use crate::{
         stream::{SchemaRecords, StreamParams},
     },
     service::{
-        db, ingestion::get_wal_time_key, schema::check_for_schema,
+        db, ingestion::get_write_partition_key, schema::check_for_schema,
         usage::report_request_usage_stats,
     },
 };
@@ -404,7 +404,7 @@ async fn write_logs(
         }
 
         // get hour key
-        let hour_key = get_wal_time_key(
+        let hour_key = get_write_partition_key(
             timestamp,
             &partition_keys,
             partition_time_level,

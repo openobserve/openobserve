@@ -426,7 +426,7 @@ pub async fn metrics_json_handler(
                             .entry(local_metric_name.to_owned())
                             .or_default();
                         // get hour key
-                        let hour_key = crate::service::ingestion::get_wal_time_key(
+                        let hour_key = crate::service::ingestion::get_write_partition_key(
                             timestamp,
                             &partition_keys,
                             partition_time_level,
