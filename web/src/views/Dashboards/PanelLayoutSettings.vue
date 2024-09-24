@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-mx-md">
       <div
         data-test="panel-layout-settings-height"
-        class="o2-input"
+        class="o2-input tw-relative"
         style="padding-top: 12px"
       >
         <q-input
-          v-model="height"
+          v-model.number="updatedLayout.h"
           :label="t('dashboard.panelHeight') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -54,15 +54,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           type="number"
           :rules="[(val: any) => !!val || t('common.nameRequired')]"
-          style="min-width: 480px"
+          style="min-width: 220px"
         />
+
+        <div>Approximately {{ getRowCount }} rows will be displayed</div>
+
+        <q-icon
+          name="info_outline"
+          class="cursor-pointer q-ml-sm tw-absolute tw-top-[14px] tw-left-[94px]"
+          size="16px"
+        >
+          <q-tooltip
+            anchor="center end"
+            self="center left"
+            class="tw-text-[12px]"
+          >
+            1 unit = 30px
+          </q-tooltip>
+        </q-icon>
       </div>
+    </div>
+    <div class="flex justify-center q-mt-lg">
+      <q-btn
+        ref="closeBtn"
+        v-close-popup="true"
+        class="q-mb-md text-bold"
+        :label="t('dashboard.cancel')"
+        text-color="light-text"
+        padding="sm md"
+        no-caps
+      />
+      <q-btn
+        :label="t('dashboard.save')"
+        class="q-mb-md text-bold no-border q-ml-md"
+        color="secondary"
+        padding="sm xl"
+        @click="savePanelLayout"
+        no-caps
+      />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -77,24 +112,33 @@ export default defineComponent({
       required: true,
     },
   },
+  emits: ["save:layout"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
 
-    const height = computed({
-      get: () => props.layout.h,
-      set: (value) => {
-        emit("update:layout", { ...props.layout, h: Number(value) });
-      },
+    const updatedLayout = ref({ ...props.layout });
+
+    const savePanelLayout = () => {
+      emit("save:layout", { ...updatedLayout.value });
+    };
+
+    const getRowCount = computed(() => {
+      // 24 is the height of toolbar
+      // 28 is the height of table header
+      // 28.5 is the height of each row
+      return Number(Math.ceil((updatedLayout.value.h * 30 - (28 + 24)) / 28.5));
     });
 
     return {
       t,
       store,
       router,
-      height,
       getImageURL,
+      savePanelLayout,
+      getRowCount,
+      updatedLayout,
     };
   },
 });

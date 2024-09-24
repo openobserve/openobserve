@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         @refreshPanelRequest="refreshPanelRequest"
-        @openLayoutConfig="openLayoutConfig"
+        @openEditLayout="openLayoutConfig"
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <PanelLayoutSettings
           :layout="selectedPanelConfig.data.layout"
-          @update:layout="onLayoutUpdate"
+          @save:layout="savePanelLayout"
         />
       </q-dialog>
 
@@ -563,43 +563,24 @@ export default defineComponent({
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
 
-      console.log("Selected tab id", selectedTabId.value);
-
-      currentDashboardData.data.tabs.forEach((tab: any) => {
-        if (tab.tabId === selectedTabId.value) {
-          console.log("Selected tab", tab);
-          tab.panels.forEach((panel: any) => {
-            console.log("Panel", panel);
-            if (panel.id === id) {
-              selectedPanelConfig.value.data = panel;
-            }
-          });
-        }
-      });
+      selectedPanelConfig.value.data = JSON.parse(
+        JSON.stringify(getPanelFromTab(selectedTabId.value, id)),
+      );
     };
 
-    const onLayoutUpdate = async (layout) => {
-      currentDashboardData.data.tabs.forEach((tab: any) => {
-        if (tab.tabId === selectedTabId.value) {
-          console.log("Selected tab", tab);
-          tab.panels.forEach((panel: any) => {
-            console.log("Panel", panel);
-            if (panel.id === selectedPanelConfig.value.data.id) {
-              panel.layout = layout;
-            }
-          });
-        }
-      });
+    const savePanelLayout = async (layout) => {
+      const panel = getPanelFromTab(
+        selectedTabId.value,
+        selectedPanelConfig.value.data.id,
+      );
+      if (panel) panel.layout = layout;
+
+      selectedPanelConfig.value.show = false;
+      selectedPanelConfig.value.data = null;
 
       await nextTick();
 
-      renderDashboardChartsRef.value?.layoutUpdate();
-
-      await setTimeout(() => {
-        window.dispatchEvent(new Event("resize"));
-      }, 1000);
-
-      console.log("Layout updated", layout);
+      window.dispatchEvent(new Event("resize"));
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
@@ -622,6 +603,13 @@ export default defineComponent({
         setTimeString();
       }
     });
+
+    const getPanelFromTab = (tabId: string, panelId: string) => {
+      const tab = currentDashboardData.data.tabs.find(
+        (tab) => tab.tabId === tabId,
+      );
+      return tab.panels.find((panel) => panel.id === panelId);
+    };
 
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
@@ -961,7 +949,7 @@ export default defineComponent({
       config,
       openLayoutConfig,
       selectedPanelConfig,
-      onLayoutUpdate,
+      savePanelLayout,
       renderDashboardChartsRef,
     };
   },

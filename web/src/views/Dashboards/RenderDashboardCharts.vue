@@ -488,7 +488,7 @@ export default defineComponent({
     };
 
     const openEditLayout = (id: string) => {
-      emit("openLayoutConfig", id);
+      emit("openEditLayout", id);
     };
 
     return {
