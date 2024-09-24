@@ -128,7 +128,13 @@ export default defineComponent({
       // 24 is the height of toolbar
       // 28 is the height of table header
       // 28.5 is the height of each row
-      return Number(Math.ceil((updatedLayout.value.h * 30 - (28 + 24)) / 28.5));
+      const count = Number(
+        Math.ceil((updatedLayout.value.h * 30 - (28 + 24)) / 28.5),
+      );
+
+      if (count < 0) return 0;
+
+      return count;
     });
 
     return {
