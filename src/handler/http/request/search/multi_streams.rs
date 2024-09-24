@@ -13,34 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::{ collections::HashMap, io::Error };
 
-use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
-use chrono::{Duration, Utc};
+use actix_web::{ get, http::StatusCode, post, web, HttpRequest, HttpResponse };
+use chrono::{ Duration, Utc };
 use config::{
     get_config,
-    meta::{
-        search,
-        stream::StreamType,
-        usage::{RequestStats, UsageType},
-    },
+    meta::{ search, stream::StreamType, usage::{ RequestStats, UsageType } },
     metrics,
-    utils::{base64, json},
+    utils::{ base64, json },
 };
 use infra::errors;
-use tracing::{Instrument, Span};
+use tracing::{ Instrument, Span };
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::{ self, http::HttpResponse as MetaHttpResponse },
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_or_create_trace_id,
+                get_search_type_from_request,
+                get_stream_type_from_request,
             },
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{ search as SearchService, usage::report_request_usage_stats },
 };
 
 /// SearchStreamData
@@ -48,13 +46,13 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    security("Authorization" = []),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = SearchRequest,
+        description = "Search query",
+        content_type = "application/json",
+        example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -62,9 +60,15 @@ use crate::{
             "from": 0,
             "size": 10
         }
-    })),
+    })
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (
+            status = 200,
+            description = "Success",
+            content_type = "application/json",
+            body = SearchResponse,
+            example = json!({
             "took": 155,
             "hits": [
                 {
@@ -88,16 +92,27 @@ use crate::{
             "from": 0,
             "size": 1,
             "scan_size": 28943
-        })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        }),
+        ),
+        (
+            status = 400,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        ),
+        (
+            status = 500,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        )
     )
 )]
 #[post("/{org_id}/_search_multi")]
 pub async fn search_multi(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    body: web::Bytes
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
@@ -113,24 +128,27 @@ pub async fn search_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     // handle encoding for query and aggs
     let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
-    let mut query_fn = multi_req
-        .query_fn
-        .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
+    let mut query_fn = multi_req.query_fn.as_ref().and_then(|v| base64::decode_url(v).ok());
 
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
@@ -141,6 +159,8 @@ pub async fn search_multi(
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+
+    let per_query_resp = multi_req.per_query_response;
 
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
@@ -154,18 +174,23 @@ pub async fn search_multi(
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
         rpc_req.org_id = org_id.to_string();
         rpc_req.stream_type = stream_type.to_string();
-        let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req)
-            .await
+        let resp: SearchService::sql::Sql = match
+            crate::service::search::sql::Sql::new(&rpc_req).await
         {
             Ok(v) => v,
             Err(e) => {
                 return Ok(match e {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        e.to_string(),
-                    )),
+                    errors::Error::ErrorCode(code) =>
+                        HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code(code)
+                        ),
+                    _ =>
+                        HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                e.to_string()
+                            )
+                        ),
                 });
             }
         };
@@ -177,34 +202,36 @@ pub async fn search_multi(
 
             use crate::common::{
                 infra::config::USERS,
-                utils::auth::{is_root_user, AuthExtractor},
+                utils::auth::{ is_root_user, AuthExtractor },
             };
 
             if !is_root_user(user_id) {
-                let user: meta::user::User =
-                    USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
+                let user: meta::user::User = USERS.get(&format!("{org_id}/{user_id}"))
+                    .unwrap()
+                    .clone();
                 let stream_type_str = stream_type.to_string();
 
-                if user.is_external
-                    && !crate::handler::http::auth::validator::check_permissions(
+                if
+                    user.is_external &&
+                    !crate::handler::http::auth::validator::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
                             o2_type: format!(
                                 "{}:{}",
-                                OFGA_MODELS
-                                    .get(stream_type_str.as_str())
-                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                OFGA_MODELS.get(stream_type_str.as_str()).map_or(
+                                    stream_type_str.as_str(),
+                                    |model| model.key
+                                ),
                                 resp.stream_name
                             ),
                             org_id: org_id.clone(),
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
-                        Some(user.role),
-                    )
-                    .await
+                        Some(user.role)
+                    ).await
                 {
                     return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
                 }
@@ -221,9 +248,7 @@ pub async fn search_multi(
             }
         }
 
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .inc();
+        metrics::QUERY_PENDING_NUMS.with_label_values(&[&org_id]).inc();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -238,9 +263,7 @@ pub async fn search_multi(
         #[cfg(feature = "enterprise")]
         let took_wait = 0;
         log::info!("http search multi API wait in queue took: {}", took_wait);
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .dec();
+        metrics::QUERY_PENDING_NUMS.with_label_values(&[&org_id]).dec();
 
         let trace_id = trace_id.clone();
         // do search
@@ -249,31 +272,33 @@ pub async fn search_multi(
             &org_id,
             stream_type,
             Some(user_id.to_string()),
-            &req,
-        )
-        .instrument(http_span.clone())
-        .await;
+            &req
+        ).instrument(http_span.clone()).await;
 
         match search_res {
             Ok(mut res) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "200",
-                        &org_id,
-                        "",
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_search_multi",
+                            "200",
+                            &org_id,
+                            "",
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "200",
-                        &org_id,
-                        "",
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_search_multi",
+                            "200",
+                            &org_id,
+                            "",
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .inc();
                 res.set_trace_id(trace_id);
                 res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
@@ -306,14 +331,13 @@ pub async fn search_multi(
                     StreamType::Logs,
                     UsageType::Search,
                     num_fn,
-                    started_at,
-                )
-                .await;
+                    started_at
+                ).await;
 
                 multi_res.took += res.took;
 
                 if res.total > multi_res.total {
-                    multi_res.total = res.total
+                    multi_res.total = res.total;
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
@@ -329,34 +353,40 @@ pub async fn search_multi(
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "500",
-                        &org_id,
-                        "",
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_search_multi",
+                            "500",
+                            &org_id,
+                            "",
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_search_multi",
-                        "500",
-                        &org_id,
-                        "",
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_search_multi",
+                            "500",
+                            &org_id,
+                            "",
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .inc();
 
                 log::error!("search error: {:?}", err);
                 multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
                 if let errors::Error::ErrorCode(code) = err {
                     if let errors::ErrorCodes::SearchCancelQuery(_) = code {
-                        return Ok(HttpResponse::TooManyRequests().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ));
+                        return Ok(
+                            HttpResponse::TooManyRequests().json(
+                                meta::http::HttpResponse::error_code_with_trace_id(
+                                    code,
+                                    Some(trace_id)
+                                )
+                            )
+                        );
                     }
                 }
             }
@@ -381,19 +411,25 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    security("Authorization" = []),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = SearchRequest,
+        description = "Search query",
+        content_type = "application/json",
+        example = json!({
         "sql": "select * from k8s ",
         "start_time": 1675182660872049i64,
         "end_time": 1675185660872049i64
-    })),
+    })
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (
+            status = 200,
+            description = "Success",
+            content_type = "application/json",
+            body = SearchResponse,
+            example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -402,24 +438,32 @@ pub async fn search_multi(
                 [1674213225158000i64, 1674213225158000i64],
                 [1674213225158000i64, 1674213225158000i64],
             ]
-        })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        }),
+        ),
+        (
+            status = 400,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        ),
+        (
+            status = 500,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        )
     )
 )]
 #[post("/{org_id}/_search_partition_multi")]
 pub async fn _search_partition_multi(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    body: web::Bytes
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!(
-            "/api/{org_id}/_search_partition_multi",
-            org_id = org_id.clone()
-        )
+        tracing::info_span!("/api/{org_id}/_search_partition_multi", org_id = org_id.clone())
     } else {
         Span::none()
     };
@@ -429,12 +473,16 @@ pub async fn _search_partition_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let search_fut = SearchService::search_partition_multi(&trace_id, &org_id, stream_type, &req);
@@ -448,54 +496,66 @@ pub async fn _search_partition_multi(
         Ok(res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_search_partition_multi",
-                    "200",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
+                .with_label_values(
+                    &[
+                        "/api/org/_search_partition_multi",
+                        "200",
+                        &org_id,
+                        "",
+                        stream_type.to_string().as_str(),
+                    ]
+                )
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_search_partition_multi",
-                    "200",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
+                .with_label_values(
+                    &[
+                        "/api/org/_search_partition_multi",
+                        "200",
+                        &org_id,
+                        "",
+                        stream_type.to_string().as_str(),
+                    ]
+                )
                 .inc();
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_search_partition_multi",
-                    "500",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
+                .with_label_values(
+                    &[
+                        "/api/org/_search_partition_multi",
+                        "500",
+                        &org_id,
+                        "",
+                        stream_type.to_string().as_str(),
+                    ]
+                )
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_search_partition_multi",
-                    "500",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
+                .with_label_values(
+                    &[
+                        "/api/org/_search_partition_multi",
+                        "500",
+                        &org_id,
+                        "",
+                        stream_type.to_string().as_str(),
+                    ]
+                )
                 .inc();
             log::error!("search error: {:?}", err);
             Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
+                errors::Error::ErrorCode(code) =>
+                    HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id))
+                    ),
+                _ =>
+                    HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            err.to_string()
+                        )
+                    ),
             })
         }
     }
@@ -548,7 +608,7 @@ pub async fn _search_partition_multi(
 #[get("/{org_id}/{stream_names}/_around_multi")]
 pub async fn around_multi(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    in_req: HttpRequest
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -572,16 +632,18 @@ pub async fn around_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
+        None => {
+            return Ok(MetaHttpResponse::bad_request("around key is empty"));
+        }
     };
-    let mut query_fn = query
-        .get("query_fn")
-        .and_then(|v| base64::decode_url(v).ok());
+    let mut query_fn = query.get("query_fn").and_then(|v| base64::decode_url(v).ok());
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
             query_fn = Some(format!("{} \n .", vrl_function));
@@ -597,8 +659,8 @@ pub async fn around_multi(
     if let Some(v) = query.get("sql") {
         let sqls = v.split(',').collect::<Vec<&str>>();
         for (i, sql) in sqls.into_iter().enumerate() {
-            uses_fn = functions::get_all_transform_keys(&org_id)
-                .await
+            uses_fn = functions
+                ::get_all_transform_keys(&org_id).await
                 .iter()
                 .any(|fn_name| v.contains(&format!("{}(", fn_name)));
             if uses_fn {
@@ -609,9 +671,7 @@ pub async fn around_multi(
         }
     }
 
-    let around_size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+    let around_size = query.get("size").map_or(10, |v| v.parse::<i64>().unwrap_or(10));
 
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
@@ -627,19 +687,11 @@ pub async fn around_multi(
             .map(|s| s.to_string())
             .collect::<Vec<_>>()
     });
-    let timeout = query
-        .get("timeout")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-    let around_start_time = around_key
-        - Duration::try_seconds(900)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-    let around_end_time = around_key
-        + Duration::try_seconds(900)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+    let timeout = query.get("timeout").map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let around_start_time =
+        around_key - Duration::try_seconds(900).unwrap().num_microseconds().unwrap();
+    let around_end_time =
+        around_key + Duration::try_seconds(900).unwrap().num_microseconds().unwrap();
 
     let mut multi_resp = search::Response {
         size: around_size,
@@ -655,9 +707,7 @@ pub async fn around_multi(
         .map(|v| v.to_string());
 
     for around_sql in around_sqls.iter() {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .inc();
+        metrics::QUERY_PENDING_NUMS.with_label_values(&[&org_id]).inc();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -671,13 +721,8 @@ pub async fn around_multi(
         let took_wait = start.elapsed().as_millis() as usize;
         #[cfg(feature = "enterprise")]
         let took_wait = 0;
-        log::info!(
-            "http search around multi API wait in queue took: {}",
-            took_wait
-        );
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&org_id])
-            .dec();
+        log::info!("http search around multi API wait in queue took: {}", took_wait);
+        metrics::QUERY_PENDING_NUMS.with_label_values(&[&org_id]).dec();
 
         // search forward
         let req = config::meta::search::Request {
@@ -702,52 +747,66 @@ pub async fn around_multi(
             search_type: Some(search::SearchEventType::UI),
             index_type: "".to_string(),
         };
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
+        let search_res = SearchService::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id.clone(),
+            &req
+        ).instrument(http_span.clone()).await;
 
         let resp_forward = match search_res {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        &stream_names,
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_around_multi",
+                            "500",
+                            &org_id,
+                            &stream_names,
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        &stream_names,
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_around_multi",
+                            "500",
+                            &org_id,
+                            &stream_names,
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .inc();
                 log::error!("multi search around error: {:?}", err);
                 return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
+                    errors::Error::ErrorCode(code) =>
+                        match code {
+                            errors::ErrorCodes::SearchCancelQuery(_) =>
+                                HttpResponse::TooManyRequests().json(
+                                    meta::http::HttpResponse::error_code_with_trace_id(
+                                        code,
+                                        Some(trace_id)
+                                    )
+                                ),
+                            _ =>
+                                HttpResponse::InternalServerError().json(
+                                    meta::http::HttpResponse::error_code_with_trace_id(
+                                        code,
+                                        Some(trace_id)
+                                    )
+                                ),
+                        }
+                    _ =>
+                        HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                err.to_string()
+                            )
                         ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
                 });
             }
         };
@@ -775,61 +834,73 @@ pub async fn around_multi(
             search_type: Some(search::SearchEventType::UI),
             index_type: "".to_string(),
         };
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
+        let search_res = SearchService::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id.clone(),
+            &req
+        ).instrument(http_span.clone()).await;
 
         let resp_backward = match search_res {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        &stream_names,
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_around_multi",
+                            "500",
+                            &org_id,
+                            &stream_names,
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_around_multi",
-                        "500",
-                        &org_id,
-                        &stream_names,
-                        stream_type.to_string().as_str(),
-                    ])
+                    .with_label_values(
+                        &[
+                            "/api/org/_around_multi",
+                            "500",
+                            &org_id,
+                            &stream_names,
+                            stream_type.to_string().as_str(),
+                        ]
+                    )
                     .inc();
                 log::error!("multi search around error: {:?}", err);
                 return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
+                    errors::Error::ErrorCode(code) =>
+                        match code {
+                            errors::ErrorCodes::SearchCancelQuery(_) =>
+                                HttpResponse::TooManyRequests().json(
+                                    meta::http::HttpResponse::error_code_with_trace_id(
+                                        code,
+                                        Some(trace_id)
+                                    )
+                                ),
+                            _ =>
+                                HttpResponse::InternalServerError().json(
+                                    meta::http::HttpResponse::error_code_with_trace_id(
+                                        code,
+                                        Some(trace_id)
+                                    )
+                                ),
+                        }
+                    _ =>
+                        HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                err.to_string()
+                            )
                         ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
                 });
             }
         };
 
         let hits_num_backward = resp_backward.hits.len();
         for i in 0..hits_num_backward {
-            multi_resp
-                .hits
-                .push(resp_backward.hits[hits_num_backward - 1 - i].to_owned());
+            multi_resp.hits.push(resp_backward.hits[hits_num_backward - 1 - i].to_owned());
         }
         let hits_num_forward = resp_forward.hits.len();
         for i in 0..hits_num_forward {
@@ -844,22 +915,26 @@ pub async fn around_multi(
 
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
-            .with_label_values(&[
-                "/api/org/_around_multi",
-                "200",
-                &org_id,
-                &stream_names,
-                stream_type.to_string().as_str(),
-            ])
+            .with_label_values(
+                &[
+                    "/api/org/_around_multi",
+                    "200",
+                    &org_id,
+                    &stream_names,
+                    stream_type.to_string().as_str(),
+                ]
+            )
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
-            .with_label_values(&[
-                "/api/org/_around_multi",
-                "200",
-                &org_id,
-                &stream_names,
-                stream_type.to_string().as_str(),
-            ])
+            .with_label_values(
+                &[
+                    "/api/org/_around_multi",
+                    "200",
+                    &org_id,
+                    &stream_names,
+                    stream_type.to_string().as_str(),
+                ]
+            )
             .inc();
 
         let user_id = match &user_id {
@@ -876,10 +951,9 @@ pub async fn around_multi(
             max_ts: Some(around_end_time),
             cached_ratio: Some(cached_ratio_avg),
             trace_id: Some(trace_id.clone()),
-            took_wait_in_queue: match (
-                resp_forward.took_detail.as_ref(),
-                resp_backward.took_detail.as_ref(),
-            ) {
+            took_wait_in_queue: match
+                (resp_forward.took_detail.as_ref(), resp_backward.took_detail.as_ref())
+            {
                 (Some(forward_took), Some(backward_took)) => {
                     Some(forward_took.cluster_wait_queue + backward_took.cluster_wait_queue)
                 }
@@ -897,9 +971,8 @@ pub async fn around_multi(
             StreamType::Logs,
             UsageType::SearchAround,
             num_fn,
-            started_at,
-        )
-        .await;
+            started_at
+        ).await;
     }
 
     multi_resp.hits.sort_by(|a, b| {
