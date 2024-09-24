@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <RenderDashboardCharts
         v-if="selectedDate"
+        ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
@@ -215,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         @refreshPanelRequest="refreshPanelRequest"
+        @openEditLayout="openLayoutConfig"
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
@@ -229,6 +231,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
       >
         <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
+
+      <q-dialog
+        v-model="selectedPanelConfig.show"
+        position="right"
+        full-height
+        maximized
+      >
+        <PanelLayoutSettings
+          :layout="selectedPanelConfig.data.layout"
+          @save:layout="savePanelLayout"
+        />
       </q-dialog>
 
       <q-dialog
@@ -286,6 +300,7 @@ import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -301,6 +316,7 @@ export default defineComponent({
     DashboardSettings,
     RenderDashboardCharts,
     ScheduledDashboards,
+    PanelLayoutSettings,
   },
   setup() {
     const { t } = useI18n();
@@ -330,6 +346,8 @@ export default defineComponent({
     const folderId = computed(() => route.query.folder);
 
     const tabId = computed(() => route.query.tab);
+
+    const renderDashboardChartsRef = ref(null);
 
     onBeforeMount(async () => {
       await importMoment();
@@ -391,6 +409,11 @@ export default defineComponent({
 
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
+
+    const selectedPanelConfig = ref({
+      data: null,
+      show: false,
+    });
 
     // selected tab
     const selectedTabId: any = ref(route.query.tab ?? null);
@@ -537,6 +560,36 @@ export default defineComponent({
       showDashboardSettingsDialog.value = true;
     };
 
+    const openLayoutConfig = (id: string) => {
+      selectedPanelConfig.value.show = true;
+
+      const panelData = getPanelFromTab(selectedTabId.value, id);
+
+      if (!panelData) {
+        console.log("Panel not found");
+        return;
+      }
+
+      selectedPanelConfig.value.data = JSON.parse(JSON.stringify(panelData));
+    };
+
+    const savePanelLayout = async (layout) => {
+      const panel = getPanelFromTab(
+        selectedTabId.value,
+        selectedPanelConfig.value.data.id,
+      );
+      if (panel) panel.layout = layout;
+
+      selectedPanelConfig.value.show = false;
+      selectedPanelConfig.value.data = null;
+
+      await nextTick();
+
+      window.dispatchEvent(new Event("resize"));
+
+      await renderDashboardChartsRef.value?.saveDashboard();
+    };
+
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
       if (selectedDate.value && dateTimePicker.value) {
@@ -557,6 +610,18 @@ export default defineComponent({
         setTimeString();
       }
     });
+
+    const getPanelFromTab = (tabId: string, panelId: string) => {
+      const tab = currentDashboardData.data.tabs.find(
+        (tab) => tab.tabId === tabId,
+      );
+
+      if (!tab || !tab.panels) {
+        return null;
+      }
+
+      return tab.panels.find((panel) => panel.id === panelId);
+    };
 
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
@@ -892,9 +957,12 @@ export default defineComponent({
       arePanelsLoading,
       cancelQuery,
       traceIdRef,
-      searchRequestTraceIds,
       handleEmittedData,
       config,
+      openLayoutConfig,
+      selectedPanelConfig,
+      savePanelLayout,
+      renderDashboardChartsRef,
     };
   },
 });
