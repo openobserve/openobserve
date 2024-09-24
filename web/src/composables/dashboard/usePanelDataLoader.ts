@@ -1309,7 +1309,7 @@ export const usePanelDataLoader = (
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
       rootMargin: "0px",
-      threshold: 0.1, // Adjust as needed
+      threshold: 0, // Adjust as needed
     });
 
     if (chartPanelRef?.value) observer.observe(chartPanelRef?.value);
