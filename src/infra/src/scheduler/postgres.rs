@@ -22,8 +22,7 @@ use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
     db::{
         self,
-        postgres::{cache_indices, CLIENT},
-        DBIndex, INDICES,
+        postgres::{create_index, CLIENT},
     },
     errors::{DbError, Error, Result},
 };
@@ -82,35 +81,32 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     async fn create_table_index(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
 
-        let queries = vec![
-            (
-                "scheduled_jobs_key_idx",
-                "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            ),
-            (
-                "scheduled_jobs_org_key_idx",
-                "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            ),
-            (
-                "scheduled_jobs_org_module_key_idx",
-                "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
-            ),
-        ];
+        create_index(
+            &pool,
+            "scheduled_jobs_key_idx",
+            "scheduled_jobs",
+            false,
+            &["module_key"],
+        )
+        .await?;
+        create_index(
+            &pool,
+            "scheduled_jobs_org_key_idx",
+            "scheduled_jobs",
+            false,
+            &["org", "module_key"],
+        )
+        .await?;
+        create_index(
+            &pool,
+            "scheduled_jobs_org_module_key_idx",
+            "scheduled_jobs",
+            true,
+            &["org", "module", "module_key"],
+        )
+        .await?;
 
-        for (idx, query) in queries {
-            if indices.contains(&DBIndex {
-                name: idx.into(),
-                table: "scheduled_jobs".into(),
-            }) {
-                continue;
-            }
-            if let Err(e) = sqlx::query(query).execute(&pool).await {
-                log::error!("[POSTGRES] create table scheduled_jobs index error: {}", e);
-                return Err(e.into());
-            }
-        }
         Ok(())
     }
 

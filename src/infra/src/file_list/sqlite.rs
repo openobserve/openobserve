@@ -25,10 +25,7 @@ use hashbrown::HashMap;
 use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
 
 use crate::{
-    db::{
-        sqlite::{cache_indices, CLIENT_RO, CLIENT_RW},
-        DBIndex, INDICES,
-    },
+    db::sqlite::{create_index, CLIENT_RO, CLIENT_RW},
     errors::{Error, Result},
 };
 
@@ -1159,117 +1156,107 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let sqls = vec![
-        (
-            "file_list_org_idx",
-            "file_list",
-            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);",
-        ),
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+
+    let indices: Vec<(&str, &str, &[&str])> = vec![
+        ("file_list_org_idx", "file_list", &["org"]),
         (
             "file_list_stream_ts_idx",
             "file_list",
-            "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, max_ts, min_ts);",
+            &["stream", "max_ts", "min_ts"],
         ),
-        (
-            "file_list_history_org_idx",
-            "file_list_history",
-            "CREATE INDEX IF NOT EXISTS file_list_history_org_idx on file_list_history (org);",
-        ),
+        ("file_list_history_org_idx", "file_list_history", &["org"]),
         (
             "file_list_history_stream_ts_idx",
             "file_list_history",
-            "CREATE INDEX IF NOT EXISTS file_list_history_stream_ts_idx on file_list_history (stream, max_ts, min_ts);",
-        ),
-        (
-            "file_list_history_stream_file_idx",
-            "file_list_history",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_history_stream_file_idx on file_list_history (stream, date, file);",
+            &["stream", "max_ts", "min_ts"],
         ),
         (
             "file_list_deleted_created_at_idx",
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
+            &["org", "created_at"],
         ),
         (
             "file_list_deleted_stream_date_file_idx",
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_date_file_idx on file_list_deleted (stream, date, file);",
-        ),
-        (
-            "file_list_jobs_stream_offsets_idx",
-            "file_list_jobs",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offsets_idx on file_list_jobs (stream, offsets);",
+            &["stream", "date", "file"],
         ),
         (
             "file_list_jobs_stream_status_idx",
             "file_list_jobs",
-            "CREATE INDEX IF NOT EXISTS file_list_jobs_stream_status_idx on file_list_jobs (status, stream);",
+            &["status", "stream"],
         ),
-        (
-            "stream_stats_org_idx",
-            "stream_stats",
-            "CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);",
-        ),
-        (
-            "stream_stats_stream_idx",
-            "stream_stats",
-            "CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);",
-        ),
+        ("stream_stats_org_idx", "stream_stats", &["org"]),
     ];
-
-    let client = CLIENT_RW.clone();
-    let client = client.lock().await;
-    let indices = INDICES.get_or_init(|| cache_indices(&client)).await;
-    for (idx, table, sql) in sqls {
-        if indices.contains(&DBIndex {
-            name: idx.into(),
-            table: table.into(),
-        }) {
-            continue;
-        }
-        if let Err(e) = sqlx::query(sql).execute(&*client).await {
-            log::error!("[SQLITE] create table {} index error: {}", table, e);
-            return Err(e.into());
-        }
+    for (idx, table, fields) in indices {
+        create_index(&client, idx, table, false, fields).await?;
     }
 
-    // create UNIQUE index for file_list
-    if !indices.contains(&DBIndex {
-        name: "file_list_stream_file_idx".into(),
-        table: "file_list".into(),
-    }) {
-        let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
-        if let Err(e) = sqlx::query(unique_index_sql).execute(&*client).await {
-            if !e.to_string().contains("UNIQUE constraint failed") {
-                return Err(e.into());
-            }
-            // delete duplicate records
-            log::warn!("[SQLITE] starting delete duplicate records");
-            let ret = sqlx::query(
+    let unique_indices: Vec<(&str, &str, &[&str])> = vec![
+        (
+            "file_list_history_stream_file_idx",
+            "file_list_history",
+            &["stream", "date", "file"],
+        ),
+        (
+            "file_list_jobs_stream_offsets_idx",
+            "file_list_jobs",
+            &["stream", "offsets"],
+        ),
+        ("stream_stats_stream_idx", "stream_stats", &["stream"]),
+    ];
+    for (idx, table, fields) in unique_indices {
+        create_index(&client, idx, table, true, fields).await?;
+    }
+
+    // This is a case where we want to MAKE the index unique
+
+    let res = create_index(
+        &client,
+        "file_list_stream_file_idx",
+        "file_list",
+        true,
+        &["stream", "date", "file"],
+    )
+    .await;
+    if let Err(e) = res {
+        if !e.to_string().contains("UNIQUE constraint failed") {
+            return Err(e);
+        }
+        // delete duplicate records
+        log::warn!("[SQLITE] starting delete duplicate records");
+        let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(&*client).await?;
-            log::warn!("[SQLITE] total: {} duplicate records", ret.len());
-            for (i, r) in ret.iter().enumerate() {
-                let stream = r.get::<String, &str>("stream");
-                let date = r.get::<String, &str>("date");
-                let file = r.get::<String, &str>("file");
-                let id = r.get::<i64, &str>("id");
-                sqlx::query(
+        log::warn!("[SQLITE] total: {} duplicate records", ret.len());
+        for (i, r) in ret.iter().enumerate() {
+            let stream = r.get::<String, &str>("stream");
+            let date = r.get::<String, &str>("date");
+            let file = r.get::<String, &str>("file");
+            let id = r.get::<i64, &str>("id");
+            sqlx::query(
                     r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
                 ).bind(id).bind(stream).bind(date).bind(file).execute(&*client).await?;
-                if i / 1000 == 0 {
-                    log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
-                }
+            if i % 1000 == 0 {
+                log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
             }
-            log::warn!(
-                "[SQLITE] delete duplicate records: {}/{}",
-                ret.len(),
-                ret.len()
-            );
-            // create index again
-            sqlx::query(unique_index_sql).execute(&*client).await?;
-            log::warn!("[SQLITE] create table index(file_list_stream_file_idx) succeed");
         }
+        log::warn!(
+            "[SQLITE] delete duplicate records: {}/{}",
+            ret.len(),
+            ret.len()
+        );
+        // create index again
+        create_index(
+            &client,
+            "file_list_stream_file_idx",
+            "file_list",
+            true,
+            &["stream", "date", "file"],
+        )
+        .await?;
+        log::warn!("[SQLITE] create table index(file_list_stream_file_idx) succeed");
     }
 
     // delete trigger for old version

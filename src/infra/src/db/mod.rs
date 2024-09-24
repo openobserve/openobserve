@@ -35,7 +35,7 @@ pub static NO_NEED_WATCH: bool = false;
 static DEFAULT: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
-pub static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub async fn get_db() -> &'static Box<dyn Db> {
     DEFAULT.get_or_init(default).await
@@ -236,9 +236,9 @@ pub struct MetaRecord {
 }
 
 #[derive(Hash, Clone, Eq, PartialEq)]
-pub struct DBIndex {
-    pub name: String,
-    pub table: String,
+struct DBIndex {
+    name: String,
+    table: String,
 }
 
 #[cfg(test)]

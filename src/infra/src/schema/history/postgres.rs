@@ -18,10 +18,7 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::{
-        postgres::{cache_indices, CLIENT},
-        DBIndex, INDICES,
-    },
+    db::postgres::{create_index, CLIENT},
     errors::{Error, Result},
 };
 
@@ -110,33 +107,31 @@ CREATE TABLE IF NOT EXISTS schema_history
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
-    let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
-    let sqls = vec![
-        (
-            "schema_history_org_idx",
-            "CREATE INDEX IF NOT EXISTS schema_history_org_idx on schema_history (org);",
-        ),
-        (
-            "schema_history_stream_idx",
-            "CREATE INDEX IF NOT EXISTS schema_history_stream_idx on schema_history (org, stream_type, stream_name);",
-        ),
-        (
-            "schema_history_stream_version_idx",
-            "CREATE UNIQUE INDEX IF NOT EXISTS schema_history_stream_version_idx on schema_history (org, stream_type, stream_name, start_dt);",
-        ),
-    ];
-    for (idx, sql) in sqls {
-        if indices.contains(&DBIndex {
-            name: idx.into(),
-            table: "schema_history".into(),
-        }) {
-            continue;
-        }
-        if let Err(e) = sqlx::query(sql).execute(&pool).await {
-            log::error!("[POSTGRES] create table schema_history index error: {}", e);
-            return Err(e.into());
-        }
-    }
+
+    create_index(
+        &pool,
+        "schema_history_org_idx",
+        "schema_history",
+        false,
+        &["org"],
+    )
+    .await?;
+    create_index(
+        &pool,
+        "schema_history_stream_idx",
+        "schema_history",
+        false,
+        &["org", "stream_type", "stream_name"],
+    )
+    .await?;
+    create_index(
+        &pool,
+        "schema_history_stream_version_idx",
+        "schema_history",
+        true,
+        &["org", "stream_type", "stream_name", "start_dt"],
+    )
+    .await?;
 
     Ok(())
 }
