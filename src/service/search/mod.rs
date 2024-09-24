@@ -406,6 +406,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             async move {
                 let cfg = get_config();
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -565,6 +566,7 @@ pub async fn cancel_query(
                 let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
                         &tracing::Span::current().context(),
