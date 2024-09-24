@@ -241,7 +241,7 @@ impl Metadata for DistinctValues {
                     get_config().common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
-                let hour_key = ingestion::get_wal_time_key(
+                let hour_key = ingestion::get_write_partition_key(
                     timestamp,
                     &vec![],
                     unwrap_partition_time_level(None, StreamType::Metadata),

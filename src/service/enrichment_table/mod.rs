@@ -157,7 +157,7 @@ pub async fn save_enrichment_data(
         if records.is_empty() {
             let schema = stream_schema_map.get(stream_name).unwrap();
             let schema_key = schema.hash_key();
-            hour_key = super::ingestion::get_wal_time_key(
+            hour_key = super::ingestion::get_write_partition_key(
                 timestamp,
                 &vec![],
                 PartitionTimeLevel::Unset,

@@ -98,7 +98,7 @@ impl Metadata for TraceListIndex {
 
             let mut data = json::to_value(item).unwrap();
             let data = data.as_object_mut().unwrap();
-            let hour_key = ingestion::get_wal_time_key(
+            let hour_key = ingestion::get_write_partition_key(
                 timestamp,
                 PARTITION_KEYS.to_vec().as_ref(),
                 unwrap_partition_time_level(None, StreamType::Metadata),
@@ -263,7 +263,7 @@ mod tests {
             config::get_config().common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
-        let hour_key = ingestion::get_wal_time_key(
+        let hour_key = ingestion::get_write_partition_key(
             timestamp,
             &vec![],
             unwrap_partition_time_level(None, StreamType::Metadata),
