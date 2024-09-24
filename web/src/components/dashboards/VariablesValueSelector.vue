@@ -400,7 +400,7 @@ export default defineComponent({
           currentVariable.value =
             selectedOptionsValues.length > 0
               ? selectedOptionsValues
-              : [currentVariable.options[0].value];
+              : [currentVariable?.options?.[0]?.value];
         }
       } else {
         // here, multi select is false

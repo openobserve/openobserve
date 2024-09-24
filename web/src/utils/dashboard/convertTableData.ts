@@ -32,7 +32,7 @@ import {
 export const convertTableData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
 ) => {
   // if no data than return it
   if (
@@ -43,12 +43,46 @@ export const convertTableData = (
   ) {
     return { rows: [], columns: [] };
   }
+
   const x = panelSchema?.queries[0].fields?.x || [];
   const y = panelSchema?.queries[0].fields?.y || [];
-  const columnData = [...x, ...y];
-
-  const tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
+  let columnData = [...x, ...y];
+  let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
+
+  // use all response keys if tableDynamicColumns is true
+  if (panelSchema?.config?.table_dynamic_columns == true) {
+    let responseKeys: any = new Set();
+
+    // insert all keys of searchQueryData into responseKeys
+    tableRows?.forEach((row: any) => {
+      Object.keys(row).forEach((key) => {
+        responseKeys?.add(key);
+      });
+    });
+
+    // set to array
+    responseKeys = Array.from(responseKeys);
+
+    // remove x and y keys
+    const xAxisKeys = x.map((key: any) => key.alias);
+    const yAxisKeys = y.map((key: any) => key.alias);
+    responseKeys = responseKeys?.filter(
+      (key: any) => !xAxisKeys.includes(key) && !yAxisKeys.includes(key),
+    );
+
+    // create panelSchema fields object
+    responseKeys = responseKeys.map((key: any) => ({
+      label: key,
+      alias: key,
+      column: key,
+      color: null,
+      isDerived: false,
+    }));
+
+    // add responseKeys to columnData
+    columnData = [...columnData, ...responseKeys];
+  }
 
   // identify histogram fields for auto and custom sql
   if (panelSchema?.queries[0]?.customQuery === false) {
@@ -59,7 +93,6 @@ export const convertTableData = (
         const sample = tableRows
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
-
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample);
 
@@ -77,7 +110,6 @@ export const convertTableData = (
         const sample = tableRows
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
-
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample);
 
@@ -88,49 +120,196 @@ export const convertTableData = (
     }
   }
 
-  const columns = columnData.map((it: any) => {
-    let obj: any = {};
-    const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
-    obj["name"] = it.label;
-    obj["field"] = it.alias;
-    obj["label"] = it.label;
-    obj["align"] = !isNumber ? "left" : "right";
-    obj["sortable"] = true;
-    // if number then sort by number and use decimal point config option in format
-    if (isNumber) {
-      obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-      obj["format"] = (val: any) => {
-        return !Number.isNaN(val)
-          ? `${
-              formatUnitValue(
-                getUnitValue(
-                  val,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals ?? 2
-                )
-              ) ?? 0
-            }`
-          : val;
-      };
+  const isTransposeEnabled = panelSchema.config.table_transpose;
+  const transposeColumn = columnData[0]?.alias || "";
+  const transposeColumnLabel = columnData[0]?.label || "";
+  let columns;
+
+  if (!isTransposeEnabled) {
+    columns = columnData.map((it: any) => {
+      let obj: any = {};
+      const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
+      obj["name"] = it.label;
+      obj["field"] = it.alias;
+      obj["label"] = it.label;
+      obj["align"] = !isNumber ? "left" : "right";
+      obj["sortable"] = true;
+      // if number then sort by number and use decimal point config option in format
+      if (isNumber) {
+        obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+        obj["format"] = (val: any) => {
+          return !Number.isNaN(val)
+            ? `${
+                formatUnitValue(
+                  getUnitValue(
+                    val,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals ?? 2,
+                  ),
+                ) ?? 0
+              }`
+            : val;
+        };
+      }
+
+      // if current field is histogram field then return formatted date
+      if (histogramFields.includes(it.alias)) {
+        // if current field is histogram field then return formatted date
+        obj["format"] = (val: any) => {
+          return formatDate(
+            toZonedTime(
+              typeof val === "string"
+                ? `${val}Z`
+                : new Date(val)?.getTime() / 1000,
+              store.state.timezone,
+            ),
+          );
+        };
+      }
+      return obj;
+    });
+  } else {
+    // lets get all columns from a particular field
+    const transposeColumns = searchQueryData[0].map(
+      (it: any) => it[transposeColumn] ?? "",
+    );
+
+    let uniqueTransposeColumns: any = [];
+    const columnDuplicationMap: any = {};
+
+    transposeColumns.forEach((col: any, index: any) => {
+      if (!columnDuplicationMap[col]) {
+        uniqueTransposeColumns.push(col);
+        columnDuplicationMap[col] = 1;
+      } else {
+        const uniqueCol = `${col}_${columnDuplicationMap[col]}`;
+        uniqueTransposeColumns.push(uniqueCol);
+        columnDuplicationMap[col] += 1;
+      }
+    });
+
+    const isFirstColumnHistogram = histogramFields.includes(transposeColumn);
+
+    if (isFirstColumnHistogram) {
+      uniqueTransposeColumns = uniqueTransposeColumns.map((val: any) => {
+        let formattedDate = null;
+
+        if (val) {
+          // Check if the value contains an underscore (e.g., "2024-09-23T08:12:00_1")
+          let baseVal = val;
+          let underscorePart = "";
+
+          // If underscore is found, split the value and retain the underscore part
+          if (typeof val === "string" && val.includes("_")) {
+            const parts = val.split("_");
+            baseVal = parts[0]; // The date part (e.g., "2024-09-23T08:12:00")
+            underscorePart = `_${parts[1]}`; // The underscore and suffix part (e.g., "_1")
+          }
+
+          // Parse and format the base date part
+          const parsedDate =
+            typeof baseVal === "string"
+              ? new Date(`${baseVal}Z`)
+              : new Date(baseVal);
+
+          if (!isNaN(parsedDate.getTime())) {
+            formattedDate = formatDate(
+              toZonedTime(parsedDate, store.state.timezone),
+            );
+          }
+
+          // Append the underscore part (if it exists) back to the formatted date
+          formattedDate = formattedDate
+            ? `${formattedDate}${underscorePart}`
+            : null;
+        }
+
+        // Return the formatted date with the underscore or the original value if it can't be parsed
+        return formattedDate || val;
+      });
     }
 
-    // if current field is histogram field then return formatted date
-    if (histogramFields.includes(it.alias)) {
-      // if current field is histogram field then return formatted date
-      obj["format"] = (val: any) => {
-        return formatDate(
-          toZonedTime(
-            typeof val === "string"
-              ? `${val}Z`
-              : new Date(val)?.getTime() / 1000,
-            store.state.timezone
-          )
-        );
-      };
-    }
-    return obj;
-  });
+    // Filter out the first column but retain the label
+    columnData = columnData.filter((it: any) => it.alias !== transposeColumn);
+
+    // Generate label and corresponding transposed data rows
+    columns = [
+      {
+        name: "label",
+        field: "label",
+        label: transposeColumnLabel,
+        align: "left",
+      }, // Add label column with the first column's label
+      ...uniqueTransposeColumns.map((it: any) => {
+        let obj: any = {};
+        const isNumber = isSampleValuesNumbers(tableRows, it, 20);
+
+        obj["name"] = it;
+        obj["field"] = it;
+        obj["label"] = it;
+        obj["align"] = !isNumber ? "left" : "right";
+        obj["sortable"] = true;
+
+        if (isNumber) {
+          obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+          obj["format"] = (val: any) => {
+            return !Number.isNaN(val)
+              ? `${
+                  formatUnitValue(
+                    getUnitValue(
+                      val,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals ?? 2,
+                    ),
+                  ) ?? 0
+                }`
+              : val;
+          };
+        }
+
+        // Check if it's a histogram field and apply timezone conversion
+        if (histogramFields.includes(it)) {
+          obj["format"] = (val: any) => {
+            return formatDate(
+              toZonedTime(
+                typeof val === "string"
+                  ? `${val}Z`
+                  : new Date(val)?.getTime() / 1000,
+                store.state.timezone,
+              ),
+            );
+          };
+        }
+
+        return obj;
+      }),
+    ];
+
+    // Transpose rows, adding 'label' as the first column
+    tableRows = columnData.map((it: any) => {
+      let obj = uniqueTransposeColumns.reduce(
+        (acc: any, curr: any, reduceIndex: any) => {
+          const value = searchQueryData[0][reduceIndex][it.alias] ?? "";
+          acc[curr] = histogramFields.includes(it.alias)
+            ? formatDate(
+                toZonedTime(
+                  typeof value === "string"
+                    ? `${value}Z`
+                    : new Date(value)?.getTime() / 1000,
+                  store.state.timezone,
+                ),
+              )
+            : value;
+          return acc;
+        },
+        {},
+      );
+      obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
+      return obj;
+    });
+  }
 
   return {
     rows: tableRows,

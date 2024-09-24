@@ -219,6 +219,10 @@ pub struct PanelConfig {
     no_value_replacement: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     wrap_table_cells: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_transpose: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_dynamic_columns: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
