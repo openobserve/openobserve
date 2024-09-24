@@ -630,7 +630,7 @@ async fn write_traces(
         // End check for alert trigger
 
         // get hour key
-        let hour_key = super::ingestion::get_wal_time_key(
+        let hour_key = super::ingestion::get_write_partition_key(
             timestamp,
             &partition_keys,
             partition_time_level,

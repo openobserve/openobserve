@@ -843,7 +843,7 @@ pub(crate) async fn generate_index_on_ingester(
             .as_i64()
             .unwrap();
 
-        let hour_key = crate::service::ingestion::get_wal_time_key(
+        let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
             &Vec::new(),
             PartitionTimeLevel::Hourly,

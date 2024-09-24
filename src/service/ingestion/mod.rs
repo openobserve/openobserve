@@ -310,7 +310,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 }
 
-pub fn get_wal_time_key(
+pub fn get_write_partition_key(
     timestamp: i64,
     partition_keys: &Vec<StreamPartition>,
     time_level: PartitionTimeLevel,
@@ -337,14 +337,12 @@ pub fn get_wal_time_key(
         if key.disabled {
             continue;
         }
-        match local_val.get(&key.field) {
-            Some(v) => {
-                let val = get_string_value(v);
-                let val = key.get_partition_key(&val);
-                time_key.push_str(&format!("/{}", format_partition_key(&val)));
-            }
-            None => continue,
+        let val = match local_val.get(&key.field) {
+            Some(v) => get_string_value(v),
+            None => "null".to_string(),
         };
+        let val = key.get_partition_key(&val);
+        time_key.push_str(&format!("/{}", format_partition_key(&val)));
     }
     time_key
 }
@@ -671,12 +669,12 @@ mod tests {
         assert_eq!(format_partition_key("default/olympics"), "defaultolympics");
     }
     #[test]
-    fn test_get_wal_time_key() {
+    fn test_get_write_partition_key() {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_wal_time_key(
+            get_write_partition_key(
                 1620000000,
                 &vec![
                     StreamPartition::new("country"),
@@ -691,12 +689,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_wal_time_key_no_partition_keys() {
+    fn test_get_write_partition_key_no_partition_keys() {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_wal_time_key(
+            get_write_partition_key(
                 1620000000,
                 &vec![],
                 PartitionTimeLevel::Hourly,
@@ -707,9 +705,9 @@ mod tests {
         );
     }
     #[test]
-    fn test_get_wal_time_key_no_partition_keys_no_local_val() {
+    fn test_get_write_partition_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_wal_time_key(
+            get_write_partition_key(
                 1620000000,
                 &vec![],
                 PartitionTimeLevel::Hourly,
