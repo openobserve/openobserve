@@ -89,6 +89,7 @@ pub async fn query(
                 .parse()
                 .map_err(|_| Error::Message("invalid org_id".to_string()))?;
             let mut request = tonic::Request::new(req);
+            request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
             opentelemetry::global::get_text_map_propagator(|propagator| {
                 propagator.inject_context(
@@ -196,6 +197,7 @@ pub async fn query(
         .parse()
         .map_err(|_| Error::Message("invalid org_id".to_string()))?;
     let mut request = tonic::Request::new(req);
+    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
     opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.inject_context(

@@ -85,7 +85,8 @@ pub async fn get_cached_results(
                     is_descending:cache_req.is_descending,
                 };
 
-                let request = tonic::Request::new(req);
+                let mut request = tonic::Request::new(req);
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
                 log::info!(
                     "[trace_id {trace_id}] get_cached_results->grpc: request node: {}",
@@ -297,7 +298,8 @@ pub async fn delete_cached_results(path: String) -> bool {
                    path: local_path.clone(),
                 };
 
-                let request = tonic::Request::new(req);
+                let mut request = tonic::Request::new(req);
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
                 log::info!(
                     "[trace_id {trace_id}] delete_cached_results->grpc: request node: {}",
