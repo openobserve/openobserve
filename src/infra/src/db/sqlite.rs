@@ -690,10 +690,8 @@ impl super::Db for SqliteDb {
     }
 
     async fn add_start_dt_column(&self) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        create_meta_backup(&client).await?;
-        add_start_dt_column(&client).await?;
+        create_meta_backup().await?;
+        add_start_dt_column().await?;
         Ok(())
     }
 }
@@ -717,9 +715,10 @@ CREATE TABLE IF NOT EXISTS meta
     )
     .execute(&*client)
     .await?;
+    drop(client);
 
     // create start_dt column for old version <= 0.9.2
-    add_start_dt_column(&client).await?;
+    add_start_dt_column().await?;
 
     // create table index
     create_index("meta_module_idx", "meta", false, &["module"]).await?;
@@ -735,11 +734,13 @@ CREATE TABLE IF NOT EXISTS meta
     Ok(())
 }
 
-async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
+async fn add_start_dt_column() -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
     // Attempt to add the column, ignoring the error if the column already exists
     if let Err(e) =
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
-            .execute(client)
+            .execute(&*client)
             .await
     {
         // Check if the error is about the duplicate column
@@ -748,6 +749,7 @@ async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
             return Err(e.into());
         }
     }
+    drop(client);
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
     create_index(
@@ -761,7 +763,9 @@ async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
     Ok(())
 }
 
-async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
+async fn create_meta_backup() -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
     let mut tx = client.begin().await?;
     if let Err(e) =
         sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)

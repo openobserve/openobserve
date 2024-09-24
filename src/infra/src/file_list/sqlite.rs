@@ -1156,9 +1156,6 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let client = CLIENT_RW.clone();
-    let client = client.lock().await;
-
     let indices: Vec<(&str, &str, &[&str])> = vec![
         ("file_list_org_idx", "file_list", &["org"]),
         (
@@ -1225,6 +1222,8 @@ pub async fn create_table_index() -> Result<()> {
         }
         // delete duplicate records
         log::warn!("[SQLITE] starting delete duplicate records");
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(&*client).await?;
@@ -1241,6 +1240,7 @@ pub async fn create_table_index() -> Result<()> {
                 log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
             }
         }
+        drop(client);
         log::warn!(
             "[SQLITE] delete duplicate records: {}/{}",
             ret.len(),
@@ -1259,6 +1259,8 @@ pub async fn create_table_index() -> Result<()> {
 
     // delete trigger for old version
     // compatible for old version <= 0.6.4
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
     sqlx::query(r#"DROP TRIGGER IF EXISTS update_stream_stats_delete;"#)
         .execute(&*client)
         .await?;
