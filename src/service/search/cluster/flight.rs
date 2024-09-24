@@ -984,8 +984,7 @@ pub async fn get_inverted_index_file_list(
 
 fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     let plan = displayable(physical_plan.as_ref())
-        .set_show_schema(false)
-        .indent(true)
+        .indent(false)
         .to_string();
     println!("+---------------------------+----------+");
     println!("leader physical plan {stage} rewrite");

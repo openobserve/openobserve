@@ -116,7 +116,22 @@ pub async fn search(
         )
         .await
     } else {
-        MultiCachedQueryResponse::default()
+        let query = rpc_req.clone().query.unwrap();
+        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+            Ok(v) => {
+                let ts_column = cacher::get_ts_col(&v, &cfg.common.column_timestamp, is_aggregate)
+                    .unwrap_or_default();
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {:?}", e);
+                MultiCachedQueryResponse::default()
+            }
+        }
     };
 
     // No cache data present, add delta for full query
@@ -206,7 +221,7 @@ pub async fn search(
 
             let enter_span = tracing::span::Span::current();
             let task = tokio::task::spawn(
-                async move {
+                (async move {
                     let trace_id = trace_id.clone();
                     req.query.start_time = delta.delta_start_time;
                     req.query.end_time = delta.delta_end_time;
@@ -224,7 +239,7 @@ pub async fn search(
                     }
 
                     SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
-                }
+                })
                 .instrument(enter_span),
             );
             tasks.push(task);
@@ -256,7 +271,11 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
-    if is_aggregate && c_resp.histogram_interval > -1 {
+    if is_aggregate
+        && res.histogram_interval.is_none()
+        && !c_resp.ts_column.is_empty()
+        && c_resp.histogram_interval > -1
+    {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
@@ -468,15 +487,21 @@ async fn write_results(
     is_descending: bool,
 ) {
     let mut local_resp = res.clone();
-    let remove_index = if is_descending {
-        local_resp.hits.len() - 1
+    let remove_hit = if is_descending {
+        local_resp.hits.last()
     } else {
-        0
+        local_resp.hits.first()
     };
 
-    if !local_resp.hits.is_empty() {
-        local_resp.hits.remove(remove_index);
-    };
+    if !local_resp.hits.is_empty() && remove_hit.is_some() {
+        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+
+        if let Some(ts_value) = ts_value_to_remove {
+            local_resp
+                .hits
+                .retain(|hit| hit.get(ts_column) != Some(&ts_value));
+        }
+    }
 
     if local_resp.hits.is_empty() || local_resp.hits.len() < 2 {
         return;

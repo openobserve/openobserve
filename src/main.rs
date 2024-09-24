@@ -329,7 +329,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("HTTP server stopped");
 
-    // flush useage report
+    // flush usage report
     usage::flush().await;
 
     // leave the cluster

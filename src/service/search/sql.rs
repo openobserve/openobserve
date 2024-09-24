@@ -20,7 +20,7 @@ use chrono::Duration;
 use config::{
     get_config,
     meta::{
-        sql::{resolve_stream_names, Sql as MetaSql},
+        sql::{resolve_stream_names, OrderBy, Sql as MetaSql},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
@@ -74,7 +74,7 @@ pub struct Sql {
     pub offset: i64,
     pub time_range: Option<(i64, i64)>,
     pub group_by: Vec<String>,
-    pub order_by: Vec<(String, bool)>,
+    pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub sorted_by_time: bool,     // if only order by _timestamp
     pub use_inverted_index: bool, // if can use inverted index
@@ -136,11 +136,11 @@ impl Sql {
             && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
-            order_by.push((get_config().common.column_timestamp.clone(), false));
+            order_by.push((get_config().common.column_timestamp.clone(), OrderBy::Desc));
         }
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == get_config().common.column_timestamp
-            && !order_by[0].1;
+            && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
         // 4. get match_all() value
@@ -309,13 +309,13 @@ fn generate_schema_fields(
 }
 
 /// visit a sql to get all columns
-/// TODO: handle subquery without (table.field_name) perfix
+/// TODO: handle subquery without (table.field_name) prefix
 struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
     columns_alias: HashSet<(String, String)>,
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
     group_by: Vec<String>,
-    order_by: Vec<(String, bool)>, // field_name, asc
+    order_by: Vec<(String, OrderBy)>, // field_name, order_by
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
@@ -389,7 +389,14 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
                 order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
-                    self.order_by.push((expr_name, order.asc.unwrap_or(true)));
+                    self.order_by.push((
+                        expr_name,
+                        if order.asc.unwrap_or_default() {
+                            OrderBy::Asc
+                        } else {
+                            OrderBy::Desc
+                        },
+                    ));
                 }
             }
         }

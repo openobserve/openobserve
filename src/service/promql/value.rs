@@ -692,7 +692,7 @@ mod tests {
         let value = labels.get_value("a");
         assert!(value == "1");
 
-        let value = labels.get_value("non-existant-label");
+        let value = labels.get_value("non-existent-label");
         assert!(value.is_empty());
     }
 

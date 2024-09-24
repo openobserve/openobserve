@@ -114,7 +114,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     }
 
     if is_waiting_streams {
-        // compact zero hour for daily partiton
+        // compact zero hour for daily partition
         let time_zero_hour = Utc
             .with_ymd_and_hms(time_now.year(), time_now.month(), time_now.day(), 0, 0, 0)
             .unwrap()
@@ -143,7 +143,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // compact zero hour for daily partiton
+    // compact zero hour for daily partition
     let offset_zero_hour = Utc
         .with_ymd_and_hms(
             offset_time.year(),
