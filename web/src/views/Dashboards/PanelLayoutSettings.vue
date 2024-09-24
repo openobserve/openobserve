@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="min-width: 220px"
         />
 
-        <div>Approximately {{ getRowCount }} rows will be displayed</div>
+        <div>Approximately {{ getRowCount }} table rows will be displayed</div>
 
         <q-icon
           name="info_outline"
