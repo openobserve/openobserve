@@ -175,7 +175,7 @@ export const convertTableData = (
       (it: any) => it[transposeColumn] ?? "",
     );
 
-    const uniqueTransposeColumns: any = [];
+    let uniqueTransposeColumns: any = [];
     const columnDuplicationMap: any = {};
 
     transposeColumns.forEach((col: any, index: any) => {
@@ -188,6 +188,47 @@ export const convertTableData = (
         columnDuplicationMap[col] += 1;
       }
     });
+
+    const isFirstColumnHistogram = histogramFields.includes(transposeColumn);
+
+    if (isFirstColumnHistogram) {
+      uniqueTransposeColumns = uniqueTransposeColumns.map((val: any) => {
+        let formattedDate = null;
+
+        if (val) {
+          // Check if the value contains an underscore (e.g., "2024-09-23T08:12:00_1")
+          let baseVal = val;
+          let underscorePart = "";
+
+          // If underscore is found, split the value and retain the underscore part
+          if (val.includes("_")) {
+            const parts = val.split("_");
+            baseVal = parts[0]; // The date part (e.g., "2024-09-23T08:12:00")
+            underscorePart = `_${parts[1]}`; // The underscore and suffix part (e.g., "_1")
+          }
+
+          // Parse and format the base date part
+          const parsedDate =
+            typeof baseVal === "string"
+              ? new Date(`${baseVal}Z`)
+              : new Date(baseVal);
+
+          if (!isNaN(parsedDate.getTime())) {
+            formattedDate = formatDate(
+              toZonedTime(parsedDate, store.state.timezone),
+            );
+          }
+
+          // Append the underscore part (if it exists) back to the formatted date
+          formattedDate = formattedDate
+            ? `${formattedDate}${underscorePart}`
+            : null;
+        }
+
+        // Return the formatted date with the underscore or the original value if it can't be parsed
+        return formattedDate || val;
+      });
+    }
 
     // Filter out the first column but retain the label
     columnData = columnData.filter((it: any) => it.alias !== transposeColumn);
@@ -228,6 +269,7 @@ export const convertTableData = (
           };
         }
 
+        // Check if it's a histogram field and apply timezone conversion
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
             return formatDate(
@@ -249,7 +291,17 @@ export const convertTableData = (
     tableRows = columnData.map((it: any) => {
       let obj = uniqueTransposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
-          acc[curr] = searchQueryData[0][reduceIndex][it.alias] ?? "";
+          const value = searchQueryData[0][reduceIndex][it.alias] ?? "";
+          acc[curr] = histogramFields.includes(it.alias)
+            ? formatDate(
+                toZonedTime(
+                  typeof value === "string"
+                    ? `${value}Z`
+                    : new Date(value)?.getTime() / 1000,
+                  store.state.timezone,
+                ),
+              )
+            : value;
           return acc;
         },
         {},
