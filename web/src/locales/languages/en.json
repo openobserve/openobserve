@@ -57,7 +57,8 @@
     "cancelChanges": "Cancel Changes",
     "logs": "Logs",
     "addGroup":"Add Group",
-    "addCondition":"Add Condition"
+    "addCondition":"Add Condition",
+    "required": "Value is required"
   },
   "search": {
     "selectIndex": "Select Stream First",
