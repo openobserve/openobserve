@@ -46,7 +46,6 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
-    security("Authorization" = []),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
         content = SearchRequest,
@@ -148,6 +147,8 @@ pub async fn search_multi(
         }
     };
 
+    let per_query_resp = multi_req.per_query_response;
+
     let mut query_fn = multi_req.query_fn.as_ref().and_then(|v| base64::decode_url(v).ok());
 
     if let Some(vrl_function) = &query_fn {
@@ -159,8 +160,6 @@ pub async fn search_multi(
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
-
-    let per_query_resp = multi_req.per_query_response;
 
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
@@ -345,10 +344,16 @@ pub async fn search_multi(
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
-                multi_res.hits.extend(res.hits);
+
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
+
+                if per_query_resp {
+                    multi_res.hits.push(serde_json::Value::Array(res.hits));
+                } else {
+                    multi_res.hits.extend(res.hits);
+                }
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -411,7 +416,6 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
-    security("Authorization" = []),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
         content = SearchRequest,
