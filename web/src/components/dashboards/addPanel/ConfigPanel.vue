@@ -57,6 +57,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_transpose"
+      :label="t('dashboard.tableTranspose')"
+      data-test="dashboard-config-table_transpose"
+    />
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_dynamic_columns"
+      :label="t('dashboard.tableDynamicColumns')"
+      data-test="dashboard-config-table_dynamic_columns"
+    />
+
+    <div class="space"></div>
+
     <div class="o2-input">
       <q-select
         v-if="
@@ -976,6 +994,16 @@ export default defineComponent({
       // by default, use wrap_table_cells as false
       if (!dashboardPanelData.data.config.wrap_table_cells) {
         dashboardPanelData.data.config.wrap_table_cells = false;
+      }
+
+      // by default, use table_transpose as false
+      if (!dashboardPanelData.data.config.table_transpose) {
+        dashboardPanelData.data.config.table_transpose = false;
+      }
+
+      // by default, use table_dynamic_columns  as false
+      if (!dashboardPanelData.data.config.table_dynamic_columns) {
+        dashboardPanelData.data.config.table_dynamic_columns = false;
       }
     });
 

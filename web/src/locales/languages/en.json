@@ -572,6 +572,8 @@
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
     "wraptext": "Wrap Table Cells",
+    "tableTranspose": "Transpose",
+    "tableDynamicColumns": "Allow Dynamic Columns",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
