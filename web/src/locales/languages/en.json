@@ -354,7 +354,7 @@
     "header": "Streams",
     "search": "Search Stream",
     "name": "Name",
-    "docNum": "Doc Num",
+    "docNum": "Records",
     "storageSize": "Ingested Data",
     "compressedSize": "Compressed Size",
     "time": "Time",
