@@ -242,18 +242,50 @@ impl QueryCondition {
                 }
             }
         };
-        if self.search_event_type.is_none() && resp.total < trigger_condition.threshold as usize {
+        let records: Option<Vec<Map<String, Value>>> = Some(
+            resp.hits
+                .iter()
+                .map(|hit| hit.as_object().unwrap().clone())
+                .collect(),
+        );
+        if self.search_event_type.is_none() {
+            let threshold = trigger_condition.threshold as usize;
+            match trigger_condition.operator {
+                Operator::EqualTo => {
+                    if records.as_ref().unwrap().len() == threshold {
+                        return Ok((records, now));
+                    }
+                }
+                Operator::NotEqualTo => {
+                    if records.as_ref().unwrap().len() != threshold {
+                        return Ok((records, now));
+                    }
+                }
+                Operator::GreaterThan => {
+                    if records.as_ref().unwrap().len() > threshold {
+                        return Ok((records, now));
+                    }
+                }
+                Operator::GreaterThanEquals => {
+                    if records.as_ref().unwrap().len() >= threshold {
+                        return Ok((records, now));
+                    }
+                }
+                Operator::LessThan => {
+                    if records.as_ref().unwrap().len() < threshold {
+                        return Ok((records, now));
+                    }
+                }
+                Operator::LessThanEquals => {
+                    if records.as_ref().unwrap().len() <= threshold {
+                        return Ok((records, now));
+                    }
+                }
+                _ => {}
+            }
             Ok((None, now))
         } else {
-            Ok((
-                Some(
-                    resp.hits
-                        .iter()
-                        .map(|hit| hit.as_object().unwrap().clone())
-                        .collect(),
-                ),
-                now,
-            ))
+            Ok((records, now))
         }
     }
 }
