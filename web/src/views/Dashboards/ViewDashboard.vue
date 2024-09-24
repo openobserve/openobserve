@@ -563,9 +563,14 @@ export default defineComponent({
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
 
-      selectedPanelConfig.value.data = JSON.parse(
-        JSON.stringify(getPanelFromTab(selectedTabId.value, id)),
-      );
+      const panelData = getPanelFromTab(selectedTabId.value, id);
+
+      if (!panelData) {
+        console.log("Panel not found");
+        return;
+      }
+
+      selectedPanelConfig.value.data = JSON.parse(JSON.stringify(panelData));
     };
 
     const savePanelLayout = async (layout) => {
@@ -610,6 +615,11 @@ export default defineComponent({
       const tab = currentDashboardData.data.tabs.find(
         (tab) => tab.tabId === tabId,
       );
+
+      if (!tab || !tab.panels) {
+        return null;
+      }
+
       return tab.panels.find((panel) => panel.id === panelId);
     };
 
