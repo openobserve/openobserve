@@ -1201,7 +1201,7 @@ pub async fn create_table_index() -> Result<()> {
         ("stream_stats_org_idx", "stream_stats", &["org"]),
     ];
     for (idx, table, fields) in indices {
-        create_index(&pool, idx, table, false, fields).await?;
+        create_index(idx, table, false, fields).await?;
     }
 
     let unique_indices: Vec<(&str, &str, &[&str])> = vec![
@@ -1218,12 +1218,11 @@ pub async fn create_table_index() -> Result<()> {
         ("stream_stats_stream_idx", "stream_stats", &["stream"]),
     ];
     for (idx, table, fields) in unique_indices {
-        create_index(&pool, idx, table, true, fields).await?;
+        create_index(idx, table, true, fields).await?;
     }
 
     // This is a case where we want to MAKE the index unique if it isn't
     let res = create_index(
-        &pool,
         "file_list_stream_file_idx",
         "file_list",
         true,
@@ -1267,7 +1266,6 @@ pub async fn create_table_index() -> Result<()> {
         );
         // create index again
         create_index(
-            &pool,
             "file_list_stream_file_idx",
             "file_list",
             true,

@@ -51,11 +51,12 @@ fn connect() -> Pool<MySql> {
         .connect_lazy_with(db_opts)
 }
 
-async fn cache_indices(pool: &Pool<MySql>) -> HashSet<DBIndex> {
+async fn cache_indices() -> HashSet<DBIndex> {
+    let client = CLIENT.clone();
     let var_name = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
     let sql = var_name;
     let res = sqlx::query_as::<_, (String, String)>(sql)
-        .fetch_all(pool)
+        .fetch_all(&client)
         .await;
     match res {
         Ok(r) => r
@@ -632,17 +633,9 @@ CREATE TABLE IF NOT EXISTS meta
     }
 
     // create table index
-    create_index(&pool, "meta_module_idx", "meta", false, &["module"]).await?;
+    create_index("meta_module_idx", "meta", false, &["module"]).await?;
+    create_index("meta_module_key1_idx", "meta", false, &["module", "key1"]).await?;
     create_index(
-        &pool,
-        "meta_module_key1_idx",
-        "meta",
-        false,
-        &["module", "key1"],
-    )
-    .await?;
-    create_index(
-        &pool,
         "meta_module_start_dt_idx",
         "meta",
         true,
@@ -678,7 +671,6 @@ async fn add_start_dt_column() -> Result<()> {
 
     // create new index meta_module_start_dt_idx
     create_index(
-        &pool,
         "meta_module_start_dt_idx",
         "meta",
         true,
@@ -686,7 +678,7 @@ async fn add_start_dt_column() -> Result<()> {
     )
     .await?;
     // delete old index meta_module_key2_idx
-    delete_index(&pool, "meta_module_key2_idx", "meta").await?;
+    delete_index("meta_module_key2_idx", "meta").await?;
 
     Ok(())
 }
@@ -738,13 +730,13 @@ async fn create_meta_backup() -> Result<()> {
 }
 
 pub async fn create_index(
-    client: &Pool<MySql>,
     idx_name: &str,
     table: &str,
     unique: bool,
     fields: &[&str],
 ) -> Result<()> {
-    let indices = INDICES.get_or_init(|| cache_indices(client)).await;
+    let client = CLIENT.clone();
+    let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: idx_name.into(),
         table: table.into(),
@@ -760,13 +752,14 @@ pub async fn create_index(
         table,
         fields.join(",")
     );
-    sqlx::query(&sql).execute(client).await?;
+    sqlx::query(&sql).execute(&client).await?;
     log::info!("[MYSQL] index {} created successfully", idx_name);
     Ok(())
 }
 
-pub async fn delete_index(client: &Pool<MySql>, idx_name: &str, table: &str) -> Result<()> {
-    let indices = INDICES.get_or_init(|| cache_indices(client)).await;
+pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
+    let client = CLIENT.clone();
+    let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
         table: table.into(),
@@ -775,7 +768,7 @@ pub async fn delete_index(client: &Pool<MySql>, idx_name: &str, table: &str) -> 
     }
     log::info!("[MYSQL] deleting index {} on table {}", idx_name, table);
     let sql = format!("DROP INDEX {} ON {};", idx_name, table);
-    sqlx::query(&sql).execute(client).await?;
+    sqlx::query(&sql).execute(&client).await?;
     log::info!("[MYSQL] index {} deleted successfully", idx_name);
     Ok(())
 }

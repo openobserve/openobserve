@@ -97,10 +97,11 @@ fn connect_ro() -> Pool<Sqlite> {
         .connect_lazy_with(db_opts)
 }
 
-async fn cache_indices(pool: &Pool<Sqlite>) -> HashSet<DBIndex> {
+async fn cache_indices() -> HashSet<DBIndex> {
+    let client = CLIENT_RO.clone();
     let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
     let res = sqlx::query_as::<_, (String, String)>(sql)
-        .fetch_all(pool)
+        .fetch_all(&client)
         .await;
     match res {
         Ok(r) => r
@@ -721,17 +722,9 @@ CREATE TABLE IF NOT EXISTS meta
     add_start_dt_column(&client).await?;
 
     // create table index
-    create_index(&client, "meta_module_idx", "meta", false, &["module"]).await?;
+    create_index("meta_module_idx", "meta", false, &["module"]).await?;
+    create_index("meta_module_key1_idx", "meta", false, &["module", "key1"]).await?;
     create_index(
-        &client,
-        "meta_module_key1_idx",
-        "meta",
-        false,
-        &["module", "key1"],
-    )
-    .await?;
-    create_index(
-        &client,
         "meta_module_start_dt_idx",
         "meta",
         true,
@@ -758,14 +751,13 @@ async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
     create_index(
-    client,
         "meta_module_start_dt_idx",
         "meta",
         true,
         &["module", "key1", "key2", "start_dt"],
     )
     .await?;
-    delete_index(client, "meta_module_key2_idx", "meta").await?;
+    delete_index("meta_module_key2_idx", "meta").await?;
     Ok(())
 }
 
@@ -795,13 +787,14 @@ async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
 }
 
 pub async fn create_index(
-    client: &Pool<Sqlite>,
     idx_name: &str,
     table: &str,
     unique: bool,
     fields: &[&str],
 ) -> Result<()> {
-    let indices = INDICES.get_or_init(|| cache_indices(client)).await;
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: idx_name.into(),
         table: table.into(),
@@ -817,13 +810,15 @@ pub async fn create_index(
         table,
         fields.join(",")
     );
-    sqlx::query(&sql).execute(client).await?;
+    sqlx::query(&sql).execute(&*client).await?;
     log::info!("[SQLITE] index {} created successfully", idx_name);
     Ok(())
 }
 
-pub async fn delete_index(client: &Pool<Sqlite>, idx_name: &str, table: &str) -> Result<()> {
-    let indices = INDICES.get_or_init(|| cache_indices(client)).await;
+pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
         table: table.into(),
@@ -832,7 +827,7 @@ pub async fn delete_index(client: &Pool<Sqlite>, idx_name: &str, table: &str) ->
     }
     log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
     let sql = format!("DROP INDEX IF EXISTS {};", idx_name,);
-    sqlx::query(&sql).execute(client).await?;
+    sqlx::query(&sql).execute(&*client).await?;
     log::info!("[SQLITE] index {}deleted successfully", idx_name);
     Ok(())
 }

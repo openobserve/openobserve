@@ -80,10 +80,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-
         create_index(
-            &pool,
             "scheduled_jobs_key_idx",
             "scheduled_jobs",
             false,
@@ -91,7 +88,6 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         )
         .await?;
         create_index(
-            &pool,
             "scheduled_jobs_org_key_idx",
             "scheduled_jobs",
             false,
@@ -99,7 +95,6 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         )
         .await?;
         create_index(
-            &pool,
             "scheduled_jobs_org_module_key_idx",
             "scheduled_jobs",
             true,

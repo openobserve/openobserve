@@ -107,18 +107,8 @@ CREATE TABLE IF NOT EXISTS schema_history
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let client = CLIENT_RW.clone();
-    let client = client.lock().await;
+    create_index("schema_history_org_idx", "schema_history", false, &["org"]).await?;
     create_index(
-        &client,
-        "schema_history_org_idx",
-        "schema_history",
-        false,
-        &["org"],
-    )
-    .await?;
-    create_index(
-        &client,
         "schema_history_stream_idx",
         "schema_history",
         false,
@@ -126,7 +116,6 @@ pub async fn create_table_index() -> Result<()> {
     )
     .await?;
     create_index(
-        &client,
         "schema_history_stream_version_idx",
         "schema_history",
         true,
