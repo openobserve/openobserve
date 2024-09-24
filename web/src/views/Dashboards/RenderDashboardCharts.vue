@@ -517,6 +517,7 @@ export default defineComponent({
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
       openEditLayout,
+      saveDashboard,
     };
   },
   methods: {

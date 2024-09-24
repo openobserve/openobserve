@@ -581,6 +581,8 @@ export default defineComponent({
       await nextTick();
 
       window.dispatchEvent(new Event("resize"));
+
+      await renderDashboardChartsRef.value?.saveDashboard();
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
