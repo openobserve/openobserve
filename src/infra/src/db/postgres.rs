@@ -24,12 +24,13 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions, Pool, Postgres,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 
-use super::{DBIndex, INDICES};
+use super::DBIndex;
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 fn connect() -> Pool<Postgres> {
     let cfg = config::get_config();

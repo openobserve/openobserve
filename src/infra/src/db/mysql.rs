@@ -24,12 +24,13 @@ use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPoolOptions},
     ConnectOptions, MySql, Pool,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 
-use super::{DBIndex, INDICES};
+use super::DBIndex;
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 fn connect() -> Pool<MySql> {
     let cfg = config::get_config();

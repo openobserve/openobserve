@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -35,7 +35,6 @@ pub static NO_NEED_WATCH: bool = false;
 static DEFAULT: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
-static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub async fn get_db() -> &'static Box<dyn Db> {
     DEFAULT.get_or_init(default).await

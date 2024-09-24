@@ -27,9 +27,9 @@ use sqlx::{
     },
     Pool, Sqlite,
 };
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{mpsc, Mutex, OnceCell, RwLock};
 
-use super::{DBIndex, INDICES};
+use super::DBIndex;
 use crate::{
     db::{Event, EventData},
     errors::*,
@@ -38,6 +38,8 @@ use crate::{
 pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
 pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
     Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
+
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
