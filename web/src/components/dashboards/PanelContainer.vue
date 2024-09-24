@@ -310,6 +310,7 @@ export default defineComponent({
     "refreshPanelRequest",
     "refresh",
     "update:initial-variable-values",
+    "onEditLayout",
   ],
   props: [
     "data",
