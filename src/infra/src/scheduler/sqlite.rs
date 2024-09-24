@@ -21,7 +21,9 @@ use sqlx::{Pool, Row, Sqlite};
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
     db::{
-        self, cache_indices_sqlite, sqlite::{CLIENT_RO, CLIENT_RW}, DBIndex, INDICES
+        self,
+        sqlite::{cache_indices, CLIENT_RO, CLIENT_RW},
+        DBIndex, INDICES,
     },
     errors::{DbError, Error, Result},
 };
@@ -77,7 +79,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     async fn create_table_index(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let indices = INDICES.get_or_init(|| cache_indices_sqlite(&client)).await;
+        let indices = INDICES.get_or_init(|| cache_indices(&client)).await;
         let queries = vec![
             (
                 "scheduled_jobs_key_idx",
@@ -93,8 +95,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             ),
         ];
 
-        for (idx,query) in queries {
-            if indices.contains(&DBIndex{name:idx.into(),table:"scheduled_jobs".into()}){
+        for (idx, query) in queries {
+            if indices.contains(&DBIndex {
+                name: idx.into(),
+                table: "scheduled_jobs".into(),
+            }) {
                 continue;
             }
             sqlx::query(query).execute(&*client).await?;

@@ -19,7 +19,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
-use sqlx::{MySql, Pool, Postgres, Sqlite};
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::errors::{DbError, Error, Result};
@@ -240,48 +239,6 @@ pub struct MetaRecord {
 pub struct DBIndex {
     pub name: String,
     pub table: String,
-}
-
-pub async fn cache_indices_mysql(pool: &Pool<MySql>) -> HashSet<DBIndex> {
-    let sql = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
-    let res = sqlx::query_as::<_, (String, String)>(sql)
-        .fetch_all(pool)
-        .await;
-    match res {
-        Ok(r) => r
-            .into_iter()
-            .map(|(name, table)| DBIndex { name, table })
-            .collect(),
-        Err(_) => HashSet::new(),
-    }
-}
-
-pub async fn cache_indices_pg(pool: &Pool<Postgres>) -> HashSet<DBIndex> {
-    let sql = r#"SELECT indexname, tablename FROM pg_indexes;"#;
-    let res = sqlx::query_as::<_, (String, String)>(sql)
-        .fetch_all(pool)
-        .await;
-    match res {
-        Ok(r) => r
-            .into_iter()
-            .map(|(name, table)| DBIndex { name, table })
-            .collect(),
-        Err(_) => HashSet::new(),
-    }
-}
-
-pub async fn cache_indices_sqlite(pool: &Pool<Sqlite>) -> HashSet<DBIndex> {
-    let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
-    let res = sqlx::query_as::<_, (String, String)>(sql)
-        .fetch_all(pool)
-        .await;
-    match res {
-        Ok(r) => r
-            .into_iter()
-            .map(|(name, table)| DBIndex { name, table })
-            .collect(),
-        Err(_) => HashSet::new(),
-    }
 }
 
 #[cfg(test)]

@@ -18,7 +18,10 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::{cache_indices_sqlite, sqlite::CLIENT_RW, DBIndex, INDICES},
+    db::{
+        sqlite::{cache_indices, CLIENT_RW},
+        DBIndex, INDICES,
+    },
     errors::{Error, Result},
 };
 
@@ -124,7 +127,7 @@ pub async fn create_table_index() -> Result<()> {
 
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&client)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(&client)).await;
     for (idx, sql) in sqls {
         if indices.contains(&DBIndex {
             name: idx.into(),

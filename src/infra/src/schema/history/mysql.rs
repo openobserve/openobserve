@@ -18,7 +18,10 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::{cache_indices_mysql, mysql::CLIENT, DBIndex, INDICES},
+    db::{
+        mysql::{cache_indices, CLIENT},
+        DBIndex, INDICES,
+    },
     errors::{Error, Result},
 };
 
@@ -106,7 +109,7 @@ CREATE TABLE IF NOT EXISTS schema_history
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
-    let indices = INDICES.get_or_init(|| cache_indices_mysql(&pool)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
     let sqls = vec![
         (
             "schema_history_org_idx",

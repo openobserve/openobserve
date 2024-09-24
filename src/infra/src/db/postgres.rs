@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -26,7 +26,7 @@ use sqlx::{
 };
 use tokio::sync::mpsc;
 
-use super::{cache_indices_pg, DBIndex, INDICES};
+use super::{DBIndex, INDICES};
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
@@ -51,6 +51,19 @@ fn connect() -> Pool<Postgres> {
         .connect_lazy_with(db_opts)
 }
 
+pub async fn cache_indices(pool: &Pool<Postgres>) -> HashSet<DBIndex> {
+    let sql = r#"SELECT indexname, tablename FROM pg_indexes;"#;
+    let res = sqlx::query_as::<_, (String, String)>(sql)
+        .fetch_all(pool)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
+}
 pub struct PostgresDb {}
 
 impl PostgresDb {
@@ -527,7 +540,7 @@ impl super::Db for PostgresDb {
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
 
     // create table
     _ = sqlx::query(
@@ -595,7 +608,7 @@ async fn create_index_item(sql: &str) -> Result<()> {
 async fn add_start_dt_column() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
-    let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
 
     if let Err(e) = sqlx::query(
         r#"ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;"#,

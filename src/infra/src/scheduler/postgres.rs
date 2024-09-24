@@ -20,7 +20,11 @@ use sqlx::Row;
 
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
-    db::{self, cache_indices_pg, postgres::CLIENT, DBIndex, INDICES},
+    db::{
+        self,
+        postgres::{cache_indices, CLIENT},
+        DBIndex, INDICES,
+    },
     errors::{DbError, Error, Result},
 };
 
@@ -78,7 +82,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
     async fn create_table_index(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
+        let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
 
         let queries = vec![
             (

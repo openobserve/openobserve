@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -29,7 +29,7 @@ use sqlx::{
 };
 use tokio::sync::{mpsc, Mutex, RwLock};
 
-use super::{cache_indices_sqlite, DBIndex, INDICES};
+use super::{DBIndex, INDICES};
 use crate::{
     db::{Event, EventData},
     errors::*,
@@ -95,6 +95,20 @@ fn connect_ro() -> Pool<Sqlite> {
         .max_lifetime(max_lifetime)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
+}
+
+pub async fn cache_indices(pool: &Pool<Sqlite>) -> HashSet<DBIndex> {
+    let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
+    let res = sqlx::query_as::<_, (String, String)>(sql)
+        .fetch_all(pool)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
 }
 
 pub struct SqliteDbChannel {
@@ -686,7 +700,7 @@ impl super::Db for SqliteDb {
 async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    let indices = INDICES.get_or_init(|| cache_indices_sqlite(&client)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(&client)).await;
     // create table
     sqlx::query(
         r#"
@@ -740,7 +754,7 @@ CREATE TABLE IF NOT EXISTS meta
 }
 
 async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
-    let indices = INDICES.get_or_init(|| cache_indices_sqlite(client)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(client)).await;
     // Attempt to add the column, ignoring the error if the column already exists
     if let Err(e) =
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)

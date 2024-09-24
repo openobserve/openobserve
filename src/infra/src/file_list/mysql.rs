@@ -25,7 +25,10 @@ use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::{
-    db::{cache_indices_mysql, mysql::CLIENT, DBIndex, INDICES},
+    db::{
+        mysql::{cache_indices, CLIENT},
+        DBIndex, INDICES,
+    },
     errors::{DbError, Error, Result},
 };
 
@@ -1192,9 +1195,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
-    let indices = INDICES.get_or_init(|| cache_indices_mysql(&pool)).await;
-    // TODO(YJDoc2) create a unified way for creating all kinds of index, use this common check there,
-    // and use that instead of doing queries like this
+    let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
+    // TODO(YJDoc2) create a unified way for creating all kinds of index, use this common check
+    // there, and use that instead of doing queries like this
     let sqls = vec![
         (
             "file_list_org_idx",

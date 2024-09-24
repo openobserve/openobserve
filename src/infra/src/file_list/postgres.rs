@@ -25,7 +25,10 @@ use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
 
 use crate::{
-    db::{cache_indices_pg, postgres::CLIENT, DBIndex, INDICES},
+    db::{
+        postgres::{cache_indices, CLIENT},
+        DBIndex, INDICES,
+    },
     errors::{Error, Result},
 };
 
@@ -1169,7 +1172,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
-    let indices = INDICES.get_or_init(|| cache_indices_pg(&pool)).await;
+    let indices = INDICES.get_or_init(|| cache_indices(&pool)).await;
     let sqls = vec![
         (
             "file_list_org_idx",
