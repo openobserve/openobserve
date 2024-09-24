@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refreshPanelRequest="refreshPanelRequest"
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
+              @onEditLayout="openEditLayout"
             >
             </PanelContainer>
           </div>
@@ -486,6 +487,10 @@ export default defineComponent({
       emit("refreshPanelRequest", panelId);
     };
 
+    const openEditLayout = (id: string) => {
+      emit("openEditLayout", id);
+    };
+
     return {
       store,
       addPanelData,
@@ -511,6 +516,8 @@ export default defineComponent({
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
+      openEditLayout,
+      saveDashboard,
     };
   },
   methods: {
