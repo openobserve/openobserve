@@ -36,74 +36,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="q-mx-md">
-      <div
-        data-test="panel-layout-settings-height"
-        class="o2-input tw-relative"
-        style="padding-top: 12px"
-      >
-        <q-input
-          v-model.number="updatedLayout.h"
-          :label="t('dashboard.panelHeight') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          type="number"
-          :rules="[
-            (val: any) => {
-              if (val === null || val === undefined || val === '') {
-                return t('common.required'); // If value is empty or null
-              }
-              return val > 0 ? true : 'Value must be greater than 0'; // Ensure value is greater than 0
-            },
-          ]"
-          style="min-width: 220px"
-        />
-
-        <div class="tw-text-[12px]">
-          Approximately
-          <span class="tw-font-bold">{{ getRowCount }}</span> table rows will be
-          displayed
-        </div>
-
-        <q-icon
-          name="info_outline"
-          class="cursor-pointer q-ml-sm tw-absolute tw-top-[14px] tw-left-[94px]"
-          size="16px"
+    <q-form @submit="savePanelLayout">
+      <div class="q-mx-md">
+        <div
+          data-test="panel-layout-settings-height"
+          class="o2-input tw-relative"
+          style="padding-top: 12px"
         >
-          <q-tooltip
-            anchor="center end"
-            self="center left"
-            class="tw-text-[12px]"
+          <q-input
+            v-model.number="updatedLayout.h"
+            :label="t('dashboard.panelHeight') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            type="number"
+            :rules="[
+              (val: any) => {
+                if (val === null || val === undefined || val === '') {
+                  return t('common.required'); // If value is empty or null
+                }
+                return val > 0 ? true : t('common.valueMustBeGreaterThanZero'); // Ensure value is greater than 0
+              },
+            ]"
+            style="min-width: 220px"
+          />
+
+          <div class="tw-text-[12px]">
+            Approximately
+            <span class="tw-font-bold">{{ getRowCount }}</span> table rows will
+            be displayed
+          </div>
+
+          <q-icon
+            name="info_outline"
+            class="cursor-pointer q-ml-sm tw-absolute tw-top-[14px] tw-left-[94px]"
+            size="16px"
           >
-            1 unit = 30px
-          </q-tooltip>
-        </q-icon>
+            <q-tooltip
+              anchor="center end"
+              self="center left"
+              class="tw-text-[12px]"
+            >
+              1 unit = 30px
+            </q-tooltip>
+          </q-icon>
+        </div>
       </div>
-    </div>
-    <div class="flex justify-center q-mt-lg">
-      <q-btn
-        ref="closeBtn"
-        v-close-popup="true"
-        class="q-mb-md text-bold"
-        :label="t('dashboard.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        no-caps
-      />
-      <q-btn
-        :label="t('dashboard.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        @click="savePanelLayout"
-        no-caps
-      />
-    </div>
+      <div class="flex justify-center q-mt-lg">
+        <q-btn
+          ref="closeBtn"
+          v-close-popup="true"
+          class="q-mb-md text-bold"
+          :label="t('dashboard.cancel')"
+          text-color="light-text"
+          padding="sm md"
+          no-caps
+        />
+        <q-btn
+          :label="t('dashboard.save')"
+          class="q-mb-md text-bold no-border q-ml-md"
+          color="secondary"
+          padding="sm xl"
+          type="submit"
+          no-caps
+        />
+      </div>
+    </q-form>
   </div>
 </template>
 
