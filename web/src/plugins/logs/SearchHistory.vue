@@ -194,8 +194,11 @@
     if(key == "scan_size"){
       columnWidth = 80
     }
+    if(key == "duration"){
+      columnWidth = 100
+    }
     if( key == 'start_time' || key == 'end_time'){
-      columnWidth = 250
+      columnWidth = 200
     }
     if(key == 'sql'){
       columnWidth = 350
@@ -382,27 +385,6 @@
       }
       const   goToLogs = ( row) => {
         const duration_suffix = row.duration.split(" ")[1];
-        let relativeTime = row.duration.split(" ")[0];
-        switch (duration_suffix) {
-          case "seconds":
-            relativeTime = '1m';
-            break;
-          case "minutes":
-            relativeTime += "m";
-            break;
-          case "hours":
-            relativeTime += "h";
-            break;
-          case "days":
-            relativeTime += "d";
-            break;
-          case "months":
-            relativeTime += "M";
-            break;
-          default:
-            relativeTime += "m";
-            break;
-        }
         // emit('closeSearchHistory');
         const stream: string =
         row.stream_name
@@ -419,7 +401,7 @@
         query: {
           stream_type: "logs",
           stream,
-          period: relativeTime,
+          period: '15m',
           refresh,
           sql_mode: "true",
           query,
@@ -483,9 +465,6 @@
   text-overflow: ellipsis;
 }
 .custom-table .q-tr > .q-td:first-child {
-  text-align: left;
-}
-.custom-table .q-tr > .q-td:nth-child(4) {
   text-align: left;
 }
 
