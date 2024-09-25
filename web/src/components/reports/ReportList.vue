@@ -361,7 +361,7 @@ const filterData = (rows: any, terms: any) => {
 };
 
 const toggleReportState = (report: any) => {
-  const state = report.enabled ? "Stoping" : "Starting";
+  const state = report.enabled ? "Stopping" : "Starting";
   const dismiss = q.notify({
     message: `${state} report "${report.name}"`,
   });

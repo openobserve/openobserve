@@ -651,7 +651,7 @@ export const addTab = async (
   newTabData: any
 ) => {
   try {
-    // genereate tab id
+    // generate tab id
     newTabData.tabId = getTabId();
 
     const currentDashboardData = findDashboard(dashboardId, store, folderId);
@@ -736,7 +736,7 @@ export const getFoldersList = async (store: any) => {
       defaultFolder = {
         name: "default",
         folderId: "default",
-        decription: "default",
+        description: "default",
       };
     }
 

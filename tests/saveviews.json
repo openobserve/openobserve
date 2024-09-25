@@ -1,6 +1,6 @@
 {
     "data": {
-        "organizationIdetifier": "default",
+        "organizationIdentifier": "default",
         "runQuery": false,
         "loading": false,
         "config": {

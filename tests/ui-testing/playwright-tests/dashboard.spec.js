@@ -117,7 +117,7 @@ test.describe("dashboard UI testcases", () => {
     await orgNavigation;
   });
 
-  test("should create a new dashboar", async ({ page }) => {
+  test("should create a new dashboard", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();

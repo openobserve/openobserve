@@ -514,7 +514,7 @@ export default defineComponent({
         variablesData.values = [];
       }
 
-      // check if route has time realated query params
+      // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
         // if dashboard has relative time settings

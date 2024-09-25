@@ -1459,7 +1459,7 @@ export const convertSQLData = async (
       options.polar = {};
       options.xAxis = [];
       options.yAxis = [];
-      // for each gague we have seperate grid
+      // for each gague we have separate grid
       options.grid = gridDataForGauge.gridArray;
 
       options.series = yAxisValue.map((it: any, index: any) => {
@@ -1581,7 +1581,7 @@ export const convertSQLData = async (
       isTimeSeriesFlag = true;
 
       // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
-      // else check if xaxis value is interger(ie time will be in milliseconds)
+      // else check if xaxis value is integer(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
       const timeStringCache: any = {};

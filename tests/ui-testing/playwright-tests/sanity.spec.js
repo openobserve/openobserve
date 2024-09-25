@@ -491,7 +491,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator(
-        '[data-test="add-alert-detination-sanitydestinations-select-item"]'
+        '[data-test="add-alert-destination-sanitydestinations-select-item"]'
       )
       .click();
     await page.locator('[data-test="add-alert-submit-btn"]').click();

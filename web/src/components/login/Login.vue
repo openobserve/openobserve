@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="loginWithSSo"
       >
         <div
-          class="flex items-center justify-center full-width text-center realtive"
+          class="flex items-center justify-center full-width text-center relative"
         >
           <img
             class="absolute"

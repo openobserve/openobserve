@@ -418,7 +418,7 @@ test.describe(" visualize UI testcases", () => {
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
-    //Except :  Data should be vanish,and tab is chage visulize to Search.
+    //Except :  Data should be vanished, and tab is changed from Visualize to Search.
 
     // Perform the initial actions
     await page.locator('[data-test="date-time-btn"]').click();

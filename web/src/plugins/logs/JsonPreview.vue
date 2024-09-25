@@ -346,7 +346,7 @@ export default {
 
           const res = await searchService.search(
             {
-              org_identifier: searchObj.organizationIdetifier,
+              org_identifier: searchObj.organizationIdentifier,
               query: {
                 "query": {
                   "start_time": props.value._timestamp - 10 * 60 * 1000,
