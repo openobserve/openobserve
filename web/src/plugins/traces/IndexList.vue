@@ -97,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div v-else>
-                <basic-values-filter :row="props.row" />
-              </div>
+              <basic-values-filter v-else :row="props.row" />
             </q-td>
           </q-tr>
         </template>
