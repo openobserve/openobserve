@@ -469,6 +469,8 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name = "ZO_ROUTE_CONNECTION_POOL_DISABLED", default = false)]
+    pub connection_pool_disabled: bool,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
@@ -764,7 +766,7 @@ pub struct Common {
     pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = true,
+        default = false,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
