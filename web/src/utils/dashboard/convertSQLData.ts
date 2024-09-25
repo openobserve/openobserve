@@ -47,11 +47,6 @@ export const convertMultiSQLData = async (
     return { options: null };
   }
 
-  console.log("searchQueryData", searchQueryData, resultMetaData, metadata);
-
-  // loop on all search query data
-  // consider metadata.timeRangeGap as time range
-
   // loop on all search query data
   const options: any = [];
   for (let i = 0; i < searchQueryData.length; i++) {
@@ -62,8 +57,8 @@ export const convertMultiSQLData = async (
         store,
         chartPanelRef,
         hoveredSeriesState,
-        [resultMetaData[i]],
-        [{ queries: metadata.queries[i] }],
+        [resultMetaData.value[i]],
+        { queries: [metadata.queries[i]] },
       ),
     );
   }
@@ -75,7 +70,7 @@ export const convertMultiSQLData = async (
         options[0].options.series = [
           ...options[0].options.series,
           ...options[i].options.series.map((it: any) => {
-            return { ...it, name: it.name + " " + i };
+            return { ...it, name: it.name + " (15min ago)" };
           }),
         ];
       }
@@ -273,9 +268,7 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.value?.map(
-      (it: any) => it.histogram_interval,
-    )[0];
+    const interval = resultMetaData?.map((it: any) => it.histogram_interval)[0];
 
     if (
       !interval ||
@@ -1646,8 +1639,10 @@ export const convertSQLData = async (
             if (timeStringCache[xKey]) {
               x = timeStringCache[xKey];
             } else {
+              // need to consider time range gap
               x = toZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                new Date(options.xAxis[0].data[index] + "Z").getTime() +
+                  metadata?.queries[0]?.timeRangeGap,
                 store.state.timezone,
               );
               timeStringCache[xKey] = x;
@@ -1661,8 +1656,11 @@ export const convertSQLData = async (
             if (timeStringCache[xKey]) {
               x = timeStringCache[xKey];
             } else {
+              // need to consider time range gap
               x = toZonedTime(
-                new Date(options.xAxis[0].data[index]).getTime() / 1000,
+                (new Date(options.xAxis[0].data[index]).getTime() +
+                  metadata?.queries[0]?.timeRangeGap) /
+                  1000,
                 store.state.timezone,
               );
               timeStringCache[xKey] = x;
@@ -1802,16 +1800,21 @@ export const convertSQLData = async (
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            // need to consider time range gap
             toZonedTime(
-              new Date(options.xAxis[0].data[index] + "Z").getTime(),
+              new Date(options.xAxis[0].data[index] + "Z").getTime() +
+                metadata?.queries[0]?.timeRangeGap,
               store.state.timezone,
             ),
             it ?? null,
           ]);
         } else if (isTimeStampData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            // need to consider time range gap
             toZonedTime(
-              new Date(options.xAxis[0].data[index]).getTime() / 1000,
+              (new Date(options.xAxis[0].data[index]).getTime() +
+                metadata?.queries[0]?.timeRangeGap) /
+                1000,
               store.state.timezone,
             ),
             it ?? null,

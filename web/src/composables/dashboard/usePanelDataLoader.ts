@@ -535,6 +535,7 @@ export const usePanelDataLoader = (
             panelQueryIndex,
             it,
           ] of panelSchema.value.queries.entries()) {
+            state.loading = true;
             const { query: query1, metadata: metadata1 } = replaceQueryValue(
               it.query,
               startISOTimestamp,
@@ -560,7 +561,7 @@ export const usePanelDataLoader = (
                   : endISOTimestamp,
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
-              timeRangeGap: panelQueryIndex != 0 ? 24 * 60 * 60 * 1000000 : 0,
+              timeRangeGap: panelQueryIndex != 0 ? 60 * 60 * 1000 : 0,
             };
             const { traceparent, traceId } = generateTraceContext();
             addTraceId(traceId);
