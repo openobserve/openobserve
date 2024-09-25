@@ -77,6 +77,8 @@ const getDefaultDashboardPanelData: any = () => ({
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
+      table_transpose: false,
+      table_dynamic_columns: false,
     },
     htmlContent: "",
     markdownContent: "",
