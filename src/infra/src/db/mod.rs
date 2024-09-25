@@ -234,6 +234,12 @@ pub struct MetaRecord {
     pub value: String,
 }
 
+#[derive(Hash, Clone, Eq, PartialEq)]
+struct DBIndex {
+    name: String,
+    table: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
