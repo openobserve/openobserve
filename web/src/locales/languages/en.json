@@ -58,7 +58,8 @@
     "logs": "Logs",
     "addGroup":"Add Group",
     "addCondition":"Add Condition",
-    "required": "Value is required"
+    "required": "Value is required",
+    "valueMustBeGreaterThanZero": "Value must be greater than zero"
   },
   "search": {
     "selectIndex": "Select Stream First",
