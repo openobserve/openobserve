@@ -986,7 +986,7 @@ pub struct Compact {
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
-    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
+    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
@@ -1424,7 +1424,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
     if cfg.common.local_mode
-        || (cfg.common.meta_store != "sqlite" && cfg.common.meta_store != "etcd")
+        || cfg.common.meta_store.starts_with("mysql")
+        || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.meta_store_external = true;
     }

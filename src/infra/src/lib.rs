@@ -27,6 +27,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::init().await?;
     cache::init().await?;
     file_list::create_table().await?;
+    file_list::LOCAL_CACHE.create_table().await?;
     queue::init().await?;
     scheduler::init().await?;
     schema::init().await?;

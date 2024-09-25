@@ -30,9 +30,10 @@ pub mod sqlite;
 
 const ID_BATCH_SIZE: usize = 2000;
 
-static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
+static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
+pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
-pub fn connect() -> Box<dyn FileList> {
+pub fn connect_default() -> Box<dyn FileList> {
     match config::get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
@@ -40,6 +41,10 @@ pub fn connect() -> Box<dyn FileList> {
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
+}
+
+pub fn connect_local_cache() -> Box<dyn FileList> {
+    Box::<sqlite::SqliteFileList>::default()
 }
 
 #[async_trait]
@@ -50,6 +55,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
+    async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
     async fn batch_add_deleted(
@@ -73,7 +79,7 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -252,7 +258,7 @@ pub async fn query(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
     CLIENT.query_by_ids(ids).await
 }
 
@@ -407,15 +413,19 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
+    #[sqlx(default)]
+    pub id: i64,
     pub stream: String,
     pub date: String,
     pub file: String,
+    #[sqlx(default)]
     pub deleted: bool,
     pub min_ts: i64,
     pub max_ts: i64,
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    #[sqlx(default)]
     pub flattened: bool,
 }
 

@@ -78,6 +78,10 @@ impl super::FileList for MysqlFileList {
         self.inner_batch_add("file_list", files).await
     }
 
+    async fn batch_add_with_id(&self, _files: &[(i64, &FileKey)]) -> Result<()> {
+        todo!()
+    }
+
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
         self.inner_batch_add("file_list_history", files).await
     }
@@ -290,8 +294,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
-    FORCE INDEX (file_list_stream_ts_idx) 
+    FROM file_list
     WHERE stream = ? AND flattened = ? LIMIT 1000;
                 "#,
             )
@@ -308,8 +311,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
-    FORCE INDEX (file_list_stream_ts_idx) 
+    FROM file_list
     WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;
                 "#,
             )
@@ -323,8 +325,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
-    FORCE INDEX (file_list_stream_ts_idx) 
+    FROM file_list
     WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;
                 "#,
             )
@@ -346,7 +347,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -363,7 +364,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list WHERE id IN ({ids})"
+                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -375,6 +376,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .into_iter()
             .map(|r| {
                 (
+                    r.id,
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     FileMeta::from(&r),
                 )
@@ -405,7 +407,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if cfg.limit.use_upper_bound_for_max_ts {
             let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
             sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id, original_size FROM file_list FORCE INDEX (file_list_stream_ts_idx) WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;"#,
+                r#"SELECT id, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;"#,
             )
             .bind(stream_key)
             .bind(time_start)
@@ -415,7 +417,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await?
         } else {
             sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id, original_size FROM file_list FORCE INDEX (file_list_stream_ts_idx) WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
+                r#"SELECT id, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
             )
             .bind(stream_key)
             .bind(time_start)
@@ -465,12 +467,13 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
         let pool = CLIENT.clone();
-        let ret: Option<i64> =
-            sqlx::query_scalar(r#"SELECT MIN(min_ts) AS id FROM file_list FORCE INDEX (file_list_stream_ts_idx) WHERE stream = ? AND min_ts > ?;"#)
-            .bind(stream_key)
-            .bind(min_ts)
-            .fetch_one(&pool)
-            .await?;
+        let ret: Option<i64> = sqlx::query_scalar(
+            r#"SELECT MIN(min_ts) AS id FROM file_list WHERE stream = ? AND min_ts > ?;"#,
+        )
+        .bind(stream_key)
+        .bind(min_ts)
+        .fetch_one(&pool)
+        .await?;
         Ok(ret.unwrap_or_default())
     }
 
