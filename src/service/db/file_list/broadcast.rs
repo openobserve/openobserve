@@ -202,7 +202,8 @@ async fn send_to_node(
                     );
                     break;
                 }
-                let request = tonic::Request::new(req_query.clone());
+                let mut request = tonic::Request::new(req_query.clone());
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
                 match client.send_file_list(request).await {
                     Ok(_) => break,
                     Err(e) => {
