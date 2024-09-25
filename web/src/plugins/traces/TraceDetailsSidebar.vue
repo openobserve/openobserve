@@ -654,7 +654,7 @@ export default defineComponent({
     const getStartTime = computed(() => {
       return (
         converTimeFromNsToMs(props.span.start_time) -
-        props.baseTracePosition.startTimeMs +
+        (props.baseTracePosition?.startTimeMs || 0) +
         "ms"
       );
     });
