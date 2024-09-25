@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
-import { convertSQLData } from "@/utils/dashboard/convertSQLData";
+import {
+  convertMultiSQLData,
+  convertSQLData,
+} from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertMapData } from "@/utils/dashboard/convertMapData";
 import { convertSankeyData } from "./convertSankeyData";
@@ -68,9 +71,20 @@ export const convertPanelData = async (
         };
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
+
+        // await convertMultiSQLData(
+        //   panelSchema,
+        //   data,
+        //   store,
+        //   chartPanelRef,
+        //   hoveredSeriesState,
+        //   resultMetaData,
+        //   metadata,
+        // );
+
         return {
           chartType: panelSchema.type,
-          ...(await convertSQLData(
+          ...(await convertMultiSQLData(
             panelSchema,
             data,
             store,

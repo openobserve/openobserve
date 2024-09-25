@@ -34,6 +34,58 @@ import {
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
 
+export const convertMultiSQLData = async (
+  panelSchema: any,
+  searchQueryData: any,
+  store: any,
+  chartPanelRef: any,
+  hoveredSeriesState: any,
+  resultMetaData: any,
+  metadata: any,
+) => {
+  if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
+    return { options: null };
+  }
+
+  console.log("searchQueryData", searchQueryData, resultMetaData, metadata);
+
+  // loop on all search query data
+  // consider metadata.timeRangeGap as time range
+
+  // loop on all search query data
+  const options: any = [];
+  for (let i = 0; i < searchQueryData.length; i++) {
+    options.push(
+      await convertSQLData(
+        panelSchema,
+        [searchQueryData[i]],
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        [resultMetaData[i]],
+        [{ queries: metadata.queries[i] }],
+      ),
+    );
+  }
+
+  // loop on all options
+  if (options && options[0] && options[0].options) {
+    for (let i = 1; i < options.length; i++) {
+      if (options[i] && options[i].options && options[i].options.series) {
+        options[0].options.series = [
+          ...options[0].options.series,
+          ...options[i].options.series.map((it: any) => {
+            return { ...it, name: it.name + " " + i };
+          }),
+        ];
+      }
+    }
+  }
+
+  console.log("options", JSON.parse(JSON.stringify(options)));
+  return options[0];
+};
+
 export const convertSQLData = async (
   panelSchema: any,
   searchQueryData: any,
@@ -1972,7 +2024,7 @@ export const convertSQLData = async (
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
   return {
-    options,
+    options: JSON.parse(JSON.stringify(options)),
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
   };
 };
