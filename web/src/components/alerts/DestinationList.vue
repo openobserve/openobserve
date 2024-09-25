@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddDestination
         :destination="editingDestination"
         :templates="templates"
-        @cancel:hideform="toggleDestionationEditor"
+        @cancel:hideform="toggleDestinationEditor"
         @get:destinations="getDestinations"
       />
     </div>
@@ -310,7 +310,7 @@ export default defineComponent({
       );
     };
     const editDestination = (destination: any) => {
-      toggleDestionationEditor();
+      toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
         router.push({
@@ -373,7 +373,7 @@ export default defineComponent({
       confirmDelete.value.visible = false;
       confirmDelete.value.data = null;
     };
-    const toggleDestionationEditor = () => {
+    const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
       if (!showDestinationEditor.value)
         router.push({
@@ -422,7 +422,7 @@ export default defineComponent({
       filterData,
       editingDestination,
       templates,
-      toggleDestionationEditor,
+      toggleDestinationEditor,
       getDestinations,
       deleteDestination,
       cancelDeleteDestination,

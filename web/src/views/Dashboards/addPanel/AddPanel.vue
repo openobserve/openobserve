@@ -510,7 +510,7 @@ export default defineComponent({
         !updatedVariablesData?.values?.length && // Previous value of variables is empty
         variablesData?.values?.length > 0 // new values of variables is NOT empty
       ) {
-        // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
         Object.assign(updatedVariablesData, variablesData);
       }
     };
@@ -644,7 +644,7 @@ export default defineComponent({
         variablesData.values = [];
       }
 
-      // check if route has time realated query params
+      // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
         // if dashboard has relative time settings
@@ -674,7 +674,7 @@ export default defineComponent({
       }
     };
 
-    const isInitailDashboardPanelData = () => {
+    const isInitialDashboardPanelData = () => {
       return (
         dashboardPanelData.data.description == "" &&
         !dashboardPanelData.data.config.unit &&
@@ -691,7 +691,7 @@ export default defineComponent({
 
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
-      if (isInitailDashboardPanelData() && !editMode.value) return false;
+      if (isInitialDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
       return (
         !isEqual(chartData.value, dashboardPanelData.data) ||

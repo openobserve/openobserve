@@ -32,7 +32,7 @@ import {
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
-  formateRateInterval,
+  formatRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
 import {
@@ -46,7 +46,7 @@ import { isEqual, omit } from "lodash-es";
 /**
  * debounce time in milliseconds for panel data loader
  */
-const PANEL_DATA_LOADER_DEBOUCE_TIME = 50;
+const PANEL_DATA_LOADER_DEBOUNCE_TIME = 50;
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -158,7 +158,7 @@ export const usePanelDataLoader = (
     return new Promise<void>((resolve, reject) => {
       // wait for timeout
       // and abort if abort signal received
-      const timeoutId = setTimeout(resolve, PANEL_DATA_LOADER_DEBOUCE_TIME);
+      const timeoutId = setTimeout(resolve, PANEL_DATA_LOADER_DEBOUNCE_TIME);
 
       // Listen to the abort signal
       signal.addEventListener("abort", () => {
@@ -748,7 +748,7 @@ export const usePanelDataLoader = (
       },
       {
         name: "__rate_interval",
-        value: `${formateRateInterval(__rate_interval)}`,
+        value: `${formatRateInterval(__rate_interval)}`,
       },
     ];
 
@@ -1221,7 +1221,7 @@ export const usePanelDataLoader = (
       // 2. Regular variables >= 1 and Dynamic variables  = 0
 
       // log(
-      //   "Step4: 2: checking agains old values, currentDependentVariablesData",
+      //   "Step4: 2: checking against old values, currentDependentVariablesData",
       //   JSON.stringify(currentDependentVariablesData, null, 2)
       // );
 

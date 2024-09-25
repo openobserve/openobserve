@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="toggleAlertState(props.row)"
             />
             <q-btn
-              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              :data-test="`alert-list-${props.row.name}-update-alert`"
               icon="edit"
               class="q-ml-xs"
               padding="sm"

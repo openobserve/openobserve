@@ -163,7 +163,7 @@ export default defineComponent({
             // this.isActiveSubscription = false;
             // this.subScribePlan = true;
             // this.hostedResponse = res.data.data.url;
-            // setInterval(this.retriveHostedPage, 5000);
+            // setInterval(this.retrieveHostedPage, 5000);
             // this.loadSubscription(true);
           })
           .catch((e) => {
@@ -201,7 +201,7 @@ export default defineComponent({
       )
         .then((res) => {
           this.updatePaymentResponse = res.data.data.hosted_page;
-          setInterval(this.retriveHostedPage, 5000);
+          setInterval(this.retrieveHostedPage, 5000);
         })
         .catch((e) => {
           this.$q.notify({
@@ -305,7 +305,7 @@ export default defineComponent({
           //   )
           //     .then((res) => {
           //       this.hostedResponse = res.data.data.hosted_page;
-          //       setInterval(this.retriveHostedPage, 5000);
+          //       setInterval(this.retrieveHostedPage, 5000);
           //     })
           //     .catch((e) => {
           //       this.$q.notify({
@@ -364,8 +364,8 @@ export default defineComponent({
     const confirm_downgrade_subscription: any = ref(false);
     const currentPlanDetail = ref();
 
-    const retriveHostedPage = () => {
-      BillingService.retrive_hosted_page(
+    const retrieveHostedPage = () => {
+      BillingService.retrieve_hosted_page(
         store.state.selectedOrganization.identifier,
         hostedResponse.value.id
       ).then((res) => {
@@ -387,7 +387,7 @@ export default defineComponent({
       subscriptionref,
       listSubscriptionResponse,
       updatePaymentResponse,
-      retriveHostedPage,
+      retrieveHostedPage,
       Plans,
       changePayment,
       subScribePlan,

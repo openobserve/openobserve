@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
-    <template v-if="isFetchingIntitialRoles">
+    <template v-if="isFetchingInitialRoles">
       <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
         <q-spinner-hourglass
           color="primary"
@@ -384,7 +384,7 @@ const removedPermissions: any = ref({});
 
 const countOfVisibleResources = ref(0);
 
-const isFetchingIntitialRoles = ref(false);
+const isFetchingInitialRoles = ref(false);
 
 const filteredPermissions: Ref<{ [key: string]: Entity[] }> = ref({});
 
@@ -450,7 +450,7 @@ const updateActiveTab = (tab: string) => {
 };
 
 const getRoleDetails = () => {
-  isFetchingIntitialRoles.value = true;
+  isFetchingInitialRoles.value = true;
 
   getResources(store.state.selectedOrganization.identifier)
     .then(async (res) => {
@@ -475,12 +475,12 @@ const getRoleDetails = () => {
       await getUsers();
       savePermissionHash();
       await updateRolePermissions(permissions.value);
-      isFetchingIntitialRoles.value = false;
+      isFetchingInitialRoles.value = false;
 
       updateTableData();
     })
     .catch(() => {
-      isFetchingIntitialRoles.value = false;
+      isFetchingInitialRoles.value = false;
     });
 };
 
@@ -1865,7 +1865,7 @@ const saveRole = () => {
         timeout: 3000,
       });
 
-      // Reseting permissions state on save
+      // Resetting permissions state on save
 
       Object.keys(removedPermissions.value).forEach((permission) => {
         if (permissionsHash.value.has(permission))
