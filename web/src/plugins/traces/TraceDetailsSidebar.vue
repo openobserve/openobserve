@@ -699,7 +699,14 @@ export default defineComponent({
       emit("open-trace");
     };
 
-    const spanLinks = computed(() => JSON.parse(props.span.links));
+    const spanLinks = computed(() => {
+      try {
+        return JSON.parse(props.span.links);
+      } catch (e) {
+        console.log("Error parsing span links:", e);
+        return [];
+      }
+    });
 
     return {
       t,
