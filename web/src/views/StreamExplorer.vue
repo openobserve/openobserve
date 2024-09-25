@@ -115,7 +115,7 @@ export default defineComponent({
 
     onMounted(() => {
       if (searchBarRef.value != null) {
-        searchBarRef.value.udpateQuery();
+        searchBarRef.value.updateQuery();
       }
     });
 

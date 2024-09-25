@@ -336,7 +336,7 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page
       .locator('[data-test="dashboard-panel-name"]')
-      .fill("VRL_Dahboard");
+      .fill("VRL_Dashboard");
     await page.locator('[data-test="dashboard-panel-save"]').click();
   });
 

@@ -936,23 +936,23 @@ export default defineComponent({
       mainLayoutMixin.setup().getDefaultOrganization(store);
     }
 
-    const redirectToParentRoute = (machedRoutes: any) => {
+    const redirectToParentRoute = (matchedRoutes: any) => {
       if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
         router.push({
           name: "dashboards",
         });
       } else if (
-        machedRoutes?.length > 2 &&
+        matchedRoutes?.length > 2 &&
         !excludeParentRedirect.includes(router.currentRoute.value.name) &&
         router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&
         router.currentRoute.value.path.indexOf("/billings/") == -1
       ) {
-        if (machedRoutes[machedRoutes.length - 2]?.children?.length > 0) {
-          machedRoutes[machedRoutes.length - 2].children.forEach(
+        if (matchedRoutes[matchedRoutes.length - 2]?.children?.length > 0) {
+          matchedRoutes[matchedRoutes.length - 2].children.forEach(
             (route: any) => {
-              if (route.name == machedRoutes[machedRoutes.length - 1].name) {
+              if (route.name == matchedRoutes[matchedRoutes.length - 1].name) {
                 router.push({
-                  path: machedRoutes[machedRoutes.length - 2].path,
+                  path: matchedRoutes[matchedRoutes.length - 2].path,
                 });
               }
             },

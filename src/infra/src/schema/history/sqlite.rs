@@ -18,7 +18,7 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::sqlite::CLIENT_RW,
+    db::sqlite::{create_index, CLIENT_RW},
     errors::{Error, Result},
 };
 
@@ -107,29 +107,21 @@ CREATE TABLE IF NOT EXISTS schema_history
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let sqls = vec![
-        (
-            "schema_history",
-            "CREATE INDEX IF NOT EXISTS schema_history_org_idx on schema_history (org);",
-        ),
-        (
-            "schema_history",
-            "CREATE INDEX IF NOT EXISTS schema_history_stream_idx on schema_history (org, stream_type, stream_name);",
-        ),
-        (
-            "schema_history",
-            "CREATE UNIQUE INDEX IF NOT EXISTS schema_history_stream_version_idx on schema_history (org, stream_type, stream_name, start_dt);",
-        ),
-    ];
-
-    let client = CLIENT_RW.clone();
-    let client = client.lock().await;
-    for (table, sql) in sqls {
-        if let Err(e) = sqlx::query(sql).execute(&*client).await {
-            log::error!("[SQLITE] create table {} index error: {}", table, e);
-            return Err(e.into());
-        }
-    }
+    create_index("schema_history_org_idx", "schema_history", false, &["org"]).await?;
+    create_index(
+        "schema_history_stream_idx",
+        "schema_history",
+        false,
+        &["org", "stream_type", "stream_name"],
+    )
+    .await?;
+    create_index(
+        "schema_history_stream_version_idx",
+        "schema_history",
+        true,
+        &["org", "stream_type", "stream_name", "start_dt"],
+    )
+    .await?;
 
     Ok(())
 }

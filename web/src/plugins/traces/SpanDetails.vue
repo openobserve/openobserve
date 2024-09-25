@@ -879,7 +879,7 @@ const openReferenceTrace = (type: string, link: any) => {
   overflow-x: hidden;
 }
 
-.hearder_bg {
+.header_bg {
   border-top: 1px solid $border-color;
   background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
