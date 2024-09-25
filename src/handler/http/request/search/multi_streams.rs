@@ -49,13 +49,12 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = SearchRequest,
+        description = "Search query",
+        content_type = "application/json",
+        example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -63,9 +62,15 @@ use crate::{
             "from": 0,
             "size": 10
         }
-    })),
+    })
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (
+            status = 200,
+            description = "Success",
+            content_type = "application/json",
+            body = SearchResponse,
+            example = json!({
             "took": 155,
             "hits": [
                 {
@@ -89,9 +94,20 @@ use crate::{
             "from": 0,
             "size": 1,
             "scan_size": 28943
-        })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        }),
+        ),
+        (
+            status = 400,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        ),
+        (
+            status = 500,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        )
     )
 )]
 #[post("/{org_id}/_search_multi")]
@@ -115,18 +131,24 @@ pub async fn search_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     // handle encoding for query and aggs
     let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let mut query_fn = multi_req
@@ -143,6 +165,8 @@ pub async fn search_multi(
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+
+    let per_query_resp = multi_req.per_query_response;
 
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
@@ -311,7 +335,7 @@ pub async fn search_multi(
                 multi_res.took += res.took;
 
                 if res.total > multi_res.total {
-                    multi_res.total = res.total
+                    multi_res.total = res.total;
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
@@ -319,10 +343,15 @@ pub async fn search_multi(
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
-                multi_res.hits.extend(res.hits);
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
+
+                if per_query_resp {
+                    multi_res.hits.push(serde_json::Value::Array(res.hits));
+                } else {
+                    multi_res.hits.extend(res.hits);
+                }
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -379,19 +408,24 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = SearchRequest,
+        description = "Search query",
+        content_type = "application/json",
+        example = json!({
         "sql": "select * from k8s ",
         "start_time": 1675182660872049i64,
         "end_time": 1675185660872049i64
-    })),
+    })
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (
+            status = 200,
+            description = "Success",
+            content_type = "application/json",
+            body = SearchResponse,
+            example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -400,9 +434,20 @@ pub async fn search_multi(
                 [1674213225158000i64, 1674213225158000i64],
                 [1674213225158000i64, 1674213225158000i64],
             ]
-        })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        }),
+        ),
+        (
+            status = 400,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        ),
+        (
+            status = 500,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        )
     )
 )]
 #[post("/{org_id}/_search_partition_multi")]
@@ -428,12 +473,16 @@ pub async fn _search_partition_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let search_fut = SearchService::search_partition_multi(&trace_id, &org_id, stream_type, &req);
@@ -570,12 +619,16 @@ pub async fn around_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
+        None => {
+            return Ok(MetaHttpResponse::bad_request("around key is empty"));
+        }
     };
     let mut query_fn = query
         .get("query_fn")
