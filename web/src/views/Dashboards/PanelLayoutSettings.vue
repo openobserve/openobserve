@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 if (val === null || val === undefined || val === '') {
                   return t('common.required'); // If value is empty or null
                 }
-                return val > 0 ? true : 'Value must be greater than 0'; // Ensure value is greater than 0
+                return val > 0 ? true : t('common.valueMustBeGreaterThanZero'); // Ensure value is greater than 0
               },
             ]"
             style="min-width: 220px"
