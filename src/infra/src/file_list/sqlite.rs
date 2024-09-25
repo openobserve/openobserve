@@ -25,7 +25,7 @@ use hashbrown::HashMap;
 use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
 
 use crate::{
-    db::sqlite::{CLIENT_RO, CLIENT_RW},
+    db::sqlite::{create_index, CLIENT_RO, CLIENT_RW},
     errors::{Error, Result},
 };
 
@@ -1156,70 +1156,74 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let sqls = vec![
+    let indices: Vec<(&str, &str, &[&str])> = vec![
+        ("file_list_org_idx", "file_list", &["org"]),
         (
+            "file_list_stream_ts_idx",
             "file_list",
-            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);",
+            &["stream", "max_ts", "min_ts"],
         ),
+        ("file_list_history_org_idx", "file_list_history", &["org"]),
         (
-            "file_list",
-            "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, max_ts, min_ts);",
-        ),
-        (
+            "file_list_history_stream_ts_idx",
             "file_list_history",
-            "CREATE INDEX IF NOT EXISTS file_list_history_org_idx on file_list_history (org);",
+            &["stream", "max_ts", "min_ts"],
         ),
         (
-            "file_list_history",
-            "CREATE INDEX IF NOT EXISTS file_list_history_stream_ts_idx on file_list_history (stream, max_ts, min_ts);",
-        ),
-        (
-            "file_list_history",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_history_stream_file_idx on file_list_history (stream, date, file);",
-        ),
-        (
+            "file_list_deleted_created_at_idx",
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
+            &["org", "created_at"],
         ),
         (
+            "file_list_deleted_stream_date_file_idx",
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_date_file_idx on file_list_deleted (stream, date, file);",
+            &["stream", "date", "file"],
         ),
         (
+            "file_list_jobs_stream_status_idx",
             "file_list_jobs",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offsets_idx on file_list_jobs (stream, offsets);",
+            &["status", "stream"],
         ),
-        (
-            "file_list_jobs",
-            "CREATE INDEX IF NOT EXISTS file_list_jobs_stream_status_idx on file_list_jobs (status, stream);",
-        ),
-        (
-            "stream_stats",
-            "CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);",
-        ),
-        (
-            "stream_stats",
-            "CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);",
-        ),
+        ("stream_stats_org_idx", "stream_stats", &["org"]),
     ];
-
-    let client = CLIENT_RW.clone();
-    let client = client.lock().await;
-    for (table, sql) in sqls {
-        if let Err(e) = sqlx::query(sql).execute(&*client).await {
-            log::error!("[SQLITE] create table {} index error: {}", table, e);
-            return Err(e.into());
-        }
+    for (idx, table, fields) in indices {
+        create_index(idx, table, false, fields).await?;
     }
 
-    // create UNIQUE index for file_list
-    let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
-    if let Err(e) = sqlx::query(unique_index_sql).execute(&*client).await {
+    let unique_indices: Vec<(&str, &str, &[&str])> = vec![
+        (
+            "file_list_history_stream_file_idx",
+            "file_list_history",
+            &["stream", "date", "file"],
+        ),
+        (
+            "file_list_jobs_stream_offsets_idx",
+            "file_list_jobs",
+            &["stream", "offsets"],
+        ),
+        ("stream_stats_stream_idx", "stream_stats", &["stream"]),
+    ];
+    for (idx, table, fields) in unique_indices {
+        create_index(idx, table, true, fields).await?;
+    }
+
+    // This is a case where we want to MAKE the index unique
+
+    let res = create_index(
+        "file_list_stream_file_idx",
+        "file_list",
+        true,
+        &["stream", "date", "file"],
+    )
+    .await;
+    if let Err(e) = res {
         if !e.to_string().contains("UNIQUE constraint failed") {
-            return Err(e.into());
+            return Err(e);
         }
         // delete duplicate records
         log::warn!("[SQLITE] starting delete duplicate records");
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(&*client).await?;
@@ -1232,22 +1236,31 @@ pub async fn create_table_index() -> Result<()> {
             sqlx::query(
                     r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
                 ).bind(id).bind(stream).bind(date).bind(file).execute(&*client).await?;
-            if i / 1000 == 0 {
+            if i % 1000 == 0 {
                 log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
             }
         }
+        drop(client);
         log::warn!(
             "[SQLITE] delete duplicate records: {}/{}",
             ret.len(),
             ret.len()
         );
         // create index again
-        sqlx::query(unique_index_sql).execute(&*client).await?;
+        create_index(
+            "file_list_stream_file_idx",
+            "file_list",
+            true,
+            &["stream", "date", "file"],
+        )
+        .await?;
         log::warn!("[SQLITE] create table index(file_list_stream_file_idx) succeed");
     }
 
     // delete trigger for old version
     // compatible for old version <= 0.6.4
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
     sqlx::query(r#"DROP TRIGGER IF EXISTS update_stream_stats_delete;"#)
         .execute(&*client)
         .await?;

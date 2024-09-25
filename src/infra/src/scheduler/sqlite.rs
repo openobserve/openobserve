@@ -22,7 +22,7 @@ use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
     db::{
         self,
-        sqlite::{CLIENT_RO, CLIENT_RW},
+        sqlite::{create_index, CLIENT_RO, CLIENT_RW},
     },
     errors::{DbError, Error, Result},
 };
@@ -76,17 +76,28 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        let queries = vec![
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
-        ];
+        create_index(
+            "scheduled_jobs_key_idx",
+            "scheduled_jobs",
+            false,
+            &["module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_key_idx",
+            "scheduled_jobs",
+            false,
+            &["org", "module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_module_key_idx",
+            "scheduled_jobs",
+            true,
+            &["org", "module", "module_key"],
+        )
+        .await?;
 
-        for query in queries {
-            sqlx::query(query).execute(&*client).await?;
-        }
         Ok(())
     }
 
