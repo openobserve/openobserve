@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-my-xs">
       <div class="float-right col flex items-center">
         <syntax-guide
-          class="q-mr-md"
+          class="q-mr-sm"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         />
