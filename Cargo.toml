@@ -66,7 +66,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-awc = "3.4"
+awc = "3.5"
 base64.workspace = true
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
