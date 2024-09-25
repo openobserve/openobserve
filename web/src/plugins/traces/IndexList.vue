@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : ''
               "
             >
-              <!-- TODO OK : Repeated code make seperate component to display field  -->
+              <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
@@ -419,7 +419,7 @@ export default defineComponent({
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
       }
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
     }

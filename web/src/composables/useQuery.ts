@@ -90,7 +90,7 @@ const useQuery = () => {
       if (parsedSQL.limit != null) {
         parsedParams.limit = parsedSQL.limit.value[0].value;
 
-        if (parsedSQL.limit.seperator == "offset") {
+        if (parsedSQL.limit.separator == "offset") {
           parsedParams.offset = parsedSQL.limit.value[1].value || 0;
         }
 

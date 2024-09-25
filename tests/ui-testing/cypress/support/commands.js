@@ -18,7 +18,7 @@ Cypress.Commands.add('signin', () => {
         cy.contains(details.OrganizationName).click()
 
     })
-//     //open soure login
+//     //open source login
 //     cy.clearAllCookies()
 //     cy.visit('/')
 //     cy.get('input#f_efabf917-a6f5-4ee5-91c2-631f1414166e').type('nitin.dixit14@gmail.com')

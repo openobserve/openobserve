@@ -11,11 +11,6 @@ extend-ignore-re = [
   "cohabitatingResource[12]",
   # The following are typos yet to be fixed
   "custom_error_handeling",
-  "organizationIdetifier",
-  "udpateQuery",
-  "resetFunctionDefination",
-  "machedRoutes",
-  "seachCollapseImage",
 ]
 
 [default.extend-words]
@@ -29,7 +24,9 @@ extend-exclude = [
   "web/src/locales/languages/",
   "ua_regex/regexes.yaml",
   "tests/ui-testing/cypress/fixtures/enrichment_info.csv",
-  "*.vue",
-  "*.js",
-  "*.ts",
+  "web/src/components/rum/dd_events.js",
+  "web/src/components/rum/h_events.js",
+  "web/src/components/rum/segments.js",
+  "web/src/components/rum/sessions.js",
+  "web/src/test/unit/mockData",
 ]

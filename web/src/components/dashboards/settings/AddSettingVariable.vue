@@ -761,7 +761,7 @@ export default defineComponent({
         // for already created variable, need to add selected fields
         // check if variable type is custom
         if (edit?.type === "custom") {
-          //  loop on on options, and assing selected = false if selected key is not found
+          //  loop on on options, and assign selected = false if selected key is not found
           edit.options.forEach((option: any) => {
             if (option.selected === undefined || option.selected === null) {
               option.selected = false;

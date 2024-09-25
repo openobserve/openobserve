@@ -40,7 +40,7 @@ const billings = {
       `/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`
     );
   },
-  retrive_hosted_page: (org_identifier: string, hosted_page_id: string) => {
+  retrieve_hosted_page: (org_identifier: string, hosted_page_id: string) => {
     return http().get(
       `/api/${org_identifier}/billings/hosted_page_status/${hosted_page_id}`
     );

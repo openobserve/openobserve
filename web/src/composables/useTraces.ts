@@ -24,7 +24,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 
 const defaultObject = {
-  organizationIdetifier: "",
+  organizationIdentifier: "",
   runQuery: false,
   loading: false,
 
@@ -175,7 +175,7 @@ const useTraces = () => {
     searchObj.runQuery = false;
   };
   const updatedLocalLogFilterField = (): void => {
-    const identifier: string = searchObj.organizationIdetifier || "default";
+    const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
       useLocalTraceFilterField()?.value != null
         ? useLocalTraceFilterField()?.value

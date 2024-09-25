@@ -1032,7 +1032,7 @@ export default defineComponent({
       searchService
         .search(
           {
-            org_identifier: this.searchObj.organizationIdetifier,
+            org_identifier: this.searchObj.organizationIdentifier,
             query: this.searchObj.data.customDownloadQueryObj,
             page_type: this.searchObj.data.stream.streamType,
           },
@@ -1271,7 +1271,7 @@ export default defineComponent({
                 ) {
                   searchObj.data.stream.interestingFieldList.push(col);
                   localFields[
-                    searchObj.organizationIdetifier +
+                    searchObj.organizationIdentifier +
                       "_" +
                       searchObj.data.stream.selectedStream[0]
                   ] = searchObj.data.stream.interestingFieldList;
@@ -1444,7 +1444,7 @@ export default defineComponent({
       }
     };
 
-    const udpateQuery = () => {
+    const updateQuery = () => {
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(searchObj.data.query);
     };
@@ -1502,7 +1502,7 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      udpateQuery();
+      updateQuery();
 
       if (
         router.currentRoute.value.query.functionContent ||
@@ -2595,7 +2595,7 @@ export default defineComponent({
       showSavedViewConfirmDialog,
       cancelConfirmDialog,
       confirmDialogOK,
-      udpateQuery,
+      updateQuery,
       downloadLogs,
       saveFunction,
       resetFunctionContent,
@@ -2676,7 +2676,7 @@ export default defineComponent({
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
     },
-    resetFunctionDefination() {
+    resetFunctionDefinition() {
       return this.searchObj.data.tempFunctionContent;
     },
   },
@@ -2803,7 +2803,7 @@ export default defineComponent({
         this.resetFunctionContent();
       }
     },
-    resetFunctionDefination(newVal) {
+    resetFunctionDefinition(newVal) {
       if (newVal == "") this.resetFunctionContent();
     },
   },

@@ -56,7 +56,7 @@ import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 
 const defaultObject = {
-  organizationIdetifier: "",
+  organizationIdentifier: "",
   runQuery: false,
   loading: false,
   loadingHistogram: false,
@@ -280,7 +280,7 @@ const useLogs = () => {
     parser = await sqlParser();
   };
 
-  searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
+  searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -310,7 +310,7 @@ const useLogs = () => {
   };
 
   const updatedLocalLogFilterField = (): void => {
-    const identifier: string = searchObj.organizationIdetifier || "default";
+    const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
       useLocalLogFilterField()?.value != null
         ? useLocalLogFilterField()?.value
@@ -446,7 +446,7 @@ const useLogs = () => {
     }
   }
 
-  async function loadStreamFileds(streamName: string) {
+  async function loadStreamFields(streamName: string) {
     try {
       if (streamName != "") {
         searchObj.loadingStream = true;
@@ -813,7 +813,7 @@ const useLogs = () => {
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
 
-          if (parsedSQL.limit.seperator == "offset") {
+          if (parsedSQL.limit.separator == "offset") {
             req.query.from = parsedSQL.limit.value[1].value || 0;
           }
 
@@ -1137,7 +1137,7 @@ const useLogs = () => {
 
           await searchService
             .partition({
-              org_identifier: searchObj.organizationIdetifier,
+              org_identifier: searchObj.organizationIdentifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -1952,7 +1952,7 @@ const useLogs = () => {
       searchService
         .search(
           {
-            org_identifier: searchObj.organizationIdetifier,
+            org_identifier: searchObj.organizationIdentifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
             traceparent,
@@ -1988,7 +1988,7 @@ const useLogs = () => {
           if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
             regeratePaginationFlag = true;
           }
-          // if total records in partition is greate than recordsPerPage then we need to update pagination
+          // if total records in partition is greater than recordsPerPage then we need to update pagination
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
           refreshPartitionPagination(regeratePaginationFlag);
           searchObj.data.histogram.chartParams.title = getHistogramTitle();
@@ -2079,7 +2079,7 @@ const useLogs = () => {
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
 
-          if (parsedSQL.limit.seperator == "offset") {
+          if (parsedSQL.limit.separator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
           delete queryReq.query.track_total_hits;
@@ -2098,7 +2098,7 @@ const useLogs = () => {
       searchService
         .search(
           {
-            org_identifier: searchObj.organizationIdetifier,
+            org_identifier: searchObj.organizationIdentifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
             traceparent,
@@ -2173,7 +2173,7 @@ const useLogs = () => {
           if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
             regeratePaginationFlag = true;
           }
-          // if total records in partition is greate than recordsPerPage then we need to update pagination
+          // if total records in partition is greater than recordsPerPage then we need to update pagination
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
           refreshPartitionPagination(regeratePaginationFlag);
 
@@ -2375,7 +2375,7 @@ const useLogs = () => {
         searchService
           .search(
             {
-              org_identifier: searchObj.organizationIdetifier,
+              org_identifier: searchObj.organizationIdentifier,
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -2669,7 +2669,7 @@ const useLogs = () => {
             // if not pull the schema from server.
             if (!stream.hasOwnProperty("schema")) {
               searchObjDebug["extractFieldsWithAPI"] = " with API ";
-              const streamData: any = await loadStreamFileds(stream.name);
+              const streamData: any = await loadStreamFields(stream.name);
               const streamSchema: any = streamData.schema;
               if (streamSchema == undefined) {
                 searchObj.loadingStream = false;
@@ -2737,13 +2737,13 @@ const useLogs = () => {
             streamInterestingFieldsLocal =
               localInterestingFields.value != null &&
               localInterestingFields.value[
-                searchObj.organizationIdetifier + "_" + stream.name
+                searchObj.organizationIdentifier + "_" + stream.name
               ] !== undefined &&
               localInterestingFields.value[
-                searchObj.organizationIdetifier + "_" + stream.name
+                searchObj.organizationIdentifier + "_" + stream.name
               ].length > 0
                 ? localInterestingFields.value[
-                    searchObj.organizationIdetifier + "_" + stream.name
+                    searchObj.organizationIdentifier + "_" + stream.name
                   ]
                 : environmentInterestingFields.length > 0
                   ? [...environmentInterestingFields]
@@ -3506,7 +3506,7 @@ const useLogs = () => {
 
       searchService
         .search_around({
-          org_identifier: searchObj.organizationIdetifier,
+          org_identifier: searchObj.organizationIdentifier,
           index: streamName,
           key: obj.key,
           size: obj.size,

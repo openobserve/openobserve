@@ -352,7 +352,7 @@ export default defineComponent({
     const chartData = ref({});
     const { showErrorNotification } = useNotifications();
 
-    searchObj.organizationIdetifier =
+    searchObj.organizationIdentifier =
       store.state.selectedOrganization.identifier;
 
     const importSqlParser = async () => {
@@ -416,7 +416,7 @@ export default defineComponent({
       if (isMounted.value) updateStreams();
 
       if (
-        searchObj.organizationIdetifier !=
+        searchObj.organizationIdentifier !=
         store.state.selectedOrganization.identifier
       ) {
         loadPageData();
@@ -645,7 +645,7 @@ export default defineComponent({
 
     function loadPageData(isFirstLoad = false) {
       resetSearchObj();
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
 
       //get stream list
