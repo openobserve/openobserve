@@ -274,15 +274,19 @@ onBeforeMount(() => {
   setupTemplateData();
 });
 
+const baseTabStyle = {
+  width: "fit-content",
+  padding: "4px 14px",
+  border: "none !important",
+};
+
 const tabs = computed(() => [
   {
     label: "Web Hook",
     value: "http",
     style: {
-      width: "fit-content",
-      padding: "4px 14px",
+      ...baseTabStyle,
       background: formData.value.type === "http" ? "#5960B2" : "",
-      border: "none !important",
       color: formData.value.type === "http" ? "#ffffff !important" : "",
     },
   },
@@ -290,10 +294,8 @@ const tabs = computed(() => [
     label: "Email",
     value: "email",
     style: {
-      width: "fit-content",
-      padding: "4px 14px",
+      ...baseTabStyle,
       background: formData.value.type === "email" ? "#5960B2" : "#ffffff",
-      border: "none !important",
       color: formData.value.type === "email" ? "#ffffff !important" : "",
     },
   },
