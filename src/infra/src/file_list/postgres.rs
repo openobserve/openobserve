@@ -498,6 +498,19 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(ret.unwrap_or_default())
     }
 
+    async fn get_min_pk_value(&self) -> Result<i64> {
+        let pool = CLIENT.clone();
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MIN(id)::BIGINT AS id FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
+    async fn clean_by_min_pk_value(&self, _val: i64) -> Result<()> {
+        todo!()
+    }
+
     async fn stats(
         &self,
         org_id: &str,

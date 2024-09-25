@@ -68,7 +68,7 @@ pub async fn query(
 pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     // 1. first query from local cache
-    let (mut files, ids) = if !cfg.common.local_mode {
+    let (mut files, ids) = if !cfg.common.local_mode && cfg.common.meta_store_external {
         let ids_set: HashSet<_> = ids.iter().cloned().collect();
         let cached_files = file_list::LOCAL_CACHE
             .query_by_ids(ids)
@@ -115,7 +115,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     }
 
     // 3. set the local cache
-    if !cfg.common.local_mode {
+    if !cfg.common.local_mode && cfg.common.meta_store_external {
         let mut db_files = Vec::with_capacity(files.len() - cached_file_num);
         for (i, id) in db_ids.into_iter().enumerate() {
             db_files.push((id, &files[i + cached_file_num]));

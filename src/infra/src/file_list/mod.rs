@@ -102,6 +102,8 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
     ) -> Result<i64>;
     async fn get_max_pk_value(&self) -> Result<i64>;
+    async fn get_min_pk_value(&self) -> Result<i64>;
+    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()>;
     async fn stats(
         &self,
         org_id: &str,
@@ -301,6 +303,11 @@ pub async fn get_max_pk_value() -> Result<i64> {
 }
 
 #[inline]
+pub async fn get_min_pk_value() -> Result<i64> {
+    CLIENT.get_min_pk_value().await
+}
+
+#[inline]
 pub async fn stats(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -409,6 +416,32 @@ pub async fn check_running_jobs(before_date: i64) -> Result<()> {
 #[inline]
 pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
     CLIENT.clean_done_jobs(before_date).await
+}
+
+pub async fn local_cache_gc() -> Result<()> {
+    tokio::task::spawn(async move {
+        let cfg = config::get_config();
+        if cfg.common.local_mode || !cfg.common.meta_store_external {
+            return;
+        }
+
+        // gc every hour
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+        interval.tick().await; // the first tick is immediate
+        loop {
+            if let Ok(min_id) = get_min_pk_value().await {
+                if min_id > 0 {
+                    match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                        Ok(_) => log::info!("[file_list] local cache gc done"),
+                        Err(e) => log::error!("[file_list] local cache gc failed: {}", e),
+                    }
+                }
+            }
+            interval.tick().await;
+        }
+    });
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

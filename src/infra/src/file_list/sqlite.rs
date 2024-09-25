@@ -502,6 +502,24 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(ret.unwrap_or_default())
     }
 
+    async fn get_min_pk_value(&self) -> Result<i64> {
+        let pool = CLIENT_RO.clone();
+        let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MIN(id) AS id FROM file_list;"#)
+            .fetch_one(&pool)
+            .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
+    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query("DELETE FROM file_list WHERE id < $1;")
+            .bind(val)
+            .execute(&*client)
+            .await?;
+        Ok(())
+    }
+
     async fn stats(
         &self,
         org_id: &str,
