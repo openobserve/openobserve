@@ -143,8 +143,9 @@ async fn check_keepalive(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let req_conn_type = req.head().connection_type();
     let mut resp = next.call(req).await?;
-    if resp.status() >= StatusCode::BAD_REQUEST {
+    if resp.status() >= StatusCode::BAD_REQUEST || req_conn_type == ConnectionType::Close {
         resp.response_mut()
             .head_mut()
             .set_connection_type(ConnectionType::Close);
