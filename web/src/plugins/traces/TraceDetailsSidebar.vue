@@ -673,6 +673,11 @@ export default defineComponent({
     };
 
     const openReferenceTrace = (type: string, link: any) => {
+      if (!link || !link.context) {
+        console.error("Link or link context is undefined");
+        return;
+      }
+
       const query = {
         stream: router.currentRoute.value.query.stream,
         trace_id: link.context.traceId,
