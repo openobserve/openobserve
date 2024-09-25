@@ -98,63 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div v-else>
-                <template
-                  v-if="
-                    searchObj.meta.filterType === 'basic' &&
-                    props.row.name === 'duration'
-                  "
-                >
-                  <div class="q-mx-lg q-mt-sm" style="font-size: 14px">
-                    Duration
-                  </div>
-                  <div class="flex justify-start items-center q-px-lg q-mb-md">
-                    <div class="flex column q-mr-md q-mt-xs">
-                      <label>Min (in ms)</label>
-                      <input
-                        type="number"
-                        v-model="duration.input.min"
-                        aria-label="min"
-                        style="width: 100px"
-                      />
-                    </div>
-                    <div class="flex column q-mt-xs">
-                      <label>Max (in ms)</label>
-                      <input
-                        type="number"
-                        aria-label="max"
-                        v-model="duration.input.max"
-                        style="width: 100px"
-                      />
-                    </div>
-                  </div>
-                </template>
-                <template v-else-if="searchObj.meta.filterType === 'basic'">
-                  <advanced-values-filter
-                    v-if="fieldValues[props.row.name]"
-                    :key="searchObj.data.stream.selectedStream.value"
-                    :row="props.row"
-                    v-model:isOpen="fieldValues[props.row.name].isOpen"
-                    v-model:values="fieldValues[props.row.name].values"
-                    v-model:selectedValues="
-                      fieldValues[props.row.name].selectedValues
-                    "
-                    v-model:searchKeyword="
-                      fieldValues[props.row.name].searchKeyword
-                    "
-                    :filter="fieldValues[props.row.name]"
-                    @update:is-open="
-                      (isOpen) => handleFilterCreator(isOpen, props.row.name)
-                    "
-                    @update:selectedValues="
-                      (currValue, prevValue) =>
-                        updateQueryFilter(props.row.name, currValue, prevValue)
-                    "
-                    @update:search-keyword="getFieldValues(props.row.name)"
-                  />
-                </template>
-                <template v-else>
-                  <basic-values-filter :row="props.row" />
-                </template>
+                <basic-values-filter :row="props.row" />
               </div>
             </q-td>
           </q-tr>
@@ -251,17 +195,17 @@ export default defineComponent({
                   searchKeyword: "",
                 };
               }
-            }
+            },
           );
         }
       },
       {
         deep: true,
-      }
+      },
     );
 
     const selectedStreamName = computed(
-      () => searchObj.data.stream.selectedStream.value
+      () => searchObj.data.stream.selectedStream.value,
     );
 
     const expandedFilters: Ref<string[]> = ref([]);
@@ -282,7 +226,7 @@ export default defineComponent({
     });
 
     const getSpecialFieldsValues = (
-      name: "operation_name" | "service_name"
+      name: "operation_name" | "service_name",
     ) => {
       let filter = "";
 
@@ -388,7 +332,7 @@ export default defineComponent({
         streamOptions.value = searchObj.data.stream.streamLists;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
         );
       });
     };
@@ -414,7 +358,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(row.name)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== row.name
+            (v: any) => v !== row.name,
           );
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
@@ -446,7 +390,7 @@ export default defineComponent({
     const updateQueryFilter = (
       column: string,
       values: string[],
-      prevValues: string[]
+      prevValues: string[],
     ) => {
       try {
         const valuesString = values
@@ -498,7 +442,7 @@ export default defineComponent({
       const fields =
         [
           ...expandedFilters.value.filter(
-            (_value) => !["operation_name", "service_name"].includes(_value)
+            (_value) => !["operation_name", "service_name"].includes(_value),
           ),
         ] || [];
 
@@ -590,7 +534,7 @@ export default defineComponent({
     const modifyWhereClause = (
       node: any,
       fieldName: string,
-      newValue: any[]
+      newValue: any[],
     ) => {
       if (!node) return;
 
@@ -632,7 +576,7 @@ export default defineComponent({
         getFieldValues(columnName);
       } else {
         expandedFilters.value = expandedFilters.value.filter(
-          (_column) => _column !== columnName
+          (_column) => _column !== columnName,
         );
       }
     };
@@ -660,7 +604,7 @@ export default defineComponent({
                 key: value?.toString() || "null",
                 count: "0",
               });
-          }
+          },
         );
       });
     };

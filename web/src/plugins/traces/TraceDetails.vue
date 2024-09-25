@@ -302,8 +302,6 @@ import {
   watch,
   defineAsyncComponent,
   onBeforeMount,
-  onActivated,
-  onDeactivated,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
