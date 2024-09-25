@@ -454,6 +454,9 @@ export default defineComponent({
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
+       getStreamList,
+      getFunctions,
+      extractFields,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -641,7 +644,7 @@ export default defineComponent({
     );
     watch(
       () => router.currentRoute.value.query.type,
-      (type) => {
+      async (type) => {
         if(type == "search_history_re_apply"){
           searchObj.organizationIdetifier = router.currentRoute.value.query.org_identifier;
           searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
@@ -649,9 +652,14 @@ export default defineComponent({
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
-          loadLogsData();
-          searchObj.meta.refreshHistogram = true;
-
+          // loadLogsData();
+          //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
+          //of functions of loadLogsData to stop run query
+          await getStreamList();
+          // await getSavedViews();
+          await getFunctions();
+          await extractFields();
+          refreshData();
         }
       },
     );
