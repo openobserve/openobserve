@@ -74,7 +74,6 @@ const getDefaultDashboardPanelData: any = () => ({
       },
       drilldown: [],
       mark_line: [],
-      time_shift: [],
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
@@ -116,6 +115,7 @@ const getDefaultDashboardPanelData: any = () => ({
           // gauge min and max values
           min: 0,
           max: 100,
+          time_shift: [],
         },
       },
     ],
