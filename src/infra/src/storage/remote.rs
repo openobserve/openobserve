@@ -93,16 +93,23 @@ impl ObjectStore for Remote {
         }
     }
 
-    async fn put_multipart(&self, _location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
-    }
-
     async fn put_multipart_opts(
         &self,
-        _location: &Path,
-        _opts: PutMultipartOpts,
+        location: &Path,
+        opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
+        let file = location.to_string();
+        match self
+            .client
+            .put_multipart_opts(&(format_key(&file, true).into()), opts)
+            .await
+        {
+            Ok(r) => Ok(r),
+            Err(err) => {
+                log::error!("s3 multipart File upload error: {:?}", err);
+                Err(err)
+            }
+        }
     }
 
     async fn get(&self, location: &Path) -> Result<GetResult> {
@@ -239,6 +246,9 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
     }
     if cfg.s3.feature_http2_only {
         opts = opts.with_http2_only();
+    }
+    if cfg.s3.max_idle_per_host > 0 {
+        opts = opts.with_pool_max_idle_per_host(cfg.s3.max_idle_per_host)
     }
     let force_hosted_style = cfg.s3.feature_force_hosted_style || cfg.s3.feature_force_path_style;
     let retry_config = object_store::RetryConfig {
