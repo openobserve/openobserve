@@ -440,7 +440,15 @@ pub async fn send_notification(
     .await;
 
     let email_subject = if !dest.template.title.is_empty() {
-        process_dest_template(&dest.template.title, alert, rows, &rows_tpl_val).await
+        process_dest_template(
+            &dest.template.title,
+            alert,
+            rows,
+            &rows_tpl_val,
+            rows_end_time,
+            start_time,
+        )
+        .await
     } else {
         dest.template.name.clone()
     };
