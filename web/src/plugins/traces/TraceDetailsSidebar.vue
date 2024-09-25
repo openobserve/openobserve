@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         class="q-px-sm ellipsis non-selectable"
-        :title="getDuration"
+        :title="getStartTime"
         style="font-size: 14px"
       >
         <span class="text-grey-7">Start Time: </span>
