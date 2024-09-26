@@ -932,7 +932,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             no-caps
             padding="xs"
-            class=""
             size="sm"
             flat
             icon="info_outline"
@@ -963,15 +962,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="index"
         class="q-mb-md"
       >
-        <CustomDateTimePicker v-model="picker.offSet" :picker="picker" />
-        <q-icon
-          class="q-mr-xs q-ml-sm"
-          size="15px"
-          name="close"
-          style="cursor: pointer"
-          @click="removeTimeShift(index)"
-          :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
-        />
+        <div class="flex items-center">
+          <CustomDateTimePicker v-model="picker.offSet" :picker="picker" />
+          <q-icon
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            @click="removeTimeShift(index)"
+            :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
+          />
+        </div>
       </div>
 
       <q-btn
