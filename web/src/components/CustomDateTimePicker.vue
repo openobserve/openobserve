@@ -132,7 +132,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 
 const store = useStore();
-const dateTimePickers = ref([createPicker()]);
+const dateTimePickers = ref([]);
 const relativePeriod = ref("m");
 const relativeValue = ref(15);
 const selectedType = ref("relative");

@@ -70,7 +70,10 @@ export const convertMultiSQLData = async (
         options[0].options.series = [
           ...options[0].options.series,
           ...options[i].options.series.map((it: any) => {
-            return { ...it, name: it.name + " (15min ago)" };
+            return {
+              ...it,
+              name: `${it.name} (${metadata.queries[i].timeRangeGap} ago) `,
+            };
           }),
         ];
       }
@@ -849,10 +852,10 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key,
             )?.label,
-            color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key,
-              )?.color || "#5960b2",
+            // color:
+            //   panelSchema.queries[0]?.fields?.y.find(
+            //     (it: any) => it.alias == key,
+            //   )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -942,10 +945,10 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key,
             )?.label,
-            color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key,
-              )?.color || "#5960b2",
+            // color:
+            //   panelSchema.queries[0]?.fields?.y.find(
+            //     (it: any) => it.alias == key,
+            //   )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -969,9 +972,9 @@ export const convertSQLData = async (
           name: panelSchema?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key,
           )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+          // color:
+          //   panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+          //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           // markLine if exist
@@ -994,9 +997,9 @@ export const convertSQLData = async (
           name: panelSchema?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key,
           )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+          // color:
+          //   panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+          //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           // markLine if exist
