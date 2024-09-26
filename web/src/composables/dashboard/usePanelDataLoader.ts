@@ -35,7 +35,11 @@ import {
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  generateTraceContext,
+  escapeSingleQuotes,
+} from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 
@@ -67,12 +71,7 @@ export const usePanelDataLoader = (
    */
   const getCacheKey = () => ({
     panelSchema: toRaw(panelSchema.value),
-    variablesData: JSON.parse(
-      JSON.stringify([
-        ...(getDependentVariablesData() || []),
-        ...(getDynamicVariablesData() || []),
-      ]),
-    ),
+    variablesData: JSON.parse(JSON.stringify([...(getDependentVariablesData() || []), ...(getDynamicVariablesData() || [])])),
     forceLoad: toRaw(forceLoad.value),
     // searchType: toRaw(searchType.value),
     dashboardId: toRaw(dashboardId?.value),
@@ -1355,15 +1354,9 @@ export const usePanelDataLoader = (
       "panelSchema.markdownContent",
     ];
 
-    log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
-    log(
-      "usePanelDataLoader: panelcache: omit(getCacheKey())",
-      omit(getCacheKey(), keysToIgnore),
-    );
-    log(
-      "usePanelDataLoader: panelcache: omit(tempPanelCacheKey))",
-      omit(tempPanelCacheKey, keysToIgnore),
-    );
+    log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey)
+    log("usePanelDataLoader: panelcache: omit(getCacheKey())", omit(getCacheKey(), keysToIgnore))
+    log("usePanelDataLoader: panelcache: omit(tempPanelCacheKey))", omit(tempPanelCacheKey, keysToIgnore))
 
     // check if it is stale or not
     if (
