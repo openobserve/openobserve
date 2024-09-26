@@ -55,7 +55,7 @@
               <div class="row q-gutter-sm">
                 <div class="col">
                   <q-input
-                    v-model="picker.data.selectedDate.relative.value"
+                    v-model.number="picker.data.selectedDate.relative.value"
                     type="number"
                     dense
                     filled
@@ -70,6 +70,7 @@
                     filled
                     emit-value
                     style="width: 100px"
+                    @update:model-value="updateCustomPeriod"
                   >
                     <template v-slot:selected-item>
                       <div>{{ getPeriodLabel() }}</div>
@@ -138,8 +139,6 @@ const relativePeriodsSelect = ref([
 
 // Function to map period values to their labels
 const getPeriodLabelFromValue = (periodValue) => {
-  console.log("periodValue", periodValue);
-
   const period = relativePeriods.find((p) => p.value === periodValue);
   return period ? period.label : "Minutes";
 };
@@ -158,7 +157,7 @@ watch(
     }
   },
   { immediate: true },
-); // Run on initialization
+);
 
 // Function to update the relative date when selected
 const setRelativeDate = (period, item) => {
@@ -172,10 +171,17 @@ const setRelativeDate = (period, item) => {
   emit("update:modelValue", `${item}${period.value}`);
 };
 
+// Function to update custom period when selecting from q-select
+const updateCustomPeriod = (newPeriod) => {
+  picker.data.selectedDate.relative.label = getPeriodLabelFromValue(newPeriod);
+  emit(
+    "update:modelValue",
+    `${picker.data.selectedDate.relative.value}${newPeriod}`,
+  );
+};
+
 // Display the current selected offset
 const getDisplayValue = () => {
-  console.log("getDisplayValue", picker.data.selectedDate.relative.label);
-
   return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label} ago`;
 };
 
@@ -248,7 +254,6 @@ const getPeriodLabel = () => {
   width: 341px;
   z-index: 10001;
   max-height: 600px;
-
   .tab-button {
     &.q-btn {
       padding-bottom: 0.1rem;
