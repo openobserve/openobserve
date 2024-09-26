@@ -258,6 +258,7 @@ pub async fn search_partition(
     let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let max_query_range = stream_settings.max_query_range * 1000 * 1000 * 60 * 60;
     let files = cluster::get_file_list(
         trace_id,
         &meta,
@@ -350,6 +351,14 @@ pub async fn search_partition(
     }
     if step % min_step > 0 {
         step = step - step % min_step;
+    }
+    // this is to ensure we create partitions less than max_query_range
+    if max_query_range > 0 && step > max_query_range {
+        step = if min_step < max_query_range {
+            max_query_range - max_query_range % min_step
+        } else {
+            max_query_range
+        };
     }
 
     // Generate partitions by DESC order
