@@ -816,9 +816,14 @@ impl MultiStreamRequest {
         let mut res = vec![];
         for query in &self.sql {
             let query_fn = if query.is_old_format {
-                self.query_fn.clone()
+                self.query_fn
+                    .as_ref()
+                    .and_then(|v| base64::decode_url(v).ok())
             } else {
-                query.query_fn.clone()
+                query
+                    .query_fn
+                    .as_ref()
+                    .and_then(|v| base64::decode_url(v).ok())
             };
             res.push(Request {
                 query: Query {
