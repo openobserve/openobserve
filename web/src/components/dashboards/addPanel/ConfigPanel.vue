@@ -1290,7 +1290,15 @@ export default defineComponent({
       };
 
       timeShifts.push(newTimeShift);
-
+      if (
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+      }
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].config.time_shift.push({
