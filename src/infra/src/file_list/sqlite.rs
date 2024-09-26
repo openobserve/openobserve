@@ -371,7 +371,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
 
-        for chunk in ids.chunks(super::ID_BATCH_SIZE) {
+        for chunk in ids.chunks(get_config().limit.meta_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }

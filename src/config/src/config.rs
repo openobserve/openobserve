@@ -946,6 +946,12 @@ pub struct Limit {
         help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
+    #[env_config(
+        name = "ZO_META_ID_BATCH_SIZE",
+        default = 5000,
+        help = "batch size of id processing"
+    )]
+    pub meta_id_batch_size: usize,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -1326,6 +1332,10 @@ pub fn init() -> Config {
 
     if cfg.limit.sql_db_connections_max == 0 {
         cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
+    }
+
+    if cfg.limit.meta_id_batch_size == 0 {
+        cfg.limit.meta_id_batch_size = 5000;
     }
 
     if cfg.limit.consistent_hash_vnodes == 0 {

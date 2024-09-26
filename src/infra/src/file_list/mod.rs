@@ -28,8 +28,6 @@ pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
-const ID_BATCH_SIZE: usize = 10000;
-
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
