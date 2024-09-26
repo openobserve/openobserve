@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
 
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-if="!showSearchHistory"  id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory"  id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-else>
+    <div v-show="showSearchHistory">
       <search-history
         @closeSearchHistory="closeSearchHistoryfn"
         />
@@ -654,7 +654,7 @@ export default defineComponent({
           restoreUrlQueryParams();
           // loadLogsData();
           //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
-          //of functions of loadLogsData to stop run query
+          //of functions of loadLogsData to stop run query whenever this gets redirecited
           await getStreamList();
           // await getSavedViews();
           await getFunctions();
