@@ -471,6 +471,8 @@ export const usePanelDataLoader = (
               // append 0 seconds to the timeShiftInMilliSecondsArray at 0th index
               timeShiftInMilliSecondsArray.unshift(0);
 
+              const timeShiftQueries: any[] = [];
+
               // loop on all timeShiftInMilliSecondsArray
               for (let i = 0; i < timeShiftInMilliSecondsArray.length; i++) {
                 const timeRangeGap = timeShiftInMilliSecondsArray[i];
@@ -497,110 +499,122 @@ export const usePanelDataLoader = (
                   variables: [...(metadata1 || []), ...(metadata2 || [])],
                   timeRangeGap: timeRangeGap,
                 };
+
+                // push metadata and searchRequestObj[which will be passed to search API]
+                timeShiftQueries.push({
+                  metadata,
+                  searchRequestObj: {
+                    sql: query,
+                    start_time: startISOTimestamp - timeRangeGap * 1000,
+                    end_time: endISOTimestamp - timeRangeGap * 1000,
+                    query_fn: null,
+                  },
+                });
+              }
+
+              try {
+                // get search queries
+                const searchQueries = timeShiftQueries.map(
+                  (it: any) => it.searchRequestObj,
+                );
+
                 const { traceparent, traceId } = generateTraceContext();
                 addTraceId(traceId);
+                // if aborted, return
+                if (abortControllerRef?.signal?.aborted) {
+                  return;
+                }
+
+                state.loading = true;
+
                 try {
-                  // if aborted, return
-                  if (abortControllerRef?.signal?.aborted) {
-                    return;
+                  const searchRes = await callWithAbortController(
+                    async () =>
+                      await queryService.search(
+                        {
+                          org_identifier:
+                            store.state.selectedOrganization.identifier,
+                          query: {
+                            query: {
+                              sql: searchQueries,
+                              query_fn: it.vrlFunctionQuery
+                                ? b64EncodeUnicode(it.vrlFunctionQuery)
+                                : null,
+                              sql_mode: "full",
+                              start_time: startISOTimestamp,
+                              end_time: endISOTimestamp,
+                              per_query_response: true,
+                              size: -1,
+                            },
+                          },
+                          page_type: pageType,
+                          traceparent,
+                        },
+                        searchType.value ?? "Dashboards",
+                      ),
+                    abortControllerRef.signal,
+                  );
+                  // remove past error detail
+                  state.errorDetail = "";
+
+                  // if there is an function error and which not related to stream range, throw error
+                  if (
+                    searchRes.data.function_error &&
+                    searchRes.data.is_partial != true
+                  ) {
+                    // abort on unmount
+                    if (abortControllerRef) {
+                      // this will stop partition api call
+                      abortControllerRef?.abort();
+                    }
+
+                    // throw error
+                    throw new Error(
+                      `Function error: ${searchRes.data.function_error}`,
+                    );
                   }
 
-                  // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
-                  state.data.push([]);
-                  state.metadata.queries.push({});
-                  state.resultMetaData.push({});
-
-                  const currentQueryIndex = state.data.length - 1;
-
-                  // Update the metadata for the current query
-                  Object.assign(
-                    state.metadata.queries[currentQueryIndex],
-                    metadata,
-                  );
-
-                  state.loading = true;
-
+                  // if the query is aborted or the response is partial, break the loop
                   if (abortControllerRef?.signal?.aborted) {
                     break;
                   }
-                  const { traceparent, traceId } = generateTraceContext();
-                  addTraceId(traceId);
 
-                  try {
-                    const searchRes = await callWithAbortController(
-                      async () =>
-                        await queryService.search(
-                          {
-                            org_identifier:
-                              store.state.selectedOrganization.identifier,
-                            query: {
-                              query: {
-                                sql: query,
-                                query_fn: it.vrlFunctionQuery
-                                  ? b64EncodeUnicode(it.vrlFunctionQuery)
-                                  : null,
-                                sql_mode: "full",
-                                start_time:
-                                  startISOTimestamp - timeRangeGap * 1000,
-                                end_time: endISOTimestamp - timeRangeGap * 1000,
-                                size: -1,
-                              },
-                            },
-                            page_type: pageType,
-                            traceparent,
-                          },
-                          searchType.value ?? "Dashboards",
-                        ),
-                      abortControllerRef.signal,
-                    );
-                    // remove past error detail
-                    state.errorDetail = "";
+                  for (
+                    let i = 0;
+                    i < timeShiftInMilliSecondsArray.length;
+                    i++
+                  ) {
+                    state.data.push([]);
+                    state.metadata.queries.push({});
+                    state.resultMetaData.push({});
 
-                    // if there is an function error and which not related to stream range, throw error
-                    if (
-                      searchRes.data.function_error &&
-                      searchRes.data.is_partial != true
-                    ) {
-                      // abort on unmount
-                      if (abortControllerRef) {
-                        // this will stop partition api call
-                        abortControllerRef?.abort();
-                      }
-
-                      // throw error
-                      throw new Error(
-                        `Function error: ${searchRes.data.function_error}`,
-                      );
-                    }
-
-                    // if the query is aborted or the response is partial, break the loop
-                    if (abortControllerRef?.signal?.aborted) {
-                      break;
-                    }
-
-                    state.data[currentQueryIndex] = [
-                      ...searchRes.data.hits,
-                      ...(state.data[currentQueryIndex] ?? []),
-                    ];
+                    state.data[i] = [...searchRes.data.hits[i]];
 
                     // update result metadata
-                    state.resultMetaData[currentQueryIndex] =
-                      searchRes.data ?? {};
+                    state.resultMetaData[i] = {
+                      ...searchRes,
+                      hits: searchRes.data.hits[i],
+                    };
 
-                    // need to break the loop, save the cache
-                    saveCurrentStateToCache();
-                  } finally {
-                    removeTraceId(traceId);
+                    // Update the metadata for the current query
+                    Object.assign(
+                      state.metadata.queries[i],
+                      timeShiftQueries[i]?.metadata ?? {},
+                    );
                   }
-                } catch (error) {
-                  // Process API error for "sql"
-                  processApiError(error, "sql");
-                  return { result: null, metadata: metadata };
+
+                  // need to break the loop, save the cache
+                  saveCurrentStateToCache();
                 } finally {
-                  // set loading to false
-                  state.loading = false;
                   removeTraceId(traceId);
                 }
+              } catch (error) {
+                // Process API error for "sql"
+                processApiError(error, "sql");
+                return { result: null, metadata: null };
+              } finally {
+                // set loading to false
+                state.loading = false;
               }
             } else {
               const { query: query1, metadata: metadata1 } = replaceQueryValue(
