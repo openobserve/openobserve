@@ -79,7 +79,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn batch_add_with_id(&self, _files: &[(i64, &FileKey)]) -> Result<()> {
-        todo!()
+        unimplemented!("Unsupported")
     }
 
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
@@ -508,7 +508,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn clean_by_min_pk_value(&self, _val: i64) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
 
     async fn stats(

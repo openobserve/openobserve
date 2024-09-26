@@ -101,29 +101,32 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     };
 
     // 2. query from remote db
-    let cached_file_num = files.len();
     let db_files = file_list::query_by_ids(&ids).await?;
-    let mut db_ids = Vec::with_capacity(db_files.len());
-    for (id, key, meta) in db_files {
-        db_ids.push(id);
-        files.push(FileKey {
-            key,
-            meta,
-            deleted: false,
-            segment_ids: None,
-        });
-    }
+    let db_files = db_files
+        .into_iter()
+        .map(|(id, key, meta)| {
+            (
+                id,
+                FileKey {
+                    key,
+                    meta,
+                    deleted: false,
+                    segment_ids: None,
+                },
+            )
+        })
+        .collect::<Vec<_>>();
 
     // 3. set the local cache
     if !cfg.common.local_mode && cfg.common.meta_store_external {
-        let mut db_files = Vec::with_capacity(files.len() - cached_file_num);
-        for (i, id) in db_ids.into_iter().enumerate() {
-            db_files.push((id, &files[i + cached_file_num]));
-        }
+        let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
         }
     }
+
+    // 4. merge the results
+    files.extend(db_files.into_iter().map(|(_, f)| f));
 
     Ok(files)
 }
