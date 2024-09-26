@@ -239,8 +239,9 @@ pub async fn search_multi(
             // Check permissions on stream ends
         }
 
-        req.query.query_fn = query_fn.clone();
-
+        if !per_query_resp {
+            req.query.query_fn = query_fn.clone();
+        }
         for fn_name in functions::get_all_transform_keys(&org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
