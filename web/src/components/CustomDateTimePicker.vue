@@ -1,9 +1,9 @@
 <template>
-  <div v-for="(picker, index) in dateTimePickers" :key="index" class="q-mb-md">
+  <div>
     <q-btn
       style="width: 180px"
       data-test="date-time-btn"
-      :label="getDisplayValue(picker)"
+      :label="getDisplayValue()"
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
@@ -17,8 +17,6 @@
       anchor="bottom left"
       self="top left"
       no-route-dismiss
-      @before-show="onBeforeShow"
-      @before-hide="onBeforeHide"
     >
       <q-tab-panels
         class="tw-flex tw-justify-between"
@@ -31,9 +29,7 @@
               v-for="(period, periodIndex) in relativePeriods"
               :key="'date_' + periodIndex"
             >
-              <div class="relative-period-name">
-                {{ period.label }}
-              </div>
+              <div class="relative-period-name">{{ period.label }}</div>
               <div
                 v-for="(item, itemIndex) in relativeDates[period.value]"
                 :key="item"
@@ -42,19 +38,17 @@
                   :data-test="`date-time-relative-${item}-${period.value}-btn`"
                   :label="item"
                   :class="
-                    picker.data.selectedDate.relative.value == item &&
-                    picker.data.selectedDate.relative.period == period.value
+                    isSelected(item, period.value)
                       ? 'rp-selector-selected'
-                      : `rp-selector ${picker.relativePeriod}`
+                      : 'rp-selector'
                   "
                   outline
                   dense
                   flat
-                  @click="setRelativeDate(period, item, picker)"
+                  @click="setRelativeDate(period, item)"
                 />
               </div>
             </div>
-
             <div class="relative-row q-px-md q-py-sm">
               <div class="relative-period-name">Custom</div>
               <div class="row q-gutter-sm">
@@ -65,7 +59,6 @@
                     dense
                     filled
                     min="1"
-                    @update:model-value="onCustomPeriodSelect(picker)"
                   />
                 </div>
                 <div class="col">
@@ -75,11 +68,10 @@
                     dense
                     filled
                     emit-value
-                    @update:modelValue="onCustomPeriodSelect(picker)"
                     style="width: 100px"
                   >
                     <template v-slot:selected-item>
-                      <div>{{ getPeriodLabel(picker) }}</div>
+                      <div>{{ getPeriodLabel() }}</div>
                     </template>
                   </q-select>
                 </div>
@@ -89,94 +81,41 @@
         </q-tab-panel>
       </q-tab-panels>
     </q-menu>
-    <q-btn
-      v-if="props.deleteIcon == 'outlinedDelete'"
-      data-test="custom-date-picker-delete-btn"
-      :icon="outlinedDelete"
-      class="q-mb-sm q-ml-xs q-mr-sm"
-      :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-      padding="xs"
-      unelevated
-      size="sm"
-      round
-      flat
-      @click="removeDateTimePicker(index)"
-      style="min-width: auto"
-    />
-
-    <q-icon
-      v-else
-      class="q-mr-xs q-ml-sm"
-      size="15px"
-      name="close"
-      style="cursor: pointer"
-      @click="removeDateTimePicker(index)"
-      :data-test="`dashboard-addpanel-config-markline-remove-${index}`"
-    />
   </div>
-  <q-btn
-    @click="addDateTimePicker"
-    :class="!props.alertsPage ? 'dashboard-add-btn' : 'alert-add-btn'"
-    label="+ Add"
-    no-caps
-    data-test="date-time-picker-add-btn"
-  />
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onBeforeMount } from "vue";
-import { useStore } from "vuex";
-import {
-  outlinedDelete,
-  outlinedInfo,
-} from "@quasar/extras/material-icons-outlined";
+import { ref, reactive, watch } from "vue";
 
-const store = useStore();
-const dateTimePickers = ref([]);
-const relativePeriod = ref("m");
-const relativeValue = ref(15);
-const selectedType = ref("relative");
-
+// Define props to receive the value (offset) from parent
 const props = defineProps({
-  deleteIcon: {
-    type: String,
-    default: "",
-  },
-  alertsPage: {
-    type: Boolean,
-    default: false,
+  modelValue: String, // modelValue will bind to the offSet from parent
+});
+
+const emit = defineEmits(["update:modelValue"]);
+
+const picker = reactive({
+  activeTab: "relative",
+  showMenu: false,
+  data: {
+    selectedDate: {
+      relative: {
+        value: 0,
+        period: "m",
+        label: "Minutes",
+      },
+    },
   },
 });
 
-function createPicker() {
-  return reactive({
-    activeTab: "relative",
-    data: {
-      selectedDate: {
-        relative: {
-          value: 15,
-          period: "m",
-          label: "Minutes",
-        },
-      },
-    },
-  });
-}
-
-let relativePeriods = [
+// Periods for selection
+const relativePeriods = [
   { label: "Minutes", value: "m" },
   { label: "Hours", value: "h" },
   { label: "Days", value: "d" },
   { label: "Weeks", value: "w" },
   { label: "Months", value: "M" },
 ];
-let relativePeriodsSelect = ref([
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
-]);
 
 const relativeDates = {
   m: [1, 5, 10, 15, 30, 45],
@@ -186,90 +125,73 @@ const relativeDates = {
   M: [1, 2, 3, 4, 5, 6],
 };
 
-const relativeDatesInHour = {
-  m: [1, 1, 1, 1, 1, 1],
-  h: [1, 2, 3, 6, 8, 12],
-  d: [24, 48, 72, 96, 120, 144],
-  w: [168, 336, 504, 672, 840, 1008],
-  M: [744, 1488, 2232, 2976, 3720, 4464],
+// Options for custom period input
+const relativePeriodsSelect = ref([
+  { label: "Minutes", value: "m" },
+  { label: "Hours", value: "h" },
+  { label: "Days", value: "d" },
+  { label: "Weeks", value: "w" },
+  { label: "Months", value: "M" },
+]);
+
+// Function to map period values to their labels
+const getPeriodLabelFromValue = (periodValue) => {
+  console.log("periodValue", periodValue);
+
+  const period = relativePeriods.find((p) => p.value === periodValue);
+  return period ? period.label : "Minutes";
 };
 
-let relativePeriodsMaxValue = ref({
-  m: 0,
-  h: 0,
-  d: 0,
-  w: 0,
-  M: 0,
-});
+// Watch modelValue to reflect the correct offset when passed in from parent
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (newValue) {
+      const value = newValue.match(/\d+/g)[0]; // Extract numeric value
+      const period = newValue.match(/[a-zA-Z]+/g)[0]; // Extract period
 
-const emit = defineEmits(["update:dateTime"]);
+      picker.data.selectedDate.relative.value = Number(value);
+      picker.data.selectedDate.relative.period = period;
+      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(period); // Dynamically set label
+    }
+  },
+  { immediate: true },
+); // Run on initialization
 
-const setRelativeDate = (period, item, picker) => {
-  const { label, value } = period;
-  picker.data.selectedDate.relative.period = value;
+// Function to update the relative date when selected
+const setRelativeDate = (period, item) => {
+  picker.data.selectedDate.relative.period = period.value;
   picker.data.selectedDate.relative.value = item;
-  picker.data.selectedDate.relative.label = label;
-};
-const onCustomPeriodSelect = (picker) => {
-  const { value, period } = picker.data.selectedDate.relative;
-  if (value == 0) {
-  }
-  // const { value, period } = picker.data.selectedDate.relative;
-  // picker.data.selectedDate.relative.label = period;
+  picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
+    period.value,
+  ); // Set label dynamically
+
+  // Emit the new value to update modelValue in the parent component
+  emit("update:modelValue", `${item}${period.value}`);
 };
 
-const dateTimeArray = computed(() => {
-  return dateTimePickers.value.map((picker) => {
-    const { value, period } = picker.data.selectedDate.relative;
-    return { offSet: value && period ? `${value}${period}` : null };
-  });
-});
+// Display the current selected offset
+const getDisplayValue = () => {
+  console.log("getDisplayValue", picker.data.selectedDate.relative.label);
 
-const onBeforeShow = () => {
-  // if (props.modelValue) selectedDate.value = cloneDeep(props.modelValue);
-};
-
-const onBeforeHide = () => {
-  if (selectedType.value === "absolute")
-    resetTime(selectedTime.value.startTime, selectedTime.value.endTime);
-};
-const getDisplayValue = (picker) => {
   return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label} ago`;
 };
 
-function removeDateTimePicker(index) {
-  dateTimePickers.value.splice(index, 1);
-  emit("update:dateTime", dateTimeArray.value);
-}
-const getPeriodLabel = (picker) => {
-  const periodMapping = {
-    m: "Minutes",
-    h: "Hours",
-    d: "Days",
-    w: "Weeks",
-    M: "Months",
-  };
-  picker.data.selectedDate.relative.label =
-    periodMapping[picker.data.selectedDate.relative.period];
-  return periodMapping[picker.data.selectedDate.relative.period];
+// Check if the current selection matches the modelValue
+const isSelected = (value, period) => {
+  return (
+    picker.data.selectedDate.relative.value == value &&
+    picker.data.selectedDate.relative.period == period
+  );
 };
 
-function addDateTimePicker() {
-  dateTimePickers.value.push(createPicker());
-  emit("update:dateTime", dateTimeArray.value);
-}
-
-watch(
-  dateTimeArray,
-  (newVal) => {
-    emit("update:dateTime", newVal);
-  },
-  { deep: true },
-);
-
-onBeforeMount(() => {
-  emit("update:dateTime", dateTimeArray.value);
-});
+// Display period label for custom input
+const getPeriodLabel = () => {
+  const selectedPeriod = relativePeriods.find(
+    (p) => p.value === picker.data.selectedDate.relative.period,
+  );
+  return selectedPeriod ? selectedPeriod.label : "Minutes";
+};
 </script>
 
 <style scoped>

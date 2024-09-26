@@ -944,18 +944,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="font-size: 10px"
               max-width="250px"
             >
-              <span
-                >This feature allows you to compare data points from multiple
+              <span>
+                This feature allows you to compare data points from multiple
                 queries over a selected time range. By adjusting the date or
                 time, the system will retrieve corresponding data from different
                 queries, enabling you to observe changes or differences between
-                the selected time periods
+                the selected time periods.
               </span>
             </q-tooltip>
           </q-btn>
         </div>
       </div>
-      <CustomDateTimePicker @update:dateTime="handleDateTimeUpdate" />
+
+      <div
+        v-for="(picker, index) in dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift"
+        :key="index"
+        class="q-mb-md"
+      >
+        <CustomDateTimePicker v-model="picker.offSet" :picker="picker" />
+        <q-icon
+          class="q-mr-xs q-ml-sm"
+          size="15px"
+          name="close"
+          style="cursor: pointer"
+          @click="removeTimeShift(index)"
+          :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
+        />
+      </div>
+
+      <q-btn
+        @click="addTimeShift"
+        style="cursor: pointer; padding: 0px 5px"
+        label="+ Add"
+        no-caps
+        data-test="dashboard-addpanel-config-time-shift-add-btn"
+      />
     </div>
   </div>
 </template>
@@ -993,7 +1018,6 @@ export default defineComponent({
         value: "osm",
       },
     ];
-
     onBeforeMount(() => {
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
@@ -1248,6 +1272,37 @@ export default defineComponent({
       ),
     );
 
+    const timeShifts = [];
+
+    const addTimeShift = () => {
+      const newTimeShift = {
+        offSet: "0m",
+        data: {
+          selectedDate: {
+            relative: {
+              value: 0,
+              period: "m",
+              label: "Minutes",
+            },
+          },
+        },
+      };
+
+      timeShifts.push(newTimeShift);
+
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.time_shift.push({
+        offSet: newTimeShift.offSet,
+      });
+    };
+
+    const removeTimeShift = (index: any) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.time_shift.splice(index, 1);
+    };
+
     return {
       t,
       dashboardPanelData,
@@ -1264,6 +1319,8 @@ export default defineComponent({
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
       handleDateTimeUpdate,
+      addTimeShift,
+      removeTimeShift,
     };
   },
 });
