@@ -179,6 +179,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             infra_file_list::create_table_index()
                 .await
                 .expect("file list create table index failed");
+            infra_file_list::LOCAL_CACHE
+                .create_table_index()
+                .await
+                .expect("file list create table index failed");
             update_stats_from_file_list()
                 .await
                 .expect("file list remote calculate stats failed");
@@ -186,6 +190,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     infra_file_list::create_table_index().await?;
+    infra_file_list::LOCAL_CACHE.create_table_index().await?;
     tokio::task::spawn(async move { db::file_list::remote::cache_stats().await });
 
     #[cfg(feature = "enterprise")]

@@ -103,6 +103,7 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
 
     // create table index
     infra_file_list::create_table_index().await?;
+    infra_file_list::LOCAL_CACHE.create_table_index().await?;
     log::info!("Load file_list create table index done");
 
     // delete files
