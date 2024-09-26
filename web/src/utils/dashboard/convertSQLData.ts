@@ -25,6 +25,7 @@ import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
+  convertSecondsToOffset,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -72,7 +73,9 @@ export const convertMultiSQLData = async (
           ...options[i].options.series.map((it: any) => {
             return {
               ...it,
-              name: `${it.name} (${metadata.queries[i].timeRangeGap} ago) `,
+              name: metadata?.queries[i]?.timeRangeGap
+                ? `${it.name} (${convertSecondsToOffset(metadata?.queries[i]?.timeRangeGap)} ago) `
+                : it.name,
             };
           }),
         ];

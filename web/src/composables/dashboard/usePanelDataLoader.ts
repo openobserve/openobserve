@@ -42,6 +42,7 @@ import {
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
+import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -275,26 +276,6 @@ export const usePanelDataLoader = (
       abortController?.abort();
     }
   };
-
-  function convertOffsetToSeconds(offset: string) {
-    const value = parseInt(offset.slice(0, -1)); // Extract the numeric part
-    const unit = offset.slice(-1); // Extract the last character (unit)
-
-    switch (unit) {
-      case "m": // Minutes
-        return value * 60 * 1000;
-      case "h": // Hours
-        return value * 60 * 60 * 1000;
-      case "d": // Days
-        return value * 24 * 60 * 60 * 1000;
-      case "w": // Weeks
-        return value * 7 * 24 * 60 * 60 * 1000;
-      case "M": // Months (approximate, using 30.44 days per month)
-        return value * 30.44 * 24 * 60 * 60 * 1000;
-      default:
-        return 0; // Return 0 if the unit is not recognized
-    }
-  }
 
   const loadData = async () => {
     try {
