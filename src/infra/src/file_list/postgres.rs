@@ -78,6 +78,10 @@ impl super::FileList for PostgresFileList {
         self.inner_batch_add("file_list", files).await
     }
 
+    async fn batch_add_with_id(&self, _files: &[(i64, &FileKey)]) -> Result<()> {
+        unimplemented!("Unsupported")
+    }
+
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
         self.inner_batch_add("file_list_history", files).await
     }
@@ -355,14 +359,14 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
         let mut ret = Vec::new();
         let pool = CLIENT.clone();
 
-        for chunk in ids.chunks(super::ID_BATCH_SIZE) {
+        for chunk in ids.chunks(get_config().limit.meta_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -372,7 +376,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list WHERE id IN ({ids})"
+                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -384,6 +388,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .into_iter()
             .map(|r| {
                 (
+                    r.id,
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     FileMeta::from(&r),
                 )
@@ -491,6 +496,19 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .fetch_one(&pool)
                 .await?;
         Ok(ret.unwrap_or_default())
+    }
+
+    async fn get_min_pk_value(&self) -> Result<i64> {
+        let pool = CLIENT.clone();
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MIN(id)::BIGINT AS id FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
+    async fn clean_by_min_pk_value(&self, _val: i64) -> Result<()> {
+        Ok(()) // do nothing
     }
 
     async fn stats(

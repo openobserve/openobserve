@@ -55,6 +55,9 @@ pub async fn lock_with_trace_id(
 
 #[inline(always)]
 pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Result<()> {
+    if locker.is_none() {
+        return Ok(());
+    }
     let unlock = unlock(locker).await;
     match unlock {
         Ok(_) => {
