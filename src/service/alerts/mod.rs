@@ -233,7 +233,13 @@ impl QueryCondition {
         )
         .await
         {
-            Ok(v) => v,
+            Ok(v) => {
+                if v.is_partial {
+                    return Err(anyhow::anyhow!("{}", v.function_error));
+                } else {
+                    v
+                }
+            }
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
                     return Err(anyhow::anyhow!("{}", e.get_message()));
