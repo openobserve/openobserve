@@ -9,6 +9,7 @@
       class="date-time-button"
       outline
       no-caps
+      :disable="isFirstEntry"
       @click="picker.showMenu = !picker.showMenu"
     />
     <q-menu
@@ -90,6 +91,7 @@ import { ref, reactive, watch } from "vue";
 // Define props to receive the value (offset) from parent
 const props = defineProps({
   modelValue: String, // modelValue will bind to the offSet from parent
+  isFirstEntry: Boolean,
 });
 
 const emit = defineEmits(["update:modelValue"]);

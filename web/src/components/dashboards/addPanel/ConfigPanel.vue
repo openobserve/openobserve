@@ -954,7 +954,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
       </div>
-
+      <CustomDateTimePicker
+        modelValue="0m"
+        :isFirstEntry="true"
+        :disable="true"
+        class="q-mb-md"
+      />
       <div
         v-for="(picker, index) in dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -963,7 +968,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mb-md"
       >
         <div class="flex items-center">
-          <CustomDateTimePicker v-model="picker.offSet" :picker="picker" />
+          <CustomDateTimePicker
+            v-model="picker.offSet"
+            :picker="picker"
+            :isFirstEntry="false"
+          />
           <q-icon
             class="q-mr-xs q-ml-sm"
             size="15px"
@@ -1277,11 +1286,11 @@ export default defineComponent({
 
     const addTimeShift = () => {
       const newTimeShift = {
-        offSet: "0m",
+        offSet: "15m",
         data: {
           selectedDate: {
             relative: {
-              value: 0,
+              value: 15,
               period: "m",
               label: "Minutes",
             },
