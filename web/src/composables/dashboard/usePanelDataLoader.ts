@@ -569,7 +569,7 @@ export const usePanelDataLoader = (
                     state.metadata.queries.push({});
                     state.resultMetaData.push({});
 
-                    state.data[i] = [...searchRes.data.hits[i]];
+                    state.data[i] = [...(searchRes.data.hits[i] ?? [])];
 
                     // update result metadata
                     state.resultMetaData[i] = {
