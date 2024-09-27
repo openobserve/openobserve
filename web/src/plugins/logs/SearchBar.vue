@@ -398,6 +398,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('search.shareLink')"
           @click="shareLink"
         ></q-btn>
+        <q-btn
+          data-test="logs-search-bar-share-link-btn"
+          class="q-mr-xs download-logs-btn q-px-sm"
+          size="sm"
+          icon="history"
+          :title="'Search History'"
+          @click="showSearchHistoryfn"
+          
+        ></q-btn>
         <div class="float-left">
           <date-time
             ref="dateTimeRef"
@@ -978,6 +987,7 @@ export default defineComponent({
     "handleQuickModeChange",
     "handleRunQueryFn",
     "onAutoIntervalTrigger",
+    "showSearchHistory",
   ],
   methods: {
     searchData() {
@@ -2358,6 +2368,9 @@ export default defineComponent({
           });
         });
     };
+    const showSearchHistoryfn = () => {
+      emit("showSearchHistory");
+    };
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
@@ -2629,6 +2642,7 @@ export default defineComponent({
       savedFunctionSelectedName,
       saveFunctionLoader,
       shareLink,
+      showSearchHistoryfn,
       getImageURL,
       resetFilters,
       customDownloadDialog,
