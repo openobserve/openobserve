@@ -201,7 +201,7 @@ pub async fn search_multi(
 
         // get stream settings
         if let Some(settings) =
-            infra::schema::get_settings(&org_id, &resp.stream_name, stream_type).await
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
@@ -211,7 +211,7 @@ pub async fn search_multi(
                 req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
                 range_error = format!(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
-                    range_error, &resp.stream_name, max_query_range
+                    range_error, &stream_name, max_query_range
                 );
             }
         }
