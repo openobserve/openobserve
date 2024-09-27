@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div icon="info" class="justify-between date-time-container">
     <q-btn
-      data-test="date-time-btn"
+      :data-test="dataTestName"
       id="date-time-button"
       ref="datetimeBtn"
       data-cy="date-time-button"
@@ -370,6 +370,10 @@ export default defineComponent({
     queryRangeRestrictionInHour: {
       type: Number,
       default: 0,
+    },
+    dataTestName: {
+      type: String,
+      default: "date-time-btn",
     },
   },
 
