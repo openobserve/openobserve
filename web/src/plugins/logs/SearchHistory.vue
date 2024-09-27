@@ -6,7 +6,7 @@
       <div class="flex tw-justify-between tw-items-center" >
         <div class="flex items-center q-py-sm q-pl-md">
           <div
-          data-test="add-alert-back-btn"
+          data-test="search-history-alert-back-btn"
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
           title="Go Back"
@@ -22,7 +22,6 @@
               ref="searchDateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
-              :data-test-name="'search-history-date-time-btn'"
               @on:date-change="updateDateTime"
             />
             <div>
