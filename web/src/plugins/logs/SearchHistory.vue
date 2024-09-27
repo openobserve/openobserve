@@ -19,11 +19,11 @@
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
           <date-time
-              ref="dateTimeRef"
+              ref="searchDateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
 
-              data-test="alerts-history-date-time-dropdown"
+              data-test="search-history-date-time-dropdown"
               @on:date-change="updateDateTime"
             />
             <div>
@@ -157,7 +157,7 @@
       const store = useStore();
       const {t} = useI18n();
       const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
-      const dateTimeRef = ref(null)
+      const searchDateTimeRef = ref(null)
       const { searchObj } = useLogs();
       const dataToBeLoaded :any = ref([]);
       const dateTimeToBeSent : any = ref({});
@@ -296,8 +296,8 @@
               store.state.timezone,
               "HH:mm",
             );
-              dateTimeRef.value?.setAbsoluteTime(value.startTime, value.endTime);
-              dateTimeRef.value?.setDateType("absolute");
+              searchDateTimeRef.value?.setAbsoluteTime(value.startTime, value.endTime);
+              searchDateTimeRef.value?.setDateType("absolute");
             
           }
         }
@@ -430,7 +430,7 @@
         qTable,
         updateDateTime,
         pagination,  
-        dateTimeRef,
+        searchDateTimeRef,
         expandedRow,
         goToLogs,
         triggerExpand,
