@@ -165,6 +165,8 @@ pub async fn search_multi(
         }
     }
 
+    let mut range_error = String::new();
+
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
@@ -196,6 +198,23 @@ pub async fn search_multi(
             }
         };
         vrl_stream_name = stream_name.clone();
+
+        // get stream settings
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &resp.stream_name, stream_type).await
+        {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
+                    > max_query_range
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "{} Query duration for stream {} is modified due to query range restriction of {} hours",
+                    range_error, &resp.stream_name, max_query_range
+                );
+            }
+        }
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
@@ -359,6 +378,16 @@ pub async fn search_multi(
                 } else {
                     multi_res.hits.extend(res.hits);
                 }
+
+                if res.is_partial {
+                    multi_res.is_partial = true;
+                    let partial_err = "Please be aware that the response is based on partial data";
+                    multi_res.function_error = if res.function_error.is_empty() {
+                        partial_err.to_string()
+                    } else {
+                        format!("{} \n {}", partial_err, res.function_error)
+                    };
+                }
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -481,6 +510,15 @@ pub async fn search_multi(
     } else {
         multi_res.hits
     };
+
+    if !range_error.is_empty() {
+        multi_res.is_partial = true;
+        multi_res.function_error = if multi_res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, multi_res.function_error)
+        };
+    }
 
     let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
