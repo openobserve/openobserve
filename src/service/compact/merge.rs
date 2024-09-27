@@ -727,7 +727,6 @@ pub async fn merge_files(
                 &mut buf,
                 Arc::new(schema),
                 &bloom_filter_fields,
-                &full_text_search_fields,
                 diff_fields,
                 FileType::PARQUET,
             )
@@ -769,7 +768,6 @@ pub async fn merge_files(
         new_schema.clone(),
         &new_batches,
         &bloom_filter_fields,
-        &full_text_search_fields,
         &new_file_meta,
     )
     .await?;
