@@ -787,10 +787,10 @@ dependencies = [
  "bytes",
  "futures",
  "paste",
- "prost 0.13.3",
- "prost-types 0.13.3",
+ "prost 0.13.2",
+ "prost-types 0.13.2",
  "tokio",
- "tonic 0.12.3",
+ "tonic 0.12.2",
 ]
 
 [[package]]
@@ -1216,7 +1216,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
 dependencies = [
  "async-trait",
- "axum-core 0.4.4",
+ "axum-core 0.4.3",
  "bytes",
  "futures-util",
  "http 1.1.0",
@@ -1255,9 +1255,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.4.4"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e6b8ba012a258d63c9adfa28b9ddcf66149da6f986c5b5452e629d5ee64bf00"
+checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1268,7 +1268,7 @@ dependencies = [
  "mime",
  "pin-project-lite",
  "rustversion",
- "sync_wrapper 1.0.1",
+ "sync_wrapper 0.1.2",
  "tower-layer",
  "tower-service",
 ]
@@ -2940,7 +2940,7 @@ dependencies = [
  "datafusion-expr",
  "datafusion-proto-common",
  "object_store",
- "prost 0.13.3",
+ "prost 0.13.2",
 ]
 
 [[package]]
@@ -2953,7 +2953,7 @@ dependencies = [
  "chrono",
  "datafusion-common",
  "object_store",
- "prost 0.13.3",
+ "prost 0.13.2",
 ]
 
 [[package]]
@@ -5594,7 +5594,7 @@ dependencies = [
  "parquet",
  "prometheus",
  "promql-parser",
- "prost 0.13.3",
+ "prost 0.13.2",
  "proto",
  "pyroscope",
  "pyroscope_pprofrs",
@@ -5621,7 +5621,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
- "tonic 0.12.3",
+ "tonic 0.12.2",
  "tracing",
  "tracing-appender",
  "tracing-opentelemetry",
@@ -5696,13 +5696,13 @@ dependencies = [
  "opentelemetry-http",
  "opentelemetry-proto",
  "opentelemetry_sdk",
- "prost 0.13.3",
+ "prost 0.13.2",
  "reqwest 0.12.4",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
- "tonic 0.12.3",
+ "tonic 0.12.2",
 ]
 
 [[package]]
@@ -5714,9 +5714,9 @@ dependencies = [
  "hex",
  "opentelemetry 0.25.0",
  "opentelemetry_sdk",
- "prost 0.13.3",
+ "prost 0.13.2",
  "serde",
- "tonic 0.12.3",
+ "tonic 0.12.2",
 ]
 
 [[package]]
@@ -6332,12 +6332,12 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.13.3"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b0487d90e047de87f984913713b85c601c05609aad5b0df4b4573fbf69aa13f"
+checksum = "3b2ecbe40f08db5c006b5764a2645f7f3f141ce756412ac9e1dd6087e6d32995"
 dependencies = [
  "bytes",
- "prost-derive 0.13.3",
+ "prost-derive 0.13.2",
 ]
 
 [[package]]
@@ -6389,9 +6389,9 @@ dependencies = [
 
 [[package]]
 name = "prost-derive"
-version = "0.13.3"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
+checksum = "acf0c195eebb4af52c752bec4f52f645da98b6e92077a04110c7f349477ae5ac"
 dependencies = [
  "anyhow",
  "itertools 0.13.0",
@@ -6422,11 +6422,11 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.13.3"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4759aa0d3a6232fb8dbdb97b61de2c20047c68aca932c7ed76da9d788508d670"
+checksum = "60caa6738c7369b940c3d49246a8d1749323674c65cb13010134f5c9bad5b519"
 dependencies = [
- "prost 0.13.3",
+ "prost 0.13.2",
 ]
 
 [[package]]
@@ -6436,12 +6436,12 @@ dependencies = [
  "async-trait",
  "datafusion",
  "datafusion-proto",
- "prost 0.13.3",
+ "prost 0.13.2",
  "prost-build",
  "serde",
  "serde_json",
  "tokio",
- "tonic 0.12.3",
+ "tonic 0.12.2",
  "tonic-build 0.11.0",
 ]
 
@@ -8419,9 +8419,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.16"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f4e6ce100d0eb49a2734f8c0812bcd324cf357d21810932c5df6b96ef2b86f1"
+checksum = "267ac89e0bec6e691e5813911606935d77c476ff49024f98abcea3e7b15e37af"
 dependencies = [
  "futures-core",
  "pin-project-lite",
@@ -8513,9 +8513,9 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.12.3"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877c5b330756d856ffcc4553ab34a5684481ade925ecc54bcd1bf02b1d0d4d52"
+checksum = "c6f6ba989e4b2c58ae83d862d3a3e27690b6e3ae630d0deb59f3697f32aa88ad"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8532,7 +8532,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
- "prost 0.13.3",
+ "prost 0.13.2",
  "socket2",
  "tokio",
  "tokio-stream",
