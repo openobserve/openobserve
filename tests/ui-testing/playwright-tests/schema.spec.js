@@ -117,7 +117,7 @@ test.describe("Schema testcases", () => {
     await page.locator('button').filter({ hasText: 'close' }).click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-btn"]').first().click({force: true});
     await page.locator('[data-test="date-time-relative-tab"]').click();
     // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     await page.waitForTimeout(2000);
