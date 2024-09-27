@@ -83,7 +83,6 @@ export const convertMultiSQLData = async (
     }
   }
 
-  console.log("options", JSON.parse(JSON.stringify(options)));
   return options[0];
 };
 
@@ -2033,7 +2032,7 @@ export const convertSQLData = async (
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
   return {
-    options: JSON.parse(JSON.stringify(options)),
+    options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
   };
 };

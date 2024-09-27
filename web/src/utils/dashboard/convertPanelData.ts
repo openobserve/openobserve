@@ -72,16 +72,6 @@ export const convertPanelData = async (
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
 
-        // await convertMultiSQLData(
-        //   panelSchema,
-        //   data,
-        //   store,
-        //   chartPanelRef,
-        //   hoveredSeriesState,
-        //   resultMetaData,
-        //   metadata,
-        // );
-
         return {
           chartType: panelSchema.type,
           ...(await convertMultiSQLData(
