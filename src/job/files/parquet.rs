@@ -657,7 +657,6 @@ async fn merge_files(
             new_schema.clone(),
             &new_batches,
             &bloom_filter_fields,
-            &full_text_search_fields,
             &new_file_meta,
         )
         .await?;
