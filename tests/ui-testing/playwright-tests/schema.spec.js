@@ -154,7 +154,7 @@ test.describe("Schema testcases", () => {
     await page.waitForTimeout(2000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(3000);
-    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-btn"]').first().click({force: true});
     await page.locator('[data-test="date-time-relative-tab"]').click();
     // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
