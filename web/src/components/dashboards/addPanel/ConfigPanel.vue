@@ -921,7 +921,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div>
+    <div
+      v-if="
+        [
+          'area',
+          'bar',
+          'line',
+          'h-bar',
+          'h-stacked',
+          'scatter',
+          'area-stacked',
+          'stacked',
+        ].includes(dashboardPanelData.data.type) && !promqlMode
+      "
+    >
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-dashboard-period-title"
@@ -997,7 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
@@ -1242,13 +1255,6 @@ export default defineComponent({
       }
     };
 
-    const handleDateTimeUpdate = (data: any) => {
-      //here we get the data from the CustomDateTimePicker component
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].config.time_shift = data;
-    };
-
     const selectPromQlNameOption = (option: any) => {
       const inputValue =
         dashboardPanelData.data.queries[
@@ -1321,6 +1327,30 @@ export default defineComponent({
       ].config.time_shift.splice(index, 1);
     };
 
+    const isChartTypeAllowForTimeShift = computed(() => {
+      return [
+        "area",
+        "bar",
+        "line",
+        "h-bar",
+        "h-stacked",
+        "scatter",
+        "area-stacked",
+        "stacked",
+      ].includes(dashboardPanelData.data.type);
+    });
+
+    watch(
+      () => dashboardPanelData.data.type,
+      () => {
+        if (!isChartTypeAllowForTimeShift.value) {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.time_shift = [];
+        }
+      },
+    );
+
     return {
       t,
       dashboardPanelData,
@@ -1336,7 +1366,6 @@ export default defineComponent({
       legendWidthValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
-      handleDateTimeUpdate,
       addTimeShift,
       removeTimeShift,
     };
