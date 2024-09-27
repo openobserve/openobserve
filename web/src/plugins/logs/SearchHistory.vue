@@ -22,7 +22,7 @@
               ref="searchDateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
-
+              data-test-name="search-history-date-time-btn"
               data-test="search-history-date-time-dropdown"
               @on:date-change="updateDateTime"
             />
