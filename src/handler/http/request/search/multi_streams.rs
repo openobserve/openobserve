@@ -41,7 +41,10 @@ use crate::{
             },
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, RESULT_ARRAY},
+        usage::report_request_usage_stats,
+    },
 };
 
 /// SearchStreamData
@@ -162,6 +165,8 @@ pub async fn search_multi(
         }
     }
 
+    let mut range_error = String::new();
+
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
@@ -175,6 +180,7 @@ pub async fn search_multi(
         }
     }
     let queries_len = queries.len();
+    let mut vrl_stream_name = "".to_string();
 
     for mut req in queries {
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
@@ -191,6 +197,24 @@ pub async fn search_multi(
                 ));
             }
         };
+        vrl_stream_name = stream_name.clone();
+
+        // get stream settings
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+        {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
+                    > max_query_range
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "{} Query duration for stream {} is modified due to query range restriction of {} hours",
+                    range_error, &stream_name, max_query_range
+                );
+            }
+        }
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
@@ -234,8 +258,9 @@ pub async fn search_multi(
             // Check permissions on stream ends
         }
 
-        req.query.query_fn = query_fn.clone();
-
+        if !per_query_resp {
+            req.query.query_fn = query_fn.clone();
+        }
         for fn_name in functions::get_all_transform_keys(&org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
@@ -321,6 +346,7 @@ pub async fn search_multi(
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
+
                 report_request_usage_stats(
                     req_stats,
                     &org_id,
@@ -351,6 +377,16 @@ pub async fn search_multi(
                     multi_res.hits.push(serde_json::Value::Array(res.hits));
                 } else {
                     multi_res.hits.extend(res.hits);
+                }
+
+                if res.is_partial {
+                    multi_res.is_partial = true;
+                    let partial_err = "Please be aware that the response is based on partial data";
+                    multi_res.function_error = if res.function_error.is_empty() {
+                        partial_err.to_string()
+                    } else {
+                        format!("{} \n {}", partial_err, res.function_error)
+                    };
                 }
             }
             Err(err) => {
@@ -388,6 +424,100 @@ pub async fn search_multi(
                 }
             }
         }
+    }
+
+    multi_res.hits = if query_fn.is_some() && per_query_resp {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.unwrap().trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                if apply_over_hits {
+                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &meta::functions::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        &json::Value::Array(multi_res.hits),
+                        &org_id,
+                        &[vrl_stream_name],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            if per_query_resp {
+                                let flattened_array = v
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .map(|item| {
+                                        config::utils::flatten::flatten(item.clone()).unwrap()
+                                    })
+                                    .collect::<Vec<_>>();
+                                Some(serde_json::Value::Array(flattened_array))
+                            } else {
+                                (!v.is_null())
+                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                            }
+                        })
+                        .collect()
+                } else {
+                    multi_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &meta::functions::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                &hit,
+                                &org_id,
+                                &[vrl_stream_name.clone()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => multi_res.hits,
+        }
+    } else {
+        multi_res.hits
+    };
+
+    if !range_error.is_empty() {
+        multi_res.is_partial = true;
+        multi_res.function_error = if multi_res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, multi_res.function_error)
+        };
     }
 
     let column_timestamp = get_config().common.column_timestamp.to_string();

@@ -118,9 +118,10 @@ pub async fn search(
     };
 
     // 2. get inverted index file list
-    let (_use_inverted_index, idx_file_list, idx_scan_size, idx_took) =
+    let (use_fst_inverted_index, idx_file_list, idx_scan_size, idx_took) =
         get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
+    req.set_use_inverted_index(use_fst_inverted_index);
 
     // 3. get nodes
     let node_group = req
@@ -786,15 +787,17 @@ async fn get_inverted_index_file_lists(
         req.inverted_index_type.as_ref().unwrap().to_string()
     };
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
-    let use_inverted_index =
+    let use_parquet_inverted_index =
         use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    let use_fst_inverted_index =
+        use_inverted_index && (inverted_index_type == "fst" || inverted_index_type == "both");
     log::info!(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
-        use_inverted_index
+        use_parquet_inverted_index
     );
 
-    if !use_inverted_index {
-        return Ok((false, vec![], 0, 0));
+    if !use_parquet_inverted_index {
+        return Ok((use_fst_inverted_index, vec![], 0, 0));
     }
 
     let stream_name = sql.stream_names.first().unwrap();
@@ -816,7 +819,12 @@ async fn get_inverted_index_file_lists(
         idx_took,
     );
 
-    Ok((true, idx_file_list, idx_scan_size, idx_took))
+    Ok((
+        use_fst_inverted_index,
+        idx_file_list,
+        idx_scan_size,
+        idx_took,
+    ))
 }
 
 pub async fn get_inverted_index_file_list(

@@ -161,7 +161,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(2000);
     // Type the value of a variable into an input field
     await page.locator(
-      '[data-cy="date-time-button"]').click({ force: true }); await page.locator(
+      '[data-test="date-time-btn"]').click({ force: true }); await page.locator(
 
         '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
 
@@ -200,7 +200,7 @@ test.describe("Logs Queries testcases", () => {
 
     await page.waitForTimeout(2000);
     await page.locator(
-      '[data-cy="date-time-button"]').click({ force: true }); await page.locator(
+      '[data-test="date-time-btn"]').click({ force: true }); await page.locator(
 
         '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
@@ -213,7 +213,7 @@ test.describe("Logs Queries testcases", () => {
   test("should not display error if match all case added in log query search", async ({ page }) => {
     // Type the value of a variable into an input field
     await page.waitForTimeout(2000);
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code')");

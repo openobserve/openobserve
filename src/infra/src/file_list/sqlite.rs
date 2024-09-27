@@ -69,6 +69,14 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_add("file_list", files).await
     }
 
+    async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()> {
+        let files = files
+            .iter()
+            .map(|(id, f)| (Some(*id), *f))
+            .collect::<Vec<_>>();
+        self.inner_batch_add_with_id("file_list", &files).await
+    }
+
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
         self.inner_batch_add("file_list_history", files).await
     }
@@ -355,7 +363,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -363,7 +371,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
 
-        for chunk in ids.chunks(super::ID_BATCH_SIZE) {
+        for chunk in ids.chunks(get_config().limit.meta_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -373,7 +381,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list WHERE id IN ({ids})"
+                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -385,6 +393,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .iter()
             .map(|r| {
                 (
+                    r.id,
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     r.into(),
                 )
@@ -491,6 +500,24 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .fetch_one(&pool)
             .await?;
         Ok(ret.unwrap_or_default())
+    }
+
+    async fn get_min_pk_value(&self) -> Result<i64> {
+        let pool = CLIENT_RO.clone();
+        let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MIN(id) AS id FROM file_list;"#)
+            .fetch_one(&pool)
+            .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
+    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query("DELETE FROM file_list WHERE id < $1;")
+            .bind(val)
+            .execute(&*client)
+            .await?;
+        Ok(())
     }
 
     async fn stats(
@@ -935,6 +962,16 @@ SELECT stream, max(id) as id, COUNT(*) AS num
 
 impl SqliteFileList {
     async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
+        self.inner_add_with_id(table, None, file, meta).await
+    }
+
+    async fn inner_add_with_id(
+        &self,
+        table: &str,
+        id: Option<i64>,
+        file: &str,
+        meta: &FileMeta,
+    ) -> Result<()> {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -942,10 +979,11 @@ impl SqliteFileList {
         let client = client.lock().await;
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
         "#).as_str(),
     )
+        .bind(id)
         .bind(org_id)
         .bind(stream_key)
         .bind(date_key)
@@ -970,6 +1008,15 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
     }
 
     async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
+        let files: Vec<(Option<i64>, _)> = files.iter().map(|f| (None, f)).collect::<Vec<_>>();
+        self.inner_batch_add_with_id(table, &files).await
+    }
+
+    async fn inner_batch_add_with_id(
+        &self,
+        table: &str,
+        files: &[(Option<i64>, &FileKey)],
+    ) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -979,13 +1026,14 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
             let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)").as_str(),
+                format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)").as_str(),
             );
-            query_builder.push_values(files, |mut b, item| {
+            query_builder.push_values(files, |mut b, (id, item)| {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(&item.key).expect("parse file key failed");
                 let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                b.push_bind(org_id)
+                b.push_bind(id)
+                    .push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
@@ -1024,8 +1072,11 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
                 // release lock
                 drop(client);
                 // add file one by one
-                for item in files {
-                    if let Err(e) = self.inner_add(table, &item.key, &item.meta).await {
+                for (id, item) in files {
+                    if let Err(e) = self
+                        .inner_add_with_id(table, *id, &item.key, &item.meta)
+                        .await
+                    {
                         log::error!("[SQLITE] single insert {table} add error: {}", e);
                         return Err(e);
                     }

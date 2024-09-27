@@ -152,6 +152,7 @@ pub async fn search(
             .await
             .unwrap_or_default();
         let (file_list, file_list_took) = get_file_list_by_ids(
+            &trace_id,
             &org_id,
             stream_type,
             stream_name,
@@ -161,7 +162,7 @@ pub async fn search(
             &req.file_id_list,
             &req.idx_file_list,
         )
-        .await;
+        .await?;
         log::info!(
             "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
             req.partition,
@@ -269,6 +270,7 @@ pub async fn search(
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip_all, fields(org_id = org_id, stream_name = stream_name))]
 async fn get_file_list_by_ids(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -277,11 +279,9 @@ async fn get_file_list_by_ids(
     equal_items: &Option<Vec<(String, String)>>,
     ids: &[i64],
     idx_file_list: &[cluster_rpc::IdxFileName],
-) -> (Vec<FileKey>, usize) {
+) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
-    let file_list = crate::service::file_list::query_by_ids(ids)
-        .await
-        .unwrap_or_default();
+    let file_list = crate::service::file_list::query_by_ids(trace_id, ids).await?;
     // if there are any files in idx_files_list, use them to filter the files we got from ids,
     // otherwise use all the files we got from ids
     let file_list = if idx_file_list.is_empty() {
@@ -323,5 +323,5 @@ async fn get_file_list_by_ids(
     }
     files.sort_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
-    (files, start.elapsed().as_millis() as usize)
+    Ok((files, start.elapsed().as_millis() as usize))
 }
