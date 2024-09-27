@@ -19,6 +19,7 @@
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
           <date-time
+              data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
