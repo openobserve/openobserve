@@ -75,7 +75,7 @@ pub(crate) async fn write_parquet_index_to_disk(
 
     // write parquet file
     let mut buf_parquet = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf_parquet, &schema, &[], &[], &file_meta);
+    let mut writer = new_parquet_writer(&mut buf_parquet, &schema, &[], &file_meta);
     for batch in batches {
         writer.write(&batch).await?;
     }
