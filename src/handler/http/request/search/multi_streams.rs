@@ -153,6 +153,7 @@ pub async fn search_multi(
     };
 
     let per_query_resp = multi_req.per_query_response;
+    let mut range_error = "".to_string();
 
     let mut query_fn = multi_req
         .query_fn
@@ -196,8 +197,6 @@ pub async fn search_multi(
                 });
             }
         };
-
-        vrl_stream_name = stream_name.clone();
 
         // get stream settings
         if let Some(settings) =
