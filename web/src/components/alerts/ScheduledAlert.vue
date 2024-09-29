@@ -198,6 +198,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
+    <div
+        v-for="(picker, index) in  dateTimePicker"
+        :key="index"
+        class="q-mb-md"
+      >
+        <div class="flex items-center">
+          <CustomDateTimePicker
+            v-model="picker.offSet"
+            :picker="picker"
+            :isFirstEntry="false"
+            @update:model-value="updateDateTimePicker"
+          />
+          <q-icon
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            @click="removeTimeShift(index)"
+            :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
+          />
+        </div>
+      </div>
+<div>
+  <q-btn
+        @click="addTimeShift"
+        style="cursor: pointer; padding: 0px 5px"
+        label="+ Add"
+        no-caps
+        data-test="dashboard-addpanel-config-time-shift-add-btn"
+      />
+</div>
     <div class="q-mt-sm">
       <div
         v-if="
@@ -833,6 +864,8 @@ import {
 import { useStore } from "vuex";
 import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -857,6 +890,7 @@ const props = defineProps([
   "disableQueryTypeSelection",
   "vrlFunctionError",
   "showTimezoneWarning",
+  "multi_time_range"
 ]);
 
 const emits = defineEmits([
@@ -873,6 +907,7 @@ const emits = defineEmits([
   "update:vrl_function",
   "update:showVrlFunction",
   "validate-sql",
+  "update:multi_time_range"
 ]);
 
 const { t } = useI18n();
@@ -936,6 +971,15 @@ const filteredNumericColumns = ref(getNumericColumns.value);
 const addField = () => {
   emits("field:add");
 };
+
+const updateDateTimePicker = (data) =>{
+  emits("update:multi_time_range", dateTimePicker.value);
+  console.log("data",dateTimePicker.value);
+}
+
+const removeTimeShift = (index: any) => {
+  dateTimePicker.value.splice(index, 1);
+    };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
@@ -1003,6 +1047,7 @@ const onFunctionSelect = (_function: any) => {
 };
 
 const functionsList = computed(() => store.state.organizationData.functions);
+const dateTimePicker = ref(props.multi_time_range) || [];
 
 const functionOptions = ref<any[]>([]);
 
@@ -1051,6 +1096,23 @@ const updateQuery = () => {
 
   if (tab.value === "sql") query.value = props.sql;
 };
+const addTimeShift = () => {
+      const newTimeShift = {
+        offSet: "15m",
+        data: {
+          selectedDate: {
+            relative: {
+              value: 15,
+              period: "m",
+              label: "Minutes",
+            },
+          },
+        },
+      };
+
+      dateTimePicker.value.push({offSet:newTimeShift.offSet});
+      
+    };
 
 const updatePromqlCondition = () => {
   emits("update:promql_condition", promqlCondition.value);
