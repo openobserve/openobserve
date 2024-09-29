@@ -197,6 +197,30 @@ pub async fn search_multi(
             }
         };
 
+        vrl_stream_name = stream_name.clone();
+
+        // get stream settings
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+        {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
+                    > max_query_range
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "{} Query duration for stream {} is modified due to query range restriction of {} hours",
+                    range_error, &stream_name, max_query_range
+                );
+
+                if multi_res.new_start_time.is_none() {
+                    multi_res.new_start_time = Some(req.query.start_time);
+                    multi_res.new_end_time = Some(req.query.end_time);
+                }
+            }
+        }
+
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
@@ -359,6 +383,19 @@ pub async fn search_multi(
                     multi_res.hits.push(serde_json::Value::Array(res.hits));
                 } else {
                     multi_res.hits.extend(res.hits);
+                }
+
+                if res.is_partial {
+                    multi_res.is_partial = true;
+                    let partial_err = "Please be aware that the response is based on partial data";
+                    multi_res.function_error = if res.function_error.is_empty() {
+                        partial_err.to_string()
+                    } else {
+                        format!("{} \n {}", partial_err, res.function_error)
+                    };
+                }
+                if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
+                    multi_res.histogram_interval = res.histogram_interval;
                 }
             }
 
