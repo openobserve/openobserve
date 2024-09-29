@@ -197,7 +197,7 @@ pub async fn search_multi(
                 });
             }
         };
-
+        stream_name = resp.stream_name.clone();
         // get stream settings
         if let Some(settings) =
             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
@@ -350,7 +350,7 @@ pub async fn search_multi(
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
-                stream_name = resp.stream_name.clone();
+
                 report_request_usage_stats(
                     req_stats,
                     &org_id,
@@ -519,6 +519,15 @@ pub async fn search_multi(
     } else {
         multi_res.hits
     };
+
+    if !range_error.is_empty() {
+        multi_res.is_partial = true;
+        multi_res.function_error = if multi_res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, multi_res.function_error)
+        };
+    }
 
     let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
