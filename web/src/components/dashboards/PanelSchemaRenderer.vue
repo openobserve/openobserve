@@ -675,11 +675,11 @@ export default defineComponent({
         // use metadata query[replaced variables values] or panelSchema query
         drilldownVariables.query =
           metadata?.value?.queries[0]?.query ??
-          panelSchema.value.queries[0].query ??
+          panelSchema?.value?.queries[0]?.query ??
           "";
         drilldownVariables.query_encoded = b64EncodeUnicode(
           metadata?.value?.queries[0]?.query ??
-            panelSchema.value.queries[0].query ??
+            panelSchema?.value?.queries[0]?.query ??
             "",
         );
 
