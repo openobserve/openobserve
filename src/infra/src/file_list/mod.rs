@@ -71,6 +71,14 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_parallel(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_level: PartitionTimeLevel,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<(String, FileMeta)>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -240,6 +248,29 @@ pub async fn query(
 }
 
 #[inline]
+#[tracing::instrument(
+    name = "infra:file_list:query_parallel",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_parallel(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<(String, FileMeta)>> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    CLIENT
+        .query_parallel(org_id, stream_type, stream_name, time_level, time_range)
+        .await
+}
+
+#[inline]
 pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<(String, bool)>> {
     CLIENT.query_deleted(org_id, time_max, limit).await
 }
@@ -367,15 +398,18 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
+    #[sqlx(default)]
     pub stream: String,
     pub date: String,
     pub file: String,
+    #[sqlx(default)]
     pub deleted: bool,
     pub min_ts: i64,
     pub max_ts: i64,
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    #[sqlx(default)]
     pub flattened: bool,
 }
 

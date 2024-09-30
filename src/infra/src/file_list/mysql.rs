@@ -19,7 +19,11 @@ use async_trait::async_trait;
 use config::{
     get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    utils::{hash::Sum64, parquet::parse_file_key_columns},
+    utils::{
+        hash::Sum64,
+        parquet::parse_file_key_columns,
+        time::{end_of_the_day, DAY_MICRO_SECS},
+    },
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
@@ -344,6 +348,98 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 )
             })
             .collect())
+    }
+
+    async fn query_parallel(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        _time_level: PartitionTimeLevel,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<(String, FileMeta)>> {
+        if let Some((start, end)) = time_range {
+            if start == 0 && end == 0 {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let (time_start, time_end) = time_range.unwrap_or((0, 0));
+        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS {
+            vec![(time_start, time_end)]
+        } else {
+            let mut partitions = Vec::new();
+            let mut start = time_start;
+            while start < time_end {
+                let end_of_day = std::cmp::min(end_of_the_day(start), time_end);
+                partitions.push((start, end_of_day));
+                start = end_of_day + 1; // next day, use end_of_day + 1 microsecond
+            }
+            partitions
+        };
+
+        log::debug!("file_list day_partitions: {:?}", day_partitions);
+
+        let mut tasks = Vec::with_capacity(day_partitions.len());
+        for (time_start, time_end) in day_partitions {
+            let stream_key = stream_key.clone();
+            tasks.push(tokio::task::spawn(async move {
+                let pool = CLIENT.clone();
+                let cfg = get_config();
+                if cfg.limit.use_upper_bound_for_max_ts {
+                    // TODO: if partition is daily, we need to remove this logic
+                    let max_ts_upper_bound =
+                        time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                    sqlx::query_as::<_, super::FileRecord>(
+                        r#"
+SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
+    FROM file_list 
+    WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;
+                        "#,
+                    )
+                    .bind(stream_key)
+                    .bind(time_start)
+                    .bind(max_ts_upper_bound)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+                } else {
+                    sqlx::query_as::<_, super::FileRecord>(
+                        r#"
+SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
+    FROM file_list 
+    WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;
+                        "#,
+                    )
+                    .bind(stream_key)
+                    .bind(time_start)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+                }
+            }));
+        }
+
+        let mut rets = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            let ret = match task.await {
+                Ok(Ok(r)) => r.into_iter().map(|r| {
+                    (
+                        format!("files/{}/{}/{}", stream_name, r.date, r.file),
+                        FileMeta::from(&r),
+                    )
+                }),
+                Ok(Err(e)) => {
+                    return Err(e.into());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
+            };
+            rets.push(ret);
+        }
+        Ok(rets.into_iter().flatten().collect())
     }
 
     async fn query_deleted(

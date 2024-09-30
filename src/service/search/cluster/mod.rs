@@ -856,7 +856,7 @@ pub(crate) async fn get_file_list(
             .len()
             <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = file_list::query(
+    let file_list = file_list::query_parallel(
         &sql.org_id,
         &sql.stream_name,
         stream_type,

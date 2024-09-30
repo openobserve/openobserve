@@ -21,7 +21,7 @@ use config::{
         bitvec::BitVec,
         inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
         search::{ScanStats, SearchType, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{FileKey, StreamType},
     },
     utils::inverted_index::{
         convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes, split_token,
@@ -33,7 +33,6 @@ use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
     storage,
 };
 use itertools::Itertools;
@@ -89,25 +88,8 @@ pub async fn search(
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-
     // get file list
-    let mut files = match file_list.is_empty() {
-        true => {
-            get_file_list(
-                trace_id,
-                &sql,
-                stream_type,
-                partition_time_level,
-                &stream_settings.partition_keys,
-            )
-            .instrument(enter_span.clone())
-            .await?
-        }
-        false => file_list.to_vec(),
-    };
+    let mut files = file_list.to_vec();
     if files.is_empty() {
         return Ok((vec![], ScanStats::default(), 0));
     }
@@ -279,55 +261,6 @@ pub async fn search(
 
     scan_stats.idx_took = idx_took;
     Ok((tables, scan_stats, target_partitions))
-}
-
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
-async fn get_file_list(
-    trace_id: &str,
-    sql: &Sql,
-    stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Result<Vec<FileKey>, Error> {
-    log::debug!(
-        "[trace_id {trace_id}] search->storage: get file_list in grpc, stream {}/{}/{}, time_range {:?}",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
-        &sql.meta.time_range
-    );
-    let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = match file_list::query(
-        &sql.org_id,
-        &sql.stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-        true,
-    )
-    .await
-    {
-        Ok(file_list) => file_list,
-        Err(err) => {
-            log::error!("[trace_id {trace_id}] get file list error: {}", err);
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                "get file list error".to_string(),
-            )));
-        }
-    };
-
-    let mut files = Vec::with_capacity(file_list.len());
-    for file in file_list {
-        if sql
-            .match_source(&file, false, false, stream_type, partition_keys)
-            .await
-        {
-            files.push(file.to_owned());
-        }
-    }
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    Ok(files)
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
