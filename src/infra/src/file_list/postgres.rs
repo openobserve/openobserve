@@ -437,7 +437,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
             let ret = match task.await {
                 Ok(Ok(r)) => r.into_iter().map(|r| {
                     (
-                        format!("files/{}/{}/{}", stream_name, r.date, r.file),
+                        format!("files/{}/{}/{}", stream_key, r.date, r.file),
                         FileMeta::from(&r),
                     )
                 }),
