@@ -932,7 +932,11 @@ import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete, MarkLineConfig },
+  components: {
+    Drilldown,
+    CommonAutoComplete,
+    MarkLineConfig,
+  },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
