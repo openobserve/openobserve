@@ -299,6 +299,42 @@ async fn query_inner(
     Ok(file_keys)
 }
 
+
+#[tracing::instrument(
+    name = "service::file_list::query_parallel",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_parallel(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    time_level: PartitionTimeLevel,
+    time_min: i64,
+    time_max: i64,
+    _is_local: bool,
+) -> Result<Vec<FileKey>, anyhow::Error> { 
+    let files = file_list::query_parallel(
+        org_id,
+        stream_type,
+        stream_name,
+        time_level,
+        Some((time_min, time_max)),
+    )
+    .await?;
+    let mut file_keys = Vec::with_capacity(files.len());
+    for file in files {
+        file_keys.push(FileKey {
+            key: file.0,
+            meta: file.1,
+            deleted: false,
+            segment_ids: None,
+        });
+    }
+    Ok(file_keys)
+}
+
+
 #[inline]
 pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
