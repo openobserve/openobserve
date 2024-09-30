@@ -256,7 +256,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-show="showSearchHistory">
       <search-history
+      ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
+        :isClicked="showSearchHistory"
+
         />
     </div>
   </q-page>
@@ -436,6 +439,7 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
+    const searchHistoryRef = ref(null);
     let {
       searchObj,
       getQueryData,
@@ -613,7 +617,9 @@ export default defineComponent({
 
     watch(
       () => router.currentRoute.value.query.type,
+      
       (type, prev) => {
+
         if (
 
           searchObj.shouldIgnoreWatcher == false &&
@@ -650,6 +656,8 @@ export default defineComponent({
           searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
           searchObj.data.stream.streamType = router.currentRoute.value.query.stream_type;
           resetSearchObj();
+          searchObj.data.queryResults.hits = [];
+          searchObj.meta.searchApplied = false;
           resetStreamData();
           restoreUrlQueryParams();
           // loadLogsData();
@@ -842,6 +850,7 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
+
       router.push({
           name: "logs",
           query: {
@@ -850,6 +859,8 @@ export default defineComponent({
           },
         });
       showSearchHistory.value = true;
+
+
     }
 
     function removeFieldByName(data, fieldName) {
@@ -1061,6 +1072,7 @@ export default defineComponent({
     const closeSearchHistoryfn = () => {
       router.back();
       showSearchHistory.value = false;
+      refreshHistogramChart();
     };
 
     // watch for changes in the visualize toggle

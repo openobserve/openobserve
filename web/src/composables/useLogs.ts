@@ -552,7 +552,9 @@ const useLogs = () => {
 
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
-
+    if(query.hasOwnProperty("type") && query.type == "search_history_re_apply"){
+      delete query.type;
+    }
     router.push({ query });
   };
 
@@ -3702,7 +3704,9 @@ const useLogs = () => {
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
-      // searchObj.data.histogram.chartParams.title = ""
+      if(router.currentRoute.value.query.hasOwnProperty("type") &&  router.currentRoute.value.query.type == "search_history_re_apply"){
+       delete router.currentRoute.value.query.type;
+        }   
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -3820,7 +3824,9 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
-
+    if(queryParams.hasOwnProperty("type") &&  queryParams.type == "search_history_re_apply"){
+      delete queryParams.type;
+    }
     // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
