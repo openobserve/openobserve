@@ -377,7 +377,9 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
-        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS {
+        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
+            || stream_type == StreamType::EnrichmentTables
+        {
             vec![(time_start, time_end)]
         } else {
             let mut partitions = Vec::new();
