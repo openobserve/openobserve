@@ -446,6 +446,7 @@ pub async fn local_cache_gc() -> Result<()> {
 pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
     pub stream: String,
     pub date: String,
     pub file: String,
