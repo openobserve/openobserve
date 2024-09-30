@@ -354,7 +354,10 @@ export default defineComponent({
           combinedWarnings.push(combinedMessage);
         }
       });
-      maxQueryRange.value = combinedWarnings;
+
+      // NOTE: for multi query, just show the first query warning
+      maxQueryRange.value =
+        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
     };
 
     // to store and show when the panel was last loaded
