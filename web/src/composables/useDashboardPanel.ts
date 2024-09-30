@@ -756,6 +756,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
 
       case "area":
@@ -829,6 +832,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "geomap":
         dashboardPanelData.data.queries[
@@ -853,16 +859,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit = 0;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "sankey":
         dashboardPanelData.data.queries[
@@ -894,6 +909,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit = 0;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
       default:
         break;
     }
