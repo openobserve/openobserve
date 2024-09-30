@@ -726,10 +726,10 @@ export default defineComponent({
       formData.value = alerts.value.find(
         (alert: any) => alert.uuid === props.row?.uuid,
       ) as Alert;
-      if( formData.value){
-        console.log(formData,"formdata")
-        formData.value.query_condition.multi_time_range = [{offSet:"30m"}];
-      }
+      //use this comment for testing multi_time_range shifts
+      // if( formData.value){
+      //   formData.value.query_condition.multi_time_range = [{offSet:"30m"}];
+      // }
       let action;
       if (!props.row) {
         isUpdated.value = false;
