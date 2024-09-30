@@ -1010,7 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
+import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
@@ -1326,30 +1326,6 @@ export default defineComponent({
         dashboardPanelData.layout.currentQueryIndex
       ].config.time_shift.splice(index, 1);
     };
-
-    const isChartTypeAllowForTimeShift = computed(() => {
-      return [
-        "area",
-        "bar",
-        "line",
-        "h-bar",
-        "h-stacked",
-        "scatter",
-        "area-stacked",
-        "stacked",
-      ].includes(dashboardPanelData.data.type);
-    });
-
-    watch(
-      () => dashboardPanelData.data.type,
-      () => {
-        if (!isChartTypeAllowForTimeShift.value) {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].config.time_shift = [];
-        }
-      },
-    );
 
     return {
       t,
