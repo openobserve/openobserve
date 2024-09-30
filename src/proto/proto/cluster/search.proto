@@ -56,8 +56,9 @@ message SearchResponse {
     int32           size = 5;
     bytes           hits = 6;
     ScanStats scan_stats = 8;
-    bool      is_partial = 9;
-    int32      idx_took = 10;
+    int32       idx_took = 9;
+    bool     is_partial = 10;
+    string  partial_err = 11;
 }
 
 enum AggregateMode {

@@ -55,7 +55,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
+    let (merge_batches, scan_stats, took_wait, is_partial, partial_err, idx_took) =
         match super::search(&trace_id, sql.clone(), req).await {
             Ok(v) => v,
             Err(e) => {
@@ -190,7 +190,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
 
     result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
-    result.set_partial(is_partial);
+    result.set_partial(is_partial, partial_err);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);

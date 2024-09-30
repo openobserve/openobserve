@@ -311,8 +311,13 @@ impl Response {
         self.trace_id = trace_id;
     }
 
-    pub fn set_partial(&mut self, is_partial: bool) {
+    pub fn set_partial(&mut self, is_partial: bool, msg: String) {
         self.is_partial = is_partial;
+        if self.function_error.is_empty() {
+            self.function_error = msg;
+        } else {
+            self.function_error = format!("{} \n {}", self.function_error, msg);
+        }
     }
 
     pub fn set_histogram_interval(&mut self, val: Option<i64>) {
