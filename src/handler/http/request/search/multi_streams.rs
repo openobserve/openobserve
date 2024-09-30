@@ -213,6 +213,11 @@ pub async fn search_multi(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
                     range_error, &stream_name, max_query_range
                 );
+
+                if multi_res.new_start_time.is_none() {
+                    multi_res.new_start_time = Some(req.query.start_time);
+                    multi_res.new_end_time = Some(req.query.end_time);
+                }
             }
         }
 
@@ -387,6 +392,9 @@ pub async fn search_multi(
                     } else {
                         format!("{} \n {}", partial_err, res.function_error)
                     };
+                }
+                if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
+                    multi_res.histogram_interval = res.histogram_interval;
                 }
             }
             Err(err) => {
