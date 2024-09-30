@@ -75,7 +75,7 @@ pub async fn search(
     trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut req: cluster_rpc::SearchRequest,
-) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, String, usize)> {
     let start = std::time::Instant::now();
 
     let cfg = get_config();
@@ -513,6 +513,7 @@ pub async fn search(
                         Node::default(),
                         cluster_rpc::SearchResponse {
                             is_partial: true,
+                            partial_err: err.to_string(),
                             ..Default::default()
                         },
                     ));
@@ -567,7 +568,7 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-    let (merge_batches, mut scan_stats, is_partial) = match handle {
+    let (merge_batches, mut scan_stats, is_partial, partial_err) = match handle {
         Ok(v) => v,
         Err(e) => {
             // search done, release lock
@@ -602,7 +603,14 @@ pub async fn search(
 
     scan_stats.idx_scan_size = idx_scan_size as i64;
     scan_stats.original_size += idx_scan_size as i64;
-    Ok((merge_batches, scan_stats, took_wait, is_partial, idx_took))
+    Ok((
+        merge_batches,
+        scan_stats,
+        took_wait,
+        is_partial,
+        partial_err,
+        idx_took,
+    ))
 }
 
 #[cfg(feature = "enterprise")]
@@ -695,14 +703,20 @@ async fn merge_grpc_result(
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
     is_final_phase: bool,
-) -> Result<(Vec<RecordBatch>, ScanStats, bool)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, bool, String)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
     let mut batches: Vec<Vec<RecordBatch>> = Vec::new();
     let mut is_partial = false;
+    let mut partial_err = "".to_string();
     for (_, resp) in results {
         if resp.is_partial {
             is_partial = true;
+            if partial_err.is_empty() {
+                partial_err = resp.partial_err;
+            } else {
+                partial_err = format!("{} \n {}", partial_err, resp.partial_err);
+            }
             continue;
         }
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
@@ -791,7 +805,7 @@ async fn merge_grpc_result(
                 return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: super cluster follow cluster merge task is cancel"))));
             }
         }
-        Ok((merge_batch, scan_stats, is_partial))
+        Ok((merge_batch, scan_stats, is_partial, partial_err))
     } else {
         let merge_batch;
         tokio::select! {
@@ -823,7 +837,7 @@ async fn merge_grpc_result(
                 return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: final merge task is cancel"))));
             }
         }
-        Ok((merge_batch, scan_stats, is_partial))
+        Ok((merge_batch, scan_stats, is_partial, partial_err))
     }
 }
 

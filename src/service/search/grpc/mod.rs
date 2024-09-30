@@ -191,6 +191,7 @@ pub async fn search(
             hits: vec![],
             scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
             is_partial: false,
+            partial_err: "".to_string(),
         });
     }
 
@@ -331,6 +332,7 @@ pub async fn search(
         hits: hits_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
         is_partial: false,
+        partial_err: "".to_string(),
     };
 
     Ok(result)

@@ -1397,10 +1397,12 @@ pub struct SearchResponse {
     pub hits: ::prost::alloc::vec::Vec<u8>,
     #[prost(message, optional, tag = "8")]
     pub scan_stats: ::core::option::Option<ScanStats>,
-    #[prost(bool, tag = "9")]
-    pub is_partial: bool,
-    #[prost(int32, tag = "10")]
+    #[prost(int32, tag = "9")]
     pub idx_took: i32,
+    #[prost(bool, tag = "10")]
+    pub is_partial: bool,
+    #[prost(string, tag = "11")]
+    pub partial_err: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

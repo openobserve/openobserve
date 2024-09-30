@@ -73,7 +73,7 @@ pub async fn search(
         .into_iter()
         .map(|v| (Node::default(), v))
         .collect();
-    let (merge_batches, scan_stats, is_partial) =
+    let (merge_batches, scan_stats, is_partial, partial_err) =
         match super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await {
             Ok(v) => v,
             Err(e) => {
@@ -209,7 +209,7 @@ pub async fn search(
 
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);
-    result.set_partial(is_partial);
+    result.set_partial(is_partial, partial_err);
     result.set_histogram_interval(sql.histogram_interval);
     result.set_cluster_took(start.elapsed().as_millis() as usize, 0);
     result.set_file_count(scan_stats.files as usize);
