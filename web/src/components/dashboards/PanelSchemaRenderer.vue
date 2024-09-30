@@ -672,9 +672,15 @@ export default defineComponent({
         }
 
         // param to pass current query
-        drilldownVariables.query = panelSchema.value.queries[0].query ?? "";
+        // use metadata query[replaced variables values] or panelSchema query
+        drilldownVariables.query =
+          metadata?.value?.queries[0]?.query ??
+          panelSchema?.value?.queries[0]?.query ??
+          "";
         drilldownVariables.query_encoded = b64EncodeUnicode(
-          panelSchema.value.queries[0].query ?? "",
+          metadata?.value?.queries[0]?.query ??
+            panelSchema?.value?.queries[0]?.query ??
+            "",
         );
 
         // if chart type is 'table' then we need to pass the table name
