@@ -573,7 +573,7 @@ export const usePanelDataLoader = (
 
                     // update result metadata
                     state.resultMetaData[i] = {
-                      ...searchRes,
+                      ...searchRes.data,
                       hits: searchRes.data.hits[i],
                     };
 
