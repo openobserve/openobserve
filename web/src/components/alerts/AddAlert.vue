@@ -183,7 +183,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-else>
-
               <scheduled-alert
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
@@ -200,7 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:promql_condition="
                   formData.query_condition.promql_condition
                 "
-                v-model:multi_time_range ="formData.query_condition.multi_time_range"
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
@@ -209,7 +207,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @input:update="onInputUpdate"
                 @validate-sql="validateSqlQuery"
                 @update:showVrlFunction="updateFunctionVisibility"
-                @update:multi_time_range="updateMultiTimeRange"
                 class="q-mt-sm"
               />
             </div>
@@ -502,7 +499,6 @@ const defaultValue: any = () => {
       },
       promql_condition: null,
       vrl_function: null,
-      multi_time_range:[],
     },
     trigger_condition: {
       period: 10,
@@ -1187,11 +1183,6 @@ export default defineComponent({
         vrlFunctionError.value = "";
       }
     };
-    const updateMultiTimeRange = (value) =>{
-      if(value){
-        formData.value.query_condition.multi_time_range = value;
-      }
-    }
 
     return {
       t,
@@ -1256,7 +1247,6 @@ export default defineComponent({
       convertDateToTimestamp,
       getTimezonesByOffset,
       showTimezoneWarning,
-      updateMultiTimeRange,
     };
   },
 
