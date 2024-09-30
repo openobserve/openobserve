@@ -168,6 +168,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
+    let should_store_last_end_time =
+        alert.trigger_condition.frequency == alert.trigger_condition.period;
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
