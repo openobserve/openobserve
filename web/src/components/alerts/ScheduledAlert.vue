@@ -1015,7 +1015,7 @@ const addField = () => {
   emits("field:add");
 };
 
-const updateDateTimePicker = (data) =>{
+const updateDateTimePicker = (data : any) =>{
   emits("update:multi_time_range", dateTimePicker.value);
   console.log("data",dateTimePicker.value);
 }

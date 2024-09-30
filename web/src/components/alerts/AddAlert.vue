@@ -1187,7 +1187,7 @@ export default defineComponent({
         vrlFunctionError.value = "";
       }
     };
-    const updateMultiTimeRange = (value) =>{
+    const updateMultiTimeRange = (value : any) =>{
       if(value){
         formData.value.query_condition.multi_time_range = value;
       }
