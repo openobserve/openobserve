@@ -1224,6 +1224,8 @@ pub struct S3 {
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
     pub max_retries: usize,
+    #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
+    pub max_idle_per_host: usize,
 }
 
 #[derive(Debug, EnvConfig)]
