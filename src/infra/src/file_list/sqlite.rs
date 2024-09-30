@@ -422,7 +422,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
 
         let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
-            || stream_type == StreamType::EnrichmentTables
+            || time_end - time_start > DAY_MICRO_SECS * 30
         {
             vec![(time_start, time_end)]
         } else {
