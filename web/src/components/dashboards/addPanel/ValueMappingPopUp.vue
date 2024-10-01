@@ -41,7 +41,7 @@
             :key="index"
             class="draggable-row"
           >
-            <div class="draggable-handle">
+            <div class="draggable-handle tw-self-center">
               <q-icon
                 name="drag_indicator"
                 color="grey-13"
@@ -52,20 +52,54 @@
             <div class="draggable-content">
               <q-select
                 v-model="mapping.type"
-                :options="mappingTypes"
                 label="Type"
-                class="tw-w-40 showLabelOnTop"
-                stack-label
-                emit-value
+                :options="mappingTypes"
                 data-test="dashboard-addpanel-config-value-mapping-type-select"
-              />
+                emit-value
+                input-debounce="0"
+                behavior="menu"
+                filled
+                borderless
+                dense
+                class="q-mb-xs"
+              ></q-select>
+
               <q-input
                 v-if="mapping.type === 'value'"
                 v-model="mapping.value"
                 label="Value"
                 class="showLabelOnTop"
-                data-test="dashboard-addpanel-config-value-mapping-name-edit"
+                data-test="dashboard-addpanel-config-value-mapping-value-input"
               />
+
+              <q-input
+                v-if="mapping.type === 'range'"
+                v-model="mapping.from"
+                label="From"
+                class="showLabelOnTop"
+                data-test="dashboard-addpanel-config-value-mapping-value-from-input"
+              />
+
+              <q-input
+                v-if="mapping.type === 'range'"
+                v-model="mapping.to"
+                label="To"
+                class="showLabelOnTop"
+                data-test="dashboard-addpanel-config-value-mapping-value-to-input"
+              />
+
+              <div v-if="mapping.color">
+                <input
+                  v-if="mapping.color"
+                  type="color"
+                  data-test="dashboard-addpanel-config-value-mapping-color-input"
+                  v-model="mapping.color"
+                />
+                <div @click="removeColorByIndex(index)">Remove Color</div>
+              </div>
+              <div v-else>
+                <div @click="setColorByIndex(index)">Set color</div>
+              </div>
 
               <span class="q-ml-lg">
                 <q-btn
@@ -78,6 +112,7 @@
                   round
                   flat
                   data-test="dashboard-addpanel-config-value-mapping-delete-btn"
+                  @click="removeValueMappingByIndex(index)"
                 ></q-btn>
               </span>
             </div>
@@ -139,7 +174,7 @@ export default defineComponent({
       dashboardPanelData.data.config.mappings.push({
         type: "value",
         value: "",
-        color: "#000000",
+        color: null,
       });
     };
 
@@ -158,6 +193,14 @@ export default defineComponent({
       }
     });
 
+    const setColorByIndex = (index: number) => {
+      dashboardPanelData.data.config.mappings[index].color = "#000000";
+    };
+
+    const removeColorByIndex = (index: number) => {
+      dashboardPanelData.data.config.mappings[index].color = null;
+    };
+
     return {
       t,
       dashboardPanelData,
@@ -167,6 +210,8 @@ export default defineComponent({
       mappingTypes,
       dragOptions,
       outlinedDelete,
+      setColorByIndex,
+      removeColorByIndex,
     };
   },
 });
