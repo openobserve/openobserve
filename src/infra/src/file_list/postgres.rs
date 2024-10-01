@@ -19,7 +19,11 @@ use async_trait::async_trait;
 use config::{
     get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    utils::{hash::Sum64, parquet::parse_file_key_columns},
+    utils::{
+        hash::Sum64,
+        parquet::parse_file_key_columns,
+        time::{end_of_the_day, DAY_MICRO_SECS},
+    },
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
@@ -352,7 +356,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .into_iter()
             .map(|r| {
                 (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     FileMeta::from(&r),
                 )
             })
@@ -366,7 +370,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut ret = Vec::new();
         let pool = CLIENT.clone();
 
-        for chunk in ids.chunks(get_config().limit.meta_id_batch_size) {
+        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -389,7 +393,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .map(|r| {
                 (
                     r.id,
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     FileMeta::from(&r),
                 )
             })
@@ -411,34 +415,68 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-
-        let pool = CLIENT.clone();
-
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
-        let cfg = get_config();
-        let ret = if cfg.limit.use_upper_bound_for_max_ts {
-            let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-            sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
-            )
-            .bind(stream_key)
-            .bind(time_start)
-            .bind(max_ts_upper_bound)
-            .bind(time_end)
-            .fetch_all(&pool)
-            .await?
-        } else {
-            sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
-            )
-            .bind(stream_key)
-            .bind(time_start)
-            .bind(time_end)
-            .fetch_all(&pool)
-            .await?
-        };
 
-        Ok(ret)
+        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
+            || time_end - time_start > DAY_MICRO_SECS * 30
+            || !get_config().limit.file_list_multi_thread
+        {
+            vec![(time_start, time_end)]
+        } else {
+            let mut partitions = Vec::new();
+            let mut start = time_start;
+            while start < time_end {
+                let end_of_day = std::cmp::min(end_of_the_day(start), time_end);
+                partitions.push((start, end_of_day));
+                start = end_of_day + 1; // next day, use end_of_day + 1 microsecond
+            }
+            partitions
+        };
+        log::debug!("file_list day_partitions: {:?}", day_partitions);
+
+        let mut tasks = Vec::with_capacity(day_partitions.len());
+        for (time_start, time_end) in day_partitions {
+            let stream_key = stream_key.clone();
+            tasks.push(tokio::task::spawn(async move {
+                let pool = CLIENT.clone();
+                let cfg = get_config();
+                if cfg.limit.use_upper_bound_for_max_ts {
+                    let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                    sqlx::query_as::<_, super::FileId>(
+                        r#"SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
+                    )
+                    .bind(stream_key)
+                    .bind(time_start)
+                    .bind(max_ts_upper_bound)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+                } else {
+                    sqlx::query_as::<_, super::FileId>(
+                        r#"SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
+                    )
+                    .bind(stream_key)
+                    .bind(time_start)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+                }
+            }));
+        }
+
+        let mut rets = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok(Ok(r)) => rets.extend(r),
+                Ok(Err(e)) => {
+                    return Err(e.into());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
+            };
+        }
+        Ok(rets)
     }
 
     async fn query_deleted(

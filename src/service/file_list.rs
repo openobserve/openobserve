@@ -28,6 +28,7 @@ use infra::{
     errors::{Error, Result},
     file_list, storage,
 };
+use rayon::slice::ParallelSliceMut;
 
 use crate::service::db;
 
@@ -138,20 +139,16 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
 )]
 pub async fn query_ids(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     time_level: PartitionTimeLevel,
-    time_min: i64,
-    time_max: i64,
+    time_range: Option<(i64, i64)>,
 ) -> Result<Vec<file_list::FileId>> {
-    file_list::query_ids(
-        org_id,
-        stream_type,
-        stream_name,
-        time_level,
-        Some((time_min, time_max)),
-    )
-    .await
+    let mut files =
+        file_list::query_ids(org_id, stream_type, stream_name, time_level, time_range).await?;
+    files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
+    files.dedup_by(|a, b| a.id == b.id);
+    Ok(files)
 }
 
 #[inline]

@@ -334,11 +334,12 @@ pub async fn get_latest_traces(
         let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
         let trace_start_time = item.get("trace_start_time").unwrap().as_i64().unwrap();
         let trace_end_time = item.get("trace_end_time").unwrap().as_i64().unwrap();
-        if trace_start_time < start_time {
-            start_time = trace_start_time;
+        // trace time is nanosecond, need to compare with microsecond
+        if trace_start_time / 1000 < start_time {
+            start_time = trace_start_time / 1000;
         }
-        if trace_end_time > end_time {
-            end_time = trace_end_time;
+        if trace_end_time / 1000 > end_time {
+            end_time = trace_end_time / 1000;
         }
         traces_data.insert(
             trace_id.clone(),

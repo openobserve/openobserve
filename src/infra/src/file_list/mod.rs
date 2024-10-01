@@ -264,7 +264,7 @@ pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
 
 #[inline]
 #[tracing::instrument(
-    name = "infra:file_list:query_db_ids",
+    name = "infra:file_list:db:query_ids",
     skip_all,
     fields(org_id = org_id, stream_name = stream_name)
 )]
@@ -446,6 +446,7 @@ pub async fn local_cache_gc() -> Result<()> {
 pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
     pub stream: String,
     pub date: String,
     pub file: String,
@@ -532,5 +533,6 @@ pub enum FileListJobStatus {
 #[derive(Clone, Debug, Default, sqlx::FromRow)]
 pub struct FileId {
     pub id: i64,
+    pub records: i64,
     pub original_size: i64,
 }
