@@ -722,6 +722,11 @@ export const convertSQLData = async (
         // inverse data for h-stacked and h-bar
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
+        label: {
+          show: panelSchema.config?.label?.position == null ? false : true,
+          position: panelSchema.config?.label?.position || "None",
+          rotate: panelSchema.config?.label?.rotate || 0,
+        },
         nameLocation: "middle",
         nameGap: 25,
         nameTextStyle: {
@@ -897,11 +902,18 @@ export const convertSQLData = async (
               const data = missingValueData.filter(
                 (it: any) => it[key1] == key
               );
+
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                 ...defaultSeriesProps,
+                label: {
+                  show:
+                    panelSchema.config?.label?.position == null ? false : true,
+                  position: panelSchema.config?.label?.position || "None",
+                  rotate: panelSchema.config?.label?.rotate || 0,
+                },
                 // markLine if exist
                 markLine: {
                   silent: true,
@@ -928,6 +940,11 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
+            label: {
+              show: panelSchema.config?.label?.position == null ? false : true,
+              position: panelSchema.config?.label?.position || "None",
+              rotate: panelSchema.config?.label?.rotate || 0,
+            },
             // color:
             //   panelSchema.queries[0]?.fields?.y.find(
             //     (it: any) => it.alias == key,
@@ -1021,6 +1038,11 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
+            label: {
+              show: panelSchema.config?.label?.position == null ? false : true,
+              position: panelSchema.config?.label?.position || "None",
+              rotate: panelSchema.config?.label?.rotate || 0,
+            },
             // color:
             //   panelSchema.queries[0]?.fields?.y.find(
             //     (it: any) => it.alias == key,
@@ -1054,9 +1076,9 @@ export const convertSQLData = async (
           opacity: 0.8,
           ...defaultSeriesProps,
           label: {
-            show: true,
-            position: "top",
-            rotate: 10,
+            show: panelSchema.config?.label?.position == null ? false : true,
+            position: panelSchema.config?.label?.position || "None",
+            rotate: panelSchema.config?.label?.rotate || 0,
           },
           // markLine if exist
           markLine: {
@@ -1098,9 +1120,11 @@ export const convertSQLData = async (
             silent: true,
             animation: false,
             data: getMarkLineData(panelSchema),
-          },label: {
-            show: true,
-            position: "top",
+          },
+          label: {
+            show: panelSchema.config?.label?.position == null ? false : true,
+            position: panelSchema.config?.label?.position || "None",
+            rotate: panelSchema.config?.label?.rotate || 0,
           },
           data: getAxisDataFromKey(key),
           barMinHeight: 1,
@@ -1304,6 +1328,11 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          label: {
+            show: panelSchema.config?.label?.position == null ? false : true,
+            position: panelSchema.config?.label?.position || "None",
+            rotate: panelSchema.config?.label?.rotate || 0,
+          },
           // markLine if exist
           markLine: {
             silent: true,
@@ -1365,6 +1394,7 @@ export const convertSQLData = async (
           {
             ...defaultSeriesProps,
             name: panelSchema?.queries[0]?.fields?.y[0].label,
+
             data: zValues
               .map((it: any, index: any) => {
                 return xAxisZerothPositionUniqueValue.map(
@@ -1514,6 +1544,11 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          label: {
+            show: panelSchema.config?.label?.position == null ? false : true,
+            position: panelSchema.config?.label?.position || "None",
+            rotate: panelSchema.config?.label?.rotate || 0,
+          },
           // markLine if exist
           markLine: {
             silent: true,
