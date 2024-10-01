@@ -681,6 +681,12 @@ pub async fn match_file(
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
+    // fast path
+    if partition_keys.is_empty() || !source.key.contains('=') {
+        return true;
+    }
+
+    // slow path
     let mut filters = generate_filter_from_equal_items(equal_items);
     let partition_keys: HashMap<&String, &StreamPartition> =
         partition_keys.iter().map(|v| (&v.field, v)).collect();

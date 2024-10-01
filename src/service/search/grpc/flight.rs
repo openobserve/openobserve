@@ -319,7 +319,7 @@ async fn get_file_list_by_ids(
         )
         .await
         {
-            files.push(file.to_owned());
+            files.push(file);
         }
     }
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
