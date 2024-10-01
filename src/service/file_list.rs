@@ -305,14 +305,15 @@ async fn query_inner(
     fields(org_id = org_id, stream_name = stream_name)
 )]
 pub async fn query_parallel(
+    trace_id: &str,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
-    _is_local: bool,
 ) -> Result<Vec<FileKey>, anyhow::Error> {
+    let start = std::time::Instant::now();
     let files = file_list::query_parallel(
         org_id,
         stream_type,
@@ -321,6 +322,14 @@ pub async fn query_parallel(
         Some((time_min, time_max)),
     )
     .await?;
+
+    log::debug!(
+        "[trace_id {trace_id}] service: get_file_list time_range: {:?}, num: {}, took: {} ms",
+        (time_min, time_max),
+        files.len(),
+        start.elapsed().as_millis(),
+    );
+
     let mut file_keys = Vec::with_capacity(files.len());
     for file in files {
         file_keys.push(FileKey {

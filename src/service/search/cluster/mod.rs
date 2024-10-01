@@ -843,27 +843,21 @@ async fn merge_grpc_result(
 
 #[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub(crate) async fn get_file_list(
-    _trace_id: &str,
+    trace_id: &str,
     sql: &super::sql::Sql,
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
-    let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default()
-            .len()
-            <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = file_list::query_parallel(
+        trace_id,
         &sql.org_id,
         &sql.stream_name,
         stream_type,
         time_level,
         time_min,
         time_max,
-        is_local,
     )
     .await
     .unwrap_or_default();
