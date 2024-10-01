@@ -14,10 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::web;
-use config::utils::json;
+use config::utils::{hash::Sum64, json};
 
 use crate::{
-    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
+    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardHash, DashboardVersion},
     service::db,
 };
 
@@ -32,12 +32,15 @@ pub(crate) async fn get(
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let bytes = db::get(&key).await?;
+    let dash_str = std::str::from_utf8(&bytes)?;
+    let hash = config::utils::hash::gxhash::new().sum64(dash_str);
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
     if d_version.version == 1 {
         let dash: v1::Dashboard = json::from_slice(&bytes)?;
         Ok(Dashboard {
             v1: Some(dash),
             version: 1,
+            hash,
             ..Default::default()
         })
     } else if d_version.version == 2 {
@@ -45,6 +48,7 @@ pub(crate) async fn get(
         Ok(Dashboard {
             v2: Some(dash),
             version: 2,
+            hash,
             ..Default::default()
         })
     } else if d_version.version == 3 {
@@ -52,6 +56,7 @@ pub(crate) async fn get(
         Ok(Dashboard {
             v3: Some(dash),
             version: 3,
+            hash,
             ..Default::default()
         })
     } else if d_version.version == 4 {
@@ -59,6 +64,7 @@ pub(crate) async fn get(
         Ok(Dashboard {
             v4: Some(dash),
             version: 4,
+            hash,
             ..Default::default()
         })
     } else {
@@ -66,6 +72,7 @@ pub(crate) async fn get(
         Ok(Dashboard {
             v5: Some(dash),
             version: 5,
+            hash,
             ..Default::default()
         })
     }
@@ -79,6 +86,17 @@ pub(crate) async fn put(
     body: web::Bytes,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{}", dashboard_id);
+    if let Ok(existing_dash_bytes) = db::get(&key).await {
+        let existing_dash_str = std::str::from_utf8(&existing_dash_bytes)?;
+        let existing_dash_hash = config::utils::hash::gxhash::new().sum64(existing_dash_str);
+        let d_hash: DashboardHash = json::from_slice(&body)?;
+        log::warn!("TL: received dash_hash: {}", d_hash.hash);
+        if d_hash.hash != existing_dash_hash {
+            return Err(anyhow::anyhow!(
+                "This dashboard has been updated by someone else. Please refresh to get the latest data before saving the changes."
+            ));
+        }
+    };
     let d_version: DashboardVersion = json::from_slice(&body)?;
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
@@ -166,12 +184,15 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
         .await?
         .into_values()
         .map(|val| {
+            let dash_str = std::str::from_utf8(&val)?;
+            let hash = config::utils::hash::gxhash::new().sum64(dash_str);
             let d_version: DashboardVersion = json::from_slice(&val).unwrap();
             if d_version.version == 1 {
                 let dash: v1::Dashboard = json::from_slice(&val).unwrap();
                 Ok(Dashboard {
                     v1: Some(dash),
                     version: 1,
+                    hash,
                     ..Default::default()
                 })
             } else if d_version.version == 2 {
@@ -179,6 +200,7 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 Ok(Dashboard {
                     v2: Some(dash),
                     version: 2,
+                    hash,
                     ..Default::default()
                 })
             } else if d_version.version == 3 {
@@ -186,6 +208,7 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 Ok(Dashboard {
                     v3: Some(dash),
                     version: 3,
+                    hash,
                     ..Default::default()
                 })
             } else if d_version.version == 4 {
@@ -193,6 +216,7 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 Ok(Dashboard {
                     v4: Some(dash),
                     version: 4,
+                    hash,
                     ..Default::default()
                 })
             } else {
@@ -200,6 +224,7 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 Ok(Dashboard {
                     v5: Some(dash),
                     version: 5,
+                    hash,
                     ..Default::default()
                 })
             }
