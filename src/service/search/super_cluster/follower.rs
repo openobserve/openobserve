@@ -123,8 +123,7 @@ pub async fn search(
         partition_time_level,
         req.time_range,
     )
-    .await
-    .unwrap_or_default();
+    .await?;
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;

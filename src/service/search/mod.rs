@@ -298,8 +298,7 @@ pub async fn search_partition(
                 partition_time_level,
                 sql.time_range,
             )
-            .await
-            .unwrap_or_default();
+            .await?;
             max_query_range = max(max_query_range, stream_settings.max_query_range);
             files.extend(stream_files);
         }

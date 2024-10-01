@@ -744,8 +744,7 @@ pub async fn get_file_id_lists(
             partition_time_level,
             time_range,
         )
-        .await
-        .unwrap_or_default();
+        .await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
