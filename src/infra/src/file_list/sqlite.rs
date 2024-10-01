@@ -419,7 +419,12 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
                         r.into_iter()
                             .map(|r| {
                                 (
-                                    format!("files/{}/{}/{}", stream_key, r.date, r.file),
+                                    "files/".to_string()
+                                        + &stream_key
+                                        + "/"
+                                        + &r.date
+                                        + "/"
+                                        + &r.file,
                                     FileMeta::from(&r),
                                 )
                             })
@@ -442,7 +447,12 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
                         r.into_iter()
                             .map(|r| {
                                 (
-                                    format!("files/{}/{}/{}", stream_key, r.date, r.file),
+                                    "files/".to_string()
+                                        + &stream_key
+                                        + "/"
+                                        + &r.date
+                                        + "/"
+                                        + &r.file,
                                     FileMeta::from(&r),
                                 )
                             })
