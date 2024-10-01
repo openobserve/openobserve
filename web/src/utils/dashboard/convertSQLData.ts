@@ -2287,7 +2287,13 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
+        smooth:
+          panelSchema.config?.line_interpolation === "smooth" ? true : false,
+        step: ["step-start", "step-end", "step-middle"].includes(
+          panelSchema.config?.line_interpolation,
+        )
+          ? panelSchema.config.line_interpolation.replace("step-", "")
+          : false,
         showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,
         lineStyle: { width: 1.5 },
@@ -2348,7 +2354,13 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
     case "area":
       return {
         type: "line",
-        smooth: true,
+        smooth:
+          panelSchema.config?.line_interpolation === "smooth" ? true : false,
+        step: ["step-start", "step-end", "step-middle"].includes(
+          panelSchema.config?.line_interpolation,
+        )
+          ? panelSchema.config.line_interpolation.replace("step-", "")
+          : false,
         emphasis: { focus: "series" },
         areaStyle: {},
         showSymbol: panelSchema.config?.show_symbol ?? false,
@@ -2380,7 +2392,13 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
     case "area-stacked":
       return {
         type: "line",
-        smooth: true,
+        smooth:
+          panelSchema.config?.line_interpolation === "smooth" ? true : false,
+        step: ["step-start", "step-end", "step-middle"].includes(
+          panelSchema.config?.line_interpolation,
+        )
+          ? panelSchema.config.line_interpolation.replace("step-", "")
+          : false,
         stack: "Total",
         areaStyle: {},
         emphasis: {

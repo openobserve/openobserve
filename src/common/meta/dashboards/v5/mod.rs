@@ -210,6 +210,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     show_symbol: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    line_interpolation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
