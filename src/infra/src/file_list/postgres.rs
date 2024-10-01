@@ -370,7 +370,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut ret = Vec::new();
         let pool = CLIENT.clone();
 
-        for chunk in ids.chunks(get_config().limit.meta_id_batch_size) {
+        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -419,6 +419,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
             || time_end - time_start > DAY_MICRO_SECS * 30
+            || !get_config().limit.file_list_multi_thread
         {
             vec![(time_start, time_end)]
         } else {
