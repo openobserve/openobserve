@@ -872,11 +872,13 @@ pub(crate) async fn get_file_list(
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
-        if sql
-            .match_source(&file, false, false, stream_type, partition_keys)
-            .await
+        if partition_keys.is_empty()
+            || !file.key.contains('=')
+            || sql
+                .match_source(&file, false, false, stream_type, partition_keys)
+                .await
         {
-            files.push(file.to_owned());
+            files.push(file);
         }
     }
 
