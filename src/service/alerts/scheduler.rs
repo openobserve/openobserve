@@ -125,11 +125,20 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         }
     };
     let now = Utc::now().timestamp_micros();
+    // The delay in processing the trigger from the time it was supposed to run
+    let processing_delay = now - trigger.next_run_at;
     // This is the end time of the last trigger timerange  + 1.
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
     let start_time = if trigger.data.is_empty() {
-        None
+        // approximate the start time involving the alert manager delay
+        Some(
+            now - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
+                - processing_delay,
+        )
     } else {
         let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
         if let Ok(last_data) = last_data {
@@ -156,7 +165,9 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
-    let mut trigger_data_stream = TriggerData {
+    let mut should_store_last_end_time =
+        alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
+    let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: triggered_at,
         org: trigger.org,
         module: TriggerDataType::Alert,
@@ -251,6 +262,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 .unwrap();
         }
         new_trigger.is_silenced = true;
+        // For silence period, no need to store last end time
+        should_store_last_end_time = false;
     } else if alert.trigger_condition.frequency_type == FrequencyType::Cron {
         let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
         // tz_offset is in minutes
@@ -300,10 +313,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 }
                 trigger_data_stream.success_response = Some(success_msg);
                 // Notification was sent successfully, store the last used end_time in the triggers
-                new_trigger.data = json::to_string(&DerivedTriggerData {
-                    period_end_time: alert_end_time,
-                })
-                .unwrap();
+                new_trigger.data = if should_store_last_end_time {
+                    json::to_string(&DerivedTriggerData {
+                        period_end_time: alert_end_time,
+                    })
+                    .unwrap()
+                } else {
+                    "".to_string()
+                };
                 // Notification is already sent to some destinations,
                 // hence in case of partial errors, no need to retry
                 db::scheduler::update_trigger(new_trigger).await?;
@@ -358,10 +375,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         );
         // Condition did not match, store the last used end_time in the triggers
         // In the next run, the alert will be checked from the last end_time
-        new_trigger.data = json::to_string(&DerivedTriggerData {
-            period_end_time: end_time,
-        })
-        .unwrap();
+        new_trigger.data = if should_store_last_end_time {
+            json::to_string(&DerivedTriggerData {
+                period_end_time: end_time,
+            })
+            .unwrap()
+        } else {
+            "".to_string()
+        };
         db::scheduler::update_trigger(new_trigger).await?;
         trigger_data_stream.start_time = match start_time {
             Some(start_time) => start_time,
