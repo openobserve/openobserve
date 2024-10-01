@@ -67,6 +67,8 @@ export interface Template {
   name: string;
   body: any;
   isDefault?: boolean;
+  type: "http" | "email";
+  title?: string;
 }
 
 // Template object which is modified in frontend to display in table and form
@@ -85,6 +87,19 @@ export interface Destination {
   skip_tls_verify: boolean;
   headers: Headers;
   template: string | Template;
+  emails: string;
+  type: "http" | "email";
+}
+
+export interface DestinationPayload {
+  name: string;
+  url: string;
+  method: string;
+  skip_tls_verify: boolean;
+  headers: Headers;
+  template: string | Template;
+  emails: string[];
+  type: "http" | "email";
 }
 
 // Destination object which is modified in frontend to display in table and form
