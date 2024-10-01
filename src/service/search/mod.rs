@@ -363,12 +363,13 @@ pub async fn search_partition(
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
+    let duration = req.end_time - req.start_time;
     while end > req.start_time {
         let start = max(end - step, req.start_time);
-        if last_partition_step > 0 {
+        if last_partition_step > 0 && duration > min_step {
             partitions.push([end - last_partition_step, end]);
             end -= last_partition_step;
-        }
+        };
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
