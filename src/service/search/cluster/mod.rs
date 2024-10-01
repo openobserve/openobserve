@@ -38,6 +38,7 @@ use infra::{
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use proto::cluster_rpc;
+use rayon::slice::ParallelSliceMut;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -885,7 +886,7 @@ pub(crate) async fn get_file_list(
         start.elapsed().as_millis(),
     );
 
-    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
 
     log::debug!(
