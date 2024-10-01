@@ -581,6 +581,8 @@
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
+    "labelPosition": "Label Position",
+    "labelRotate": "Label Rotate",
     "basemapLabel": "Base Map",
     "customunitLabel": "Custom Unit",
     "currencyDollar": "Currency - Dollar ($)",
@@ -656,7 +658,12 @@
     "scheduledReports": "Scheduled Reports",
     "newReport": "New Report",
     "scheduledDashboards": "Scheduled Dashboards",
-    "panelHeight": "Panel Height"
+    "panelHeight": "Panel Height",
+    "none": "None",
+    "inside": "Inside",
+    "insideTop": "Inside Top",
+    "insideBottom": "Inside Bottom",
+    "top": "Top"
   },
   "panel": {
     "header": "Panel",
