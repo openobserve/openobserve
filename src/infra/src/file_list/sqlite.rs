@@ -409,12 +409,22 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                         "#,
                     )
-                    .bind(stream_key)
+                    .bind(stream_key.clone())
                     .bind(time_start)
                     .bind(max_ts_upper_bound)
                     .bind(time_end)
                     .fetch_all(&pool)
                     .await
+                    .map(|r| {
+                        r.into_iter()
+                            .map(|r| {
+                                (
+                                    format!("files/{}/{}/{}", stream_key, r.date, r.file),
+                                    FileMeta::from(&r),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
                 } else {
                     sqlx::query_as::<_, super::FileRecord>(
                         r#"
@@ -423,34 +433,38 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                         "#,
                     )
-                    .bind(stream_key)
+                    .bind(stream_key.clone())
                     .bind(time_start)
                     .bind(time_end)
                     .fetch_all(&pool)
                     .await
+                    .map(|r| {
+                        r.into_iter()
+                            .map(|r| {
+                                (
+                                    format!("files/{}/{}/{}", stream_key, r.date, r.file),
+                                    FileMeta::from(&r),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
                 }
             }));
         }
 
-        let mut rets = Vec::with_capacity(tasks.len());
+        let mut files = Vec::new();
         for task in tasks {
-            let ret = match task.await {
-                Ok(Ok(r)) => r.into_iter().map(|r| {
-                    (
-                        format!("files/{}/{}/{}", stream_key, r.date, r.file),
-                        FileMeta::from(&r),
-                    )
-                }),
+            match task.await {
+                Ok(Ok(r)) => files.extend(r),
                 Ok(Err(e)) => {
                     return Err(e.into());
                 }
                 Err(e) => {
                     return Err(Error::Message(e.to_string()));
                 }
-            };
-            rets.push(ret);
+            }
         }
-        Ok(rets.into_iter().flatten().collect())
+        Ok(files)
     }
 
     async fn query_deleted(
