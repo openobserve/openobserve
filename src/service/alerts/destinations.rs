@@ -24,7 +24,7 @@ use crate::{
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db,
+    service::db::{self, user},
 };
 
 pub async fn save(
@@ -49,6 +49,25 @@ pub async fn save(
                     http::StatusCode::BAD_REQUEST,
                     anyhow::anyhow!("Atleast one alert destination email is required"),
                 ));
+            }
+            for email in destination.emails.iter() {
+                // Check if the email is part of the org
+                match user::get(Some(org_id), email).await {
+                    Ok(user) => {
+                        if user.is_none() {
+                            return Err((
+                                http::StatusCode::BAD_REQUEST,
+                                anyhow::anyhow!("Destination email must be part of this org"),
+                            ));
+                        }
+                    }
+                    Err(_) => {
+                        return Err((
+                            http::StatusCode::BAD_REQUEST,
+                            anyhow::anyhow!("Destination email must be part of this org"),
+                        ));
+                    }
+                }
             }
             if !config::get_config().smtp.smtp_enabled {
                 return Err((
