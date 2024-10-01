@@ -23,6 +23,7 @@ use config::{
         search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
+    metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
     utils::{file::get_file_meta as util_get_file_meta, json},
 };
 use futures::future::try_join_all;
