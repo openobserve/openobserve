@@ -23,7 +23,7 @@ use config::{
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
     utils::sql::is_aggregate_query,
-    QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
+    ID_COL_NAME, QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -40,10 +40,7 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
-use crate::{
-    common::meta::{ingestion::ID_COL_NAME, stream::StreamParams},
-    service::search::match_source,
-};
+use crate::{common::meta::stream::StreamParams, service::search::match_source};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',

@@ -105,6 +105,9 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             // {?} extra 2
             size += 2;
             for (k, v) in map {
+                if k == crate::ORIGINAL_DATA_COL_NAME {
+                    continue;
+                }
                 // "key":?, extra 4 bytes
                 size += k.len() + estimate_json_bytes(v) + 4;
             }
