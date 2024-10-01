@@ -569,7 +569,16 @@ export const usePanelDataLoader = (
                     state.metadata.queries.push({});
                     state.resultMetaData.push({});
 
-                    state.data[i] = [...(searchRes.data.hits[i] ?? [])];
+                    if (
+                      searchRes?.data?.hits &&
+                      Array.isArray(searchRes.data.hits[i])
+                    ) {
+                      state.data[i] = [...(searchRes.data.hits[i] ?? [])];
+                    } else {
+                      throw new Error(
+                        "Invalid response format: Expected an array, but received an object. Please update your function.",
+                      );
+                    }
 
                     // update result metadata
                     state.resultMetaData[i] = {
