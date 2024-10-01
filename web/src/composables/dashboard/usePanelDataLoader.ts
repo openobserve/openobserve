@@ -576,7 +576,7 @@ export const usePanelDataLoader = (
                       state.data[i] = [...(searchRes.data.hits[i] ?? [])];
                     } else {
                       throw new Error(
-                        "Invalid response format: Expected an array, but received an object. Please modify your VRL function.",
+                        "Invalid response format: Expected an array, but received an object. Please update your function.",
                       );
                     }
 
