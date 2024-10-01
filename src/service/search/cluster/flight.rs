@@ -730,7 +730,6 @@ pub async fn get_file_id_lists(
     time_range: Option<(i64, i64)>,
 ) -> Result<HashMap<String, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
-    let (time_min, time_max) = time_range.unwrap();
     for name in stream_names {
         // stream settings
         let stream_settings =
@@ -743,8 +742,7 @@ pub async fn get_file_id_lists(
             stream_type,
             name,
             partition_time_level,
-            time_min,
-            time_max,
+            time_range,
         )
         .await
         .unwrap_or_default();

@@ -291,14 +291,12 @@ pub async fn search_partition(
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         if !skip_get_file_list {
-            let (time_min, time_max) = sql.time_range.unwrap();
             let stream_files = crate::service::file_list::query_ids(
                 &sql.org_id,
                 stream_type,
                 stream,
                 partition_time_level,
-                time_min,
-                time_max,
+                sql.time_range,
             )
             .await
             .unwrap_or_default();
