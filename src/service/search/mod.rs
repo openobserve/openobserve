@@ -364,7 +364,11 @@ pub async fn search_partition(
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
     while end > req.start_time {
-        let start = max(end - step - last_partition_step, req.start_time);
+        let start = max(end - step, req.start_time);
+        if last_partition_step > 0 {
+            partitions.push([end - last_partition_step, end]);
+            end -= last_partition_step;
+        }
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
