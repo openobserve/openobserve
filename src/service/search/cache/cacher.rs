@@ -536,7 +536,7 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
 
 pub fn get_ts_col(parsed_sql: &Sql, ts_col: &str, is_aggregate: bool) -> Option<String> {
     for (original, alias) in &parsed_sql.aliases {
-        if original.contains("histogram") {
+        if original == ts_col || original.contains("histogram") {
             return Some(alias.clone());
         }
     }

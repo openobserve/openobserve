@@ -832,8 +832,8 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
         return Ok(());
     }
     log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
-    let sql = format!("DROP INDEX IF EXISTS {};", idx_name,);
+    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
     sqlx::query(&sql).execute(&*client).await?;
-    log::info!("[SQLITE] index {}deleted successfully", idx_name);
+    log::info!("[SQLITE] index {} deleted successfully", idx_name);
     Ok(())
 }

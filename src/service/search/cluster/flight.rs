@@ -23,7 +23,7 @@ use config::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
-        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+        stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
     utils::inverted_index::split_token,
@@ -737,35 +737,17 @@ pub async fn get_file_id_lists(
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         // get file list
-        let file_id_list =
-            get_file_id_list(org_id, stream_type, name, time_range, partition_time_level).await;
+        let file_id_list = crate::service::file_list::query_ids(
+            org_id,
+            stream_type,
+            name,
+            partition_time_level,
+            time_range,
+        )
+        .await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-#[tracing::instrument(name = "service:search:cluster:flight:get_file_id_list", skip_all)]
-pub(crate) async fn get_file_id_list(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    time_level: PartitionTimeLevel,
-) -> Vec<FileId> {
-    let (time_min, time_max) = time_range.unwrap();
-    let mut files = crate::service::file_list::query_ids(
-        org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await
-    .unwrap_or_default();
-    files.sort_by(|a, b| a.id.cmp(&b.id));
-    files.dedup_by(|a, b| a.id == b.id);
-    files
 }
 
 #[tracing::instrument(

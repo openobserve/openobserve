@@ -31,6 +31,7 @@ use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
+use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
     db,
@@ -318,10 +319,10 @@ async fn get_file_list_by_ids(
         )
         .await
         {
-            files.push(file.to_owned());
+            files.push(file);
         }
     }
-    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok((files, start.elapsed().as_millis() as usize))
 }
