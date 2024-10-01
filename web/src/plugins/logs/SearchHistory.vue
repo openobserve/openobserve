@@ -31,6 +31,7 @@
                 label="Get History"
                 @click="fetchSearchHistory"
                 class="q-ml-md"
+                :disable="isLoading"
               />
             </div>
   
