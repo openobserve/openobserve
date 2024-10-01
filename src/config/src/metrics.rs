@@ -673,6 +673,16 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static DB_QUERY_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("db_query_time", "db query time. ".to_owned())
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["kind", "table"],
+    )
+    .expect("Metric created")
+});
+
 pub static FILE_LIST_ID_SELECT_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -874,6 +884,9 @@ fn register_metrics(registry: &Registry) {
     // db stats
     registry
         .register(Box::new(DB_QUERY_NUMS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(DB_QUERY_TIME.clone()))
         .expect("Metric registered");
 
     // file list specific metrics

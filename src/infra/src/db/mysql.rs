@@ -17,7 +17,10 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{metrics::DB_QUERY_NUMS, utils::hash::Sum64};
+use config::{
+    metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
+    utils::hash::Sum64,
+};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -123,6 +126,7 @@ impl super::Db for MysqlDb {
         let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["INSERT", "meta"]).inc();
+        let start = std::time::Instant::now();
         if let Err(e) = sqlx::query(
             r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#
         )
@@ -159,7 +163,7 @@ impl super::Db for MysqlDb {
             log::error!("[MYSQL] commit put meta error: {}", e);
             return Err(e.into());
         }
-
+        let time = start.elapsed().as_secs_f64();
         // event watch
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
@@ -167,6 +171,10 @@ impl super::Db for MysqlDb {
                 .put(key, Bytes::from(""), true, start_dt)
                 .await?;
         }
+
+        DB_QUERY_TIME
+            .with_label_values(&["put_item", "meta"])
+            .observe(time);
 
         Ok(())
     }

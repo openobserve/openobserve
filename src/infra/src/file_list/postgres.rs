@@ -19,12 +19,13 @@ use async_trait::async_trait;
 use config::{
     get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    metrics::DB_QUERY_NUMS,
+    metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
         time::{end_of_the_day, DAY_MICRO_SECS},
     },
+    
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
@@ -106,15 +107,20 @@ impl super::FileList for PostgresFileList {
                 DB_QUERY_NUMS
                     .with_label_values(&["SELECT", "file_list"])
                     .inc();
-                let ret: Option<i64> = match sqlx::query_scalar(
+                let start = std::time::Instant::now();
+                let query_res = sqlx::query_scalar(
                     r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
                 .bind(stream_key)
                 .bind(date_key)
                 .bind(file_name)
                 .fetch_one(&pool)
-                .await
-                {
+                .await;
+                let time = start.elapsed().as_secs_f64();
+                DB_QUERY_TIME
+                    .with_label_values(&["select_id", "file_list"])
+                    .observe(time);
+                let ret: Option<i64> = match query_res {
                     Ok(v) => v,
                     Err(sqlx::Error::RowNotFound) => {
                         continue;
@@ -139,7 +145,12 @@ impl super::FileList for PostgresFileList {
                     .with_label_values(&["DELETE", "file_list"])
                     .inc();
                 let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+                let start = std::time::Instant::now();
                 _ = pool.execute(sql.as_str()).await?;
+                let time = start.elapsed().as_secs_f64();
+                DB_QUERY_TIME
+                    .with_label_values(&["delete_id", "file_list"])
+                    .observe(time);
             }
         }
         Ok(())
@@ -255,11 +266,11 @@ impl super::FileList for PostgresFileList {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
-        .with_label_values(&["SELECT", "file_list"])
-        .inc();
-        let ret = sqlx
-            ::query_as::<_, super::FileRecord>(
-                r#"
+            .with_label_values(&["SELECT", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+            r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#
@@ -267,8 +278,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
-            .fetch_one(&pool).await?;
-        Ok(FileMeta::from(&ret))
+            .fetch_one(&pool).await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_single", "file_list"])
+            .observe(time);
+        Ok(FileMeta::from(&ret?))
     }
 
     async fn contains(&self, file: &str) -> Result<bool> {
@@ -278,6 +293,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = sqlx::query(
             r#"SELECT * FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
         )
@@ -286,6 +302,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .bind(file_name)
         .fetch_one(&pool)
         .await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["contains", "file_list"])
+            .observe(time);
         if let Err(sqlx::Error::RowNotFound) = ret {
             return Ok(false);
         }
@@ -336,6 +356,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = if flattened.is_some() {
             sqlx
                 ::query_as::<_, super::FileRecord>(
@@ -382,6 +403,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .await
             }
         };
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_multiple", "file_list"])
+            .observe(time);
         Ok(ret?
             .into_iter()
             .map(|r| {
