@@ -974,6 +974,12 @@ pub struct Limit {
         help = "buffer for upper bound in mins"
     )]
     pub upper_bound_for_max_ts: i64,
+    #[env_config(
+        name = "ZO_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
 }
 
 #[derive(EnvConfig)]
