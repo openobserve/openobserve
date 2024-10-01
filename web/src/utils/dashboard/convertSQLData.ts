@@ -834,8 +834,9 @@ export const convertSQLData = async (
     },
     series: [],
   };
+  console.log("options", options);
 
-  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
+  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
@@ -2274,8 +2275,8 @@ const largestLabel = (data: any) => {
  * @param {string} type - The type of chart.
  * @return {Object} - The properties for the given chart type.
  */
-const getPropsByChartTypeForSeries = (type: string) => {
-  switch (type) {
+const getPropsByChartTypeForSeries = (panelSchema: any) => {
+  switch (panelSchema.type) {
     case "bar":
       return {
         type: "bar",
@@ -2287,7 +2288,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
-        showSymbol: false,
+        showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,
         lineStyle: { width: 1.5 },
       };
@@ -2350,7 +2351,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         emphasis: { focus: "series" },
         areaStyle: {},
-        showSymbol: false,
+        showSymbol: panelSchema.config?.show_symbol ?? false,
         lineStyle: { width: 1.5 },
       };
     case "stacked":
@@ -2385,7 +2386,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
-        showSymbol: false,
+        showSymbol: panelSchema.config?.show_symbol ?? false,
         lineStyle: { width: 1.5 },
       };
     case "metric":
