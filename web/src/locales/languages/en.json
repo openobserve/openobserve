@@ -663,7 +663,10 @@
     "inside": "Inside",
     "insideTop": "Inside Top",
     "insideBottom": "Inside Bottom",
-    "top": "Top"
+    "top": "Top",
+    "showSymbol": "Show Symbol",
+    "yes": "Yes",
+    "no": "No"
   },
   "panel": {
     "header": "Panel",
