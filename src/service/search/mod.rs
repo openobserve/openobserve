@@ -343,6 +343,10 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    // if the partition number is too large, we limit it to 1000
+    if part_num > 1000 {
+        part_num = 1000;
+    }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
