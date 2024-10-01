@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use config::{
     get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    metrics::DB_QUERY_NUMS,
+    metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{hash::Sum64, parquet::parse_file_key_columns},
 };
 use hashbrown::HashMap;
@@ -105,15 +105,20 @@ impl super::FileList for MysqlFileList {
                 DB_QUERY_NUMS
                     .with_label_values(&["SELECT", "file_list"])
                     .inc();
-                let ret: Option<i64> = match sqlx::query_scalar(
+                let start = std::time::Instant::now();
+                let query_res = sqlx::query_scalar(
                     r#"SELECT id FROM file_list WHERE stream = ? AND date = ? AND file = ?"#,
                 )
                 .bind(stream_key)
                 .bind(date_key)
                 .bind(file_name)
                 .fetch_one(&pool)
-                .await
-                {
+                .await;
+                let time = start.elapsed().as_secs_f64();
+                DB_QUERY_TIME
+                    .with_label_values(&["select_id", "file_list"])
+                    .observe(time);
+                let ret: Option<i64> = match query_res {
                     Ok(v) => v,
                     Err(sqlx::Error::RowNotFound) => continue,
                     Err(e) => return Err(e.into()),
@@ -133,7 +138,12 @@ impl super::FileList for MysqlFileList {
                 DB_QUERY_NUMS
                     .with_label_values(&["DELETE", "file_list"])
                     .inc();
+                let start = std::time::Instant::now();
                 _ = pool.execute(sql.as_str()).await?;
+                let time = start.elapsed().as_secs_f64();
+                DB_QUERY_TIME
+                    .with_label_values(&["delete_id", "file_list"])
+                    .observe(time);
             }
         }
         Ok(())
@@ -243,6 +253,7 @@ impl super::FileList for MysqlFileList {
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
@@ -253,8 +264,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .bind(date_key)
         .bind(file_name)
         .fetch_one(&pool)
-        .await?;
-        Ok(FileMeta::from(&ret))
+        .await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_single", "file_list"])
+            .observe(time);
+        Ok(FileMeta::from(&ret?))
     }
 
     async fn contains(&self, file: &str) -> Result<bool> {
@@ -264,6 +279,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret =
             sqlx::query(r#"SELECT * FROM file_list WHERE stream = ? AND date = ? AND file = ?;"#)
                 .bind(stream_key)
@@ -271,6 +287,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .bind(file_name)
                 .fetch_one(&pool)
                 .await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["contains", "file_list"])
+            .observe(time);
         if let Err(sqlx::Error::RowNotFound) = ret {
             return Ok(false);
         }
@@ -321,6 +341,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
@@ -367,6 +388,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await
             }
         };
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_multiple", "file_list"])
+            .observe(time);
         Ok(ret?
             .into_iter()
             .map(|r| {
@@ -400,10 +425,15 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             DB_QUERY_NUMS
                 .with_label_values(&["SELECT", "file_list"])
                 .inc();
+            let start = std::time::Instant::now();
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
-                .await?;
-            ret.extend_from_slice(&res);
+                .await;
+            let time = start.elapsed().as_secs_f64();
+            DB_QUERY_TIME
+                .with_label_values(&["get_by_id", "file_list"])
+                .observe(time);
+            ret.extend_from_slice(&res?);
         }
 
         Ok(ret
@@ -441,6 +471,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = if cfg.limit.use_upper_bound_for_max_ts {
             let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
             sqlx::query_as::<_, super::FileId>(
@@ -451,7 +482,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .bind(max_ts_upper_bound)
             .bind(time_end)
             .fetch_all(&pool)
-            .await?
+            .await
         } else {
             sqlx::query_as::<_, super::FileId>(
                 r#"SELECT id, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
@@ -460,10 +491,14 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .bind(time_start)
             .bind(time_end)
             .fetch_all(&pool)
-            .await?
+            .await
         };
 
-        Ok(ret)
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_ids", "file_list"])
+            .observe(time);
+        Ok(ret?)
     }
 
     async fn query_deleted(
@@ -1206,7 +1241,9 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS.with_label_values(&["CREATE", "file_list"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["CREATE", "file_list"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -1229,7 +1266,9 @@ CREATE TABLE IF NOT EXISTS file_list
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS.with_label_values(&["CREATE", "file_list_history"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["CREATE", "file_list_history"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
@@ -1252,7 +1291,9 @@ CREATE TABLE IF NOT EXISTS file_list_history
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS.with_label_values(&["CREATE", "file_list_deleted"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["CREATE", "file_list_deleted"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
@@ -1270,7 +1311,9 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS.with_label_values(&["CREATE", "file_list_jobs"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["CREATE", "file_list_jobs"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_jobs
@@ -1289,7 +1332,9 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS.with_label_values(&["CREATE", "stream_stats"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["CREATE", "stream_stats"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
@@ -1393,7 +1438,9 @@ pub async fn create_table_index() -> Result<()> {
 
         log::warn!("[MYSQL] starting delete duplicate records");
         // delete duplicate records
-        DB_QUERY_NUMS.with_label_values(&["SELECT", "file_list"]).inc();
+        DB_QUERY_NUMS
+            .with_label_values(&["SELECT", "file_list"])
+            .inc();
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(&pool).await?;
@@ -1403,7 +1450,9 @@ pub async fn create_table_index() -> Result<()> {
             let date = r.get::<String, &str>("date");
             let file = r.get::<String, &str>("file");
             let id = r.get::<i64, &str>("id");
-            DB_QUERY_NUMS.with_label_values(&["DELETE", "file_list"]).inc();
+            DB_QUERY_NUMS
+                .with_label_values(&["DELETE", "file_list"])
+                .inc();
             sqlx::query(
                 r#"DELETE FROM file_list WHERE id != ? AND stream = ? AND date = ? AND file = ?;"#,
             )
@@ -1438,7 +1487,9 @@ pub async fn create_table_index() -> Result<()> {
 
 async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS.with_label_values(&["SELECT", "information_schema.columns"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["SELECT", "information_schema.columns"])
+        .inc();
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );
