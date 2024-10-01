@@ -18,6 +18,12 @@
         </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
+          <div class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md  ">
+            <q-icon name="info" class="q-mr-xs " size="16px" />
+             <div>
+              Search History might be delayed by <b> {{ delayMessage }}</b>
+             </div>
+            </div>
           <date-time
               data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
@@ -98,7 +104,8 @@
       </div>
     </q-td>
   </q-tr>
-</template>
+      </template>
+
 
 
       </q-table>
@@ -122,7 +129,7 @@
   </template>
   <script lang="ts">
   //@ts-nocheck
-  import { ref, watch, onMounted  , nextTick} from 'vue';
+  import { ref, watch, onMounted  , nextTick,computed} from 'vue';
   import {
     timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp } from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
@@ -270,6 +277,16 @@
           });
       });
     }
+    const delayMessage = computed (() => {
+      const delay = store.state.zoConfig.usage_publish_interval;
+      if (delay <= 60) {
+        return '60 seconds';
+      } else {
+        const minutes = Math.floor(delay / 60);
+        return `${minutes} minute(s)`;
+      }
+    });
+
       
       const updateDateTime = async (value: any) => {
         const {startTime, endTime} = value;
@@ -407,6 +424,7 @@
         triggerExpand,
         copyToClipboard,
         formatTime,
+        delayMessage,
       };
       // Watch the searchObj for changes
       
@@ -437,6 +455,11 @@
 }
 .custom-table .q-tr > .q-td:first-child {
   text-align: left;
+}
+.warning-text {
+  color: #F5A623;
+  border: 1px solid #F5A623;
+  border-radius: 2px ;
 }
 
 
