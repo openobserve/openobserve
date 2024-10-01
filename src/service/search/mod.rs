@@ -16,7 +16,7 @@
 use std::{cmp::max, collections::HashSet, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
-use cache::cacher::get_ts_col;
+use cache::cacher::get_ts_col_order_by;
 use chrono::Duration;
 use config::{
     get_config, ider,
@@ -320,7 +320,8 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
+    let ts_column = res_ts_column.map(|(v, _)| v);
     if ts_column.is_none() || apply_over_hits {
         resp.partitions.push([req.start_time, req.end_time]);
         return Ok(resp);
