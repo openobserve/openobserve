@@ -359,7 +359,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .iter()
             .map(|r| {
                 (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     r.into(),
                 )
             })
@@ -397,7 +397,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .map(|r| {
                 (
                     r.id,
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     r.into(),
                 )
             })
