@@ -666,7 +666,13 @@
     "top": "Top",
     "showSymbol": "Show Symbol",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "lineInterpolation": "Line Interpolation",
+    "linear": "Linear",
+    "smooth": "Smooth",
+    "stepBefore": "Step Before",
+    "stepAfter": "Step After",
+    "stepMiddle": "Step Middle"
   },
   "panel": {
     "header": "Panel",

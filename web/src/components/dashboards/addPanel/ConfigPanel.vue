@@ -1035,6 +1035,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-select
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.line_interpolation"
+        :options="lineInterpolationOptions"
+        dense
+        :label="t('dashboard.lineInterpolation')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.line_interpolation
+            ? lineInterpolationOptions.find(
+                (it: any) =>
+                  it.value == dashboardPanelData.data.config.line_interpolation,
+              )?.label
+            : 'smooth'
+        }`"
+        data-test="dashboard-config-line_interpolation"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
@@ -1253,6 +1288,11 @@ export default defineComponent({
       if (!dashboardPanelData.data.config.show_symbol) {
         dashboardPanelData.data.config.show_symbol = false;
       }
+
+      // by default, set line interpolation as smooth
+      if (!dashboardPanelData.data.config.line_interpolation) {
+        dashboardPanelData.data.config.line_interpolation = "smooth";
+      }
     });
 
     const legendWidthValue = computed({
@@ -1434,6 +1474,28 @@ export default defineComponent({
       },
     ];
 
+    const lineInterpolationOptions = [
+      {
+        label: t("dashboard.linear"),
+        value: "linear",
+      },
+      {
+        label: t("dashboard.smooth"),
+        value: "smooth",
+      },
+      {
+        label: t("dashboard.stepBefore"),
+        value: "step-start",
+      },
+      {
+        label: t("dashboard.stepAfter"),
+        value: "step-end",
+      },
+      {
+        label: t("dashboard.stepMiddle"),
+        value: "step-middle",
+      },
+    ];
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[
@@ -1531,6 +1593,7 @@ export default defineComponent({
       unitOptions,
       labelPositionOptions,
       showSymbol,
+      lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,
       handleBlur,
