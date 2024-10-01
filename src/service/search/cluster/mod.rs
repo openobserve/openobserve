@@ -849,6 +849,7 @@ pub(crate) async fn get_file_list(
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
+    let start = std::time::Instant::now();
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = file_list::query_parallel(
         trace_id,
@@ -862,6 +863,12 @@ pub(crate) async fn get_file_list(
     .await
     .unwrap_or_default();
 
+    log::debug!(
+        "[trace_id {trace_id}] cluster: get_file_list done, num: {}, took: {} ms",
+        file_list.len(),
+        start.elapsed().as_millis(),
+    );
+
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
         if sql
@@ -871,8 +878,22 @@ pub(crate) async fn get_file_list(
             files.push(file.to_owned());
         }
     }
+
+    log::debug!(
+        "[trace_id {trace_id}] cluster: match_source done, num: {}, took: {} ms",
+        files.len(),
+        start.elapsed().as_millis(),
+    );
+
     files.sort_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
+
+    log::debug!(
+        "[trace_id {trace_id}] cluster: dedup done, num: {}, took: {} ms",
+        files.len(),
+        start.elapsed().as_millis(),
+    );
+
     files
 }
 
