@@ -53,10 +53,7 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        meta::{ingestion::ORIGINAL_DATA_COL_NAME, stream::StreamParams},
-    },
+    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
@@ -212,6 +209,7 @@ pub async fn search(
                     } else {
                         None
                     },
+                    is_partial: res.is_partial,
                     ..Default::default()
                 };
                 report_request_usage_stats(
@@ -909,7 +907,7 @@ fn generate_select_start_search_schema(
     };
 
     // skip selecting "_original" column if `SELECT * ...`
-    new_schema_fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+    new_schema_fields.retain(|field| field.name() != config::ORIGINAL_DATA_COL_NAME);
 
     Ok((Arc::new(Schema::new(new_schema_fields)), diff_fields))
 }
