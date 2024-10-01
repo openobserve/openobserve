@@ -53,6 +53,10 @@ const getDefaultDashboardPanelData: any = () => ({
       top_results_others: false,
       axis_width: null,
       axis_border_show: false,
+      label: {
+        position: null,
+        rotate: 0,
+      },
       legend_width: {
         value: null,
         unit: "px",

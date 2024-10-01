@@ -206,6 +206,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_border_show: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<Label>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
@@ -428,4 +430,12 @@ pub struct LegendWidth {
     pub value: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Label {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotate: Option<f64>,
 }

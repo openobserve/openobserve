@@ -472,7 +472,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :min="0"
         @update:model-value="
           (value: any) =>
-            (dashboardPanelData.data.config.axis_label_rotation = value ? value : 0)
+            (dashboardPanelData.data.config.axis_label_rotation = value
+              ? value
+              : 0)
         "
         label="AxisRotate"
         color="input-border"
@@ -926,6 +928,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+
+      <q-select
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.label.position"
+        :options="labelPositionOptions"
+        dense
+        :label="t('dashboard.labelPosition')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.label.position
+            ? labelPositionOptions.find(
+                (it) =>
+                  it.value == dashboardPanelData.data.config.label.position,
+              )?.label
+            : 'None'
+        }`"
+        data-test="dashboard-config-label-position"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
+      <q-input
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+        v-model.number="dashboardPanelData.data.config.label.rotate"
+        :label="t('dashboard.labelRotate')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        :type="'number'"
+        placeholder="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.label.rotate =
+              value !== '' ? value : 0)
+        "
+        data-test="dashboard-config-label-rotate"
+      >
+      </q-input>
+
+      <div class="space"></div>
+
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
@@ -1131,6 +1205,14 @@ export default defineComponent({
       if (!dashboardPanelData.data.config.table_dynamic_columns) {
         dashboardPanelData.data.config.table_dynamic_columns = false;
       }
+
+      // by default, use label position as null and rotate as 0
+      if (!dashboardPanelData.data.config.label) {
+        dashboardPanelData.data.config.label = {
+          position: null,
+          rotate: 0,
+        };
+      }
     });
 
     const legendWidthValue = computed({
@@ -1277,6 +1359,30 @@ export default defineComponent({
         value: "custom",
       },
     ];
+
+    const labelPositionOptions = [
+      {
+        label: t("dashboard.none"),
+        value: null,
+      },
+      {
+        label: t("dashboard.top"),
+        value: "top",
+      },
+      {
+        label: t("dashboard.inside"),
+        value: "inside",
+      },
+      {
+        label: t("dashboard.insideTop"),
+        value: "insideTop",
+      },
+      {
+        label: t("dashboard.insideBottom"),
+        value: "insideBottom",
+      },
+    ];
+
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[
@@ -1372,6 +1478,7 @@ export default defineComponent({
       symbolOptions,
       legendsPositionOptions,
       unitOptions,
+      labelPositionOptions,
       isWeightFieldPresent,
       setUnit,
       handleBlur,
