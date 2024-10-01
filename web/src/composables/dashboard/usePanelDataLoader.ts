@@ -652,6 +652,9 @@ export const usePanelDataLoader = (
                   return;
                 }
 
+                // request order_by
+                const order_by = res?.data?.order_by ?? "asc";
+
                 // partition array from api response
                 const partitionArr = res?.data?.partitions ?? [];
 
@@ -749,10 +752,19 @@ export const usePanelDataLoader = (
                       break;
                     }
 
-                    state.data[currentQueryIndex] = [
-                      ...searchRes.data.hits,
-                      ...(state.data[currentQueryIndex] ?? []),
-                    ];
+                    // if order by is desc, append new partition response at end
+                    if (order_by.toLowerCase() === "desc") {
+                      state.data[currentQueryIndex] = [
+                        ...(state.data[currentQueryIndex] ?? []),
+                        ...searchRes.data.hits,
+                      ];
+                    } else {
+                      // else append new partition response at start
+                      state.data[currentQueryIndex] = [
+                        ...searchRes.data.hits,
+                        ...(state.data[currentQueryIndex] ?? []),
+                      ];
+                    }
 
                     // update result metadata
                     state.resultMetaData[currentQueryIndex] =
