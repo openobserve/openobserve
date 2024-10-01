@@ -1000,6 +1000,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-select
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.show_symbol"
+        :options="showSymbol"
+        dense
+        :label="t('dashboard.showSymbol')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.show_symbol
+            ? showSymbol.find(
+                (it: any) =>
+                  it.value == dashboardPanelData.data.config.show_symbol,
+              )?.label
+            : 'No'
+        }`"
+        data-test="dashboard-config-show_symbol"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
@@ -1213,6 +1248,11 @@ export default defineComponent({
           rotate: 0,
         };
       }
+
+      // by default, set show_symbol as false
+      if (!dashboardPanelData.data.config.show_symbol) {
+        dashboardPanelData.data.config.show_symbol = false;
+      }
     });
 
     const legendWidthValue = computed({
@@ -1383,6 +1423,17 @@ export default defineComponent({
       },
     ];
 
+    const showSymbol = [
+      {
+        label: t("dashboard.yes"),
+        value: true,
+      },
+      {
+        label: t("dashboard.no"),
+        value: false,
+      },
+    ];
+
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[
@@ -1479,6 +1530,7 @@ export default defineComponent({
       legendsPositionOptions,
       unitOptions,
       labelPositionOptions,
+      showSymbol,
       isWeightFieldPresent,
       setUnit,
       handleBlur,
