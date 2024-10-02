@@ -85,9 +85,38 @@
           <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
 
          </div>
+
          <div class="tw-pl-2">
           <q-btn
             @click.stop="copyToClipboard(props.row.sql)"
+            size="xs"
+            icon="content_copy"
+            class="copy-btn tw-py-3"
+          />
+          <q-btn
+            @click.stop="goToLogs(props.row)"
+            size="xs"
+            label="Go To Logs"
+            class="copy-btn tw-py-3 tw-mx-2"
+          />
+         </div>
+        
+         
+        </div>
+      </div>
+      <div v-if="props.row?.function" class="text-left tw-px-2 expanded-content">
+        <strong >Function Defination:</strong>
+
+        <div class="tw-flex tw-items-start tw-justify-center" >
+       
+         <div class="scrollable-content  ">
+          <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
+
+         </div>
+
+         <div class="tw-pl-2 tw-flex tw-my-auto">
+          <q-btn
+            @click.stop="copyToClipboard(props.row.function)"
             size="xs"
             icon="content_copy"
             class="copy-btn tw-py-3"
@@ -249,22 +278,31 @@
         const response = await searchService.get_history( org_identifier,startTime,endTime,
            );
            const limitedHits = response.data.hits;
-           columnsToBeRendered.value = generateColumns(limitedHits);
-           limitedHits.forEach((hit:any)=>{
-            const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
+           const filteredHits = limitedHits.filter((hit) => hit.event !== "Functions");
+           console.log(filteredHits, "filteredHits")
+           columnsToBeRendered.value = generateColumns(filteredHits);
+           filteredHits.forEach((hit:any)=>{
+
+            const {formatted, raw} = calculateDuration(hit.min_ts, hit.max_ts);
             hit.duration = formatted;
             hit.rawDuration = raw;
-            hit.toBeStoredStartTime = hit.start_time;
-            hit.toBeStoredEndTime = hit.end_time;
-            hit.start_time = timestampToTimezoneDate(hit.start_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
-            hit.end_time = timestampToTimezoneDate(hit.end_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
-            hit.rawTook = hit.took;
-            hit.took  = formatTime(hit.took);
-            hit.rawScanRecords = hit.scan_records;
-            hit.rawScanSize = hit.scan_size;
+            hit.toBeStoredStartTime = hit.min_ts;
+            hit.toBeStoredEndTime = hit.max_ts;
+            hit.start_time = timestampToTimezoneDate(hit.min_ts / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
+            hit.end_time = timestampToTimezoneDate(hit.max_ts / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
+            hit.rawTook = hit.response_time;
+            hit.took  = formatTime(hit.response_time);
+            hit.scan_records = hit.num_records;
+            hit.rawScanRecords = hit.num_records;
+            hit.scan_size = hit.size + hit.unit;
+            hit.rawScanSize = hit.size;
+            hit.cached_ratio = hit.cached_ratio;
             hit.rawCachedRatio = hit.cached_ratio;
+            hit.sql = hit.request_body;
+            hit.function = hit.function;
+            
             })
-           dataToBeLoaded.value = response.data.hits;
+           dataToBeLoaded.value = filteredHits;
           isLoading.value = false;
      } catch (error) {
       console.log(error, "error")
@@ -451,22 +489,29 @@
 
       const query = b64EncodeUnicode(row.sql);
 
+      const queryObject = {
+        stream_type: "logs",
+        stream,
+        period: '15m',
+        refresh,
+        sql_mode: "true",
+        query,
+        defined_schemas: "user_defined_schema",
+        org_identifier: row.org_id,
+        quick_mode: "false",
+        show_histogram: "true",
+        type: "search_history_re_apply"
+      };
+
+      if(row.hasOwnProperty('function') && row.function){
+        const functionContent = b64EncodeUnicode(row.function);
+        queryObject['functionContent'] = functionContent;
+      }
+
+
       router.push({
         path: "/logs",
-        query: {
-          stream_type: "logs",
-          stream,
-          period: '15m',
-          refresh,
-          sql_mode: "true",
-          query,
-          defined_schemas:"user_defined_schema",
-          org_identifier: row.org_id,
-          quick_mode: "false",
-          show_histogram: "true",
-          type: "search_history_re_apply"
-
-        },
+        query: queryObject,
       });
     };
 
