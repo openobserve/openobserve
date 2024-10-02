@@ -248,7 +248,7 @@
  
         const response = await searchService.get_history( org_identifier,startTime,endTime,
            );
-           const limitedHits = response.data.hits.slice(0, 50);
+           const limitedHits = response.data.hits;
            columnsToBeRendered.value = generateColumns(limitedHits);
            limitedHits.forEach((hit:any)=>{
             const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
