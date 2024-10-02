@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         Click here</a
       >
-      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve. Please ensure to choose JSON as output format. 
+      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry 1.0 as the output format.
       <p class="q-ml-lg text-italic" style="padding-right: 2px">Note: Output is available under Logs with stream name 'cloudwatch_metrics'.</p>
     </div>
   </div>
