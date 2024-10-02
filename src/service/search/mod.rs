@@ -371,14 +371,16 @@ pub async fn search_partition(
     let duration = req.end_time - req.start_time;
     while end > req.start_time {
         let mut start = max(end - step, req.start_time);
-        if last_partition_step > 0 && duration > min_step {
+        if last_partition_step > 0 && duration > min_step && part_num > 1 {
             partitions.push([end - last_partition_step, end]);
             start -= last_partition_step;
             end -= last_partition_step;
-            last_partition_step = 0;
-        };
+        } else {
+            start -= last_partition_step;
+        }
         partitions.push([start, end]);
         end = start;
+        last_partition_step = 0;
     }
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
