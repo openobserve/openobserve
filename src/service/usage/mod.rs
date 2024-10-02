@@ -104,6 +104,7 @@ pub async fn report_request_usage_stats(
             trace_id: None,
             took_wait_in_queue: stats.took_wait_in_queue,
             result_cache_ratio: None,
+            is_partial: stats.is_partial,
         });
     };
 
@@ -138,6 +139,7 @@ pub async fn report_request_usage_stats(
         trace_id: stats.trace_id,
         took_wait_in_queue: stats.took_wait_in_queue,
         result_cache_ratio: stats.result_cache_ratio,
+        is_partial: stats.is_partial,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;

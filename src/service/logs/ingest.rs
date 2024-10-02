@@ -29,6 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
@@ -39,7 +40,7 @@ use crate::{
         ingestion::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
             IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
-            StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+            StreamStatus,
         },
         stream::StreamParams,
     },

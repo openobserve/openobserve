@@ -229,6 +229,7 @@ pub async fn search(
                     } else {
                         None
                     },
+                    is_partial: res.is_partial,
                     ..Default::default()
                 };
                 report_request_usage_stats(
