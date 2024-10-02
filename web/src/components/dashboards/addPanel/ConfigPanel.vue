@@ -1002,16 +1002,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'h-bar',
-            'line',
-            'scatter',
-            'stacked',
-            'h-stacked',
-          ].includes(dashboardPanelData.data.type)
+          ['area', 'area-stacked', 'line'].includes(
+            dashboardPanelData.data.type,
+          )
         "
         outlined
         v-model="dashboardPanelData.data.config.show_symbol"
@@ -1037,16 +1030,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="
-          [
-            'area',
-            'area-stacked',
-            'bar',
-            'h-bar',
-            'line',
-            'scatter',
-            'stacked',
-            'h-stacked',
-          ].includes(dashboardPanelData.data.type)
+          ['area', 'area-stacked', 'line'].includes(
+            dashboardPanelData.data.type,
+          )
         "
         outlined
         v-model="dashboardPanelData.data.config.line_interpolation"
