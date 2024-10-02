@@ -38,7 +38,9 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+        stream::{
+            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
+        },
     },
     metrics,
     utils::{
@@ -791,6 +793,7 @@ pub(crate) async fn generate_index_on_ingester(
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
             bloom_filter_fields: vec!["term".to_string()],
+            partition_keys: vec![StreamPartition::new_prefix("term")],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
@@ -832,11 +835,10 @@ pub(crate) async fn generate_index_on_ingester(
     if json_rows.is_empty() {
         return Ok(());
     }
-    let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    for record_val in recs {
-        let timestamp: i64 = record_val
+    for row in json_rows {
+        let timestamp: i64 = row
             .get(&get_config().common.column_timestamp)
             .unwrap()
             .as_i64()
@@ -844,9 +846,9 @@ pub(crate) async fn generate_index_on_ingester(
 
         let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
-            &Vec::new(),
+            &vec![StreamPartition::new_prefix("term")],
             PartitionTimeLevel::Hourly,
-            &json::Map::new(),
+            &row,
             Some(schema_key_str),
         );
 
@@ -856,7 +858,7 @@ pub(crate) async fn generate_index_on_ingester(
             records: vec![],
             records_size: 0,
         });
-
+        let record_val: json::Value = json::Value::Object(row);
         let record_size = json::estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
