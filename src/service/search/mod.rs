@@ -393,7 +393,7 @@ pub async fn search_partition(
             start -= last_partition_step;
             end -= last_partition_step;
         } else {
-            start = max(end - step - last_partition_step, req.start_time);
+            start -= last_partition_step;
         }
         partitions.push([start, end]);
         end = start;
