@@ -126,7 +126,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     };
     let now = Utc::now().timestamp_micros();
     // The delay in processing the trigger from the time it was supposed to run
-    let processing_delay = now - trigger.next_run_at;
+    let processing_delay = if trigger.next_run_at == 0 {
+        0
+    } else {
+        now - trigger.next_run_at
+    };
     // This is the end time of the last trigger timerange  + 1.
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
