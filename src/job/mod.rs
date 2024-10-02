@@ -56,6 +56,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
+        let _ = crate::service::organization::check_and_create_org(DEFAULT_ORG).await;
         let _ = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
@@ -78,6 +79,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
 
+    db::organization::org_settings_cache()
+        .await
+        .expect("organization settings cache sync failed");
     db::organization::cache()
         .await
         .expect("organization cache sync failed");
@@ -111,6 +115,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::dashboards::reports::watch().await });
+    tokio::task::spawn(async move { db::organization::org_settings_watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });

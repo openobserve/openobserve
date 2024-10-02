@@ -15,7 +15,7 @@
 
 use actix_web::{
     dev::ServiceRequest,
-    error::{ErrorForbidden, ErrorUnauthorized},
+    error::{ErrorForbidden, ErrorNotFound, ErrorUnauthorized},
     http::{header, Method},
     web, Error,
 };
@@ -26,6 +26,7 @@ use crate::{
     common::{
         meta::{
             ingestion::INGESTION_EP,
+            organization::DEFAULT_ORG,
             user::{
                 AuthTokensExt, DBUser, TokenValidationResponse, TokenValidationResponseBuilder,
                 UserRole,
@@ -60,9 +61,9 @@ pub async fn validator(
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        validate_credentials_ext(user_id, password, path, auth_token).await
+        validate_credentials_ext(user_id, password, path, auth_token, req.method()).await
     } else {
-        validate_credentials(user_id, password.trim(), path).await
+        validate_credentials(user_id, password.trim(), path, req.method()).await
     } {
         Ok(res) => {
             if res.is_valid {
@@ -111,8 +112,8 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
+    method: &Method,
 ) -> Result<TokenValidationResponse, Error> {
-    let user;
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
         if v.is_empty() {
@@ -120,23 +121,9 @@ pub async fn validate_credentials(
         }
     }
 
-    // this is only applicable for super admin user
-    if is_root_user(user_id) {
-        user = users::get_user(None, user_id).await;
-        if user.is_none() {
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
-    } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
-        user = match db_user {
+        match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
                 if all_users.is_empty() {
@@ -148,10 +135,15 @@ pub async fn validate_credentials(
             Err(_) => None,
         }
     } else {
-        user = match path.find('/') {
+        match path.find('/') {
             Some(index) => {
                 let org_id = &path[0..index];
-                users::get_user(Some(org_id), user_id).await
+                check_and_create_org(user_id, org_id, method, path).await?;
+                if is_root_user(user_id) {
+                    users::get_user(Some(DEFAULT_ORG), user_id).await
+                } else {
+                    users::get_user(Some(org_id), user_id).await
+                }
             }
             None => users::get_user(None, user_id).await,
         }
@@ -227,8 +219,8 @@ pub async fn validate_credentials_ext(
     in_password: &str,
     path: &str,
     auth_token: AuthTokensExt,
+    method: &Method,
 ) -> Result<TokenValidationResponse, Error> {
-    let user;
     let config = get_config();
     let password_ext_salt = config.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
@@ -238,23 +230,9 @@ pub async fn validate_credentials_ext(
         }
     }
 
-    // this is only applicable for super admin user
-    if is_root_user(user_id) {
-        user = users::get_user(None, user_id).await;
-        if user.is_none() {
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
-    } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
-        user = match db_user {
+        match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
                 if all_users.is_empty() {
@@ -266,10 +244,17 @@ pub async fn validate_credentials_ext(
             Err(_) => None,
         }
     } else {
-        user = match path.find('/') {
+        match path.find('/') {
             Some(index) => {
                 let org_id = &path[0..index];
-                users::get_user(Some(org_id), user_id).await
+                if let Err(e) = check_and_create_org(user_id, org_id, method, path).await {
+                    return Err(e);
+                }
+                if is_root_user(user_id) {
+                    users::get_user(Some(DEFAULT_ORG), user_id).await
+                } else {
+                    users::get_user(Some(org_id), user_id).await
+                }
             }
             None => users::get_user(None, user_id).await,
         }
@@ -314,12 +299,45 @@ pub async fn validate_credentials_ext(
     }
 }
 
+/// Creates the org if all the below conditions satisfied
+/// - The org does not exist in the meta table
+/// - The user is a root user
+/// - This is a ingestion POST endpoint
+async fn check_and_create_org(
+    user_id: &str,
+    org_id: &str,
+    method: &Method,
+    path: &str,
+) -> Result<(), Error> {
+    let config = get_config();
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+    let url_len = path_columns.len();
+    if crate::service::organization::get_org(org_id)
+        .await
+        .is_none()
+    {
+        if !config.common.create_org_through_ingestion {
+            return Err(ErrorNotFound("Organization not found"));
+        } else if is_root_user(user_id)
+            && method.eq(&Method::POST)
+            && INGESTION_EP.contains(&path_columns[url_len - 1])
+            && crate::service::organization::check_and_create_org(org_id)
+                .await
+                .is_err()
+        {
+            return Err(ErrorUnauthorized("Organization could not be created"));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub async fn validate_credentials_ext(
     _user_id: &str,
     _in_password: &str,
     _path: &str,
     _auth_token: AuthTokensExt,
+    _req: &Method,
 ) -> Result<TokenValidationResponse, Error> {
     Err(ErrorForbidden("Not allowed"))
 }
@@ -425,7 +443,7 @@ pub async fn validator_aws(
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();
 
-                match validate_credentials(&creds[0], &creds[1], path).await {
+                match validate_credentials(&creds[0], &creds[1], path, req.method()).await {
                     Ok(res) => {
                         if res.is_valid {
                             let mut req = req;
@@ -469,7 +487,7 @@ pub async fn validator_gcp(
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>();
 
-            match validate_credentials(&creds[0], &creds[1], path).await {
+            match validate_credentials(&creds[0], &creds[1], path, req.method()).await {
                 Ok(res) => {
                     if res.is_valid {
                         let mut req = req;
@@ -698,6 +716,11 @@ pub(crate) async fn check_permissions(
         None => "".to_string(),
     };
     let org_id = if auth_info.org_id.eq("organizations") {
+        if auth_info.method.eq("POST") {
+            // The user is trying to create a new org
+            // No need to check permission, return true
+            return true;
+        }
         user_id
     } else {
         &auth_info.org_id
@@ -869,32 +892,37 @@ mod tests {
         .unwrap();
 
         assert!(
-            validate_credentials(init_user, pwd, "default/_bulk")
+            validate_credentials(init_user, pwd, "default/_bulk", &Method::POST)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "default/_bulk")
-                .await
-                .unwrap()
-                .is_valid
-        );
-        assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
-        assert!(
-            !validate_credentials(user_id, pwd, "/")
+            !validate_credentials("", pwd, "default/_bulk", &Method::POST)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            validate_credentials(user_id, pwd, "default/user")
+            !validate_credentials("", pwd, "/", &Method::GET)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, "x", "default/user")
+            !validate_credentials(user_id, pwd, "/", &Method::GET)
+                .await
+                .unwrap()
+                .is_valid
+        );
+        assert!(
+            validate_credentials(user_id, pwd, "default/user", &Method::GET)
+                .await
+                .unwrap()
+                .is_valid
+        );
+        assert!(
+            !validate_credentials(user_id, "x", "default/user", &Method::GET)
                 .await
                 .unwrap()
                 .is_valid

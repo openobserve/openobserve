@@ -28,7 +28,7 @@ use crate::{
         dashboards::reports,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
-        organization::OrganizationSetting,
+        organization::{Organization, OrganizationSetting},
         pipelines::PipeLine,
         prom::ClusterLeader,
         syslog::SyslogRoute,
@@ -54,6 +54,8 @@ pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =

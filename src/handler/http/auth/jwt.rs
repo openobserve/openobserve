@@ -23,8 +23,8 @@ use jsonwebtoken::TokenData;
 use o2_enterprise::enterprise::openfga::{
     authorizer::{
         authz::{
-            get_org_creation_tuples, get_user_creation_tuples, get_user_org_tuple,
-            get_user_role_creation_tuple, get_user_role_deletion_tuple, update_tuples,
+            get_user_creation_tuples, get_user_org_tuple, get_user_role_creation_tuple,
+            get_user_role_deletion_tuple, update_tuples,
         },
         roles::{
             check_and_get_crole_tuple_for_new_user, get_roles_for_user,
@@ -41,7 +41,7 @@ use regex::Regex;
 use {
     crate::{
         common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
-        service::{db, users},
+        service::{db, organization, users},
     },
     o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
 };
@@ -119,6 +119,7 @@ pub async fn process_token(
 
         if O2_CONFIG.openfga.enabled {
             for (index, org) in source_orgs.iter().enumerate() {
+                // Assuming all the relevant tuples for this org exist
                 let mut tuples = vec![];
                 get_user_creation_tuples(
                     &org.name,
@@ -126,16 +127,10 @@ pub async fn process_token(
                     &org.role.to_string(),
                     &mut tuples,
                 );
-                get_org_creation_tuples(
-                    &org.name,
-                    &mut tuples,
-                    OFGA_MODELS
-                        .iter()
-                        .map(|(_, fga_entity)| fga_entity.key)
-                        .collect(),
-                    NON_OWNING_ORG.to_vec(),
-                )
-                .await;
+
+                // Create the org if it does not exist. `org.name` is the id of the org.
+                // Also it creates necessary ofga tuples for the newly created org
+                let _ = organization::check_and_create_org(&org.name).await;
 
                 if index == 0 {
                     // this is to allow user call organization api with org
@@ -210,6 +205,7 @@ pub async fn process_token(
                 }
                 None => {
                     // The organization is not found in source_orgs, hence removed
+                    // TODO: Check if removing org from db is the right thing to do
                     orgs_removed.push(existing_org);
                 }
             }
@@ -217,6 +213,8 @@ pub async fn process_token(
 
         // Add the user to the newly added organizations
         for org in orgs_added {
+            let _ = organization::check_and_create_org(&org.name).await;
+
             match users::add_user_to_org(
                 &org.name,
                 &user_email,
@@ -372,16 +370,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         log::info!("group_to_custom_role: User does not exist in the database");
 
         if O2_CONFIG.openfga.enabled {
-            get_org_creation_tuples(
-                &O2_CONFIG.dex.default_org,
-                &mut tuples,
-                OFGA_MODELS
-                    .iter()
-                    .map(|(_, fga_entity)| fga_entity.key)
-                    .collect(),
-                NON_OWNING_ORG.to_vec(),
-            )
-            .await;
+            let _ = organization::check_and_create_org(&O2_CONFIG.dex.default_org).await;
             tuples.push(get_user_org_tuple(&O2_CONFIG.dex.default_org, user_email));
             tuples.push(get_user_org_tuple(user_email, user_email));
             let start = std::time::Instant::now();

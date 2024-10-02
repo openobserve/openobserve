@@ -91,6 +91,30 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
+pub async fn save_org_tuples(org_id: &str) {
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
+    if O2_CONFIG.openfga.enabled {
+        o2_enterprise::enterprise::openfga::authorizer::authz::save_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn save_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub async fn delete_org_tuples(org_id: &str) {
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
+    if O2_CONFIG.openfga.enabled {
+        o2_enterprise::enterprise::openfga::authorizer::authz::delete_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
 pub fn get_role(role: UserRole) -> UserRole {
     use std::str::FromStr;
 
@@ -246,7 +270,7 @@ impl FromRequest for AuthExtractor {
             )));
         }
         let object_type = if url_len == 1 {
-            if method.eq("GET") && path_columns[0].eq("organizations") {
+            if path_columns[0].eq("organizations") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 };
@@ -311,6 +335,13 @@ impl FromRequest for AuthExtractor {
                     "{}:{}",
                     OFGA_MODELS.get("streams").unwrap().key,
                     path_columns[1]
+                )
+            } else if path_columns[1].starts_with("rename") {
+                // Org rename
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("organizations").unwrap().key,
+                    org_id
                 )
             } else if method.eq("PUT")
                 || method.eq("DELETE")
@@ -397,7 +428,9 @@ impl FromRequest for AuthExtractor {
 
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
-            if (method.eq("POST") && path_columns[1].starts_with("_search"))
+            if (method.eq("POST")
+                && path_columns.len() > 1
+                && path_columns[1].starts_with("_search"))
                 || path.contains("/prometheus/api/v1/query")
                 || path.contains("/resources")
                 || path.contains("/format_query")
