@@ -16,7 +16,6 @@
 use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
-use cache::cacher::get_ts_col;
 use chrono::Duration;
 use config::{
     get_config, ider,
@@ -24,7 +23,7 @@ use config::{
         cluster::RoleGroup,
         search,
         sql::OrderBy,
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{FileKey, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
@@ -283,8 +282,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
-
+    let ts_column = cache::cacher::get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
     let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     let mut files = Vec::new();
@@ -294,14 +292,14 @@ pub async fn search_partition(
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         if !skip_get_file_list {
-            let stream_files = get_file_list(
-                &sql,
-                stream,
+            let stream_files = crate::service::file_list::query_ids(
+                &sql.org_id,
                 stream_type,
+                stream,
                 partition_time_level,
-                &stream_settings.partition_keys,
+                sql.time_range,
             )
-            .await;
+            .await?;
             max_query_range = max(max_query_range, stream_settings.max_query_range);
             files.extend(stream_files);
         }
@@ -332,22 +330,15 @@ pub async fn search_partition(
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
-    let (records, original_size, compressed_size) =
-        files
-            .iter()
-            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
-                (
-                    records + f.meta.records,
-                    original_size + f.meta.original_size,
-                    compressed_size + f.meta.compressed_size,
-                )
-            });
+    let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
+        (records + f.records, original_size + f.original_size)
+    });
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
         records: records as usize,
         original_size: original_size as usize,
-        compressed_size: compressed_size as usize,
+        compressed_size: 0, // there is no compressed size in file list
         histogram_interval: sql.histogram_interval,
         max_query_range,
         partitions: vec![],
@@ -369,6 +360,10 @@ pub async fn search_partition(
     let mut part_num = max(1, total_secs / cfg.limit.query_partition_by_secs);
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
+    }
+    // if the partition number is too large, we limit it to 1000
+    if part_num > 1000 {
+        part_num = 1000;
     }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
@@ -691,6 +686,12 @@ pub async fn match_file(
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
+    // fast path
+    if partition_keys.is_empty() || !source.key.contains('=') {
+        return true;
+    }
+
+    // slow path
     let mut filters = generate_filter_from_equal_items(equal_items);
     let partition_keys: HashMap<&String, &StreamPartition> =
         partition_keys.iter().map(|v| (&v.field, v)).collect();
@@ -850,30 +851,6 @@ pub async fn search_partition_multi(
     }
     res.records = total_rec;
     Ok(res)
-}
-
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
-async fn get_file_list(
-    sql: &Sql,
-    stream_name: &str,
-    stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Vec<FileKey> {
-    let (time_min, time_max) = sql.time_range.unwrap();
-    let mut files = super::file_list::query(
-        &sql.org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await
-    .unwrap_or_default();
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    files
 }
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);

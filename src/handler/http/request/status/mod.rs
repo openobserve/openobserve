@@ -110,6 +110,8 @@ struct ConfigResponse<'a> {
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
     all_fields_name: String,
+    usage_enabled: bool,
+    usage_publish_interval: i64,
 }
 
 #[derive(Serialize)]
@@ -267,6 +269,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         all_fields_name: cfg.common.column_all.to_string(),
+        usage_enabled: cfg.common.usage_enabled,
+        usage_publish_interval: cfg.common.usage_publish_interval,
     }))
 }
 
