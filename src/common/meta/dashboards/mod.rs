@@ -27,11 +27,6 @@ fn default_version() -> i32 {
     1
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DashboardHash {
-    pub hash: u64,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema, Default)]
 pub struct Dashboard {
     pub v1: Option<v1::Dashboard>,

@@ -45,7 +45,7 @@ pub async fn create_dashboard(
     match dashboards::folders::get(org_id, folder_id).await {
         Ok(_) => {
             let dashboard_id = ider::generate();
-            match save_dashboard(org_id, &dashboard_id, folder_id, body).await {
+            match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
                 Ok(res) => {
                     set_ownership(
                         org_id,
@@ -71,7 +71,7 @@ pub async fn create_dashboard(
                 };
                 folders::save_folder(org_id, folder, true).await?;
                 let dashboard_id = ider::generate();
-                match save_dashboard(org_id, &dashboard_id, folder_id, body).await {
+                match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
                     Ok(res) => {
                         set_ownership(
                             org_id,
@@ -108,9 +108,10 @@ pub async fn update_dashboard(
     dashboard_id: &str,
     folder_id: &str,
     body: web::Bytes,
+    hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
     // Store new dashboard in the database
-    save_dashboard(org_id, dashboard_id, folder_id, body).await
+    save_dashboard(org_id, dashboard_id, folder_id, body, hash).await
 }
 
 #[tracing::instrument]
@@ -180,8 +181,9 @@ async fn save_dashboard(
     dashboard_id: &str,
     folder_id: &str,
     body: web::Bytes,
+    hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
-    match dashboards::put(org_id, dashboard_id, folder_id, body).await {
+    match dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))
@@ -218,7 +220,9 @@ pub async fn move_dashboard(
         };
 
         // add the dashboard to the destination folder
-        if let Err(error) = dashboards::put(org_id, dashboard_id, to_folder, dash.into()).await {
+        if let Err(error) =
+            dashboards::put(org_id, dashboard_id, to_folder, dash.into(), None).await
+        {
             return Ok(Response::InternalServerError(error).into());
         }
 

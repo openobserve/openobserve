@@ -17,7 +17,7 @@ use actix_web::web;
 use config::utils::{hash::Sum64, json};
 
 use crate::{
-    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardHash, DashboardVersion},
+    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
     service::db,
 };
 
@@ -84,14 +84,18 @@ pub(crate) async fn put(
     dashboard_id: &str,
     folder: &str,
     body: web::Bytes,
+    hash: Option<&str>,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{}", dashboard_id);
     if let Ok(existing_dash_bytes) = db::get(&key).await {
         let existing_dash_str = std::str::from_utf8(&existing_dash_bytes)?;
         let existing_dash_hash = config::utils::hash::gxhash::new().sum64(existing_dash_str);
-        let d_hash: DashboardHash = json::from_slice(&body)?;
-        log::warn!("TL: received dash_hash: {}", d_hash.hash);
-        if d_hash.hash != existing_dash_hash {
+        let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
+            return Err(anyhow::anyhow!(
+                "Request to update existing dashboard with missing or invalid hash value. BUG"
+            ));
+        };
+        if hash_val != existing_dash_hash {
             return Err(anyhow::anyhow!(
                 "This dashboard has been updated by someone else. Please refresh to get the latest data before saving the changes."
             ));
