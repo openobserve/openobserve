@@ -372,13 +372,29 @@ pub async fn search_partition(
     if step % min_step > 0 {
         step = step - step % min_step;
     }
+    // this is to ensure we create partitions less than max_query_range
+    if max_query_range > 0 && step > max_query_range {
+        step = if min_step < max_query_range {
+            max_query_range - max_query_range % min_step
+        } else {
+            max_query_range
+        };
+    }
 
     // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
+    let duration = req.end_time - req.start_time;
     while end > req.start_time {
-        let start = max(end - step - last_partition_step, req.start_time);
+        let mut start = max(end - step, req.start_time);
+        if last_partition_step > 0 && duration > min_step && part_num > 1 {
+            partitions.push([end - last_partition_step, end]);
+            start -= last_partition_step;
+            end -= last_partition_step;
+        } else {
+            start -= last_partition_step;
+        }
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
