@@ -33,7 +33,9 @@ pub(crate) async fn get(
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let bytes = db::get(&key).await?;
     let dash_str = std::str::from_utf8(&bytes)?;
-    let hash = config::utils::hash::gxhash::new().sum64(dash_str);
+    let hash = config::utils::hash::gxhash::new()
+        .sum64(dash_str)
+        .to_string();
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
     if d_version.version == 1 {
         let dash: v1::Dashboard = json::from_slice(&bytes)?;
@@ -189,7 +191,9 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
         .into_values()
         .map(|val| {
             let dash_str = std::str::from_utf8(&val)?;
-            let hash = config::utils::hash::gxhash::new().sum64(dash_str);
+            let hash = config::utils::hash::gxhash::new()
+                .sum64(dash_str)
+                .to_string();
             let d_version: DashboardVersion = json::from_slice(&val).unwrap();
             if d_version.version == 1 {
                 let dash: v1::Dashboard = json::from_slice(&val).unwrap();
