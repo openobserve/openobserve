@@ -190,7 +190,11 @@ async fn save_dashboard(
         }
         Err(error) => {
             tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
-            Ok(Response::InternalServerError(error).into())
+            if error.to_string().contains("Conflict") {
+                Ok(Response::Conflict(error).into())
+            } else {
+                Ok(Response::InternalServerError(error).into())
+            }
         }
     }
 }
@@ -238,6 +242,7 @@ pub async fn move_dashboard(
 enum Response {
     OkMessage(String),
     NotFound(String),
+    Conflict(anyhow::Error),
     InternalServerError(anyhow::Error),
 }
 
@@ -251,6 +256,10 @@ impl From<Response> for HttpResponse {
             Response::NotFound(entity) => Self::NotFound().json(MetaHttpResponse::error(
                 http::StatusCode::NOT_FOUND.into(),
                 format!("{entity} not found"),
+            )),
+            Response::Conflict(err) => Self::Conflict().json(MetaHttpResponse::error(
+                http::StatusCode::CONFLICT.into(),
+                err.to_string(),
             )),
             Response::InternalServerError(err) => {
                 Self::InternalServerError().json(MetaHttpResponse::error(

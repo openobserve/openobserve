@@ -99,7 +99,7 @@ pub(crate) async fn put(
         };
         if hash_val != existing_dash_hash {
             return Err(anyhow::anyhow!(
-                "This dashboard has been updated by someone else. Please refresh to get the latest data before saving the changes."
+                "Conflict: This dashboard has been updated by someone else. Please refresh to get the latest data before saving the changes."
             ));
         }
     };
@@ -111,11 +111,17 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
+        let value: bytes::Bytes = json::to_vec(&dash)?.into();
+        let dash_str = std::str::from_utf8(&value)?;
+        let hash = config::utils::hash::gxhash::new()
+            .sum64(dash_str)
+            .to_string();
 
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
+        match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v1: Some(dash),
                 version: 1,
+                hash,
                 ..Default::default()
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
@@ -127,10 +133,16 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
+        let value: bytes::Bytes = json::to_vec(&dash)?.into();
+        let dash_str = std::str::from_utf8(&value)?;
+        let hash = config::utils::hash::gxhash::new()
+            .sum64(dash_str)
+            .to_string();
+        match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v2: Some(dash),
                 version: 2,
+                hash,
                 ..Default::default()
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
@@ -142,10 +154,16 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
+        let value: bytes::Bytes = json::to_vec(&dash)?.into();
+        let dash_str = std::str::from_utf8(&value)?;
+        let hash = config::utils::hash::gxhash::new()
+            .sum64(dash_str)
+            .to_string();
+        match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v3: Some(dash),
                 version: 3,
+                hash,
                 ..Default::default()
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
@@ -157,10 +175,16 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
+        let value: bytes::Bytes = json::to_vec(&dash)?.into();
+        let dash_str = std::str::from_utf8(&value)?;
+        let hash = config::utils::hash::gxhash::new()
+            .sum64(dash_str)
+            .to_string();
+        match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v4: Some(dash),
                 version: 4,
+                hash,
                 ..Default::default()
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
@@ -172,10 +196,16 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
+        let value: bytes::Bytes = json::to_vec(&dash)?.into();
+        let dash_str = std::str::from_utf8(&value)?;
+        let hash = config::utils::hash::gxhash::new()
+            .sum64(dash_str)
+            .to_string();
+        match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v5: Some(dash),
                 version: 5,
+                hash,
                 ..Default::default()
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
