@@ -61,7 +61,30 @@
 
 
       <template v-slot:body="props">
-  <q-tr :props="props" @click="triggerExpand(props)">
+        <q-tr
+          :data-test="`stream-association-table-${props.row.trace_id}-row`"
+          :props="props"
+          style="cursor: pointer"
+          @click="triggerExpand(props)"
+        >
+          <q-td >
+            <q-btn
+              dense
+              flat
+              size="xs"
+              :icon="
+                expandedRow != props.row.trace_id
+                  ? 'expand_more'
+                  : 'expand_less'
+              "
+            />
+          </q-td>
+          
+          <q-td v-for="col in columnsToBeRendered.slice(1)" :key="col.name" :props="props">
+          {{ props.row[col.field] }}
+        </q-td>
+        </q-tr>
+  <!-- <q-tr :props="props" @click="triggerExpand(props)">
     <q-td 
       :class="`column-${col.name}`"
       v-for="col in props.cols"
@@ -71,14 +94,23 @@
       {{ col.value }}
     </q-td>
     
-  </q-tr>
+  </q-tr> -->
   <q-tr v-show="expandedRow === props.row.trace_id" :props="props" >
 
     <q-td colspan="100%">
 
       <div class="text-left tw-px-2 expanded-content">
-        <strong >SQL Query:</strong>
+       <div class="tw-flex tw-items-center tw-my-2">
+        <strong >SQL Query: <span>  <q-btn
+            @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
+            size="xs"
+            dense
+            flat
+            icon="content_copy"
+            class="copy-btn tw-py-2 tw-px-2 "
+          /></span></strong>
 
+       </div>
         <div class="tw-flex tw-items-start tw-justify-center" >
        
          <div class="scrollable-content  ">
@@ -105,7 +137,17 @@
         </div>
       </div>
       <div v-if="props.row?.function" class="text-left tw-px-2 q-mt-sm expanded-content">
-        <strong class="text-sm">Function Defination:</strong>
+        <div class="tw-flex tw-items-center tw-my-2">
+        <strong >Function Defination: <span>  <q-btn
+            @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
+            size="xs"
+            dense
+            flat
+            icon="content_copy"
+            class="copy-btn tw-py-2 tw-px-2 "
+          /></span></strong>
+
+       </div>
 
         <div class="tw-flex tw-items-start tw-justify-center" >
        
@@ -139,14 +181,7 @@
 
       <div class="tw-flex q-mt-md tw-items-start" >
 
-<div class="tw-pl-2 tw-flex tw-my-auto">
- <q-btn
-   @click.stop="copyToClipboard(props.row)"
-   size="xs"
-   label="Copy to Clipboard"
-   icon="content_copy"
-   class="copy-btn tw-py-3"
- />
+<div class=" tw-flex tw-my-auto">
  <q-btn
    @click.stop="goToLogs(props.row)"
    size="xs"
@@ -240,6 +275,7 @@
 
   // Define the desired column order and names
   const desiredColumns = [
+    {key : '#' , label : '#',align: 'center',sortable: false},
     { key: 'trace_id', label: 'Trace ID' },
     { key: 'start_time', label: 'Start Time' },
     { key: 'end_time', label: 'End Time' },
@@ -270,13 +306,18 @@
       columnWidth = 200
     }
     if(key == 'sql'){
-      columnWidth = 350
+      columnWidth = 260
       sortable = false;
     }
     if(key == "trace_id"){
       columnWidth = 250
       align = "left"
       sortable = false;
+    }
+    if(key == "#"){
+      columnWidth = 50
+      sortable = false;
+      align = "left"
     }
    // Custom width for each column
     return {
@@ -404,17 +445,11 @@
 
         // return a.rawDuration - b.rawDuration;
       }
-      const  copyToClipboard = (row) => {
-        const toBeCopiedObj  = {
-          sql_query: row.sql,
-        }
-        if(row.hasOwnProperty('function') && row.function){
-          toBeCopiedObj['function_defination'] = row.function;
-        }
-      navigator.clipboard.writeText(JSON.stringify(toBeCopiedObj)).then(() => {
+      const  copyToClipboard = (text,type) => {
+      navigator.clipboard.writeText(text).then(() => {
         $q.notify({
             type: "positive",
-            message: "Content Copied Successfully!",
+            message: `${type} Copied Successfully!`,
             timeout: 5000,
           });
       }).catch(() => {
@@ -603,9 +638,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.custom-table .q-tr > .q-td:first-child {
-  text-align: left;
-}
+
 .warning-text {
   color: #F5A623;
   border: 1px solid #F5A623;
