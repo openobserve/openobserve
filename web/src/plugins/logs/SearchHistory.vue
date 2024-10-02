@@ -56,6 +56,7 @@
         :rows-per-page-options="[]"
         class="custom-table"
         style="width: 100%;"
+        :sort-method="sortMethod"
       >
 
 
@@ -198,9 +199,12 @@
 
   return desiredColumns.map(({ key, label }) => {
     let columnWidth = 200;
+
     let align = "center";
+    let sortable = true;
     if(key == "scan_records" || key == "cached_ratio" || key == "took"){
       columnWidth = 80
+
     }
     if(key == "scan_size"){
       columnWidth = 80
@@ -213,10 +217,12 @@
     }
     if(key == 'sql'){
       columnWidth = 350
+      sortable = false;
     }
     if(key == "trace_id"){
       columnWidth = 250
       align = "left"
+      sortable = false;
     }
    // Custom width for each column
     return {
@@ -224,7 +230,7 @@
       label: label,     // Column label
       field: key,       // Field accessor
       align: 'center',
-      sortable: true,
+      sortable: sortable,
       style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
     };
   });
@@ -242,14 +248,21 @@
  
         const response = await searchService.get_history( org_identifier,startTime,endTime,
            );
-           columnsToBeRendered.value = generateColumns(response.data.hits);
-           response.data.hits.forEach((hit:any)=>{
-            hit.duration = calculateDuration(hit.start_time, hit.end_time);
+           const limitedHits = response.data.hits.slice(0, 50);
+           columnsToBeRendered.value = generateColumns(limitedHits);
+           limitedHits.forEach((hit:any)=>{
+            const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
+            hit.duration = formatted;
+            hit.rawDuration = raw;
             hit.toBeStoredStartTime = hit.start_time;
             hit.toBeStoredEndTime = hit.end_time;
             hit.start_time = timestampToTimezoneDate(hit.start_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
             hit.end_time = timestampToTimezoneDate(hit.end_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
+            hit.rawTook = hit.took;
             hit.took  = formatTime(hit.took);
+            hit.rawScanRecords = hit.scan_records;
+            hit.rawScanSize = hit.scan_size;
+            hit.rawCachedRatio = hit.cached_ratio;
             })
            dataToBeLoaded.value = response.data.hits;
           isLoading.value = false;
@@ -262,6 +275,72 @@
         
 
       };
+
+      const   sortMethod = (rows, sortBy, descending) => {
+        const data = [...rows];
+        if(sortBy === 'duration'){
+          if (descending) {
+            return data.sort((a, b) => b.rawDuration - a.rawDuration);
+          }
+          return data.sort((a, b) => a.rawDuration - b.rawDuration);
+        }
+
+        if(sortBy === "took"){
+          if (descending) {
+            return data.sort((a, b) => b.rawTook - a.rawTook);
+          }
+          return data.sort((a, b) => a.rawTook - b.rawTook);
+        }
+        if(sortBy === "scan_records"){
+          if (descending) {
+            return data.sort((a, b) => b.rawScanRecords - a.rawScanRecords);
+          }
+          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
+          return data.sort((a, b) => a.rawScanRecords - b.rawScanRecords);
+        }
+        if(sortBy === "scan_size"){
+          if (descending) {
+            return data.sort((a, b) => b.rawScanSize - a.rawScanSize);
+          }
+          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
+          return data.sort((a, b) => a.rawScanSize - b.rawScanSize);
+        }
+        if(sortBy === "scan_size"){
+          if (descending) {
+            return data.sort((a, b) => b.rawScanSize - a.rawScanSize);
+          }
+          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
+          return data.sort((a, b) => a.rawScanSize - b.rawScanSize);
+        }
+        if(sortBy === "cached_ratio"){
+          if (descending) {
+            return data.sort((a, b) => b.rawCachedRatio - a.rawCachedRatio);
+          }
+          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
+          return data.sort((a, b) => a.rawCachedRatio - b.rawCachedRatio);
+        }
+        if(sortBy == "start_time"){
+          if (descending) {
+            return data.sort((a, b) => b.toBeStoredStartTime - a.toBeStoredStartTime);
+          }
+          return data.sort((a, b) => a.toBeStoredStartTime - b.toBeStoredStartTime);
+
+        }
+
+        if(sortBy == "end_time"){
+          if (descending) {
+            return data.sort((a, b) => b.toBeStoredEndTime - a.toBeStoredEndTime);
+          }
+          return data.sort((a, b) => a.toBeStoredEndTime - b.toBeStoredEndTime);
+
+        }
+
+
+
+        
+
+        // return a.rawDuration - b.rawDuration;
+      }
       const  copyToClipboard = (text) => {
       navigator.clipboard.writeText(text).then(() => {
         $q.notify({
@@ -299,64 +378,56 @@
       return `${took.toFixed(2)} sec`;
       }
       const calculateDuration = (startTime, endTime) => {
-    
-    // Calculate the duration in microseconds
-    const durationMicroseconds = endTime - startTime;
+  const durationMicroseconds = endTime - startTime;
+  const durationSeconds = durationMicroseconds / 1e6;
 
-    // Convert microseconds to seconds
-    const durationSeconds = durationMicroseconds / 1e6;
+  // Store the raw duration in a separate property
+  const rawDuration = durationSeconds;
 
-    // Define time unit conversions
-    const secondsInMinute = 60;
-    const secondsInHour = 3600;
-    const secondsInDay = 86400;
-    const secondsInMonth = 2592000; // Approximation (30 days)
-    const secondsInYear = 31536000; // Approximation (365 days)
+  let result = '';
 
-    // Convert to the appropriate time unit
-    let result = '';
-
-    if (durationSeconds < secondsInMinute) {
-      result = `${durationSeconds.toFixed(2)} seconds`;
-    } else if (durationSeconds < secondsInHour) {
-      const minutes = Math.floor(durationSeconds / secondsInMinute);
-      const seconds = durationSeconds % secondsInMinute;
-      result = `${minutes} minutes`;
-      if (seconds > 0) {
-        result += ` and ${seconds.toFixed(2)} seconds`;
-      }
-    } else if (durationSeconds < secondsInDay) {
-      const hours = Math.floor(durationSeconds / secondsInHour);
-      const minutes = Math.floor((durationSeconds % secondsInHour) / secondsInMinute);
-      result = `${hours} hours`;
-      if (minutes > 0) {
-        result += ` and ${minutes} minutes`;
-      }
-    } else if (durationSeconds < secondsInMonth) {
-      const days = Math.floor(durationSeconds / secondsInDay);
-      const hours = Math.floor((durationSeconds % secondsInDay) / secondsInHour);
-      result = `${days} days`;
-      if (hours > 0) {
-        result += ` and ${hours} hours`;
-      }
-    } else if (durationSeconds < secondsInYear) {
-      const months = Math.floor(durationSeconds / secondsInMonth);
-      const days = Math.floor((durationSeconds % secondsInMonth) / secondsInDay);
-      result = `${months} months`;
-      if (days > 0) {
-        result += ` and ${days} days`;
-      }
-    } else {
-      const years = Math.floor(durationSeconds / secondsInYear);
-      const months = Math.floor((durationSeconds % secondsInYear) / secondsInMonth);
-      result = `${years} years`;
-      if (months > 0) {
-        result += ` and ${months} months`;
-      }
+  if (durationSeconds < 60) {
+    result = `${durationSeconds.toFixed(2)} seconds`;
+  } else if (durationSeconds < 3600) {
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    result = `${minutes} minutes`;
+    if (seconds > 0) {
+      result += ` and ${seconds.toFixed(2)} seconds`;
     }
+  } else if (durationSeconds < 86400) {
+    const hours = Math.floor(durationSeconds / 3600);
+    const minutes = Math.floor((durationSeconds % 3600) / 60);
+    result = `${hours} hours`;
+    if (minutes > 0) {
+      result += ` and ${minutes} minutes`;
+    }
+  } else if (durationSeconds < 2592000) {
+    const days = Math.floor(durationSeconds / 86400);
+    const hours = Math.floor((durationSeconds % 86400) / 3600);
+    result = `${days} days`;
+    if (hours > 0) {
+      result += ` and ${hours} hours`;
+    }
+  } else if (durationSeconds < 31536000) {
+    const months = Math.floor(durationSeconds / 2592000);
+    const days = Math.floor((durationSeconds % 2592000) / 86400);
+    result = `${months} months`;
+    if (days > 0) {
+      result += ` and ${days} days`;
+    }
+  } else {
+    const years = Math.floor(durationSeconds / 31536000);
+    const months = Math.floor((durationSeconds % 31536000) / 2592000);
+    result = `${years} years`;
+    if (months > 0) {
+      result += ` and ${months} months`;
+    }
+  }
 
-    return result;
-    };
+  return { formatted: result, raw: rawDuration };
+};
+
 
 
       const triggerExpand = (props) =>{
@@ -425,6 +496,7 @@
         copyToClipboard,
         formatTime,
         delayMessage,
+        sortMethod,
       };
       // Watch the searchObj for changes
       
