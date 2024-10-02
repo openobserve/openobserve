@@ -370,14 +370,15 @@ pub async fn search_partition(
     let mut last_partition_step = end % min_step;
     let duration = req.end_time - req.start_time;
     while end > req.start_time {
-        let start = max(end - step, req.start_time);
+        let mut start = max(end - step, req.start_time);
         if last_partition_step > 0 && duration > min_step {
             partitions.push([end - last_partition_step, end]);
+            start -= last_partition_step;
             end -= last_partition_step;
+            last_partition_step = 0;
         };
         partitions.push([start, end]);
         end = start;
-        last_partition_step = 0;
     }
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
