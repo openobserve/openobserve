@@ -86,7 +86,7 @@
 
          </div>
 
-         <div class="tw-pl-2">
+         <!-- <div class="tw-pl-2">
           <q-btn
             @click.stop="copyToClipboard(props.row.sql)"
             size="xs"
@@ -99,13 +99,13 @@
             label="Go To Logs"
             class="copy-btn tw-py-3 tw-mx-2"
           />
-         </div>
+         </div> -->
         
          
         </div>
       </div>
-      <div v-if="props.row?.function" class="text-left tw-px-2 expanded-content">
-        <strong >Function Defination:</strong>
+      <div v-if="props.row?.function" class="text-left tw-px-2 q-mt-sm expanded-content">
+        <strong class="text-sm">Function Defination:</strong>
 
         <div class="tw-flex tw-items-start tw-justify-center" >
        
@@ -113,7 +113,7 @@
           <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
 
          </div>
-
+<!-- 
          <div class="tw-pl-2 tw-flex tw-my-auto">
           <q-btn
             @click.stop="copyToClipboard(props.row.function)"
@@ -127,11 +127,36 @@
             label="Go To Logs"
             class="copy-btn tw-py-3 tw-mx-2"
           />
-         </div>
+         </div> -->
         
          
         </div>
+
+
+
       </div>
+
+
+      <div class="tw-flex q-mt-md tw-items-start" >
+
+<div class="tw-pl-2 tw-flex tw-my-auto">
+ <q-btn
+   @click.stop="copyToClipboard(props.row)"
+   size="xs"
+   label="Copy to Clipboard"
+   icon="content_copy"
+   class="copy-btn tw-py-3"
+ />
+ <q-btn
+   @click.stop="goToLogs(props.row)"
+   size="xs"
+   label="Go To Logs"
+   class="copy-btn tw-py-3 tw-mx-2"
+ />
+</div>
+
+
+</div>
     </q-td>
   </q-tr>
       </template>
@@ -379,8 +404,14 @@
 
         // return a.rawDuration - b.rawDuration;
       }
-      const  copyToClipboard = (text) => {
-      navigator.clipboard.writeText(text).then(() => {
+      const  copyToClipboard = (row) => {
+        const toBeCopiedObj  = {
+          sql_query: row.sql,
+        }
+        if(row.hasOwnProperty('function') && row.function){
+          toBeCopiedObj['function_defination'] = row.function;
+        }
+      navigator.clipboard.writeText(JSON.stringify(toBeCopiedObj)).then(() => {
         $q.notify({
             type: "positive",
             message: "Content Copied Successfully!",
@@ -564,6 +595,8 @@
   max-height: 200px;
    /* Use the full height of the parent */
   text-wrap: normal;
+  background-color: #e8e8e8;
+  color: black;
 }
 .q-td {
   overflow: hidden;
