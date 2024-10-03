@@ -1047,11 +1047,7 @@ const useLogs = () => {
           title: "",
           unparsed_x_data: [],
           timezone: "",
-        },
         errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
 
       const parsedSQL: any = fnParsedSQL();
 
