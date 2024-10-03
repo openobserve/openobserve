@@ -29,16 +29,27 @@ const useNotifications = () => {
     return quasar.notify({
       type: "negative",
       message: message,
+      multiLine: false,
       timeout: 0,
       actions: [
         {
-          icon: "refresh",
-          noCaps: true,
+          // icon: "refresh",
+          label: "Refresh",
           color: "white",
-          round: true,
+          style: "font-weight: bold",
+          padding: "4px",
           handler: () => {
             // refresh whole page
             window.location.reload();
+          },
+        },
+        {
+          icon: "close",
+          padding: "4px",
+          style: "font-weight: bold",
+          color: "white",
+          handler: () => {
+            /* ... */
           },
         },
       ],
