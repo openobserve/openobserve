@@ -22,6 +22,30 @@ const useNotifications = () => {
     });
   };
 
+  const showConfictErrorNotificationWithRefreshBtn = (
+    message: string,
+    options?: any,
+  ) => {
+    return quasar.notify({
+      type: "negative",
+      message: message,
+      timeout: 0,
+      actions: [
+        {
+          icon: "refresh",
+          noCaps: true,
+          color: "white",
+          round: true,
+          handler: () => {
+            // refresh whole page
+            window.location.reload();
+          },
+        },
+      ],
+      ...(options || {}),
+    });
+  };
+
   const showPositiveNotification = (message: string, options?: any) => {
     return quasar.notify({
       type: "positive",
@@ -44,6 +68,7 @@ const useNotifications = () => {
   return {
     showErrorNotification,
     showPositiveNotification,
+    showConfictErrorNotificationWithRefreshBtn,
   };
 };
 
