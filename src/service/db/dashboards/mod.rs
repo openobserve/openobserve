@@ -99,7 +99,7 @@ pub(crate) async fn put(
         };
         if hash_val != existing_dash_hash {
             return Err(anyhow::anyhow!(
-                "Conflict: This dashboard has been updated by someone else. Please refresh to get the latest data before saving the changes."
+                "Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes."
             ));
         }
     };
