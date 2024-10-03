@@ -771,7 +771,7 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response.status === 409) {
+        if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
