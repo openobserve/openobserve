@@ -44,14 +44,14 @@
         </div>
       </div>
   
-      <div class="full-width">
+      <div class="">
     <q-page>
       <q-table
         ref="qTable"
+        dense
         :rows="dataToBeLoaded"
         :columns="columnsToBeRendered"
-        :pagination="pagination"
-        hide-bottom
+        :pagination.sync="pagination"
         row-key="trace_id"
         :rows-per-page-options="[]"
         class="custom-table"
@@ -100,7 +100,7 @@
     <q-td colspan="100%">
 
       <div class="text-left tw-px-2 expanded-content">
-       <div class="tw-flex tw-items-center tw-my-2">
+       <div class="tw-flex tw-items-center ">
         <strong >SQL Query: <span>  <q-btn
             @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
             size="xs"
@@ -136,8 +136,8 @@
          
         </div>
       </div>
-      <div v-if="props.row?.function" class="text-left tw-px-2 q-mt-sm expanded-content">
-        <div class="tw-flex tw-items-center tw-my-2">
+      <div v-if="props.row?.function" class="text-left tw-px-2 expanded-content">
+        <div class="tw-flex tw-items-center ">
         <strong >Function Defination: <span>  <q-btn
             @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
             size="xs"
@@ -195,13 +195,25 @@
     </q-td>
   </q-tr>
       </template>
-
-
+      <template #bottom="scope">
+         <div class="tw-ml-auto">
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+         </div>
+        </template>
+        <template #no-data>
+       <div v-if="!isLoading" class="tw-flex tw-mx-auto">
+        <NoData />
+       </div>
+        </template>
 
       </q-table>
-      <div v-if="!isLoading && dataToBeLoaded.length === 0">
-        <NoData />
-      </div>
+
       <div
             v-if="isLoading"
             class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
@@ -233,11 +245,14 @@
   import { useI18n } from 'vue-i18n';
   import { date , QTable , useQuasar } from 'quasar';
   import type { Ref } from "vue";
+  import QTablePagination from "@/components/shared/grid/Pagination.vue";
+
   export default defineComponent({
     name: "SearchHistoryComponent",
     components: {
       DateTime,
       NoData,
+      QTablePagination,
     },
     props: {
       isClicked: {
@@ -266,10 +281,24 @@
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
 
-      const pagination = {
+
+      const perPageOptions: any = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "All", value: 0 },
+    ];
+
+      const resultTotal = ref<number>(0);
+
+      const pagination = ref({
             page: 1,
-              rowsPerPage: 50 
-      }
+              rowsPerPage: 10 
+      })
+      const selectedPerPage = ref(pagination.value.rowsPerPage);
+
       const generateColumns = (data: any) => {
      if (data.length === 0) return [];
 
@@ -277,6 +306,8 @@
   const desiredColumns = [
     {key : '#' , label : '#',align: 'center',sortable: false},
     { key: 'trace_id', label: 'Trace ID' },
+    { key: 'executed_time', label: 'Executed At' },
+
     { key: 'start_time', label: 'Start Time' },
     { key: 'end_time', label: 'End Time' },
     { key: 'duration', label: 'Duration' },
@@ -285,6 +316,7 @@
     { key: 'scan_records', label: 'Scan Records' },
     { key: 'cached_ratio', label: 'Cached Ratio' },
     { key: 'sql', label: 'SQL Query' },
+
   ];
 
   return desiredColumns.map(({ key, label }) => {
@@ -297,16 +329,17 @@
 
     }
     if(key == "scan_size"){
-      columnWidth = 80
+      columnWidth = 100
     }
     if(key == "duration"){
+      align='left'
       columnWidth = 100
     }
     if( key == 'start_time' || key == 'end_time'){
       columnWidth = 200
     }
     if(key == 'sql'){
-      columnWidth = 260
+      columnWidth = 300
       sortable = false;
     }
     if(key == "trace_id"){
@@ -315,7 +348,7 @@
       sortable = false;
     }
     if(key == "#"){
-      columnWidth = 50
+      columnWidth = 100
       sortable = false;
       align = "left"
     }
@@ -330,7 +363,6 @@
     };
   });
 };
-    
 
       const fetchSearchHistory = async ( ) => {
         columnsToBeRendered.value = [];
@@ -344,8 +376,10 @@
         const response = await searchService.get_history( org_identifier,startTime,endTime,
            );
            const limitedHits = response.data.hits;
-           const filteredHits = limitedHits.filter((hit) => hit.event !== "Functions");
-           console.log(filteredHits, "filteredHits")
+           const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
+           if(filteredHits.length > 0){
+            resultTotal.value = filteredHits.length;
+           }
            columnsToBeRendered.value = generateColumns(filteredHits);
            filteredHits.forEach((hit:any)=>{
 
@@ -366,6 +400,8 @@
             hit.rawCachedRatio = hit.cached_ratio;
             hit.sql = hit.request_body;
             hit.function = hit.function;
+            hit.rawExecutedTime = hit._timestamp;
+            hit.executed_time =  timestampToTimezoneDate(hit._timestamp / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
             
             })
            dataToBeLoaded.value = filteredHits;
@@ -436,6 +472,13 @@
             return data.sort((a, b) => b.toBeStoredEndTime - a.toBeStoredEndTime);
           }
           return data.sort((a, b) => a.toBeStoredEndTime - b.toBeStoredEndTime);
+
+        }
+        if(sortBy == "executed_time"){
+          if (descending) {
+            return data.sort((a, b) => b.rawExecutedTime - a.rawExecutedTime);
+          }
+          return data.sort((a, b) => a.rawExecutedTime - b.rawExecutedTime);
 
         }
 
@@ -580,7 +623,21 @@
         query: queryObject,
       });
     };
+    const changePagination = (val: { label: string; value: any }) => {
+      if(val.label == "All"){
+        console.log(val.value, "val.value")
+        val.value = dataToBeLoaded.value.length;
+        val.label  = 'All';
+        console.log(val.value, "val.value")
 
+      }
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value.setPagination(pagination.value);
+
+      // pagination.value.page = 1;
+      
+    };
 
       watch(() => props.isClicked, (value) => {
         if(value == true && !isLoading.value){
@@ -608,6 +665,10 @@
         formatTime,
         delayMessage,
         sortMethod,
+        resultTotal,
+        perPageOptions,
+        changePagination,
+        selectedPerPage,
       };
       // Watch the searchObj for changes
       
@@ -639,11 +700,16 @@
   text-overflow: ellipsis;
 }
 
+.custom-table .q-tr > .q-td:nth-child(2){
+  text-align: left;
+}
+
+
+
 .warning-text {
   color: #F5A623;
   border: 1px solid #F5A623;
   border-radius: 2px ;
 }
-
 
  </style>
