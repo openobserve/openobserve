@@ -97,17 +97,17 @@
   </q-tr> -->
   <q-tr v-show="expandedRow === props.row.trace_id" :props="props" >
 
-    <q-td colspan="100%">
+    <q-td  colspan="100%">
 
-      <div class="text-left tw-px-2 expanded-content">
-       <div class="tw-flex tw-items-center q-py-sm ">
-        <strong >SQL Query: <span>  <q-btn
+      <div class="text-left tw-px-2 q-mb-sm  expanded-content">
+       <div class="tw-flex tw-items-center q-py-sm  ">
+        <strong >SQL Query : <span>  <q-btn
             @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
             size="xs"
             dense
             flat
             icon="content_copy"
-            class="copy-btn-sql tw-py-2 tw-px-2 "
+            class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
           /></span></strong>
           <q-btn
             @click.stop="goToLogs(props.row)"
@@ -117,10 +117,10 @@
             class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
             icon="search"
             flat
-            style="color: #F2452F; border: #F2452F 1px solid;"
+            style="color: #F2452F; border: #F2452F 1px solid; font-weight: bold;"
           />
        </div>
-        <div class="tw-flex tw-items-start tw-justify-center" >
+        <div class="tw-flex tw-items-start  tw-justify-center" >
        
          <div class="scrollable-content  expanded-sql ">
           <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
@@ -145,15 +145,15 @@
          
         </div>
       </div>
-      <div v-if="props.row?.function" class="text-left tw-px-2 expanded-content">
+      <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
         <div class="tw-flex tw-items-center q-py-sm ">
-        <strong >Function Defination: <span>  <q-btn
+        <strong >Function Defination : <span>  <q-btn
             @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
             size="xs"
             dense
             flat
             icon="content_copy"
-            class="copy-btn-function tw-py-2 tw-px-2 "
+            class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2 "
           /></span></strong>
 
        </div>
@@ -187,15 +187,6 @@
 
       </div>
 
-
-      <div class="tw-flex q-mt-md tw-items-start" >
-
-<div class=" tw-flex tw-my-auto">
-
-</div>
-
-
-</div>
     </q-td>
   </q-tr>
       </template>
@@ -686,7 +677,7 @@
   </script>
  <style lang="scss" scoped >
 .expanded-content {
-  margin-left: 2.5rem;
+  padding: 0  3rem;
   min-width: 100vh;
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
@@ -717,6 +708,7 @@
 }
 
 .copy-btn-sql{
+  
   border: #7A54A2 1px solid;
 color: #7A54A2;
 }
