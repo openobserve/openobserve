@@ -365,7 +365,7 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
-    
+
     log::info!(
         "[trace_id {trace_id}] search_partition: resp.original_size: {}, cfg.limit.query_group_base_speed: {}, cpu_cores: {} , total_secs: {}, part_num: {}",
         resp.original_size,
@@ -403,13 +403,14 @@ pub async fn search_partition(
     let duration = req.end_time - req.start_time;
 
     log::info!(
-        "[trace_id {trace_id}] search_partition: part_num: {}, req.start_time: {}, req.end_time: {} , last_partition_step: {}, duration: {}, min_step: {}",
+        "[trace_id {trace_id}] search_partition: part_num: {}, req.start_time: {}, req.end_time: {} , last_partition_step: {}, duration: {}, min_step: {}, step: {}",
         part_num,
         req.start_time,
         req.end_time,
         last_partition_step,
         duration,
         min_step,
+        step,
     );
 
     while end > req.start_time {
@@ -428,6 +429,11 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
+
+    log::info!(
+        "[trace_id {trace_id}] search_partition: partitions: {}",
+        partitions.len(),
+    );
 
     // We need to reverse partitions if query is ASC order
     if let Some((field, order_by)) = sql.order_by.first() {
