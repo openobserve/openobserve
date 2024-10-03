@@ -199,7 +199,6 @@ const search = {
       stream_type : "logs",
       org_identifier,
       user_email : null,
-      size:50,
     };
     // Add startTime and endTime to the payload if provided
     if (startTime) {

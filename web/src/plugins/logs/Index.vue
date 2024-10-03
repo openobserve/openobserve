@@ -856,6 +856,7 @@ export default defineComponent({
           query: {
             action: "history",
             org_identifier: store.state.selectedOrganization.identifier,
+            type: "search_history",
           },
         });
       showSearchHistory.value = true;
