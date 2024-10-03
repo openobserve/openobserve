@@ -407,6 +407,11 @@
            dataToBeLoaded.value = filteredHits;
           isLoading.value = false;
      } catch (error) {
+          $q.notify({
+            type: "negative",
+            message: "Failed to fetch search history. Please try again later.",
+            timeout: 5000,
+          });
       console.log(error, "error")
       isLoading.value = false;
      } finally {
