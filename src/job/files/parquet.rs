@@ -884,7 +884,7 @@ pub(crate) async fn generate_index_on_compactor(
     stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Result<(String, FileMeta), anyhow::Error> {
+) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -900,7 +900,7 @@ pub(crate) async fn generate_index_on_compactor(
         index_fields,
     )?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
-        return Ok((String::new(), FileMeta::default()));
+        return Ok(vec![(String::new(), FileMeta::default())]);
     }
     let schema = record_batches.first().unwrap().schema();
 
@@ -961,7 +961,7 @@ pub(crate) async fn generate_index_on_compactor(
     record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
-    let (filename, filemeta, _stream_type) = write_parquet_index_to_disk(
+    let files = write_parquet_index_to_disk(
         record_batches,
         original_file_size,
         org_id,
@@ -972,8 +972,8 @@ pub(crate) async fn generate_index_on_compactor(
     )
     .await?;
 
-    log::debug!("[COMPACTOR:JOB] Written index file successfully");
-    Ok((filename, filemeta))
+    log::debug!("[COMPACTOR:JOB] Written index files successfully");
+    Ok(files)
 }
 
 fn prepare_index_record_batches(

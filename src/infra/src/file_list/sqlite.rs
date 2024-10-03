@@ -450,7 +450,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .join(" OR ");
             format!(" AND ({}) ", cond)
         };
-        log::warn!("prefix condition : {:?}", prefix_cond);
 
         let prefix_cond = Arc::new(prefix_cond);
 
