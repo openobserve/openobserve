@@ -117,7 +117,7 @@
             class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
             icon="search"
             flat
-            style="color: #F2452F; border: #F2452F 1px solid; font-weight: bold;"
+            style="color: #F2452F; border: #F2452F 1px solid;font-weight:bolder;"
           />
        </div>
         <div class="tw-flex tw-items-start  tw-justify-center" >
