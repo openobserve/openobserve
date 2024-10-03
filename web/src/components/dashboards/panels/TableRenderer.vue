@@ -31,15 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @row-click="(...args: any) => $emit('row-click', ...args)"
   >
     <template v-slot:body-cell="props">
-      <q-td
-        :props="props"
-        :style="
-          getStyle(props, [
-            { value: 'ziox', hex: '#eb4034' },
-            { value: 'monitoring', hex: '#080808' },
-          ])
-        "
-      >
+      <q-td :props="props" :style="getStyle(props)">
         {{ props.value }}
       </q-td>
     </template>
@@ -129,11 +121,22 @@ export default defineComponent({
       }
     };
 
-    const getStyle = (props: any, values: any) => {
-      const value = props.value;
-      const foundValue = values.find((v: any) => v.value == value);
-      if (foundValue) {
-        const hex = foundValue.hex;
+    const getStyle = (rowData: any) => {
+      const value = rowData.value;
+      const foundValue = props?.valueMapping?.find((v: any) => {
+        if (v.type == "value") {
+          return v.value == value;
+        } else if (v.type == "range") {
+          if (v.from && v.to && !Number.isNaN(+v.from) && !Number.isNaN(+v.to)) {
+            return +v.from <= +value && +v.to >= +value;
+          }
+          return false;
+        }
+        return false;
+      });
+
+      if (foundValue && foundValue.color) {
+        const hex = foundValue.color;
         const isDark = isDarkColor(hex);
         console.log(hex, isDark);
 

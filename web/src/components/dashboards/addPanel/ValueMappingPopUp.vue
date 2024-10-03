@@ -119,13 +119,23 @@
           </div>
         </draggable>
       </div>
-      <q-btn
+      <div class="tw-flex tw-justify-between">
+        <q-btn
         @click="addValueMapping"
         style="cursor: pointer; padding: 0px 5px"
         label="+ Add a new mapping"
         no-caps
         data-test="dashboard-addpanel-config-value-mapping-add-btn"
       />
+      <q-btn
+        v-close-popup="true"
+        style="cursor: pointer;"
+        color="primary"
+        label="Apply"
+        no-caps
+        data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+      />
+      </div>
     </div>
   </div>
 </template>
