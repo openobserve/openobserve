@@ -625,10 +625,8 @@
     };
     const changePagination = (val: { label: string; value: any }) => {
       if(val.label == "All"){
-        console.log(val.value, "val.value")
         val.value = dataToBeLoaded.value.length;
         val.label  = 'All';
-        console.log(val.value, "val.value")
 
       }
       selectedPerPage.value = val.value;
