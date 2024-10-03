@@ -101,6 +101,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { usage::run().await });
 
+    // cache short_urls
+    tokio::task::spawn(async move { db::short_url::watch().await });
+    db::short_url::cache()
+        .await
+        .expect("short url cache failed");
+
     // initialize metadata watcher
     tokio::task::spawn(async move { db::schema::watch().await });
     tokio::task::spawn(async move { db::functions::watch().await });
