@@ -100,20 +100,29 @@
     <q-td colspan="100%">
 
       <div class="text-left tw-px-2 expanded-content">
-       <div class="tw-flex tw-items-center ">
+       <div class="tw-flex tw-items-center q-py-sm ">
         <strong >SQL Query: <span>  <q-btn
             @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
             size="xs"
             dense
             flat
             icon="content_copy"
-            class="copy-btn tw-py-2 tw-px-2 "
+            class="copy-btn-sql tw-py-2 tw-px-2 "
           /></span></strong>
-
+          <q-btn
+            @click.stop="goToLogs(props.row)"
+            size="xs"
+            label="Logs"
+            dense
+            class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+            icon="search"
+            flat
+            style="color: #F2452F; border: #F2452F 1px solid;"
+          />
        </div>
         <div class="tw-flex tw-items-start tw-justify-center" >
        
-         <div class="scrollable-content  ">
+         <div class="scrollable-content  expanded-sql ">
           <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
 
          </div>
@@ -137,21 +146,21 @@
         </div>
       </div>
       <div v-if="props.row?.function" class="text-left tw-px-2 expanded-content">
-        <div class="tw-flex tw-items-center ">
+        <div class="tw-flex tw-items-center q-py-sm ">
         <strong >Function Defination: <span>  <q-btn
             @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
             size="xs"
             dense
             flat
             icon="content_copy"
-            class="copy-btn tw-py-2 tw-px-2 "
+            class="copy-btn-function tw-py-2 tw-px-2 "
           /></span></strong>
 
        </div>
 
         <div class="tw-flex tw-items-start tw-justify-center" >
        
-         <div class="scrollable-content  ">
+         <div class="scrollable-content expanded-function  ">
           <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
 
          </div>
@@ -182,12 +191,7 @@
       <div class="tw-flex q-mt-md tw-items-start" >
 
 <div class=" tw-flex tw-my-auto">
- <q-btn
-   @click.stop="goToLogs(props.row)"
-   size="xs"
-   label="Go To Logs"
-   class="copy-btn tw-py-3 tw-mx-2"
- />
+
 </div>
 
 
@@ -196,7 +200,13 @@
   </q-tr>
       </template>
       <template #bottom="scope">
-         <div class="tw-ml-auto">
+        <div class="tw-ml-auto tw-mr-2">
+          Max Limit : <b>1000</b> 
+        </div>
+        <q-separator style="height: 1.5rem; margin: auto 0; " vertical inset class="q-mr-md" />
+
+         <div class="q-pl-md" >
+
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -344,7 +354,6 @@
     }
     if(key == "trace_id"){
       columnWidth = 250
-      align = "left"
       sortable = false;
     }
     if(key == "#"){
@@ -357,7 +366,7 @@
       name: key,        // Field name
       label: label,     // Column label
       field: key,       // Field accessor
-      align: 'center',
+      align: align,
       sortable: sortable,
       style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
     };
@@ -677,6 +686,7 @@
   </script>
  <style lang="scss" scoped >
 .expanded-content {
+  margin-left: 2.5rem;
   min-width: 100vh;
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
@@ -694,6 +704,8 @@
   background-color: #e8e8e8;
   color: black;
 }
+
+
 .q-td {
   overflow: hidden;
   white-space: nowrap;
@@ -704,12 +716,27 @@
   text-align: left;
 }
 
+.copy-btn-sql{
+  border: #7A54A2 1px solid;
+color: #7A54A2;
+}
+
+.copy-btn-function{
+  border: #0A7EBC 1px solid;
+color: #0A7EBC;
+}
 
 
 .warning-text {
   color: #F5A623;
   border: 1px solid #F5A623;
   border-radius: 2px ;
+}
+.expanded-sql{
+  border-left: #7A54A2 3px solid;
+}
+.expanded-function{
+  border-left: #0A7EBC 3px solid;
 }
 
  </style>
