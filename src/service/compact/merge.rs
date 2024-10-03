@@ -54,7 +54,9 @@ use tokio::{
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::{generate_fst_inverted_index, generate_index_on_compactor},
+    job::files::parquet::{
+        create_tantivy_index, generate_fst_inverted_index, generate_index_on_compactor,
+    },
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
@@ -806,7 +808,7 @@ pub async fn merge_files(
                         InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
                     if matches!(
                         index_format,
-                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+                        InvertedIndexFormat::Parquet | InvertedIndexFormat::All
                     ) {
                         let (index_file_name, filemeta) = generate_index_on_compactor(
                             &retain_file_list,
@@ -854,10 +856,23 @@ pub async fn merge_files(
                     }
                     if matches!(
                         index_format,
-                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+                        InvertedIndexFormat::FST | InvertedIndexFormat::All
                     ) {
                         // generate fst inverted index and write to storage
                         generate_fst_inverted_index(
+                            inverted_idx_batch.clone(),
+                            &new_file_key,
+                            &full_text_search_fields,
+                            &index_fields,
+                            Some(&retain_file_list),
+                        )
+                        .await?;
+                    }
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::Tantivy | InvertedIndexFormat::All
+                    ) {
+                        create_tantivy_index(
                             inverted_idx_batch,
                             &new_file_key,
                             &full_text_search_fields,

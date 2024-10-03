@@ -54,13 +54,14 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
-pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
+pub const INDEX_SEGMENT_LENGTH: usize = 1; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
+pub const FILE_EXT_TANTIVY: &str = ".ttv";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -695,13 +696,13 @@ pub struct Common {
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "parquet",
-        help = "InvertedIndex store format, parquet(default), fst, or both."
+        help = "InvertedIndex store format, parquet(default), fst, Tantivy, all"
     )]
     pub inverted_index_store_format: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
         default = "parquet",
-        help = "InvertedIndex search format. Can only be configured when store format is both. Otherwise, it's set by store format"
+        help = "InvertedIndex search format. Can only be configured when store format is all. Otherwise, it's set by store format"
     )]
     pub inverted_index_search_format: String,
     #[env_config(
@@ -1497,12 +1498,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.inverted_index_store_format.is_empty() {
         cfg.common.inverted_index_search_format = "parquet".to_string();
     }
-    if !["both", "parquet", "fst"].contains(&cfg.common.inverted_index_store_format.as_str()) {
+    if !["all", "parquet", "fst", "tantivy"]
+        .contains(&cfg.common.inverted_index_store_format.as_str())
+    {
         return Err(anyhow::anyhow!(
             "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet, fst."
         ));
     }
-    if cfg.common.inverted_index_store_format != "both" {
+    if cfg.common.inverted_index_store_format != "all" {
         cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
     }
 

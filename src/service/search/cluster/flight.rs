@@ -788,9 +788,11 @@ async fn get_inverted_index_file_lists(
     };
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_parquet_inverted_index =
-        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
-    let use_fst_inverted_index =
-        use_inverted_index && (inverted_index_type == "fst" || inverted_index_type == "both");
+        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "all");
+    let use_fst_inverted_index = use_inverted_index
+        && (inverted_index_type == "fst"
+            || inverted_index_type == "all"
+            || inverted_index_type == "tantivy");
     log::info!(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
         use_parquet_inverted_index

@@ -100,14 +100,16 @@ pub enum InvertedIndexFormat {
     #[default]
     Parquet,
     FST,
-    Both,
+    All,
+    Tantivy,
 }
 
 impl From<&String> for InvertedIndexFormat {
     fn from(s: &String) -> Self {
         match s.to_lowercase().as_str() {
             "fst" => InvertedIndexFormat::FST,
-            "both" => InvertedIndexFormat::Both,
+            "all" => InvertedIndexFormat::All,
+            "tantivy" => InvertedIndexFormat::Tantivy,
             _ => InvertedIndexFormat::Parquet,
         }
     }
@@ -118,7 +120,8 @@ impl std::fmt::Display for InvertedIndexFormat {
         match self {
             InvertedIndexFormat::Parquet => write!(f, "parquet"),
             InvertedIndexFormat::FST => write!(f, "fst"),
-            InvertedIndexFormat::Both => write!(f, "both"),
+            InvertedIndexFormat::All => write!(f, "all"),
+            InvertedIndexFormat::Tantivy => write!(f, "tantivy"),
         }
     }
 }

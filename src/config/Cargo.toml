@@ -57,6 +57,7 @@ segment.workspace = true
 sqlparser.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
+tantivy.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-log.workspace = true

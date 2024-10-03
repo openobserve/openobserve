@@ -13,17 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashSet, path::PathBuf};
 
 use anyhow::{anyhow, ensure, Result};
 use futures::io::Cursor;
 use itertools::Itertools;
+use tantivy::Index;
 
 use crate::{
     meta::{
         inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader, stream::StreamType,
     },
-    FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
+    FILE_EXT_PARQUET, FILE_EXT_PUFFIN, FILE_EXT_TANTIVY, INDEX_MIN_CHAR_LEN,
 };
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
@@ -80,6 +81,79 @@ pub async fn create_index_reader_from_puffin_bytes(
         .read_blob_bytes(puffin_meta.blob_metadata.first().unwrap())
         .await?;
     Ok(IndexReader::new(Cursor::new(blob_bytes)))
+}
+
+/// FST inverted index solution has a 1:1 mapping between parquet and idx files.
+/// This is a helper function to convert the paruqet file name to idx file name.
+/// e.g.
+/// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
+/// to:   files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv
+pub fn convert_parquet_idx_file_name_to_tantivy_folder(from: &str) -> Option<String> {
+    let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
+
+    if parts.len() < 4 {
+        return None;
+    }
+
+    // Replace the stream_type part
+    let stream_type_pos = 2;
+    let stream_type = match parts[stream_type_pos].as_ref() {
+        "logs" => StreamType::Logs,
+        "metrics" => StreamType::Metrics,
+        "traces" => StreamType::Traces,
+        _ => return None,
+    };
+    parts[stream_type_pos] = Cow::Borrowed("index");
+
+    // Replace the stream_name part
+    let stream_name_pos = stream_type_pos + 1;
+    parts[stream_name_pos] = Cow::Owned(format!("{}_{}", parts[stream_name_pos], stream_type));
+
+    // Replace the file extension
+    let file_name_pos = parts.len() - 1;
+    if !parts[file_name_pos].ends_with(FILE_EXT_PARQUET) {
+        return None;
+    }
+    parts[file_name_pos] =
+        Cow::Owned(parts[file_name_pos].replace(FILE_EXT_PARQUET, FILE_EXT_TANTIVY));
+
+    Some(parts.join("/"))
+}
+
+/// This function expects a path to parquet file and returns a list of tantivy index file names
+pub fn get_tantivy_index_file_names_for_parquet_file(from: &str) -> Option<HashSet<PathBuf>> {
+    let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
+
+    if parts.len() < 4 {
+        return None;
+    }
+
+    // Replace the stream_type part
+    let stream_type_pos = 2;
+    let stream_type = match parts[stream_type_pos].as_ref() {
+        "logs" => StreamType::Logs,
+        "metrics" => StreamType::Metrics,
+        "traces" => StreamType::Traces,
+        _ => return None,
+    };
+    parts[stream_type_pos] = Cow::Borrowed("index");
+
+    // Replace the stream_name part
+    let stream_name_pos = stream_type_pos + 1;
+    parts[stream_name_pos] = Cow::Owned(format!("{}_{}", parts[stream_name_pos], stream_type));
+
+    // Replace the file extension
+    let file_name_pos = parts.len() - 1;
+    if !parts[file_name_pos].ends_with(FILE_EXT_PARQUET) {
+        return None;
+    }
+    parts[file_name_pos] =
+        Cow::Owned(parts[file_name_pos].replace(FILE_EXT_PARQUET, FILE_EXT_TANTIVY));
+
+    let tantivy_index_folder = parts.iter().join("/");
+
+    let index = Index::open_in_dir(&tantivy_index_folder).ok()?;
+    Some(index.directory().list_managed_files())
 }
 
 /// FST inverted index solution has a 1:1 mapping between parquet and idx files.
@@ -290,21 +364,21 @@ mod tests {
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
-                    "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.puffin"
+                    "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv"
                         .to_string(),
                 ),
             ),
             (
                 "files/default/metrics/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
-                    "files/default/index/quickstart1_metrics/2024/02/16/16/7164299619311026293.puffin"
+                    "files/default/index/quickstart1_metrics/2024/02/16/16/7164299619311026293.ttv"
                         .to_string(),
                 ),
             ),
             (
                 "files/default/traces/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
-                    "files/default/index/quickstart1_traces/2024/02/16/16/7164299619311026293.puffin"
+                    "files/default/index/quickstart1_traces/2024/02/16/16/7164299619311026293.ttv"
                         .to_string(),
                 ),
             ),

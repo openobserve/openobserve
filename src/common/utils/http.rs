@@ -97,10 +97,11 @@ pub(crate) fn get_index_type_from_request(
         .to_lowercase();
     if index_type.is_empty() || index_type == cfg.common.inverted_index_search_format {
         Ok(cfg.common.inverted_index_search_format.to_string())
-    } else if cfg.common.inverted_index_store_format == "both" {
+    } else if cfg.common.inverted_index_store_format == "all" {
         match index_type.as_str() {
             "parquet" => Ok("parquet".to_string()),
             "fst" => Ok("fst".to_string()),
+            "tantivy" => Ok("tantivy".to_string()),
             _ => Err(Error::new(
                 ErrorKind::Other,
                 "'index_type' query param with value 'parquet' or 'fst' allowed",
