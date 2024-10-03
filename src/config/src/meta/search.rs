@@ -432,7 +432,6 @@ pub struct SearchHistoryHitResponse {
     pub org_id: String,
     pub stream_type: String,
     pub stream_name: String,
-    pub user_email: String,
     #[serde(rename = "start_time")]
     pub min_ts: i64,
     #[serde(rename = "end_time")]
@@ -468,11 +467,6 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
                 .get("stream_name")
                 .and_then(|v| v.as_str())
                 .ok_or("stream_name missing".to_string())?
-                .to_string(),
-            user_email: value
-                .get("user_email")
-                .and_then(|v| v.as_str())
-                .ok_or("user_email missing".to_string())?
                 .to_string(),
             min_ts: value
                 .get("min_ts")
