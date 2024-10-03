@@ -1014,7 +1014,7 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {} WHERE 1=1", search_stream_name);
+            let mut query = format!("SELECT * FROM {} WHERE event='Search'", search_stream_name);
 
             if let Some(org_id) = self.org_id {
                 if !org_id.is_empty() {
