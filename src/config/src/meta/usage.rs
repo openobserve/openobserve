@@ -100,6 +100,8 @@ pub struct UsageData {
     pub result_cache_ratio: Option<usize>,
     #[serde(default)]
     pub is_partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -243,6 +245,8 @@ pub struct RequestStats {
     #[serde(default)]
     pub request_body: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
@@ -270,6 +274,7 @@ impl Default for RequestStats {
             records: 0,
             response_time: 0.0,
             request_body: None,
+            function: None,
             cached_ratio: None,
             compressed_size: None,
             min_ts: None,
@@ -290,6 +295,7 @@ impl From<FileMeta> for RequestStats {
             size: meta.original_size as f64 / SIZE_IN_MB,
             records: meta.records,
             response_time: 0.0,
+            function: None,
             request_body: None,
             cached_ratio: None,
             compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
