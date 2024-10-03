@@ -16,91 +16,60 @@
 use chrono::Utc;
 use config::utils::md5;
 
-use crate::common::infra::config::URL_MAP;
+use crate::service::db;
 
-pub struct ShortUrl;
-
-impl Default for ShortUrl {
-    fn default() -> Self {
-        Self::new()
+pub async fn shorten(original_url: &str) -> Option<String> {
+    // Check if the original_url already exists in db
+    if let Some(existing_short_id) = db::short_url::get_by_original_url(original_url).await {
+        return Some(existing_short_id);
     }
+
+    let mut short_id = md5::short_hash(original_url);
+
+    // Check if the generated short_id is already present in db
+    if db::short_url::get(short_id.as_str()).await.is_ok() {
+        // Handle hash conflict - create a new hash using the timestamp
+        let timestamp = Utc::now().timestamp();
+        let input = format!("{}{}", original_url, timestamp);
+        short_id = md5::short_hash(&input);
+    }
+
+    db::short_url::set(&short_id, original_url).await.ok();
+
+    Some(short_id.to_string())
 }
 
-impl ShortUrl {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn shorten(&mut self, original_url: &str) -> String {
-        // Check if the og_url already exists in cache
-        if let Some(existing_short_id) = URL_MAP.iter().find_map(|entry| {
-            let (k, v) = entry.pair();
-            if v == original_url {
-                return Some(k.clone());
-            }
-            None
-        }) {
-            return existing_short_id;
-        }
-
-        let mut short_id = md5::short_hash(original_url);
-
-        // Check if the generated short_id is already present
-        while URL_MAP.contains_key(short_id.as_str()) {
-            // Handle hash conflict - create a new hash using the timestamp
-            let timestamp = Utc::now().timestamp();
-            let input = format!("{}{}", original_url, timestamp);
-            short_id = md5::short_hash(&input);
-        }
-
-        // TODO: Call db logic
-        // Store mapping in the in-memory cache
-        {
-            URL_MAP.insert(short_id.to_string(), original_url.to_string());
-        }
-
-        short_id.to_string()
-    }
-
-    pub fn retrieve(&self, short_id: &str) -> Option<String> {
-        URL_MAP.get(short_id).map(|value| value.to_string())
-    }
+pub async fn retrieve(short_id: &str) -> Option<String> {
+    db::short_url::get(short_id).await.ok()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_shorten_and_retrieve() {
-        let mut short_url = ShortUrl::new();
-
+    #[tokio::test]
+    async fn test_shorten_and_retrieve() {
         let original_url = "https://www.example.com/some/long/url";
-        let short_id = short_url.shorten(original_url);
+        let short_id = shorten(original_url).await.unwrap();
 
-        let retrieved_url = short_url
-            .retrieve(&short_id)
-            .expect("Failed to retrieve URL");
+        let retrieved_url = retrieve(&short_id).await.expect("Failed to retrieve URL");
 
         assert_eq!(retrieved_url, original_url);
         assert_eq!(short_id.len(), 16);
     }
 
-    #[test]
-    fn test_retrieve_nonexistent_short_id() {
-        let short_url = ShortUrl::new();
-        let retrieved_url = short_url.retrieve("nonexistent_id");
+    #[tokio::test]
+    async fn test_retrieve_nonexistent_short_id() {
+        let retrieved_url = retrieve("nonexistent_id").await;
         assert!(retrieved_url.is_none());
     }
 
-    #[test]
-    fn test_unique_original_urls() {
-        let mut short_url = ShortUrl::new();
-
+    #[tokio::test]
+    async fn test_unique_original_urls() {
         let original_url = "https://www.example.com/some/long/url";
 
-        let short_id1 = short_url.shorten(original_url);
-        let short_id2 = short_url.shorten(original_url);
+        let short_id1 = shorten(original_url).await;
+        let short_id2 = shorten(original_url).await;
 
         // Should return the same short_id
         assert_eq!(short_id1, short_id2);

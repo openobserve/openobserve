@@ -21,6 +21,7 @@ pub mod file_list;
 pub mod queue;
 pub mod scheduler;
 pub mod schema;
+pub mod short_url;
 pub mod storage;
 
 pub async fn init() -> Result<(), anyhow::Error> {

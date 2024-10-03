@@ -39,7 +39,9 @@ mod tests {
     fn test_hash() {
         let input = "hello world";
         let expected = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-        assert_eq!(hash(input), expected);
+        let res = hash(input);
+        assert_eq!(res, expected);
+        assert_eq!(res.len(), 32);
     }
 
     #[test]
