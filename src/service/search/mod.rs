@@ -36,9 +36,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-    },
+    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
@@ -288,14 +286,12 @@ pub async fn search_partition(
     let mut max_query_range = 0;
     for (stream, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         if !skip_get_file_list {
             let stream_files = crate::service::file_list::query_ids(
                 &sql.org_id,
                 stream_type,
                 stream,
-                partition_time_level,
+                &[],
                 sql.time_range,
             )
             .await?;

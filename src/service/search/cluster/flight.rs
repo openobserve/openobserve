@@ -40,7 +40,6 @@ use infra::{
     dist_lock,
     errors::{Error, Result},
     file_list::FileId,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings, SchemaCache},
 };
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
@@ -99,7 +98,7 @@ pub async fn search(
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
-        &sql.schemas,
+        &req.prefixes,
         sql.time_range,
     )
     .await?;
@@ -726,25 +725,15 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[String],
-    schemas: &HashMap<String, Arc<SchemaCache>>,
+    prefixes: &[String],
     time_range: Option<(i64, i64)>,
 ) -> Result<HashMap<String, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for name in stream_names {
-        // stream settings
-        let stream_settings =
-            unwrap_stream_settings(schemas.get(name).unwrap().schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         // get file list
-        let file_id_list = crate::service::file_list::query_ids(
-            org_id,
-            stream_type,
-            name,
-            partition_time_level,
-            time_range,
-        )
-        .await?;
+        let file_id_list =
+            crate::service::file_list::query_ids(org_id, stream_type, name, prefixes, time_range)
+                .await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
@@ -901,7 +890,24 @@ pub async fn get_inverted_index_file_list(
         index_stream_name, search_condition,
     );
 
+    // for contains, we need to search all prefixes, for others we can only
+    // search specific prefix
+    let prefix_list = match cfg.common.full_text_search_type.as_str() {
+        "contains" => vec![],
+        _ => terms
+            .iter()
+            .map(|t| {
+                t.to_ascii_lowercase()
+                    .chars()
+                    .next()
+                    .unwrap_or('_')
+                    .to_string()
+            })
+            .collect(),
+    };
+
     req.stream_type = StreamType::Index;
+    req.prefixes = prefix_list;
     query.sql = sql;
     query.from = 0;
     query.size = QUERY_WITH_NO_LIMIT;

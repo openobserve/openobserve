@@ -141,11 +141,11 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_level: PartitionTimeLevel,
+    prefixes:&[String],
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<file_list::FileId>> {
     let mut files =
-        file_list::query_ids(org_id, stream_type, stream_name, time_level, time_range).await?;
+        file_list::query_ids(org_id, stream_type, stream_name, prefixes, time_range).await?;
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
     Ok(files)
