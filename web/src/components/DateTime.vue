@@ -342,7 +342,6 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 import { max } from "moment";
-import { s } from "vite/dist/node/types.d-aGj9QkWt";
 
 export default defineComponent({
   props: {
