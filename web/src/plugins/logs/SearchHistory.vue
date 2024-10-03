@@ -295,7 +295,7 @@
 
       const pagination = ref({
             page: 1,
-              rowsPerPage: 10 
+              rowsPerPage: 100 
       })
       const selectedPerPage = ref(pagination.value.rowsPerPage);
 
