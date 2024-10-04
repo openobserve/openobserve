@@ -23,7 +23,7 @@ use config::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
-        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+        stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
     utils::inverted_index::split_token,
@@ -118,9 +118,10 @@ pub async fn search(
     };
 
     // 2. get inverted index file list
-    let (_use_inverted_index, idx_file_list, idx_scan_size, idx_took) =
+    let (use_fst_inverted_index, idx_file_list, idx_scan_size, idx_took) =
         get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
+    req.set_use_inverted_index(use_fst_inverted_index);
 
     // 3. get nodes
     let node_group = req
@@ -736,35 +737,17 @@ pub async fn get_file_id_lists(
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         // get file list
-        let file_id_list =
-            get_file_id_list(org_id, stream_type, name, time_range, partition_time_level).await;
+        let file_id_list = crate::service::file_list::query_ids(
+            org_id,
+            stream_type,
+            name,
+            partition_time_level,
+            time_range,
+        )
+        .await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-#[tracing::instrument(name = "service:search:cluster:flight:get_file_id_list", skip_all)]
-pub(crate) async fn get_file_id_list(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    time_level: PartitionTimeLevel,
-) -> Vec<FileId> {
-    let (time_min, time_max) = time_range.unwrap();
-    let mut files = crate::service::file_list::query_ids(
-        org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await
-    .unwrap_or_default();
-    files.sort_by(|a, b| a.id.cmp(&b.id));
-    files.dedup_by(|a, b| a.id == b.id);
-    files
 }
 
 #[tracing::instrument(
@@ -786,15 +769,17 @@ async fn get_inverted_index_file_lists(
         req.inverted_index_type.as_ref().unwrap().to_string()
     };
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
-    let use_inverted_index =
+    let use_parquet_inverted_index =
         use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    let use_fst_inverted_index =
+        use_inverted_index && (inverted_index_type == "fst" || inverted_index_type == "both");
     log::info!(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
-        use_inverted_index
+        use_parquet_inverted_index
     );
 
-    if !use_inverted_index {
-        return Ok((false, vec![], 0, 0));
+    if !use_parquet_inverted_index {
+        return Ok((use_fst_inverted_index, vec![], 0, 0));
     }
 
     let stream_name = sql.stream_names.first().unwrap();
@@ -816,7 +801,12 @@ async fn get_inverted_index_file_lists(
         idx_took,
     );
 
-    Ok((true, idx_file_list, idx_scan_size, idx_took))
+    Ok((
+        use_fst_inverted_index,
+        idx_file_list,
+        idx_scan_size,
+        idx_took,
+    ))
 }
 
 pub async fn get_inverted_index_file_list(

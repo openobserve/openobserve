@@ -24,7 +24,7 @@ use config::{
         search::{SearchEventType, SearchHistoryHitResponse},
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
+        usage::{RequestStats, UsageType, USAGE_STREAM},
     },
     metrics,
     utils::{base64, json},
@@ -177,10 +177,9 @@ pub async fn search(
         {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
-                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
-                    > max_query_range
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
-                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
                     "Query duration is modified due to query range restriction of {} hours",
                     max_query_range
@@ -1435,7 +1434,7 @@ pub async fn search_partition(
                 "stream_type": "logs",
                 "took": 0.056222333,
                 "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
-                "user_email": "root@example.com"
+                "function": ".",
                 },
             ],
             "total": 3,
@@ -1486,7 +1485,7 @@ pub async fn search_history(
     req.user_email = user_id.clone();
 
     // Search
-    let stream_name = "usage";
+    let stream_name = USAGE_STREAM;
     let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => {
@@ -1522,7 +1521,7 @@ pub async fn search_history(
         .with_label_values(&[&org_id])
         .dec();
 
-    let history_org_id = "_meta";
+    let history_org_id = &cfg.common.usage_org;
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,
@@ -1575,6 +1574,7 @@ pub async fn search_history(
             }
         })
         .collect::<Vec<_>>();
+
     search_res.trace_id = trace_id.clone();
 
     // report http metrics
@@ -1612,7 +1612,7 @@ pub async fn search_history(
     let num_fn = search_query_req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
-        &org_id,
+        history_org_id,
         stream_name,
         StreamType::Logs,
         UsageType::SearchHistory,

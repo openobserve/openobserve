@@ -216,13 +216,21 @@ const getTemplateByName = (name: string) => {
 const editTemplate = (template: any = null) => {
   resetEditingTemplate();
   toggleTemplateEditor();
+
+  const query: { [key: string]: string } = {
+    action: template ? "update" : "add",
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+
+  if (template) query.name = template.name;
+
+  if (router.currentRoute.value.query.type)
+    query.type = router.currentRoute.value.query.type.toString() as string;
+
   if (!template) {
     router.push({
       name: "alertTemplates",
-      query: {
-        action: "add",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
+      query,
     });
   } else {
     editingTemplate.value = { ...template };

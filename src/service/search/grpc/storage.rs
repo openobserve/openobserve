@@ -552,11 +552,11 @@ async fn filter_file_list_by_inverted_index(
                         .unwrap();
                     file.segment_ids = Some(res.clone().into_vec());
                     log::info!(
-                        "[trace_id {}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} is {:?}",
+                        "[trace_id {}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} length {}",
                         query.trace_id,
                         *full_text_terms,
                         index_terms,
-                        res.iter_ones().collect_vec()
+                        res.len(),
                     );
                 } else {
                     // if the bitmap is empty then we remove the file from the list

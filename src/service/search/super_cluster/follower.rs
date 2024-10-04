@@ -35,7 +35,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     cluster::flight::{
-        check_work_group, get_file_id_list, get_inverted_index_file_list, get_online_querier_nodes,
+        check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
         partition_filt_list,
     },
     datafusion::{
@@ -116,14 +116,14 @@ pub async fn search(
         unwrap_partition_time_level(stream_settings.partition_time_level, req.stream_type);
 
     // 1. get file id list
-    let file_id_list = get_file_id_list(
+    let file_id_list = crate::service::file_list::query_ids(
         &req.org_id,
         req.stream_type,
         stream_name,
-        req.time_range,
         partition_time_level,
+        req.time_range,
     )
-    .await;
+    .await?;
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;

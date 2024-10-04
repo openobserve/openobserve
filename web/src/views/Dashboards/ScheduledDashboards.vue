@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
   >
     <q-table
-      data-test="alert-list-table"
+      data-test="scheduled-dashboard-table"
       ref="scheduledDashboardTableRef"
       :rows="formattedReports"
       :columns="columns"
@@ -46,7 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #top="scope">
         <div class="tw-flex tw-justify-between tw-w-full">
-          <div class="q-table__title" data-test="alerts-list-title">
+          <div
+            class="q-table__title tw-flex tw-items-center"
+            data-test="alerts-list-title"
+          >
             {{ t("dashboard.scheduledDashboards") }}
           </div>
 
@@ -64,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               filled
               dense
-              class="q-ml-auto q-mb-xs no-border"
+              class="q-ml-auto no-border"
               :placeholder="t('reports.search')"
             >
               <template #prepend>
@@ -74,13 +77,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               data-test="alert-list-add-alert-btn"
-              class="q-ml-md q-mb-xs text-bold no-border"
+              class="q-ml-md text-bold no-border"
               padding="sm lg"
               color="secondary"
               no-caps
               :label="t(`dashboard.newReport`)"
               @click="createNewReport"
             />
+
+            <div class="q-ml-sm">
+              <q-btn
+                v-close-popup="true"
+                round
+                flat
+                :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+              />
+            </div>
           </div>
         </div>
 
@@ -117,6 +129,7 @@ import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
+import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps({
   reports: {
@@ -397,6 +410,11 @@ const getTimeRangeValue = (dateTime: any) => {
 
 .scheduled-dashboards {
   height: fit-content;
+
+  :deep(.q-table__top) {
+    padding-left: 0;
+    padding-right: 0;
+  }
 
   :deep(.rum-tabs) {
     border: 1px solid #eaeaea;

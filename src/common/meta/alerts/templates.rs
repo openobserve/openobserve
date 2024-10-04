@@ -32,4 +32,6 @@ pub struct Template {
     #[serde(rename = "type")]
     #[serde(default)]
     pub template_type: DestinationType,
+    #[serde(default)]
+    pub title: String,
 }
