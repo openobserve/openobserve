@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="add-stream-header row items-center no-wrap q-px-md">
+    <div class="add-stream-header row items-center no-wrap q-px-md">
       <div class="col">
         <div class="text-body1 text-bold" data-test="add-stream-title">
           {{ t("logStream.add") }}
@@ -241,6 +242,8 @@ const saveStream = async () => {
         timeout: 4000,
       });
     });
+
+    emits("added:stream-aded", streamInputs.value);
 
     emits("added:stream-aded", streamInputs.value);
 };

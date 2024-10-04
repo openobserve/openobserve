@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             :label="t(`pipeline.addPipeline`)"
             :to="{ name: 'createPipeline' }"
+            :to="{ name: 'createPipeline' }"
           />
 
           <q-table-pagination
@@ -147,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script setup lang="ts">
 import { ref, onBeforeMount, computed, watch } from "vue";
+import { ref, onBeforeMount, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
@@ -157,6 +159,8 @@ import NoData from "../shared/grid/NoData.vue";
 import { outlinedDelete , outlinedPause , outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
+
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 
@@ -280,6 +284,7 @@ const getPipelines = () => {
     .getPipelines(store.state.selectedOrganization.identifier)
     .then((response) => {
       resultTotal.value = response.data.list.length;
+      resultTotal.value = response.data.list.length;
       pipelines.value = response.data.list.map(
         (pipeline: any, index: number) => {
           const updatedEdges = pipeline.edges.map(edge => ({
@@ -314,6 +319,7 @@ const editPipeline = (pipeline: any) => {
     name: "pipelineEditor",
     query: {
       id: pipeline.pipeline_id,
+      id: pipeline.pipeline_id,
       name: pipeline.name,
       stream: pipeline.stream_name,
       stream_type: pipeline.stream_type,
@@ -323,6 +329,7 @@ const editPipeline = (pipeline: any) => {
 };
 
 const openDeleteDialog = (pipeline: any) => {
+const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
   confirmDialogMeta.value.message =
@@ -331,6 +338,7 @@ const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.data = pipeline;
 };
 
+const savePipeline = (data: any) => {
 const savePipeline = (data: any) => {
   const dismiss = q.notify({
     message: "saving pipeline...",
@@ -368,6 +376,7 @@ const savePipeline = (data: any) => {
 
 const deletePipeline = () => {
   console.log(confirmDialogMeta.value.data,"data");
+  console.log(confirmDialogMeta.value.data,"data");
   const dismiss = q.notify({
     message: "deleting pipeline...",
     position: "bottom",
@@ -375,8 +384,12 @@ const deletePipeline = () => {
   });
   const { pipeline_id} = confirmDialogMeta.value.data;
   const org_id = store.state.selectedOrganization.identifier;
+  const { pipeline_id} = confirmDialogMeta.value.data;
+  const org_id = store.state.selectedOrganization.identifier;
   pipelineService
     .deletePipeline({
+      pipeline_id,
+      org_id
       pipeline_id,
       org_id
     })

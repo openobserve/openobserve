@@ -43,6 +43,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
         />
       </div>
+      <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
+        {{ pipelineObj.currentSelectedPipeline.name }}
+      </div>
+      <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
+        <q-input
+          v-model="pipelineObj.currentSelectedPipeline.name"
+          :label="t('pipeline.pipelineName')"
+          style="border: 1px solid #eaeaea"
+          filled
+          dense
+        />
+      </div>
     </div>
 
     <div class="flex justify-end">
@@ -83,13 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex q-mt-sm">
         <NodeSidebar :nodeTypes="nodeTypes" />
       </div>
+      <div class="flex q-mt-sm">
+        <NodeSidebar :nodeTypes="nodeTypes" />
+      </div>
     </div>
     <div
       id="pipelineChartContainer"
       ref="chartContainerRef"
       class="relative-position pipeline-chart-container o2vf_node"
+      class="relative-position pipeline-chart-container o2vf_node"
       :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
     >
+      <PipelineFlow />
       <PipelineFlow />
     </div>
   </div>
@@ -100,7 +117,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     full-height
     maximized
   >
+  <q-dialog
+    v-model="pipelineObj.dialog.show"
+    position="right"
+    full-height
+    maximized
+  >
     <div class="stream-routing-dialog-container full-height">
+      <QueryForm
+        v-if="pipelineObj.dialog.name === 'query'"
       <QueryForm
         v-if="pipelineObj.dialog.name === 'query'"
         :stream-name="pipeline.stream_name"
@@ -115,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <AssociateFunction
+        v-if="pipelineObj.dialog.name === 'function'"
         v-if="pipelineObj.dialog.name === 'function'"
         :functions="functionOptions"
         :associated-functions="associatedFunctions"
@@ -144,12 +170,16 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   onMounted,
+  onMounted,
   ref,
   type Ref,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
+import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
+import { VueFlow, useVueFlow } from "@vue-flow/core";
+
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 
 import { useStore } from "vuex";
@@ -164,9 +194,15 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
+import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
+import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
+import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
+const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
@@ -239,6 +275,7 @@ const plotChart: any = ref({
           position: "bottom",
         },
         draggable: true,
+        edgeSymbol: [ "arrow"],
         edgeSymbol: [ "arrow"],
         edgeSymbolSize: [10, 10],
         edgeLabel: {
@@ -334,7 +371,70 @@ const nodeTypes: any = [
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
   },
+
+const nodeTypes: any = [
+  {
+    label: "Source",
+    icon: "input",
+    isSectionHeader: true,
+  },
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "input",
+    icon: "img:" + streamImage,
+    tooltip: "Source: Stream Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Query",
+    subtype: "query",
+    io_type: "input",
+    icon: "img:" + queryImage,
+    tooltip: "Source: Query Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Transform",
+    icon: "processing",
+    isSectionHeader: true,
+  },
+  {
+    label: "Function",
+    subtype: "function",
+    io_type: "default",
+    icon: "img:" + functionImage,
+    tooltip: "Function Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Conditions",
+    subtype: "condition",
+    io_type: "default",
+    icon: "img:" + conditionImage,
+    tooltip: "Condition Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Destination",
+    icon: "input",
+    isSectionHeader: true,
+  },
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "output",
+    icon: "img:" + streamOutputImage,
+    tooltip: "Destination: Stream Node",
+    isSectionHeader: false,
+  },
 ];
+const functions = ref<{ [key: string]: Function }>({});
+
+
+const { pipelineObj, resetPipelineData } = useDragAndDrop();
+pipelineObj.nodeTypes = nodeTypes;
+pipelineObj.functions = functions;
 const functions = ref<{ [key: string]: Function }>({});
 
 
@@ -350,8 +450,17 @@ const hasInputType = computed(() => {
   );
 });
 
+const hasInputType = computed(() => {
+  return pipelineObj.currentSelectedPipeline.nodes.some(
+    (node) => node.io_type === "input",
+  );
+});
+
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
+const refreshFunctionList = () =>{
+  getFunctions();
+}
 const refreshFunctionList = () =>{
   getFunctions();
 }
@@ -399,6 +508,9 @@ onBeforeMount(() => {
 
 
 
+
+
+
 const getPipeline = () => {
   const route = router.currentRoute.value;
 
@@ -407,7 +519,12 @@ const getPipeline = () => {
     .then(async (response) => {
       const _pipeline = response.data.list.find(
         (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
+        (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
+
+      _pipeline.nodes.forEach((node) => {
+        node.type = node.io_type;
+      });
 
       _pipeline.nodes.forEach((node) => {
         node.type = node.io_type;
@@ -438,6 +555,7 @@ const getPipeline = () => {
 
 const getFunctions = () => {
   // if (Object.keys(functions.value).length) return;
+  // if (Object.keys(functions.value).length) return;
   isFetchingFunctions.value = true;
   return functionsService
     .list(
@@ -452,6 +570,7 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
+        console.log(func,"func");
         functions.value[func.name] = func;
         functionOptions.value.push(func.name);
       });
@@ -532,6 +651,17 @@ const savePipeline = async () => {
       });
 
   saveOperation
+  const saveOperation = pipelineObj.isEditPipeline
+    ? pipelineService.updatePipeline({
+        data: pipelineObj.currentSelectedPipeline,
+        org_identifier: store.state.selectedOrganization.identifier,
+      })
+    : pipelineService.createPipeline({
+        data: pipelineObj.currentSelectedPipeline,
+        org_identifier: store.state.selectedOrganization.identifier,
+      });
+
+  saveOperation
     .then(() => {
       q.notify({
         message: "Pipeline saved successfully",
@@ -545,9 +675,17 @@ const savePipeline = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+      router.push({
+        name: "pipelines",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     })
     .catch((error) => {
       q.notify({
+        message:
+          error.response?.data?.message || "Error while saving pipeline",
         message:
           error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
@@ -557,9 +695,11 @@ const savePipeline = async () => {
     })
     .finally(() => {
       pipelineObj.isEditPipeline = false;
+      pipelineObj.isEditPipeline = false;
       dismiss();
     });
 };
+
 
 
 const openCancelDialog = () => {
@@ -619,6 +759,7 @@ const updateNewFunction = (_function: Function) => {
 
 .pipeline-chart-container {
 height: 80vh;
+height: 80vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }
@@ -639,6 +780,36 @@ height: 80vh;
 <style lang="scss">
 .stream-routing-dialog-container {
   min-width: 540px !important;
+}
+
+.o2vf_node {
+  width: auto;
+
+  .vue-flow__node {
+    padding: 0px;
+    width: auto;
+  }
+
+  .o2vf_node_input,
+  .vue-flow__node-input {
+    background-color: #c8d6f5;
+    border-color: 1px solid #2c6b2f;
+    color: black;
+  }
+
+  .o2vf_node_output,
+  .vue-flow__node-output {
+    background-color: #8fd4b8;
+    border-color: 1px solid #3b6f3f;
+    color: black;
+  }
+
+  .o2vf_node_default,
+  .vue-flow__node-default {
+    background-color: #efefef;
+    border-color: 1px solid #171e25;
+    color: black;
+  }
 }
 
 .o2vf_node {
