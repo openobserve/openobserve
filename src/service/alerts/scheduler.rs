@@ -168,8 +168,6 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
-    let should_store_last_end_time =
-        alert.trigger_condition.frequency == alert.trigger_condition.period;
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
@@ -295,8 +293,27 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     // send notification
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
-        let (alert_start_time, alert_end_time) =
-            get_alert_start_end_time(&vars, alert.trigger_condition.period, end_time, start_time);
+        // Multi-time range alerts can have multiple time ranges, hence only
+        // use the main start_time (now - period) and end_time (now) for the alert evaluation.
+        let use_given_time = if alert.query_condition.multi_time_range.is_some()
+            && !alert
+                .query_condition
+                .multi_time_range
+                .as_ref()
+                .unwrap()
+                .is_empty()
+        {
+            true
+        } else {
+            false
+        };
+        let (alert_start_time, alert_end_time) = get_alert_start_end_time(
+            &vars,
+            alert.trigger_condition.period,
+            end_time,
+            start_time,
+            use_given_time,
+        );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert.send_notification(&data, end_time, start_time).await {
