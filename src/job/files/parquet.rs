@@ -1487,7 +1487,7 @@ pub(crate) fn generate_tantivy_index(
         .context("failed to create index builder")?;
 
     // docs per row to be added in the tantivy index
-    let mut docs = HashMap::new();
+    let mut docs = BTreeMap::new();
     for (field, col) in cols {
         for row in 0..inverted_idx_batch.num_rows() {
             let doc = docs.entry(row).or_insert(doc!());

@@ -43,7 +43,11 @@ use infra::{
 };
 use itertools::Itertools;
 use proto::cluster_rpc::KvItem;
-use tantivy::{query::QueryParser, schema::Value, TantivyDocument};
+use tantivy::{
+    query::{PhrasePrefixQuery, Query, QueryParser, RegexQuery},
+    schema::Value,
+    TantivyDocument, Term,
+};
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
@@ -681,11 +685,28 @@ async fn search_tantivy_index(
 
     let mut max_doc_id = 0u32;
     if !fts_terms.is_empty() {
+        let full_text_field = tantivy_schema.get_field("_all")?;
         let query_parser = QueryParser::for_index(
             &tantivy_index,
             vec![tantivy_schema.get_field("_all").unwrap()],
         );
-        let query = query_parser.parse_query(&fts_terms.join(" "))?;
+        // TODO(Uddhav): improve this logic
+        // The issue is joining the full text search terms
+        // Ideally there should be multiple queries for each term
+        // and their result should be intersected
+        let query: Box<dyn Query> = match cfg.common.full_text_search_type.as_str() {
+            "eq" => query_parser.parse_query(&fts_terms.join(" "))?,
+            "contains" => Box::new(RegexQuery::from_pattern(
+                &fts_terms.join(" "),
+                full_text_field,
+            )?),
+            // Default to prefix search
+            _ => Box::new(PhrasePrefixQuery::new(vec![Term::from_field_text(
+                full_text_field,
+                // we join all the fields that are full text searchable
+                &fts_terms.join(" "),
+            )])),
+        };
 
         let docs = tantivy_searcher
             .search(&query, &tantivy::collector::DocSetCollector)
@@ -699,8 +720,21 @@ async fn search_tantivy_index(
 
     for term in index_terms.iter() {
         let field = tantivy_schema.get_field(&term.0).unwrap();
-        let query =
-            QueryParser::for_index(&tantivy_index, vec![field]).parse_query(&term.1.join(" "))?;
+
+        let query_parser = QueryParser::for_index(&tantivy_index, vec![field]);
+        // TODO(Uddhav): improve this logic
+        // The issue is joining the secondary index terms
+        // Ideally there should be multiple queries for each term
+        // and their result should be intersected
+        let query: Box<dyn Query> = match cfg.common.full_text_search_type.as_str() {
+            "eq" => query_parser.parse_query(&term.1.join(" "))?,
+            "contains" => Box::new(RegexQuery::from_pattern(&term.1.join(" "), field)?),
+            // Default to prefix search
+            _ => Box::new(PhrasePrefixQuery::new(vec![Term::from_field_text(
+                field,
+                &term.1.join(" "),
+            )])),
+        };
 
         let docs = tantivy_searcher
             .search(&query, &tantivy::collector::DocSetCollector)
@@ -857,4 +891,155 @@ async fn inverted_index_search_in_file(
     } else {
         (parquet_file_name.into(), Some(res)) // match -> take the file in search
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_search_tantivy_index_exact_match() {
+        let fts_terms = Arc::new(vec!["exact_term".to_string()]);
+        let index_terms = Arc::new(vec![]);
+        let result =
+            search_tantivy_index("test_trace_id", "test_parquet_file", fts_terms, index_terms)
+                .await;
+        match result {
+            Ok((file_name, Some(bitvec))) => {
+                println!("Exact match: Found matches in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Ok((file_name, None)) => {
+                println!("Exact match: No matches found in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Err(e) => {
+                println!("Exact match: Error occurred: {}", e);
+                // Handle error case
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_tantivy_index_prefix_search() {
+        let fts_terms = Arc::new(vec!["prefix".to_string()]);
+        let index_terms = Arc::new(vec![]);
+        let result =
+            search_tantivy_index("test_trace_id", "test_parquet_file", fts_terms, index_terms)
+                .await;
+        match result {
+            Ok((file_name, Some(bitvec))) => {
+                println!("Prefix search: Found matches in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Ok((file_name, None)) => {
+                println!("Prefix search: No matches found in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Err(e) => {
+                println!("Prefix search: Error occurred: {}", e);
+                // Handle error case
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_tantivy_index_regex_search() {
+        let fts_terms = Arc::new(vec!["regex.*".to_string()]);
+        let index_terms = Arc::new(vec![]);
+        let result =
+            search_tantivy_index("test_trace_id", "test_parquet_file", fts_terms, index_terms)
+                .await;
+        match result {
+            Ok((file_name, Some(bitvec))) => {
+                println!("Regex search: Found matches in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Ok((file_name, None)) => {
+                println!("Regex search: No matches found in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Err(e) => {
+                println!("Regex search: Error occurred: {}", e);
+                // Handle error case
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_tantivy_index_combined_search() {
+        let fts_terms = Arc::new(vec!["full_text_term".to_string()]);
+        let index_terms = Arc::new(vec![(
+            "index_field".to_string(),
+            vec!["index_term".to_string()],
+        )]);
+        let result =
+            search_tantivy_index("test_trace_id", "test_parquet_file", fts_terms, index_terms)
+                .await;
+        match result {
+            Ok((file_name, Some(bitvec))) => {
+                println!("Combined search: Found matches in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Ok((file_name, None)) => {
+                println!("Combined search: No matches found in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Err(e) => {
+                println!("Combined search: Error occurred: {}", e);
+                // Handle error case
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_tantivy_index_no_match() {
+        let fts_terms = Arc::new(vec!["no_match_term".to_string()]);
+        let index_terms = Arc::new(vec![(
+            "index_field".to_string(),
+            vec!["no_match_index_term".to_string()],
+        )]);
+        let result =
+            search_tantivy_index("test_trace_id", "test_parquet_file", fts_terms, index_terms)
+                .await;
+        match result {
+            Ok((file_name, Some(bitvec))) => {
+                println!("No match: Found matches in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Ok((file_name, None)) => {
+                println!("No match: No matches found in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Err(e) => {
+                println!("No match: Error occurred: {}", e);
+                // Handle error case
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_tantivy_index_empty_terms() {
+        let fts_terms = Arc::new(vec![]);
+        let index_terms = Arc::new(vec![]);
+        let result =
+            search_tantivy_index("test_trace_id", "test_parquet_file", fts_terms, index_terms)
+                .await;
+        match result {
+            Ok((file_name, Some(bitvec))) => {
+                println!("Empty terms: Found matches in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Ok((file_name, None)) => {
+                println!("Empty terms: No matches found in file {}", file_name);
+                // Add assertions to check the correctness of the results
+            }
+            Err(e) => {
+                println!("Empty terms: Error occurred: {}", e);
+                // Handle error case
+            }
+        }
+    }
 }
