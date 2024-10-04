@@ -127,19 +127,32 @@ export default defineComponent({
         if (v.type == "value") {
           return v.value == value;
         } else if (v.type == "range") {
-          if (v.from && v.to && !Number.isNaN(+v.from) && !Number.isNaN(+v.to)) {
+          if (
+            v.from &&
+            v.to &&
+            !Number.isNaN(+v.from) &&
+            !Number.isNaN(+v.to)
+          ) {
             return +v.from <= +value && +v.to >= +value;
           }
           return false;
+        } else if (v.type == "regex") {
+          // check/test if the value matches the regex
+          return new RegExp(v?.pattern ?? "").test(value);
         }
         return false;
       });
 
       if (foundValue && foundValue.color) {
         const hex = foundValue.color;
-        const isDark = isDarkColor(hex);
-        console.log(hex, isDark);
 
+        // Check if hex is valid
+        const isValidHex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex);
+        if (!isValidHex) {
+          return "";
+        }
+
+        const isDark = isDarkColor(hex);
         return `background-color: ${hex}; color: ${isDark ? "#ffffff" : "#000000"}`;
       }
       return "";

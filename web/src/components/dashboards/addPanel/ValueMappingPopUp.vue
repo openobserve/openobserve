@@ -54,6 +54,7 @@
                 v-model="mapping.type"
                 label="Type"
                 :options="mappingTypes"
+                style="width: 250px"
                 data-test="dashboard-addpanel-config-value-mapping-type-select"
                 emit-value
                 input-debounce="0"
@@ -68,37 +69,67 @@
                 v-if="mapping.type === 'value'"
                 v-model="mapping.value"
                 label="Value"
-                class="showLabelOnTop"
+                style="width: 250px"
                 data-test="dashboard-addpanel-config-value-mapping-value-input"
               />
+              <q-input
+                v-if="mapping.type === 'regex'"
+                v-model="mapping.pattern"
+                label="Regex"
+                style="width: 250px"
+                data-test="dashboard-addpanel-config-value-mapping-value-input"
+              />
+              <!-- class="showLabelOnTop" -->
 
               <q-input
                 v-if="mapping.type === 'range'"
                 v-model="mapping.from"
                 label="From"
-                class="showLabelOnTop"
                 data-test="dashboard-addpanel-config-value-mapping-value-from-input"
               />
+              <!-- class="showLabelOnTop" -->
 
               <q-input
                 v-if="mapping.type === 'range'"
                 v-model="mapping.to"
                 label="To"
-                class="showLabelOnTop"
                 data-test="dashboard-addpanel-config-value-mapping-value-to-input"
               />
+              <!-- class="showLabelOnTop" -->
 
-              <div v-if="mapping.color">
-                <input
-                  v-if="mapping.color"
-                  type="color"
-                  data-test="dashboard-addpanel-config-value-mapping-color-input"
+              <div v-if="mapping.color !== null" class="flex tw-items-center">
+                <q-input
+                  filled
                   v-model="mapping.color"
+                  :rules="['anyColor']"
+                  class="my-input"
+                >
+                  <template v-slot:append>
+                    <q-icon name="colorize" class="cursor-pointer">
+                      <q-popup-proxy
+                        cover
+                        transition-show="scale"
+                        transition-hide="scale"
+                      >
+                        <q-color v-model="mapping.color" />
+                      </q-popup-proxy>
+                    </q-icon>
+                  </template>
+                </q-input>
+                <q-icon
+                  name="close"
+                  class="cursor-pointer tw-align-middle"
+                  size="sm"
+                  @click="removeColorByIndex(index)"
                 />
-                <div @click="removeColorByIndex(index)">Remove Color</div>
               </div>
               <div v-else>
-                <div @click="setColorByIndex(index)">Set color</div>
+                <div
+                  class="cursor-pointer tw-text-blue-700 tw-font-semibold"
+                  @click="setColorByIndex(index)"
+                >
+                  Set color
+                </div>
               </div>
 
               <span class="q-ml-lg">
@@ -121,20 +152,20 @@
       </div>
       <div class="tw-flex tw-justify-between">
         <q-btn
-        @click="addValueMapping"
-        style="cursor: pointer; padding: 0px 5px"
-        label="+ Add a new mapping"
-        no-caps
-        data-test="dashboard-addpanel-config-value-mapping-add-btn"
-      />
-      <q-btn
-        v-close-popup="true"
-        style="cursor: pointer;"
-        color="primary"
-        label="Apply"
-        no-caps
-        data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-      />
+          @click="addValueMapping"
+          style="cursor: pointer; padding: 0px 5px"
+          label="+ Add a new mapping"
+          no-caps
+          data-test="dashboard-addpanel-config-value-mapping-add-btn"
+        />
+        <q-btn
+          v-close-popup="true"
+          style="cursor: pointer"
+          color="primary"
+          label="Apply"
+          no-caps
+          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+        />
       </div>
     </div>
   </div>
@@ -177,6 +208,10 @@ export default defineComponent({
       {
         label: "Range",
         value: "range",
+      },
+      {
+        label: "Regex",
+        value: "regex",
       },
     ];
 
@@ -232,16 +267,17 @@ export default defineComponent({
   display: flex;
   border-bottom: 1px solid #cccccc70;
   margin-bottom: 8px;
-  cursor: move;
 }
 
 .draggable-handle {
+  cursor: move;
   flex: 0 0 30px;
   padding: 8px;
   box-sizing: border-box;
 }
 
 .draggable-content {
+  align-items: center;
   flex: 1;
   display: flex;
   justify-content: space-between;
