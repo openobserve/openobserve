@@ -360,7 +360,7 @@ impl QueryCondition {
                 _ => {}
             }
         });
-        log::debug!("alert resp hits :{:#?}", records);
+        log::debug!("alert resp hits len:{:#?}", records.len());
         let records = Some(records);
         if self.search_event_type.is_none() {
             let threshold = trigger_condition.threshold as usize;

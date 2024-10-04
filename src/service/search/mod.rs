@@ -16,7 +16,7 @@
 use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::{
@@ -109,6 +109,8 @@ pub async fn search_multi(
     user_id: Option<String>,
     multi_req: &search::MultiStreamRequest,
 ) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
     let trace_id = if trace_id.is_empty() {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
@@ -154,6 +156,7 @@ pub async fn search_multi(
     }
     let queries_len = queries.len();
     let mut stream_name = "".to_string();
+    let mut sqls = vec![];
 
     for mut req in queries {
         stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
@@ -163,6 +166,7 @@ pub async fn search_multi(
                 "".to_string()
             }
         };
+        sqls.push(req.query.sql.clone());
         if !per_query_resp {
             req.query.query_fn = query_fn.clone();
         }
@@ -214,6 +218,7 @@ pub async fn search_multi(
         }
     }
 
+    let mut report_function_usage = false;
     multi_res.hits = if query_fn.is_some() {
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
@@ -240,6 +245,7 @@ pub async fn search_multi(
         };
         match program {
             Some(program) => {
+                report_function_usage = true;
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
@@ -249,7 +255,7 @@ pub async fn search_multi(
                         },
                         &json::Value::Array(multi_res.hits),
                         &org_id,
-                        &[stream_name],
+                        &[stream_name.clone()],
                     );
                     ret_val
                         .as_array()
@@ -298,7 +304,7 @@ pub async fn search_multi(
     } else {
         multi_res.hits
     };
-    log::debug!("multi_res after applying vrl: {:#?}", multi_res);
+    log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
     let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
@@ -309,6 +315,35 @@ pub async fn search_multi(
         let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
+    let time = start.elapsed().as_secs_f64();
+
+    if report_function_usage {
+        let req_stats = RequestStats {
+            // For functions, records = records * num_function, in this case num_function = 1
+            records: multi_res.total as i64,
+            response_time: time,
+            size: multi_res.scan_size as f64,
+            request_body: Some(json::to_string(&sqls).unwrap()),
+            user_email: None,
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            trace_id: None,
+            // took_wait_in_queue: multi_res.t,
+            search_type: multi_req.search_type,
+            ..Default::default()
+        };
+        report_request_usage_stats(
+            req_stats,
+            &org_id,
+            &stream_name,
+            stream_type,
+            UsageType::Functions,
+            0, // The request stats already contains function event
+            started_at,
+        )
+        .await;
+    }
     Ok(multi_res)
 }
 
@@ -451,13 +486,14 @@ pub async fn search(
                     },
                     ..Default::default()
                 };
+                let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
                 report_request_usage_stats(
                     req_stats,
                     org_id,
                     &stream_name,
                     StreamType::Logs,
                     UsageType::Search,
-                    0,
+                    num_fn,
                     started_at,
                 )
                 .await;
