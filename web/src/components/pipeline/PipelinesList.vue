@@ -287,6 +287,9 @@ const getPipelines = () => {
               markerEnd: {
                 type: "arrowclosed"
               }}))
+              // pipeline.stream_name = pipeline.nodes[0].data.stream_name
+              // pipeline.stream_type = pipeline.nodes[0].data.stream_type
+
           pipeline.edges = updatedEdges;
           return {
             ...pipeline,

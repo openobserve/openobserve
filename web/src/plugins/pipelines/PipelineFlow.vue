@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div class="container">
-     <div v-show="pipelineObj.dirtyFlag" class="warning-text">
+     <div v-show="pipelineObj.dirtyFlag" class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md ">
+      <q-icon name="info" class="q-mr-xs " size="16px" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
    
@@ -165,12 +166,6 @@ function resetTransform() {
   justify-content: space-between;
 }
 
-.warning-text {
-  background-color: #ffc107;
-  font-weight: bold;
-  padding: 8px;
-}
-
 .button-group {
   display: flex;
   align-items: center;
@@ -200,6 +195,11 @@ q-btn {
   justify-content: center;
 }
 
+.warning-text {
+              color: #F5A623;
+              border: 1px solid #F5A623;
+              border-radius: 2px ;
+            }
 
 
 </style>

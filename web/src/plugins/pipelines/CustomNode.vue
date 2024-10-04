@@ -210,6 +210,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
+        v-if=" data.stream_name &&  data.stream_name.hasOwnProperty('label')"
           class="row"
           style="
             text-align: left;
@@ -218,7 +219,19 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.stream_type }} -{{   data.stream_name.label }}
+          {{ data.stream_type }} - {{   data.stream_name.label }}
+        </div>
+        <div
+        v-else
+          class="row"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          {{ data.stream_type }} - {{    data.stream_name }}
         </div>
       </div>
       <div class="float-right tw-pl-2">

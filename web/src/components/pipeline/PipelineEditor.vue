@@ -391,7 +391,7 @@ onBeforeMount(() => {
   } else {
     pipelineObj.isEditPipeline = false;
     resetPipelineData();
-    console.log( pipelineObj.hasInputNode,"pipelineObj.hasInputNode")
+
   }
   getFunctions();
 });
@@ -433,8 +433,6 @@ const getPipeline = () => {
       pipelineObj.pipelineWithoutChange = JSON.parse(
         JSON.stringify(_pipeline),
       );
-      console.log("pipelineObj.currentSelectedPipeline", pipelineObj.currentSelectedPipeline);
-      console.log("pipelineObj.pipelineWithoutChange", pipelineObj.pipelineWithoutChange);
     });
 };
 
@@ -499,7 +497,7 @@ const savePipeline = async () => {
     return;
   } else {
     pipelineObj.currentSelectedPipeline.nodes.map((node) => {
-      if (node.data.node_type === "stream") {
+      if (node.data.node_type === "stream" && node.data.stream_name && node.data.stream_name.hasOwnProperty("value")) {
         node.data.stream_name = node.data.stream_name.value;
       }
     });

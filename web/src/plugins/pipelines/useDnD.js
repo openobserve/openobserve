@@ -171,7 +171,6 @@ export default function useDragAndDrop() {
   }
 
   function onEdgesChange(changes) {
-    console.log("this is working fine")
     pipelineObj.dirtyFlag = true;
     if(changes.length > 0){
       pipelineObj.edgesChange = true;
