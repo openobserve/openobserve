@@ -73,25 +73,25 @@ pub async fn get_by_original_url(original_url: &str) -> Option<String> {
     let original_url = original_url.to_string();
     // TODO: Verify this operation
     match db::get(&format!("{SHORT_URL_KEY}{original_url}")).await {
-        Ok(val) => {
-            match json::from_slice::<String>(&val) {
-                Ok(short_id) => {
-                    URL_MAP.insert(short_id.clone(), original_url.clone());
-                    Some(short_id)
-                }
-                Err(e) => {
-                    log::error!("Failed to deserialize short_id for original_url from db: {}", e);
-                    None
-                }
+        Ok(val) => match json::from_slice::<String>(&val) {
+            Ok(short_id) => {
+                URL_MAP.insert(short_id.clone(), original_url.clone());
+                Some(short_id)
             }
-        }
+            Err(e) => {
+                log::error!(
+                    "Failed to deserialize short_id for original_url from db: {}",
+                    e
+                );
+                None
+            }
+        },
         Err(e) => {
             log::error!("Original URL not found in db: {}", e);
             None
         }
     }
 }
-
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = SHORT_URL_KEY;

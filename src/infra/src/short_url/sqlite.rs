@@ -48,15 +48,7 @@ impl ShortUrl for SqliteShortUrl {
     /// Creates indexes on the short_urls table
     async fn create_table_index(&self) -> Result<()> {
         create_index("short_id_idx", "short_urls", true, &["short_id"]).await?;
-
-        create_index(
-            "original_url_idx",
-            "short_urls",
-            true,
-            &["original_url"],
-        )
-        .await?;
-
+        create_index("original_url_idx", "short_urls", true, &["original_url"]).await?;
         Ok(())
     }
 

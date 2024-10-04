@@ -49,9 +49,9 @@ use crate::{
         alerts::{build_sql, destinations},
         db,
         search::sql::RE_ONLY_SELECT,
+        short_url::ShortUrl,
     },
 };
-use crate::service::short_url;
 
 pub async fn save(
     org_id: &str,
@@ -795,7 +795,8 @@ async fn process_dest_template(
         )
     };
 
-    let alert_url = short_url::shorten(&alert_url).await;
+    // Shorten the alert url
+    let alert_url = ShortUrl::new(None).shorten(&alert_url).await;
 
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
