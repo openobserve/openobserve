@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div
-    style="padding: 0px 10px; min-width: 70%"
+    style="padding: 0px 10px; min-width: 90%"
     class="scroll o2-input"
     data-test="dashboard-value-mapping-popup"
   >
@@ -96,6 +96,12 @@
                 data-test="dashboard-addpanel-config-value-mapping-value-to-input"
               />
               <!-- class="showLabelOnTop" -->
+
+              <q-input
+                v-model="mapping.text"
+                label="Display Value"
+                data-test="dashboard-addpanel-config-value-mapping-display-value-input"
+              />
 
               <div v-if="mapping.color !== null" class="flex tw-items-center">
                 <q-input
