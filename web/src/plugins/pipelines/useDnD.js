@@ -41,6 +41,8 @@ const defaultObject = {
   dirtyFlag: false,
   isEditPipeline: false,
   isEditNode: false,
+  nodesChange:false,
+  edgesChange:false,
   draggedNode: null,
   isDragOver: false,
   isDragging: false,
@@ -159,6 +161,7 @@ export default function useDragAndDrop() {
   }
 
   function onNodeChange(changes) {
+
     console.log("Node change", changes);
   }
 
@@ -168,7 +171,11 @@ export default function useDragAndDrop() {
   }
 
   function onEdgesChange(changes) {
+    console.log("this is working fine")
     pipelineObj.dirtyFlag = true;
+    if(changes.length > 0){
+      pipelineObj.edgesChange = true;
+    }
     console.log("Edges change", changes);
   }
 
@@ -214,7 +221,9 @@ export default function useDragAndDrop() {
 
   function addNode(newNode) {
     if(pipelineObj.isEditPipeline == true ){
+      console.log("this is working")
       pipelineObj.dirtyFlag = true;
+      pipelineObj.nodesChange = true;
     }
     let currentSelectedNode = pipelineObj.currentSelectedNodeData;
     if (pipelineObj.isEditNode == true && currentSelectedNode.id != "") {
@@ -259,10 +268,10 @@ export default function useDragAndDrop() {
 
       const ids1 = extractAndSortIds(items1);
       const ids2 = extractAndSortIds(items2);
+      console.log(ids1,ids2)
   
       return JSON.stringify(ids1) === JSON.stringify(ids2);
     };
-  
     const nodesEqual = compareIds(pipeline1.nodes, pipeline2.nodes);
   
     return nodesEqual;
@@ -271,6 +280,7 @@ export default function useDragAndDrop() {
   // delete the node from pipelineObj.currentSelectedPipeline.nodes and pipelineObj.currentSelectedPipeline.edges all reference associated with target and source
   // also empty pipelineObj.currentSelectedNodeData
   function deletePipelineNode(nodeId) {
+
     pipelineObj.currentSelectedPipeline.nodes =
       pipelineObj.currentSelectedPipeline.nodes.filter(
         (node) => node.id !== nodeId,
@@ -288,13 +298,13 @@ export default function useDragAndDrop() {
       pipelineObj.currentSelectedPipeline,
       pipelineObj.pipelineWithoutChange
     );
-    if(arePipelinesEqualById == true){
+    console.log(pipelineObj.edgesChange,"edges")
+    if(arePipelinesEqualById == true && pipelineObj.edgesChange == false ){
       pipelineObj.dirtyFlag = false;
     }
     if(arePipelinesEqualById == false){
       pipelineObj.dirtyFlag = true;
     }
-    console.log(arePipelinesEqualById, "compare");
     
     
   }
