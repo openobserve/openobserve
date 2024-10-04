@@ -122,7 +122,7 @@ export default defineComponent({
     };
 
     const getStyle = (rowData: any) => {
-      const value = rowData.value;
+      const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
       const foundValue = props?.valueMapping?.find((v: any) => {
         if (v.type == "value") {
           return v.value == value;
