@@ -684,18 +684,13 @@ async fn process_dest_template(
     }
 
     // Use only the main alert time range if multi_time_range is enabled
-    let use_given_time = if alert.query_condition.multi_time_range.is_some()
+    let use_given_time = alert.query_condition.multi_time_range.is_some()
         && !alert
             .query_condition
             .multi_time_range
             .as_ref()
             .unwrap()
-            .is_empty()
-    {
-        true
-    } else {
-        false
-    };
+            .is_empty();
     // calculate start and end time
     let (alert_start_time, alert_end_time) = get_alert_start_end_time(
         &vars,

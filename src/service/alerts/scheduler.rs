@@ -295,18 +295,13 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
-        let use_given_time = if alert.query_condition.multi_time_range.is_some()
+        let use_given_time = alert.query_condition.multi_time_range.is_some()
             && !alert
                 .query_condition
                 .multi_time_range
                 .as_ref()
                 .unwrap()
-                .is_empty()
-        {
-            true
-        } else {
-            false
-        };
+                .is_empty();
         let (alert_start_time, alert_end_time) = get_alert_start_end_time(
             &vars,
             alert.trigger_condition.period,

@@ -171,7 +171,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in functions::get_all_transform_keys(&org_id).await {
+        for fn_name in functions::get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -228,7 +228,7 @@ pub async fn search_multi(
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -290,7 +290,7 @@ pub async fn search_multi(
                                     fields: program.fields.clone(),
                                 },
                                 &hit,
-                                &org_id,
+                                org_id,
                                 &[stream_name.clone()],
                             );
                             (!ret_val.is_null())
@@ -335,7 +335,7 @@ pub async fn search_multi(
         };
         report_request_usage_stats(
             req_stats,
-            &org_id,
+            org_id,
             &stream_name,
             stream_type,
             UsageType::Functions,
