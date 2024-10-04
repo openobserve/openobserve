@@ -383,8 +383,6 @@ export default defineComponent({
         showErrorNotification(error?.message ?? "Dashboard update failed", {
           timeout: 2000,
         });
-
-        // refresh dashboard
         refreshDashboard();
       }
     };
