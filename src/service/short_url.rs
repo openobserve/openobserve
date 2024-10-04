@@ -18,10 +18,10 @@ use config::utils::md5;
 
 use crate::service::db;
 
-pub async fn shorten(original_url: &str) -> Option<String> {
+pub async fn shorten(original_url: &str) -> String {
     // Check if the original_url already exists in db
     if let Some(existing_short_id) = db::short_url::get_by_original_url(original_url).await {
-        return Some(existing_short_id);
+        return existing_short_id;
     }
 
     let mut short_id = md5::short_hash(original_url);
@@ -36,7 +36,7 @@ pub async fn shorten(original_url: &str) -> Option<String> {
 
     db::short_url::set(&short_id, original_url).await.ok();
 
-    Some(short_id.to_string())
+    short_id.to_string()
 }
 
 pub async fn retrieve(short_id: &str) -> Option<String> {
@@ -50,7 +50,7 @@ mod tests {
     #[tokio::test]
     async fn test_shorten_and_retrieve() {
         let original_url = "https://www.example.com/some/long/url";
-        let short_id = shorten(original_url).await.unwrap();
+        let short_id = shorten(original_url).await;
 
         let retrieved_url = retrieve(&short_id).await.expect("Failed to retrieve URL");
 

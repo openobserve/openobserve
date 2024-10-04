@@ -40,8 +40,8 @@ impl ShortUrl for PostgresShortUrl {
 
     /// Create index for short_urls at short_id and original_url
     async fn create_table_index(&self) -> Result<()> {
-        create_index("idx_short_id", "short_urls", true, &["short_url"]).await?;
-        create_index("idx_original_url", "short_urls", true, &["original_url"]).await?;
+        create_index("short_id_idx", "short_urls", true, &["short_id"]).await?;
+        create_index("original_url_idx", "short_urls", true, &["original_url"]).await?;
         Ok(())
     }
 
