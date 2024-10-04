@@ -72,7 +72,7 @@ pub(crate) async fn write_parquet_index_to_disk(
             None => "null".to_string(),
         };
         let prefix = partition.get_partition_key(&val);
-        let batch = partition_buf.entry(prefix).or_insert_with(|| Vec::new());
+        let batch = partition_buf.entry(prefix).or_default();
         let entry = serde_json::Value::Object(row);
         batch.push(Arc::new(entry));
     }
