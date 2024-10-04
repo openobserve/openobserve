@@ -84,7 +84,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-          ["sanity.spec.js", "alerts.spec.js", "schema.spec.js", "logspage.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "multiselect-stream.spec.js", "pipeline.spec.js", "dashboardtype.spec.js", "dashboard.spec.js", "visualize.spec.js"]
+          ["sanity.spec.js", "alerts.spec.js", "schema.spec.js", "logspage.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "multiselect-stream.spec.js", "pipeline.spec.js", "dashboardtype.spec.js", "dashboard.spec.js", "visualize.spec.js", "unflattened.spec.js"]
           
     steps:
       - name: Clone the current repo
@@ -118,9 +118,10 @@ jobs:
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
-      - name: Check OpenObserve logs
-        if: always()
-        run: cat o2.log
+
+      # - name: Check OpenObserve logs
+      #   if: always()
+      #   run: cat o2.log
 
       - uses: actions/upload-artifact@v4
         if: always()

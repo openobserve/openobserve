@@ -25,20 +25,17 @@ use datafusion::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{downcast_value, internal_err, not_impl_err, plan_err, DFSchema, DataFusionError},
+    common::{downcast_value, internal_err, not_impl_err, plan_err, DataFusionError},
     error::Result,
     logical_expr::{
         function::{AccumulatorArgs, StateFieldsArgs},
         utils::format_state_name,
         Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
     },
-    physical_expr_common::{
-        aggregate::tdigest::TryIntoF64,
-        utils::limited_convert_logical_expr_to_physical_expr_with_dfschema,
-    },
-    prelude::Expr,
+    physical_plan::PhysicalExpr,
     scalar::ScalarValue,
 };
+use datafusion_functions_aggregate_common::tdigest::TryIntoF64;
 
 use super::NUMERICS;
 
@@ -104,8 +101,9 @@ impl AggregateUDFImpl for PercentileCont {
     }
 
     fn accumulator(&self, args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
-        let percentile = validate_input_percentile_expr(&args.input_exprs[1])?;
-        let accumulator = match &args.input_types[0] {
+        let percentile = validate_input_percentile_expr(&args.exprs[1])?;
+        let data_type = args.exprs[0].data_type(args.schema)?;
+        let accumulator: PercentileContAccumulator = match data_type {
             t @ (DataType::Int8
             | DataType::Int16
             | DataType::Int32
@@ -126,33 +124,34 @@ impl AggregateUDFImpl for PercentileCont {
     }
 }
 
-fn validate_input_percentile_expr(expr: &Expr) -> Result<f64> {
-    let lit = get_lit_value(expr)?;
-    let percentile = match &lit {
-        ScalarValue::Float32(Some(q)) => *q as f64,
-        ScalarValue::Float64(Some(q)) => *q,
-        got => {
+fn validate_input_percentile_expr(expr: &Arc<dyn PhysicalExpr>) -> Result<f64> {
+    let percentile = match get_scalar_value(expr)? {
+        ScalarValue::Float32(Some(value)) => value as f64,
+        ScalarValue::Float64(Some(value)) => value,
+        sv => {
             return not_impl_err!(
                 "Percentile value for 'PERCENTILE_CONT' must be Float32 or Float64 literal (got data type {})",
-                got.data_type()
+                sv.data_type()
             );
         }
     };
+
+    // Ensure the percentile is between 0 and 1.
+    if !(0.0..=1.0).contains(&percentile) {
+        return plan_err!(
+            "Percentile value must be between 0.0 and 1.0 inclusive, {percentile} is invalid"
+        );
+    }
     Ok(percentile)
 }
 
-fn get_lit_value(expr: &Expr) -> Result<ScalarValue> {
+fn get_scalar_value(expr: &Arc<dyn PhysicalExpr>) -> Result<ScalarValue> {
     let empty_schema = Arc::new(Schema::empty());
-    let empty_batch = RecordBatch::new_empty(Arc::clone(&empty_schema));
-    let dfschema = DFSchema::empty();
-    let expr = limited_convert_logical_expr_to_physical_expr_with_dfschema(expr, &dfschema)?;
-    let result = expr.evaluate(&empty_batch)?;
-    match result {
-        ColumnarValue::Array(_) => Err(DataFusionError::Internal(format!(
-            "The expr {:?} can't be evaluated to scalar value",
-            expr
-        ))),
-        ColumnarValue::Scalar(scalar_value) => Ok(scalar_value),
+    let batch = RecordBatch::new_empty(Arc::clone(&empty_schema));
+    if let ColumnarValue::Scalar(s) = expr.evaluate(&batch)? {
+        Ok(s)
+    } else {
+        internal_err!("Didn't expect ColumnarValue::Array")
     }
 }
 
@@ -183,7 +182,8 @@ impl PercentileContAccumulator {
         }
     }
 
-    fn convert_to_float(values: &ArrayRef) -> Result<Vec<f64>> {
+    // public for approx_percentile_cont_with_weight
+    pub fn convert_to_float(values: &ArrayRef) -> Result<Vec<f64>> {
         match values.data_type() {
             DataType::Float64 => {
                 let array = downcast_value!(values, Float64Array);
@@ -191,7 +191,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::Float32 => {
                 let array = downcast_value!(values, Float32Array);
@@ -199,7 +199,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::Int64 => {
                 let array = downcast_value!(values, Int64Array);
@@ -207,7 +207,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::Int32 => {
                 let array = downcast_value!(values, Int32Array);
@@ -215,7 +215,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::Int16 => {
                 let array = downcast_value!(values, Int16Array);
@@ -223,7 +223,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::Int8 => {
                 let array = downcast_value!(values, Int8Array);
@@ -231,7 +231,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::UInt64 => {
                 let array = downcast_value!(values, UInt64Array);
@@ -239,7 +239,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::UInt32 => {
                 let array = downcast_value!(values, UInt32Array);
@@ -247,7 +247,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::UInt16 => {
                 let array = downcast_value!(values, UInt16Array);
@@ -255,7 +255,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             DataType::UInt8 => {
                 let array = downcast_value!(values, UInt8Array);
@@ -263,7 +263,7 @@ impl PercentileContAccumulator {
                     .values()
                     .iter()
                     .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<datafusion::common::Result<Vec<_>>>()?)
+                    .collect::<Result<Vec<_>>>()?)
             }
             e => internal_err!("PERCENTILE_CONT is not expected to receive the type {e:?}"),
         }

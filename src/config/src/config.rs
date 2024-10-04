@@ -469,6 +469,8 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name = "ZO_ROUTE_CONNECTION_POOL_DISABLED", default = false)]
+    pub connection_pool_disabled: bool,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
@@ -521,10 +523,6 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
-    pub wal_memory_mode_enabled: bool,
-    #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
-    pub wal_line_mode_enabled: bool,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
     // TODO: should rename to column_all
@@ -768,7 +766,7 @@ pub struct Common {
     pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = true,
+        default = false,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
@@ -780,7 +778,7 @@ pub struct Common {
     pub use_multi_result_cache: bool,
     #[env_config(
         name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
-        default = "both",
+        default = "overlap",
         help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
     )]
     pub result_cache_selection_strategy: String,
@@ -827,6 +825,8 @@ pub struct Limit {
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
     pub mem_persist_interval: u64,
+    #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
+    pub wal_write_buffer_size: usize,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
@@ -896,7 +896,7 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub http_shutdown_timeout: u64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
     pub alert_schedule_concurrency: i64,
@@ -924,14 +924,16 @@ pub struct Limit {
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
     pub quick_mode_strategy: String, // first, last, both
-    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_ENABLED", default = false)]
-    pub quick_mode_file_list_enabled: bool,
-    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
-    pub quick_mode_file_list_interval: i64,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
-    pub sql_min_db_connections: u32,
+    pub sql_db_connections_min: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
-    pub sql_max_db_connections: u32,
+    pub sql_db_connections_max: u32,
+    #[env_config(
+        name = "ZO_META_CONNECTION_POOL_MAX_LIFETIME",
+        default = 0,
+        help = "Seconds, Maximum lifetime of individual connections."
+    )]
+    pub sql_db_connections_max_lifetime: u64,
     #[env_config(
         name = "ZO_META_TRANSACTION_RETRIES",
         default = 3,
@@ -944,6 +946,18 @@ pub struct Limit {
         help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_ID_BATCH_SIZE",
+        default = 5000,
+        help = "batch size of file list query"
+    )]
+    pub file_list_id_batch_size: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -958,6 +972,18 @@ pub struct Limit {
         help = "Maximum size of a single enrichment table in mb"
     )]
     pub max_enrichment_table_size: usize,
+    #[env_config(
+        name = "ZO_USE_UPPER_BOUND_FOR_MAX_TS",
+        default = false,
+        help = "use upper bound for max tx"
+    )]
+    pub use_upper_bound_for_max_ts: bool,
+    #[env_config(
+        name = "ZO_BUFFER_FOR_MAX_TS",
+        default = 60,
+        help = "buffer for upper bound in mins"
+    )]
+    pub upper_bound_for_max_ts: i64,
 }
 
 #[derive(EnvConfig)]
@@ -974,7 +1000,7 @@ pub struct Compact {
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
-    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
+    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
@@ -1204,6 +1230,8 @@ pub struct S3 {
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
     pub max_retries: usize,
+    #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
+    pub max_idle_per_host: usize,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1306,16 +1334,20 @@ pub fn init() -> Config {
         cfg.limit.file_push_limit = 10000;
     }
 
-    if cfg.limit.sql_min_db_connections == 0 {
-        cfg.limit.sql_min_db_connections = cpu_num as u32
+    if cfg.limit.sql_db_connections_min == 0 {
+        cfg.limit.sql_db_connections_min = cpu_num as u32
     }
 
-    if cfg.limit.sql_max_db_connections == 0 {
-        cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
+    if cfg.limit.sql_db_connections_max == 0 {
+        cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
+    }
+
+    if cfg.limit.file_list_id_batch_size == 0 {
+        cfg.limit.file_list_id_batch_size = 5000;
     }
 
     if cfg.limit.consistent_hash_vnodes == 0 {
-        cfg.limit.consistent_hash_vnodes = 3;
+        cfg.limit.consistent_hash_vnodes = 100;
     }
 
     // check common config
@@ -1412,7 +1444,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
     if cfg.common.local_mode
-        || (cfg.common.meta_store != "sqlite" && cfg.common.meta_store != "etcd")
+        || cfg.common.meta_store.starts_with("mysql")
+        || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.meta_store_external = true;
     }
@@ -1625,6 +1658,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.mem_table_bucket_num == 0 {
         cfg.limit.mem_table_bucket_num = 1;
+    }
+
+    // wal
+    if cfg.limit.wal_write_buffer_size < 4096 {
+        cfg.limit.wal_write_buffer_size = 4096;
     }
 
     // check query settings

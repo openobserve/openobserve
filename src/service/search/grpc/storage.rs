@@ -15,140 +15,150 @@
 
 use std::sync::Arc;
 
+use arrow_schema::Schema;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
         inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
-        search::{ScanStats, SearchType, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        search::{ScanStats, StorageType},
+        stream::FileKey,
     },
     utils::inverted_index::{
         convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes, split_token,
     },
     FILE_EXT_PARQUET, INDEX_FIELD_NAME_FOR_ALL,
 };
+use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::get_stream_setting_index_fields,
     storage,
 };
 use itertools::Itertools;
+use proto::cluster_rpc::KvItem;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, generate_search_schema_diff, sql::Sql},
+    search::{datafusion::exec, generate_filter_from_equal_items, generate_search_schema_diff},
 };
 
 type CachedFiles = (usize, usize);
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
 pub async fn search(
-    trace_id: &str,
-    sql: Arc<Sql>,
+    query: Arc<super::QueryParams>,
+    schema: Arc<Schema>,
     file_list: &[FileKey],
-    stream_type: StreamType,
-    work_group: &str,
+    req_equal_terms: &[KvItem],
+    req_match_terms: &[String],
+    sorted_by_time: bool,
+    file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
-    log::info!("[trace_id {trace_id}] search->storage: enter");
-    let schema = sql.schema.clone();
+    log::info!("[trace_id {}] search->storage: enter", query.trace_id);
     // fetch all schema versions, group files by version
     let schema_versions = match infra::schema::get_versions(
-        &sql.org_id,
-        &sql.stream_name,
-        stream_type,
-        sql.meta.time_range,
+        &query.org_id,
+        &query.stream_name,
+        query.stream_type,
+        query.time_range,
     )
     .instrument(enter_span.clone())
     .await
     {
         Ok(versions) => versions,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            log::error!("[trace_id {}] get schema error: {}", query.trace_id, err);
             return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                sql.stream_name.clone(),
+                query.stream_name.clone(),
             )));
         }
     };
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, get schema versions num {}",
-        &sql.org_id,
-        stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, get schema versions num {}",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         schema_versions.len()
     );
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new(), 0));
+        return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-
     // get file list
-    let mut files = match file_list.is_empty() {
-        true => {
-            get_file_list(
-                trace_id,
-                &sql,
-                stream_type,
-                partition_time_level,
-                &stream_settings.partition_keys,
-            )
-            .instrument(enter_span.clone())
-            .await?
-        }
-        false => file_list.to_vec(),
-    };
+    let mut files = file_list.to_vec();
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default(), 0));
+        return Ok((vec![], ScanStats::default()));
     }
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load file_list num {}",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         files.len(),
     );
 
-    // filter file_list if is an inverted index search
+    // check inverted index
     let cfg = get_config();
-    let use_inverted_index = cfg.common.inverted_index_enabled
-        && !cfg.common.feature_query_without_index
-        && sql.use_inverted_index
-        && (sql.inverted_index_type == "fst" || sql.inverted_index_type == "both")
-        && (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty());
-    let mut idx_took = 0i64;
+    let inverted_index_type = if query.inverted_index_type.is_none()
+        || query.inverted_index_type.as_ref().unwrap().is_empty()
+    {
+        cfg.common.inverted_index_search_format.clone()
+    } else {
+        query.inverted_index_type.as_ref().unwrap().to_string()
+    };
+    let use_inverted_index =
+        query.use_inverted_index && (inverted_index_type == "fst" || inverted_index_type == "both");
+    log::info!(
+        "[trace_id {}] flight->search: use_inverted_index with fst format {}",
+        query.trace_id,
+        use_inverted_index
+    );
+
+    let mut idx_took = 0;
     if use_inverted_index {
-        idx_took = filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type)
-            .await? as i64;
+        idx_took = filter_file_list_by_inverted_index(
+            query.clone(),
+            &mut files,
+            req_equal_terms,
+            req_match_terms,
+        )
+        .await?;
         log::info!(
-            "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
-            &sql.org_id,
-            &stream_type,
-            &sql.stream_name,
+            "[trace_id {}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
+            query.trace_id,
+            query.org_id,
+            query.stream_type,
+            query.stream_name,
             files.len(),
             idx_took
         );
     }
 
-    let mut scan_stats = ScanStats::new();
+    let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
+    let mut scan_stats = ScanStats::new();
     if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
             Err(err) => {
-                log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
+                log::error!(
+                    "[trace_id {}] calculate files size error: {}",
+                    query.trace_id,
+                    err
+                );
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
                 )));
@@ -171,7 +181,8 @@ pub async fn search(
                 Some(id) => id,
                 None => {
                     log::error!(
-                        "[trace_id {trace_id}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        "[trace_id {}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        query.trace_id,
                         &file.key,
                         file.meta.min_ts,
                         file.meta.max_ts
@@ -186,22 +197,23 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size
     );
 
     if cfg.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
+        super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
     }
 
     // load files to local cache
     let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) = cache_files(
-        trace_id,
+        &query.trace_id,
         &files.iter().map(|f| f.key.as_ref()).collect_vec(),
         &scan_stats,
     )
@@ -213,14 +225,17 @@ pub async fn search(
             g_files.retain(|f| !deleted_files.contains(&f.key));
         }
     }
+
+    scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
@@ -237,6 +252,7 @@ pub async fn search(
     // construct latest schema map
     let schema_latest = Arc::new(
         schema
+            .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
@@ -250,18 +266,16 @@ pub async fn search(
         if files.is_empty() {
             continue;
         }
+        if files.is_empty() {
+            continue;
+        }
         let schema = schema_versions[ver].clone();
-        let schema = Arc::new(schema);
-        let sql = sql.clone();
+        let schema = schema.with_metadata(std::collections::HashMap::new());
+
         let session = config::meta::search::Session {
-            id: format!("{trace_id}-{ver}"),
+            id: format!("{}-{ver}", query.trace_id),
             storage_type: StorageType::Memory,
-            search_type: if !sql.meta.group_by.is_empty() {
-                SearchType::Aggregation
-            } else {
-                SearchType::Normal
-            },
-            work_group: Some(work_group.to_string()),
+            work_group: query.work_group.clone(),
             target_partitions,
         };
 
@@ -271,67 +285,18 @@ pub async fn search(
             schema_latest.clone(),
             &files,
             diff_fields,
-            &sql.meta.order_by,
+            sorted_by_time,
+            file_stat_cache.clone(),
         )
         .await?;
-        tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
+        tables.push(table);
     }
 
-    scan_stats.idx_took = idx_took;
-    Ok((tables, scan_stats, target_partitions))
-}
-
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
-async fn get_file_list(
-    trace_id: &str,
-    sql: &Sql,
-    stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Result<Vec<FileKey>, Error> {
-    log::debug!(
-        "[trace_id {trace_id}] search->storage: get file_list in grpc, stream {}/{}/{}, time_range {:?}",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
-        &sql.meta.time_range
-    );
-    let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = match file_list::query(
-        &sql.org_id,
-        &sql.stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-        true,
-    )
-    .await
-    {
-        Ok(file_list) => file_list,
-        Err(err) => {
-            log::error!("[trace_id {trace_id}] get file list error: {}", err);
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                "get file list error".to_string(),
-            )));
-        }
-    };
-
-    let mut files = Vec::with_capacity(file_list.len());
-    for file in file_list {
-        if sql
-            .match_source(&file, false, false, stream_type, partition_keys)
-            .await
-        {
-            files.push(file.to_owned());
-        }
-    }
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    Ok(files)
+    Ok((tables, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
-async fn cache_files<'a>(
+async fn cache_files(
     trace_id: &str,
     files: &[&str],
     scan_stats: &ScanStats,
@@ -474,12 +439,25 @@ async fn cache_files<'a>(
 /// If the query does match then the segment IDs for the file will be updated.
 /// If the query not find corresponding index file, the file will *not* be filtered out.
 async fn filter_file_list_by_inverted_index(
-    trace_id: &str,
+    query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
-    sql: &Sql,
-    stream_type: StreamType,
+    equal_terms: &[KvItem],
+    match_terms: &[String],
 ) -> Result<usize, Error> {
     let start = std::time::Instant::now();
+
+    // construct partition filters
+    let equal_terms: Vec<(String, String)> = equal_terms
+        .iter()
+        .map(|v| (v.key.to_string(), v.value.to_string()))
+        .collect::<Vec<_>>();
+    // filter euqal_items with index_fields
+    let schema = infra::schema::get(&query.org_id, &query.stream_name, query.stream_type).await?;
+    let stream_settings = infra::schema::unwrap_stream_settings(&schema);
+    let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let index_terms_orig = super::super::filter_index_fields(&equal_terms, &index_fields);
+    let index_terms = generate_filter_from_equal_items(&index_terms_orig);
+
     // Cache the corresponding Index files
     let cfg = get_config();
     let mut scan_stats = ScanStats::new();
@@ -489,7 +467,7 @@ async fn filter_file_list_by_inverted_index(
         .filter_map(|f| convert_parquet_idx_file_name(f))
         .collect_vec();
     let (cache_type, _, (mem_cached_files, disk_cached_files)) = cache_files(
-        trace_id,
+        &query.trace_id,
         index_file_names
             .iter()
             .map(|f| f.as_str())
@@ -502,10 +480,11 @@ async fn filter_file_list_by_inverted_index(
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
@@ -513,7 +492,7 @@ async fn filter_file_list_by_inverted_index(
     );
 
     let full_text_terms = Arc::new(
-        sql.fts_terms
+        match_terms
             .iter()
             .filter_map(|t| {
                 let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
@@ -530,14 +509,14 @@ async fn filter_file_list_by_inverted_index(
             })
             .collect_vec(),
     );
-    let index_terms = Arc::new(sql.index_terms.clone());
+    let index_terms = Arc::new(index_terms);
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     let mut tasks = Vec::new();
     for file in file_list_map.keys() {
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let file_name = file.clone();
-        let trace_id_clone = trace_id.to_string();
+        let trace_id_clone = query.trace_id.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
@@ -573,15 +552,17 @@ async fn filter_file_list_by_inverted_index(
                         .unwrap();
                     file.segment_ids = Some(res.clone().into_vec());
                     log::info!(
-                        "[trace_id {trace_id}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} is {:?}",
+                        "[trace_id {}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} length {}",
+                        query.trace_id,
                         *full_text_terms,
                         index_terms,
-                        res.iter_ones().collect_vec()
+                        res.len(),
                     );
                 } else {
                     // if the bitmap is empty then we remove the file from the list
                     log::info!(
-                        "[trace_id {trace_id}] search->storage: no match found in index for file {}",
+                        "[trace_id {}] search->storage: no match found in index for file {}",
+                        query.trace_id,
                         file_name
                     );
                     file_list_map.remove(&file_name);
@@ -589,7 +570,8 @@ async fn filter_file_list_by_inverted_index(
             }
             Err(e) => {
                 log::warn!(
-                    "[trace_id {trace_id}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
+                    "[trace_id {}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
+                    query.trace_id,
                     e.to_string()
                 );
                 continue;
@@ -602,7 +584,7 @@ async fn filter_file_list_by_inverted_index(
 
 /// Fetches the file from cache if it exists, otherwise fetch from storage
 async fn fetch_file(file_name: &str) -> anyhow::Result<Vec<u8>> {
-    // first get from meory cache
+    // first get from memory cache
     if file_data::memory::exist(file_name).await {
         return file_data::memory::get(file_name, None)
             .await

@@ -134,15 +134,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if !key.contains('/') {
                     continue;
                 }
-                let key_splitted = key.split('/').collect::<Vec<&str>>();
-                let org_name = key_splitted[0];
+                let split_key = key.split('/').collect::<Vec<&str>>();
+                let org_name = split_key[0];
                 orgs.insert(org_name);
                 if need_migrate_index_streams
-                    && key_splitted.len() > 2
-                    && key_splitted[1] == "index"
+                    && split_key.len() > 2
+                    && split_key[1] == "index"
                     && !migrate_native_objects
                 {
-                    get_tuple_for_new_index(org_name, key_splitted[2], &mut tuples);
+                    get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
                 }
             }
             if migrate_native_objects {

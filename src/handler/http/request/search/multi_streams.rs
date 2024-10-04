@@ -21,6 +21,7 @@ use config::{
     get_config,
     meta::{
         search,
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -40,7 +41,10 @@ use crate::{
             },
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, RESULT_ARRAY},
+        usage::report_request_usage_stats,
+    },
 };
 
 /// SearchStreamData
@@ -48,13 +52,12 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = SearchRequest,
+        description = "Search query",
+        content_type = "application/json",
+        example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -62,9 +65,15 @@ use crate::{
             "from": 0,
             "size": 10
         }
-    })),
+    })
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (
+            status = 200,
+            description = "Success",
+            content_type = "application/json",
+            body = SearchResponse,
+            example = json!({
             "took": 155,
             "hits": [
                 {
@@ -88,9 +97,20 @@ use crate::{
             "from": 0,
             "size": 1,
             "scan_size": 28943
-        })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        }),
+        ),
+        (
+            status = 400,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        ),
+        (
+            status = 500,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        )
     )
 )]
 #[post("/{org_id}/_search_multi")]
@@ -100,8 +120,9 @@ pub async fn search_multi(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let org_id = org_id.into_inner();
     let cfg = get_config();
+
+    let org_id = org_id.into_inner();
     let started_at = Utc::now().timestamp_micros();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone())
@@ -113,18 +134,24 @@ pub async fn search_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     // handle encoding for query and aggs
     let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let mut query_fn = multi_req
@@ -138,9 +165,13 @@ pub async fn search_multi(
         }
     }
 
+    let mut range_error = String::new();
+
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+
+    let per_query_resp = multi_req.per_query_response;
 
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
@@ -149,26 +180,45 @@ pub async fn search_multi(
         }
     }
     let queries_len = queries.len();
+    let mut vrl_stream_name = "".to_string();
 
     for mut req in queries {
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
         rpc_req.org_id = org_id.to_string();
         rpc_req.stream_type = stream_type.to_string();
-        let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req)
-            .await
-        {
-            Ok(v) => v,
+        let stream_name = match resolve_stream_names(&req.query.sql) {
+            Ok(v) => v[0].clone(),
             Err(e) => {
-                return Ok(match e {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
                         StatusCode::INTERNAL_SERVER_ERROR.into(),
                         e.to_string(),
-                    )),
-                });
+                    ),
+                ));
             }
         };
+        vrl_stream_name = stream_name.clone();
+
+        // get stream settings
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+        {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                range_error = format!(
+                    "{} Query duration for stream {} is modified due to query range restriction of {} hours",
+                    range_error, &stream_name, max_query_range
+                );
+
+                if multi_res.new_start_time.is_none() {
+                    multi_res.new_start_time = Some(req.query.start_time);
+                    multi_res.new_end_time = Some(req.query.end_time);
+                }
+            }
+        }
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
@@ -196,7 +246,7 @@ pub async fn search_multi(
                                 OFGA_MODELS
                                     .get(stream_type_str.as_str())
                                     .map_or(stream_type_str.as_str(), |model| model.key),
-                                resp.stream_name
+                                stream_name
                             ),
                             org_id: org_id.clone(),
                             bypass_check: false,
@@ -212,8 +262,9 @@ pub async fn search_multi(
             // Check permissions on stream ends
         }
 
-        req.query.query_fn = query_fn.clone();
-
+        if !per_query_resp {
+            req.query.query_fn = query_fn.clone();
+        }
         for fn_name in functions::get_all_transform_keys(&org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
@@ -299,10 +350,11 @@ pub async fn search_multi(
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
+
                 report_request_usage_stats(
                     req_stats,
                     &org_id,
-                    &resp.stream_name,
+                    &stream_name,
                     StreamType::Logs,
                     UsageType::Search,
                     num_fn,
@@ -313,7 +365,7 @@ pub async fn search_multi(
                 multi_res.took += res.took;
 
                 if res.total > multi_res.total {
-                    multi_res.total = res.total
+                    multi_res.total = res.total;
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
@@ -321,10 +373,28 @@ pub async fn search_multi(
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
-                multi_res.hits.extend(res.hits);
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
+
+                if per_query_resp {
+                    multi_res.hits.push(serde_json::Value::Array(res.hits));
+                } else {
+                    multi_res.hits.extend(res.hits);
+                }
+
+                if res.is_partial {
+                    multi_res.is_partial = true;
+                    let partial_err = "Please be aware that the response is based on partial data";
+                    multi_res.function_error = if res.function_error.is_empty() {
+                        partial_err.to_string()
+                    } else {
+                        format!("{} \n {}", partial_err, res.function_error)
+                    };
+                }
+                if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
+                    multi_res.histogram_interval = res.histogram_interval;
+                }
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -363,6 +433,100 @@ pub async fn search_multi(
         }
     }
 
+    multi_res.hits = if query_fn.is_some() && per_query_resp {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.unwrap().trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                if apply_over_hits {
+                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &meta::functions::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        &json::Value::Array(multi_res.hits),
+                        &org_id,
+                        &[vrl_stream_name],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            if per_query_resp {
+                                let flattened_array = v
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .map(|item| {
+                                        config::utils::flatten::flatten(item.clone()).unwrap()
+                                    })
+                                    .collect::<Vec<_>>();
+                                Some(serde_json::Value::Array(flattened_array))
+                            } else {
+                                (!v.is_null())
+                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                            }
+                        })
+                        .collect()
+                } else {
+                    multi_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &meta::functions::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                &hit,
+                                &org_id,
+                                &[vrl_stream_name.clone()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => multi_res.hits,
+        }
+    } else {
+        multi_res.hits
+    };
+
+    if !range_error.is_empty() {
+        multi_res.is_partial = true;
+        multi_res.function_error = if multi_res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, multi_res.function_error)
+        };
+    }
+
     let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
@@ -381,19 +545,24 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(
+        content = SearchRequest,
+        description = "Search query",
+        content_type = "application/json",
+        example = json!({
         "sql": "select * from k8s ",
         "start_time": 1675182660872049i64,
         "end_time": 1675185660872049i64
-    })),
+    })
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (
+            status = 200,
+            description = "Success",
+            content_type = "application/json",
+            body = SearchResponse,
+            example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -402,9 +571,20 @@ pub async fn search_multi(
                 [1674213225158000i64, 1674213225158000i64],
                 [1674213225158000i64, 1674213225158000i64],
             ]
-        })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        }),
+        ),
+        (
+            status = 400,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        ),
+        (
+            status = 500,
+            description = "Failure",
+            content_type = "application/json",
+            body = HttpResponse,
+        )
     )
 )]
 #[post("/{org_id}/_search_partition_multi")]
@@ -415,6 +595,7 @@ pub async fn _search_partition_multi(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/_search_partition_multi",
@@ -429,12 +610,16 @@ pub async fn _search_partition_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let search_fut = SearchService::search_partition_multi(&trace_id, &org_id, stream_type, &req);
@@ -552,10 +737,9 @@ pub async fn around_multi(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-
-    let (org_id, stream_names) = path.into_inner();
     let cfg = get_config();
 
+    let (org_id, stream_names) = path.into_inner();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_names}/_around_multi",
@@ -572,12 +756,16 @@ pub async fn around_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
     };
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
+        None => {
+            return Ok(MetaHttpResponse::bad_request("around key is empty"));
+        }
     };
     let mut query_fn = query
         .get("query_fn")

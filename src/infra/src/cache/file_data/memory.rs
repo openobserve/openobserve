@@ -40,11 +40,11 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
 });
 static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
     let cfg = get_config();
-    let mut datas = Vec::with_capacity(cfg.memory_cache.bucket_num);
+    let mut data = Vec::with_capacity(cfg.memory_cache.bucket_num);
     for _ in 0..cfg.memory_cache.bucket_num {
-        datas.push(Default::default());
+        data.push(Default::default());
     }
-    datas
+    data
 });
 
 pub struct FileData {

@@ -20,7 +20,10 @@ use sqlx::Row;
 
 use super::{Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
-    db::{self, mysql::CLIENT},
+    db::{
+        self,
+        mysql::{create_index, CLIENT},
+    },
     errors::{DbError, Error, Result},
 };
 
@@ -77,24 +80,28 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        create_index(
+            "scheduled_jobs_key_idx",
+            "scheduled_jobs",
+            false,
+            &["module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_key_idx",
+            "scheduled_jobs",
+            false,
+            &["org", "module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_module_key_idx",
+            "scheduled_jobs",
+            true,
+            &["org", "module", "module_key"],
+        )
+        .await?;
 
-        let queries = vec![
-            "CREATE INDEX scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            "CREATE INDEX scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            "CREATE UNIQUE INDEX scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
-        ];
-
-        for query in queries {
-            if let Err(e) = sqlx::query(query).execute(&pool).await {
-                if e.to_string().contains("Duplicate key") {
-                    // index already exists
-                    return Ok(());
-                }
-                log::error!("[MYSQL] create table scheduled_jobs index error: {}", e);
-                return Err(e.into());
-            }
-        }
         Ok(())
     }
 
@@ -187,7 +194,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         if module == TriggerModule::Alert {
             // It will send event even if the alert is not realtime alert.
             // But that is okay, for non-realtime alerts, since the triggers are not
-            // present in the cache at all, it will just do nothin.
+            // present in the cache at all, it will just do nothing.
             let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;

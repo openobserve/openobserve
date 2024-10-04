@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #body-cell-name="props">
             <q-tr :props="props">
               <q-td :props="props" class="field_list">
-                <!-- TODO OK : Repeated code make seperate component to display field  -->
+                <!-- TODO OK : Repeated code make separate component to display field  -->
                 <template
                   v-if="
                     props.row.name === store.state.zoConfig.timestamp_column

@@ -57,7 +57,9 @@
     "cancelChanges": "Cancel Changes",
     "logs": "Logs",
     "addGroup":"Add Group",
-    "addCondition":"Add Condition"
+    "addCondition":"Add Condition",
+    "required": "Value is required",
+    "valueMustBeGreaterThanZero": "Value must be greater than zero"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -354,7 +356,7 @@
     "header": "Streams",
     "search": "Search Stream",
     "name": "Name",
-    "docNum": "Doc Num",
+    "docNum": "Records",
     "storageSize": "Ingested Data",
     "compressedSize": "Compressed Size",
     "time": "Time",
@@ -397,7 +399,8 @@
     "indexType": "Index Type",
     "addField": "Add Field",
     "addSchemaField": "Add to Defined Schema Fields",
-    "removeSchemaField": "Remove Defined Schema Fields"
+    "removeSchemaField": "Remove Defined Schema Fields",
+    "storeOriginalData" : "Store Original Data"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -576,6 +579,8 @@
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
     "wraptext": "Wrap Table Cells",
+    "tableTranspose": "Transpose",
+    "tableDynamicColumns": "Allow Dynamic Columns",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
@@ -653,7 +658,8 @@
     "updateFolder": "Update Folder",
     "scheduledReports": "Scheduled Reports",
     "newReport": "New Report",
-    "scheduledDashboards": "Scheduled Dashboards"
+    "scheduledDashboards": "Scheduled Dashboards",
+    "panelHeight": "Panel Height"
   },
   "panel": {
     "header": "Panel",
@@ -809,6 +815,7 @@
     "lastTriggered":"Last Triggered At",
     "lastSatisfied":"Last Satisfied At",
     "owner": "Owner",
+    "title": "Title",
     "createFunction": "Create Function",
     "newFunctionAssociationMsg": "Note: The function will be created, after which you will be redirected to the previous form to associate the newly created function with the pipeline."
   },

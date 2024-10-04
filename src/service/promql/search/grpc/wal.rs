@@ -19,7 +19,8 @@ use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
 use config::{
     get_config,
     meta::{
-        search::{ScanStats, SearchType, Session as SearchSession, StorageType},
+        cluster::get_internal_grpc_token,
+        search::{ScanStats, Session as SearchSession, StorageType},
         stream::StreamType,
     },
     FILE_EXT_PARQUET,
@@ -36,17 +37,19 @@ use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    transport::Channel,
     Request,
 };
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-    service::search::{
-        datafusion::exec::{prepare_datafusion_context, register_table},
-        MetadataMap,
+    common::infra::cluster::get_cached_online_ingester_nodes,
+    service::{
+        grpc::get_cached_channel,
+        search::{
+            datafusion::exec::{prepare_datafusion_context, register_table},
+            MetadataMap,
+        },
     },
 };
 
@@ -56,7 +59,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &mut [(&str, Vec<String>)],
+    filters: &mut [(String, Vec<String>)],
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // get file list
@@ -132,8 +135,7 @@ pub(crate) async fn create_context(
         })?;
     for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
         if !record_batches.is_empty() {
-            let ctx = prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None)
-                .await?;
+            let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
             // calculate schema diff
             let mut diff_fields = HashMap::new();
             let group_fields = arrow_schema.fields();
@@ -176,7 +178,6 @@ pub(crate) async fn create_context(
     let session = SearchSession {
         id: trace_id.to_string(),
         storage_type: StorageType::Tmpfs,
-        search_type: SearchType::Normal,
         work_group: None,
         target_partitions: 0,
     };
@@ -187,9 +188,7 @@ pub(crate) async fn create_context(
         stream_name,
         &[],
         hashbrown::HashMap::default(),
-        false,
         &[],
-        None,
     )
     .await?;
     resp.push((ctx, schema, parquet_scan_stats));
@@ -204,7 +203,7 @@ async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &[(&str, Vec<String>)],
+    filters: &[(String, Vec<String>)],
 ) -> Result<Vec<cluster_rpc::MetricsWalFile>> {
     let nodes = get_cached_online_ingester_nodes().await;
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
@@ -242,7 +241,7 @@ async fn get_file_list(
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid org_id".to_string()))?;
                 let mut request = tonic::Request::new(req);
-                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -258,14 +257,14 @@ async fn get_file_list(
                 let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|_| {
-                        DataFusionError::Execution("connect search node error".to_string())
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    DataFusionError::Execution("connect search node error".to_string())
+                })?;
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {

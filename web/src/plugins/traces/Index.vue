@@ -89,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :html-content="searchObj.data.errorMsg"
-                />
-
+                  :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
                 <div
                   data-test="logs-search-error-20003"
                   v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -272,7 +270,7 @@ export default defineComponent({
     const indexListRef = ref(null);
     const { getStreams, getStream } = useStreams();
 
-    searchObj.organizationIdetifier =
+    searchObj.organizationIdentifier =
       store.state.selectedOrganization.identifier;
 
     const selectedStreamName = computed(
@@ -602,7 +600,7 @@ export default defineComponent({
 
       searchService
         .get_traces({
-          org_identifier: searchObj.organizationIdetifier,
+          org_identifier: searchObj.organizationIdentifier,
           start_time: queryReq.query.start_time,
           end_time: queryReq.query.end_time,
           filter: filter || "",
@@ -669,7 +667,7 @@ export default defineComponent({
       searchService
         .search(
           {
-            org_identifier: searchObj.organizationIdetifier,
+            org_identifier: searchObj.organizationIdentifier,
             query: req,
             page_type: "traces",
           },
@@ -784,7 +782,7 @@ export default defineComponent({
 
         searchService
           .get_traces({
-            org_identifier: searchObj.organizationIdetifier,
+            org_identifier: searchObj.organizationIdentifier,
             start_time: queryReq.query.start_time,
             end_time: queryReq.query.end_time,
             filter: filter || "",
@@ -1118,7 +1116,7 @@ export default defineComponent({
       searchObj.data.resultGrid.currentPage = 0;
 
       resetSearchObj();
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
 
       //get stream list
@@ -1129,7 +1127,7 @@ export default defineComponent({
       // searchObj.loading = true;
       // this.searchObj.data.resultGrid.currentPage = 0;
       // resetSearchObj();
-      // searchObj.organizationIdetifier =
+      // searchObj.organizationIdentifier =
       //   store.state.selectedOrganization.identifier;
       // //get stream list
       // getStreamList();
@@ -1155,7 +1153,7 @@ export default defineComponent({
         loadPageData();
       }
       if (
-        searchObj.organizationIdetifier !=
+        searchObj.organizationIdentifier !=
         store.state.selectedOrganization.identifier
       ) {
         loadPageData();

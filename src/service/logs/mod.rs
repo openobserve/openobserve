@@ -48,7 +48,7 @@ use crate::{
         stream::{SchemaRecords, StreamParams},
     },
     service::{
-        db, ingestion::get_wal_time_key, schema::check_for_schema,
+        db, ingestion::get_write_partition_key, schema::check_for_schema,
         usage::report_request_usage_stats,
     },
 };
@@ -296,6 +296,7 @@ async fn write_logs(
         .get(stream_name)
         .unwrap()
         .schema()
+        .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let schema_key = latest_schema.hash_key();
@@ -378,7 +379,7 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
+                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val), None).await {
                         triggers.push((alert.clone(), v));
                         evaluated_alerts.insert(key);
                     }
@@ -403,7 +404,7 @@ async fn write_logs(
         }
 
         // get hour key
-        let hour_key = get_wal_time_key(
+        let hour_key = get_write_partition_key(
             timestamp,
             &partition_keys,
             partition_time_level,

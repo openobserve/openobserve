@@ -499,7 +499,7 @@ impl Engine {
             .iter()
             .filter_map(|mat| {
                 if mat.op == MatchOp::Equal {
-                    Some((mat.name.as_str(), vec![mat.value.to_string()]))
+                    Some((mat.name.to_string(), vec![mat.value.to_string()]))
                 } else {
                     None
                 }

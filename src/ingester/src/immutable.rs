@@ -51,6 +51,7 @@ pub async fn read_from_immutable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
+    _partition_keys: Option<Vec<(String, String)>>,
 ) -> Result<Vec<ReadRecordBatchEntry>> {
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());

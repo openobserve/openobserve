@@ -13,21 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::metrics;
-use infra::errors::{Error::ErrorCode, ErrorCodes};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::O2_CONFIG,
-    search::{QueryManager, TaskStatus, WorkGroup},
-};
+use config::metrics;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
     search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
-    QueryStatusResponse, SearchRequest, SearchResponse,
+    QueryStatusResponse,
 };
 use tonic::{Request, Response, Status};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
-
-use crate::service::search as SearchService;
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
@@ -122,172 +116,6 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search", skip_all, fields(org_id = req.get_ref().org_id))]
-    async fn search(
-        &self,
-        req: Request<SearchRequest>,
-    ) -> Result<Response<SearchResponse>, Status> {
-        let start = std::time::Instant::now();
-        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
-            prop.extract(&crate::handler::grpc::request::MetadataMap(req.metadata()))
-        });
-        tracing::Span::current().set_parent(parent_cx);
-
-        let req = req.get_ref().to_owned();
-        let org_id = req.org_id.clone();
-        let stream_type = req.stream_type.clone();
-
-        // set search task
-        #[cfg(feature = "enterprise")]
-        let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
-        #[cfg(feature = "enterprise")]
-        if !self.contain_key(&trace_id).await {
-            let req_query = req.query.as_ref().unwrap();
-            let sql = Some(req_query.sql.clone());
-            let start_time = Some(req_query.start_time);
-            let end_time = Some(req_query.end_time);
-            let user_id = req.user_id.clone();
-            self.insert(
-                trace_id.clone(),
-                TaskStatus::new(
-                    vec![],
-                    false,
-                    user_id,
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                ),
-            )
-            .await;
-        }
-
-        let result = SearchService::grpc::search(&req).await;
-
-        // remove task
-        #[cfg(feature = "enterprise")]
-        if !O2_CONFIG.super_cluster.enabled && !self.is_leader(&trace_id).await {
-            self.remove(&trace_id, false).await;
-        }
-
-        match result {
-            Ok(res) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
-                    .inc();
-
-                Ok(Response::new(res))
-            }
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
-                    .inc();
-                let message = if let ErrorCode(ref code) = err {
-                    code.to_json()
-                } else {
-                    err.to_string()
-                };
-                if let ErrorCode(ErrorCodes::SearchTimeout(_)) = err {
-                    Err(Status::deadline_exceeded(message))
-                } else {
-                    Err(Status::internal(message))
-                }
-            }
-        }
-    }
-
-    #[tracing::instrument(name = "grpc:cluster_search", skip_all, fields(org_id = req.get_ref().org_id))]
-    async fn cluster_search(
-        &self,
-        req: Request<SearchRequest>,
-    ) -> Result<Response<SearchResponse>, Status> {
-        let start = std::time::Instant::now();
-        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
-            prop.extract(&crate::handler::grpc::request::MetadataMap(req.metadata()))
-        });
-        tracing::Span::current().set_parent(parent_cx);
-
-        let req = req.get_ref().to_owned();
-        let org_id = req.org_id.clone();
-        let stream_type = req.stream_type.clone();
-
-        // set search task
-        #[cfg(feature = "enterprise")]
-        let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
-        #[cfg(feature = "enterprise")]
-        if !self.contain_key(&trace_id).await {
-            let req_query = req.query.as_ref().unwrap();
-            let sql = Some(req_query.sql.clone());
-            let start_time = Some(req_query.start_time);
-            let end_time = Some(req_query.end_time);
-            let user_id = req.user_id.clone();
-            self.insert(
-                trace_id.clone(),
-                TaskStatus::new(
-                    vec![],
-                    false,
-                    user_id,
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                ),
-            )
-            .await;
-        }
-
-        let result = SearchService::cluster::grpc::search(req).await;
-
-        // remove task
-        #[cfg(feature = "enterprise")]
-        if !self.is_leader(&trace_id).await {
-            self.remove(&trace_id, false).await;
-        }
-
-        metrics::QUERY_RUNNING_NUMS
-            .with_label_values(&[&org_id])
-            .dec();
-
-        match result {
-            Ok(res) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
-                    .inc();
-
-                Ok(Response::new(res))
-            }
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
-                    .inc();
-                let message = if let ErrorCode(code) = err {
-                    code.to_json()
-                } else {
-                    err.to_string()
-                };
-                Err(Status::internal(message))
-            }
-        }
-    }
-
     #[cfg(feature = "enterprise")]
     async fn query_status(
         &self,
@@ -340,6 +168,8 @@ impl Search for Searcher {
         &self,
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        use crate::service::search as SearchService;
+
         let trace_id = req.into_inner().trace_id;
         match SearchService::cancel_query("", &trace_id).await {
             Ok(ret) => Ok(Response::new(CancelQueryResponse {

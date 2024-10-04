@@ -369,12 +369,13 @@ pub async fn remote_write(
                 .get(&metric_name)
                 .unwrap()
                 .schema()
+                .as_ref()
                 .clone()
                 .with_metadata(HashMap::new());
             let schema_key = schema.hash_key();
 
             // get hour key
-            let hour_key = crate::service::ingestion::get_wal_time_key(
+            let hour_key = crate::service::ingestion::get_write_partition_key(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
@@ -405,7 +406,7 @@ pub async fn remote_write(
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
+                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }

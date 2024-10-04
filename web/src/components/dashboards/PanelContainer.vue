@@ -164,6 +164,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item
               clickable
               v-close-popup="true"
+              @click="onPanelModifyClick('EditLayout')"
+            >
+              <q-item-section>
+                <q-item-label data-test="dashboard-edit-layout" class="q-pa-sm"
+                  >Edit Layout</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
               @click="onPanelModifyClick('DuplicatePanel')"
             >
               <q-item-section>
@@ -299,6 +310,7 @@ export default defineComponent({
     "refreshPanelRequest",
     "refresh",
     "update:initial-variable-values",
+    "onEditLayout",
   ],
   props: [
     "data",
@@ -354,7 +366,10 @@ export default defineComponent({
           combinedWarnings.push(combinedMessage);
         }
       });
-      maxQueryRange.value = combinedWarnings;
+
+      // NOTE: for multi query, just show the first query warning
+      maxQueryRange.value =
+        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
     };
 
     // to store and show when the panel was last loaded
@@ -512,6 +527,8 @@ export default defineComponent({
         this.onDuplicatePanel(this.props.data);
       } else if (evt == "MovePanel") {
         this.confirmMovePanelDialog = true;
+      } else if (evt == "EditLayout") {
+        this.$emit("onEditLayout", this.props.data.id);
       } else {
       }
     },

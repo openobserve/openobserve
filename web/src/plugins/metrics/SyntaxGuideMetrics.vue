@@ -72,7 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all_raw('error')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all_raw('error')</span
                   >
                 </li>
                 <li>
@@ -102,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
+                  To search and use query function <i>extract_ip</i> on column
                   log use
                   <span class="bg-highlight"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
@@ -114,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
+                    class="hover:tw-underline text-primary"
                     >click here</a
                   >.
                 </li>

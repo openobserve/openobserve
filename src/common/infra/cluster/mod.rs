@@ -17,7 +17,7 @@ use std::{cmp::min, collections::HashMap, ops::Bound, sync::Arc, time::Duration}
 
 use config::{
     cluster::*,
-    get_config, get_instance_id,
+    get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
@@ -155,16 +155,6 @@ pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>
     map
 }
 
-#[inline]
-pub fn get_internal_grpc_token() -> String {
-    let cfg = get_config();
-    if cfg.grpc.internal_grpc_token.is_empty() {
-        get_instance_id()
-    } else {
-        cfg.grpc.internal_grpc_token.clone()
-    }
-}
-
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
     let cfg = get_config();
@@ -173,7 +163,7 @@ pub async fn register_and_keepalive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        let node = load_local_mode_node();
+        let node = load_local_node();
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
@@ -491,24 +481,6 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
 }
 
 #[inline(always)]
-pub fn load_local_mode_node() -> Node {
-    let cfg = get_config();
-    Node {
-        id: 1,
-        uuid: LOCAL_NODE.uuid.clone(),
-        name: cfg.common.instance_name.clone(),
-        http_addr: format!("http://127.0.0.1:{}", cfg.http.port),
-        grpc_addr: format!("http://127.0.0.1:{}", cfg.grpc.port),
-        role: [Role::All].to_vec(),
-        role_group: RoleGroup::None,
-        cpu_num: cfg.limit.cpu_num as u64,
-        status: NodeStatus::Online,
-        scheduled: true,
-        broadcasted: false,
-    }
-}
-
-#[inline(always)]
 pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.read().await.get(uuid).cloned()
 }
@@ -585,7 +557,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_consistent_hashing() {
-        let node = load_local_mode_node();
+        let node = load_local_node();
         for i in 0..10 {
             let node_q = Node {
                 name: format!("node-q-{i}").to_string(),

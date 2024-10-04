@@ -25,6 +25,7 @@ import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
+  convertSecondsToOffset,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -33,6 +34,57 @@ import {
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
+
+export const convertMultiSQLData = async (
+  panelSchema: any,
+  searchQueryData: any,
+  store: any,
+  chartPanelRef: any,
+  hoveredSeriesState: any,
+  resultMetaData: any,
+  metadata: any,
+) => {
+  if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
+    return { options: null };
+  }
+
+  // loop on all search query data
+  const options: any = [];
+  for (let i = 0; i < searchQueryData.length; i++) {
+    options.push(
+      await convertSQLData(
+        panelSchema,
+        [searchQueryData[i]],
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        [resultMetaData.value[i]],
+        { queries: [metadata.queries[i]] },
+      ),
+    );
+  }
+
+  // loop on all options
+  if (options && options[0] && options[0].options) {
+    for (let i = 1; i < options.length; i++) {
+      if (options[i] && options[i].options && options[i].options.series) {
+        options[0].options.series = [
+          ...options[0].options.series,
+          ...options[i].options.series.map((it: any) => {
+            return {
+              ...it,
+              name: metadata?.queries[i]?.timeRangeGap
+                ? `${it.name} (${convertSecondsToOffset(metadata?.queries[i]?.timeRangeGap)} ago) `
+                : it.name,
+            };
+          }),
+        ];
+      }
+    }
+  }
+
+  return options[0];
+};
 
 export const convertSQLData = async (
   panelSchema: any,
@@ -221,9 +273,7 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.value?.map(
-      (it: any) => it.histogram_interval,
-    )[0];
+    const interval = resultMetaData?.map((it: any) => it.histogram_interval)[0];
 
     if (
       !interval ||
@@ -804,10 +854,10 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key,
             )?.label,
-            color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key,
-              )?.color || "#5960b2",
+            // color:
+            //   panelSchema.queries[0]?.fields?.y.find(
+            //     (it: any) => it.alias == key,
+            //   )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -897,10 +947,10 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key,
             )?.label,
-            color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key,
-              )?.color || "#5960b2",
+            // color:
+            //   panelSchema.queries[0]?.fields?.y.find(
+            //     (it: any) => it.alias == key,
+            //   )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -924,9 +974,9 @@ export const convertSQLData = async (
           name: panelSchema?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key,
           )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+          // color:
+          //   panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+          //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           // markLine if exist
@@ -949,9 +999,9 @@ export const convertSQLData = async (
           name: panelSchema?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key,
           )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+          // color:
+          //   panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+          //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           // markLine if exist
@@ -1459,7 +1509,7 @@ export const convertSQLData = async (
       options.polar = {};
       options.xAxis = [];
       options.yAxis = [];
-      // for each gague we have seperate grid
+      // for each gague we have separate grid
       options.grid = gridDataForGauge.gridArray;
 
       options.series = yAxisValue.map((it: any, index: any) => {
@@ -1581,7 +1631,7 @@ export const convertSQLData = async (
       isTimeSeriesFlag = true;
 
       // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
-      // else check if xaxis value is interger(ie time will be in milliseconds)
+      // else check if xaxis value is integer(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
       const timeStringCache: any = {};
@@ -1594,8 +1644,10 @@ export const convertSQLData = async (
             if (timeStringCache[xKey]) {
               x = timeStringCache[xKey];
             } else {
+              // need to consider time range gap
               x = toZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                new Date(options.xAxis[0].data[index] + "Z").getTime() +
+                  metadata?.queries[0]?.timeRangeGap ?? 0,
                 store.state.timezone,
               );
               timeStringCache[xKey] = x;
@@ -1609,8 +1661,10 @@ export const convertSQLData = async (
             if (timeStringCache[xKey]) {
               x = timeStringCache[xKey];
             } else {
+              // need to consider time range gap
               x = toZonedTime(
-                new Date(options.xAxis[0].data[index]).getTime() / 1000,
+                (new Date(options.xAxis[0].data[index]).getTime() +
+                  metadata?.queries[0]?.timeRangeGap ?? 0) / 1000,
                 store.state.timezone,
               );
               timeStringCache[xKey] = x;
@@ -1750,16 +1804,20 @@ export const convertSQLData = async (
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            // need to consider time range gap
             toZonedTime(
-              new Date(options.xAxis[0].data[index] + "Z").getTime(),
+              new Date(options.xAxis[0].data[index] + "Z").getTime() +
+                metadata?.queries[0]?.timeRangeGap ?? 0,
               store.state.timezone,
             ),
             it ?? null,
           ]);
         } else if (isTimeStampData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            // need to consider time range gap
             toZonedTime(
-              new Date(options.xAxis[0].data[index]).getTime() / 1000,
+              (new Date(options.xAxis[0].data[index]).getTime() +
+                metadata?.queries[0]?.timeRangeGap ?? 0) / 1000,
               store.state.timezone,
             ),
             it ?? null,

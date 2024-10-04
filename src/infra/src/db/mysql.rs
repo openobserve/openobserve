@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -24,11 +24,13 @@ use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPoolOptions},
     ConnectOptions, MySql, Pool,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 
+use super::DBIndex;
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 fn connect() -> Pool<MySql> {
     let cfg = config::get_config();
@@ -36,10 +38,34 @@ fn connect() -> Pool<MySql> {
         .expect("mysql connect options create failed")
         .disable_statement_logging();
 
+    let max_lifetime = if cfg.limit.sql_db_connections_max_lifetime > 0 {
+        Some(std::time::Duration::from_secs(
+            cfg.limit.sql_db_connections_max_lifetime,
+        ))
+    } else {
+        None
+    };
     MySqlPoolOptions::new()
-        .min_connections(cfg.limit.sql_min_db_connections)
-        .max_connections(cfg.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_db_connections_min)
+        .max_connections(cfg.limit.sql_db_connections_max)
+        .max_lifetime(max_lifetime)
         .connect_lazy_with(db_opts)
+}
+
+async fn cache_indices() -> HashSet<DBIndex> {
+    let client = CLIENT.clone();
+    let var_name = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
+    let sql = var_name;
+    let res = sqlx::query_as::<_, (String, String)>(sql)
+        .fetch_all(&client)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
 }
 
 pub struct MysqlDb {}
@@ -202,7 +228,18 @@ impl super::Db for MysqlDb {
         };
 
         let pool = CLIENT.clone();
-        let mut tx = pool.begin().await?;
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
         let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
@@ -608,32 +645,23 @@ CREATE TABLE IF NOT EXISTS meta
     }
 
     // create table index
-    create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
-    create_index_item("CREATE INDEX meta_module_key1_idx on meta (module, key1);").await?;
-    create_index_item(
-        "CREATE UNIQUE INDEX meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
+    create_index("meta_module_idx", "meta", false, &["module"]).await?;
+    create_index("meta_module_key1_idx", "meta", false, &["module", "key1"]).await?;
+    create_index(
+        "meta_module_start_dt_idx",
+        "meta",
+        true,
+        &["module", "key1", "key2", "start_dt"],
     )
     .await?;
 
     Ok(())
 }
 
-async fn create_index_item(sql: &str) -> Result<()> {
-    let pool = CLIENT.clone();
-    if let Err(e) = sqlx::query(sql).execute(&pool).await {
-        if e.to_string().contains("Duplicate key") {
-            // index already exists
-            return Ok(());
-        }
-        log::error!("[MYSQL] create table meta index error: {}", e);
-        return Err(e.into());
-    }
-    Ok(())
-}
-
 async fn add_start_dt_column() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
+
     if let Err(e) =
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;"#)
             .execute(&mut *tx)
@@ -654,42 +682,16 @@ async fn add_start_dt_column() -> Result<()> {
     };
 
     // create new index meta_module_start_dt_idx
-    if let Err(e) = create_index_item(
-        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
+    create_index(
+        "meta_module_start_dt_idx",
+        "meta",
+        true,
+        &["module", "key1", "key2", "start_dt"],
     )
-    .await
-    {
-        log::error!(
-            "[MYSQL] Error in adding index meta_module_start_dt_idx: {}",
-            e
-        );
-        return Err(e);
-    }
-
+    .await?;
     // delete old index meta_module_key2_idx
-    let mut tx = pool.begin().await?;
-    if let Err(e) = sqlx::query(r#"DROP INDEX meta_module_key2_idx ON meta;"#)
-        .execute(&mut *tx)
-        .await
-    {
-        if !e.to_string().contains("check that column/key exists")
-            && !e.to_string().contains("check that it exists")
-        {
-            // Check for the specific MySQL error code for duplicate column
-            log::error!(
-                "[MYSQL] Error in dropping index meta_module_key2_idx: {}",
-                e
-            );
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-            }
-            return Err(e.into());
-        }
-    }
-    if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {}", e);
-        return Err(e.into());
-    };
+    delete_index("meta_module_key2_idx", "meta").await?;
+
     Ok(())
 }
 
@@ -736,5 +738,49 @@ async fn create_meta_backup() -> Result<()> {
         return Err(e.into());
     }
 
+    Ok(())
+}
+
+pub async fn create_index(
+    idx_name: &str,
+    table: &str,
+    unique: bool,
+    fields: &[&str],
+) -> Result<()> {
+    let client = CLIENT.clone();
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    let unique_str = if unique { "UNIQUE" } else { "" };
+    log::info!("[MYSQL] creating index {} on table {}", idx_name, table);
+    let sql = format!(
+        "CREATE {} INDEX {} ON {} ({});",
+        unique_str,
+        idx_name,
+        table,
+        fields.join(",")
+    );
+    sqlx::query(&sql).execute(&client).await?;
+    log::info!("[MYSQL] index {} created successfully", idx_name);
+    Ok(())
+}
+
+pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
+    let client = CLIENT.clone();
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if !indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    log::info!("[MYSQL] deleting index {} on table {}", idx_name, table);
+    let sql = format!("DROP INDEX {} ON {};", idx_name, table);
+    sqlx::query(&sql).execute(&client).await?;
+    log::info!("[MYSQL] index {} deleted successfully", idx_name);
     Ok(())
 }

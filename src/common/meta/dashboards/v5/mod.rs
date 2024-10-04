@@ -219,6 +219,10 @@ pub struct PanelConfig {
     no_value_replacement: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     wrap_table_cells: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_transpose: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_dynamic_columns: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -285,6 +289,15 @@ pub struct QueryConfig {
     min: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_shift: Option<Vec<TimeShift>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeShift {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    off_set: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

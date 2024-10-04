@@ -19,12 +19,16 @@ mod tests {
     use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
 
     use actix_web::{http::header::ContentType, test, web, App};
+    use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
     use config::{get_config, utils::json};
     use openobserve::{
         common::meta::dashboards::{v1, Dashboard, Dashboards},
-        handler::{grpc::auth::check_auth, http::router::*},
+        handler::{
+            grpc::{auth::check_auth, flight::FlightServiceImpl},
+            http::router::*,
+        },
         service::search::SEARCH_SERVER,
     };
     use prost::Message;
@@ -43,6 +47,7 @@ mod tests {
             env::set_var("ZO_PAYLOAD_LIMIT", "209715200");
             env::set_var("ZO_JSON_LIMIT", "209715200");
             env::set_var("ZO_RESULT_CACHE_ENABLED", "false");
+            env::set_var("ZO_PRINT_KEY_SQL", "true");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -66,14 +71,16 @@ mod tests {
         let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
         let search_svc = SearchServer::new(SEARCH_SERVER.clone())
             .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-            .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+            .accept_compressed(CompressionEncoding::Gzip);
+        let flight_svc = FlightServiceServer::new(FlightServiceImpl)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
             .layer(tonic::service::interceptor(check_auth))
             .add_service(search_svc)
+            .add_service(flight_svc)
             .serve(gaddr)
             .await
             .expect("gRPC server init failed");
@@ -87,7 +94,7 @@ mod tests {
 
     #[test]
     async fn e2e_test() {
-        // make sure data dir is deleted before we run integ tests
+        // make sure data dir is deleted before we run integration tests
         fs::remove_dir_all("./data")
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
@@ -304,7 +311,7 @@ mod tests {
 
     async fn e2e_get_stream_schema() {
         let auth = setup();
-        let one_sec = time::Duration::from_millis(15000);
+        let one_sec = time::Duration::from_secs(2);
         thread::sleep(one_sec);
         let app = test::init_service(
             App::new()
@@ -544,14 +551,17 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[allow(dead_code)] // TODO: enable this test
     async fn e2e_search() {
         let auth = setup();
-        let body_str = r#"{"query":{"sql":"select * from olympics_schema",
-                                "from": 0,
-                                "size": 100
-                                        }
-                            }"#;
+        let body_str = r#"{
+            "query": {
+                "sql": "select * from olympics_schema",
+                "from": 0,
+                "size": 100,
+                "start_time": 1714857600000,
+                "end_time": 1714944000000
+            }
+        }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -572,7 +582,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[allow(dead_code)] // TODO: enable this test
     async fn e2e_search_around() {
         let auth = setup();
 
@@ -1005,7 +1014,7 @@ mod tests {
     async fn e2e_post_metrics() {
         let auth = setup();
 
-        let loc_lable: Vec<prometheus_rpc::Label> = vec![
+        let loc_label: Vec<prometheus_rpc::Label> = vec![
             prometheus_rpc::Label {
                 name: "__name__".to_string(),
                 value: "grafana_api_dashboard_save_milliseconds_count".to_string(),
@@ -1045,7 +1054,7 @@ mod tests {
         let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
         let ts = prometheus_rpc::TimeSeries {
-            labels: loc_lable,
+            labels: loc_label,
             samples: loc_samples,
             exemplars: loc_exemp,
             histograms: loc_hist,

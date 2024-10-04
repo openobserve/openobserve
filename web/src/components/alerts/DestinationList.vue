@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddDestination
         :destination="editingDestination"
         :templates="templates"
-        @cancel:hideform="toggleDestionationEditor"
+        @cancel:hideform="toggleDestinationEditor"
         @get:destinations="getDestinations"
       />
     </div>
@@ -165,7 +165,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import type { DestinationData } from "@/ts/interfaces";
+import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
@@ -180,7 +180,7 @@ export default defineComponent({
   setup() {
     const qTable = ref();
     const store = useStore();
-    const editingDestination: Ref<DestinationData | null> = ref(null);
+    const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
     const q = useQuasar();
     const columns: any = ref<QTableProps["columns"]>([
@@ -220,8 +220,10 @@ export default defineComponent({
         style: "width: 110px",
       },
     ]);
-    const destinations: Ref<DestinationData[]> = ref([]);
-    const templates: Ref<Template[]> = ref([{ name: "test", body: "" }]);
+    const destinations: Ref<DestinationPayload[]> = ref([]);
+    const templates: Ref<Template[]> = ref([
+      { name: "test", body: "", type: "http" },
+    ]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
       data: null,
@@ -255,7 +257,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showDestinationEditor.value = false;
-      }
+      },
     );
 
     const getDestinations = () => {
@@ -301,16 +303,16 @@ export default defineComponent({
         editDestination(null);
       if (router.currentRoute.value.query.action === "update")
         editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string)
+          getDestinationByName(router.currentRoute.value.query.name as string),
         );
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find(
-        (destination) => destination.name === name
+        (destination) => destination.name === name,
       );
     };
     const editDestination = (destination: any) => {
-      toggleDestionationEditor();
+      toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
         router.push({
@@ -342,13 +344,13 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             destination_name: confirmDelete.value.data.name,
           })
-          .then(() =>{ 
+          .then(() => {
             q.notify({
-            type: "positive",
-            message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
-            timeout: 2000,
-          });
-            getDestinations()
+              type: "positive",
+              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
+              timeout: 2000,
+            });
+            getDestinations();
           })
           .catch((err) => {
             if (err.response.data.code === 409) {
@@ -373,7 +375,7 @@ export default defineComponent({
       confirmDelete.value.visible = false;
       confirmDelete.value.data = null;
     };
-    const toggleDestionationEditor = () => {
+    const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
       if (!showDestinationEditor.value)
         router.push({
@@ -422,7 +424,7 @@ export default defineComponent({
       filterData,
       editingDestination,
       templates,
-      toggleDestionationEditor,
+      toggleDestinationEditor,
       getDestinations,
       deleteDestination,
       cancelDeleteDestination,

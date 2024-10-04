@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
+
   <q-page class="logPage q-my-xs" id="logPage">
-    <div id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory"  id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -36,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @handleQuickModeChange="handleQuickModeChange"
             @handleRunQueryFn="handleRunQueryFn"
             @on-auto-interval-trigger="onAutoIntervalTrigger"
+            @showSearchHistory="showSearchHistoryfn"
           />
         </template>
         <template v-slot:after>
@@ -233,8 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg"
-                      />
+                        :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
                     </span>
                   </h5>
                 </div>
@@ -253,6 +254,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
+    <div v-show="showSearchHistory">
+      <search-history
+      ref="searchHistoryRef"
+        @closeSearchHistory="closeSearchHistoryfn"
+        :isClicked="showSearchHistory"
+
+        />
+    </div>
   </q-page>
 </template>
 
@@ -268,6 +277,7 @@ import {
   watch,
   defineAsyncComponent,
   provide,
+  onMounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -288,6 +298,7 @@ import { cloneDeep } from "lodash-es";
 import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
+import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -304,6 +315,7 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
+    SearchHistory,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -341,7 +353,7 @@ export default defineComponent({
         //   this.searchObj.data.resultGrid.currentPage + 1;
         this.searchObj.loading = true;
 
-        // As page count request was getting fired on chaning date records per page instead of histogram,
+        // As page count request was getting fired on changing date records per page instead of histogram,
         // so added this condition to avoid that
         this.searchObj.meta.refreshHistogram = true;
 
@@ -427,6 +439,7 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
+    const searchHistoryRef = ref(null);
     let {
       searchObj,
       getQueryData,
@@ -445,9 +458,13 @@ export default defineComponent({
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
+       getStreamList,
+      getFunctions,
+      extractFields,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const showSearchHistory = ref(false);
     let parser: any;
 
     const expandedLogs = ref([]);
@@ -505,6 +522,7 @@ export default defineComponent({
     // });
 
     onActivated(async () => {
+      
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
@@ -515,7 +533,7 @@ export default defineComponent({
           queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
         if (queryParams.type === "trace_explorer") {
-          searchObj.organizationIdetifier = queryParams.org_identifier;
+          searchObj.organizationIdentifier = queryParams.org_identifier;
           searchObj.data.stream.selectedStream.value = queryParams.stream;
           searchObj.data.stream.streamType = queryParams.stream_type;
           resetSearchObj();
@@ -525,7 +543,6 @@ export default defineComponent({
 
           return;
         }
-
         if (
           isStreamChanged &&
           queryParams.type === "stream_explorer" &&
@@ -539,7 +556,7 @@ export default defineComponent({
         }
 
         if (
-          searchObj.organizationIdetifier !=
+          searchObj.organizationIdentifier !=
             store.state.selectedOrganization.identifier &&
           searchObj.loading == false
         ) {
@@ -552,6 +569,7 @@ export default defineComponent({
         // visualize tab
         handleRunQueryFn();
       }
+
     });
 
     onBeforeMount(async () => {
@@ -567,7 +585,7 @@ export default defineComponent({
           await getRegionInfo();
         }
 
-        searchObj.organizationIdetifier =
+        searchObj.organizationIdentifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
         if (searchObj.loading == false) {
@@ -583,16 +601,27 @@ export default defineComponent({
         searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
       }
     });
+    onMounted( async() => {
+      //
+        if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
+        showSearchHistory.value = true;
+      }
+
+    });
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
      * This watcher is used to check if the user has changed the stream type from stream explorer to logs.
      * This gets triggered when stream explorer is active and user clicks on logs icon from left menu sidebar. Then we need to redirect the user to logs page again.
      */
+
     watch(
       () => router.currentRoute.value.query.type,
+      
       (type, prev) => {
+
         if (
+
           searchObj.shouldIgnoreWatcher == false &&
           router.currentRoute.value.name === "logs" &&
           prev === "stream_explorer" &&
@@ -603,6 +632,46 @@ export default defineComponent({
         }
       },
     );
+    watch(
+      ()=> router.currentRoute.value.query,
+      ()=>{
+       if(!router.currentRoute.value.query.hasOwnProperty("action") ){
+        showSearchHistory.value = false;
+      }
+      if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
+        showSearchHistory.value = true;
+      }
+    }
+      // (action) => {
+      //   if (action === "history") {
+      //     showSearchHistory.value = true;
+      //   }
+      // }
+    );
+    watch(
+      () => router.currentRoute.value.query.type,
+      async (type) => {
+        if(type == "search_history_re_apply"){
+          searchObj.organizationIdetifier = router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
+          searchObj.data.stream.streamType = router.currentRoute.value.query.stream_type;
+          resetSearchObj();
+          searchObj.data.queryResults.hits = [];
+          searchObj.meta.searchApplied = false;
+          resetStreamData();
+          restoreUrlQueryParams();
+          // loadLogsData();
+          //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
+          //of functions of loadLogsData to stop run query whenever this gets redirecited
+          await getStreamList();
+          // await getSavedViews();
+          await getFunctions();
+          await extractFields();
+          refreshData();
+        }
+      },
+    );
+
 
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");
@@ -738,12 +807,12 @@ export default defineComponent({
 
           searchObj.data.editorValue = searchObj.data.query;
 
-          searchBarRef.value.udpateQuery();
+          searchBarRef.value.updateQuery();
 
           searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
         } else {
           searchObj.data.query = "";
-          searchBarRef.value.udpateQuery();
+          searchBarRef.value.updateQuery();
         }
       } catch (e) {
         console.log("Logs : Error in setQuery");
@@ -780,6 +849,20 @@ export default defineComponent({
         handleRunQueryFn();
       }
     };
+    const showSearchHistoryfn = () => {
+
+      router.push({
+          name: "logs",
+          query: {
+            action: "history",
+            org_identifier: store.state.selectedOrganization.identifier,
+            type: "search_history",
+          },
+        });
+      showSearchHistory.value = true;
+
+
+    }
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
@@ -854,7 +937,7 @@ export default defineComponent({
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
 
-        searchBarRef.value.udpateQuery();
+        searchBarRef.value.updateQuery();
 
         searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
       }
@@ -987,6 +1070,11 @@ export default defineComponent({
       // set filters
       dashboardPanelData.data.queries[0].fields.filter = filters;
     };
+    const closeSearchHistoryfn = () => {
+      router.back();
+      showSearchHistory.value = false;
+      refreshHistogramChart();
+    };
 
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
@@ -1073,6 +1161,23 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
+    // [START] cancel running queries
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    // [END] cancel running queries
+
     return {
       t,
       store,
@@ -1099,6 +1204,8 @@ export default defineComponent({
       refreshHistogramChart,
       onChangeInterval,
       onAutoIntervalTrigger,
+      showSearchHistory,
+      showSearchHistoryfn,
       handleRunQuery,
       refreshTimezone,
       resetSearchObj,
@@ -1111,6 +1218,7 @@ export default defineComponent({
       handleChartApiError,
       visualizeErrorData,
       disableMoreErrorDetails,
+      closeSearchHistoryfn,
     };
   },
   computed: {
@@ -1343,7 +1451,7 @@ $navbarHeight: 64px;
 
   .thirdlevel {
     .field-list-collapse-btn {
-      z-index: 99;
+      z-index: 11;
       position: absolute;
       top: 5px;
       font-size: 12px !important;

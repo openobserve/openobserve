@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::Error;
+use config::meta::cluster::get_internal_grpc_token;
 use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
@@ -21,7 +22,7 @@ use tonic::{
     Request,
 };
 
-use crate::{common::infra::cluster, router::grpc::ingest::get_ingester_channel};
+use crate::service::grpc::get_ingester_channel;
 
 pub async fn ingest(
     dest_org_id: &str,
@@ -33,10 +34,10 @@ pub async fn ingest(
         .org_header_key
         .parse()
         .map_err(|_| Error::msg("invalid org_header_key".to_string()))?;
-    let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+    let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::msg("invalid token".to_string()))?;
-    let channel = get_ingester_channel().await?;
+    let (addr, channel) = get_ingester_channel().await?;
     let mut client = cluster_rpc::ingest_client::IngestClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
@@ -55,13 +56,16 @@ pub async fn ingest(
         Ok(res) => res.into_inner(),
         Err(err) => {
             log::error!(
-                "[InternalIngestion] export partial_success response: {:?}",
+                "[InternalIngestion] export partial_success node: {addr}, response: {:?}",
                 err
             );
             if err.code() == tonic::Code::Internal {
                 return Err(err.into());
             }
-            return Err(Error::msg("Ingest node error"));
+            return Err(Error::msg(format!(
+                "Ingest node {addr}, response error: {}",
+                err
+            )));
         }
     };
     Ok(res)

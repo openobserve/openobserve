@@ -16,7 +16,7 @@
 use std::str::FromStr;
 
 use proto::cluster_rpc;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
@@ -35,15 +35,8 @@ pub enum StorageType {
 pub struct Session {
     pub id: String,
     pub storage_type: StorageType,
-    pub search_type: SearchType,
     pub work_group: Option<String>,
     pub target_partitions: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SearchType {
-    Normal,
-    Aggregation,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -366,6 +359,7 @@ pub struct SearchPartitionResponse {
     pub histogram_interval: Option<i64>, // seconds, for histogram
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
+    pub order_by: super::sql::OrderBy,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -438,7 +432,6 @@ pub struct SearchHistoryHitResponse {
     pub org_id: String,
     pub stream_type: String,
     pub stream_name: String,
-    pub user_email: String,
     #[serde(rename = "start_time")]
     pub min_ts: i64,
     #[serde(rename = "end_time")]
@@ -453,6 +446,14 @@ pub struct SearchHistoryHitResponse {
     pub response_time: f64,
     pub cached_ratio: i64,
     pub trace_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _timestamp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
 }
 
 impl TryFrom<json::Value> for SearchHistoryHitResponse {
@@ -474,11 +475,6 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
                 .get("stream_name")
                 .and_then(|v| v.as_str())
                 .ok_or("stream_name missing".to_string())?
-                .to_string(),
-            user_email: value
-                .get("user_email")
-                .and_then(|v| v.as_str())
-                .ok_or("user_email missing".to_string())?
                 .to_string(),
             min_ts: value
                 .get("min_ts")
@@ -514,6 +510,19 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
                 .and_then(|v| v.as_str())
                 .ok_or("trace_id missing".to_string())?
                 .to_string(),
+            function: value
+                .get("function")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
+            _timestamp: value.get("_timestamp").and_then(|v| v.as_i64()),
+            unit: value
+                .get("unit")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
+            event: value
+                .get("event")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
         })
     }
 }
@@ -614,16 +623,35 @@ impl From<Request> for cluster_rpc::SearchRequest {
         cluster_rpc::SearchRequest {
             job: Some(job),
             org_id: "".to_string(),
-            stype: cluster_rpc::SearchType::User.into(),
             agg_mode: cluster_rpc::AggregateMode::Final.into(),
             query: Some(req_query),
-            file_list: vec![],
+            file_ids: vec![],
+            idx_files: vec![],
             stream_type: "".to_string(),
             timeout: req.timeout,
             work_group: "".to_string(),
             user_id: None,
             search_event_type: req.search_type.map(|event| event.to_string()),
             index_type: req.index_type.clone(),
+        }
+    }
+}
+
+impl From<Query> for cluster_rpc::SearchQuery {
+    fn from(query: Query) -> Self {
+        cluster_rpc::SearchQuery {
+            sql: query.sql.clone(),
+            quick_mode: query.quick_mode,
+            query_type: query.query_type.clone(),
+            from: query.from as i32,
+            size: query.size as i32,
+            start_time: query.start_time,
+            end_time: query.end_time,
+            sort_by: query.sort_by.unwrap_or_default(),
+            track_total_hits: query.track_total_hits,
+            uses_zo_fn: query.uses_zo_fn,
+            query_fn: query.query_fn.unwrap_or_default(),
+            skip_wal: query.skip_wal,
         }
     }
 }
@@ -727,9 +755,23 @@ pub struct MultiSearchPartitionResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct SqlQuery {
+    pub sql: String,
+    #[serde(default)]
+    pub start_time: Option<i64>,
+    #[serde(default)]
+    pub end_time: Option<i64>,
+    #[serde(default)]
+    pub query_fn: Option<String>,
+    #[serde(default)]
+    pub is_old_format: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct MultiStreamRequest {
-    pub sql: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_sql")]
+    pub sql: Vec<SqlQuery>, // Use the new struct for SQL queries
     #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
@@ -761,25 +803,68 @@ pub struct MultiStreamRequest {
     pub search_type: Option<SearchEventType>,
     #[serde(default)]
     pub index_type: String, // parquet(default) or fst
+    #[serde(default)]
+    pub per_query_response: bool,
+}
+
+fn deserialize_sql<'de, D>(deserializer: D) -> Result<Vec<SqlQuery>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SqlOrSqlQuery {
+        OldFormat(String),
+        NewFormat(SqlQuery),
+    }
+
+    let v: Vec<SqlOrSqlQuery> = Vec::deserialize(deserializer)?;
+
+    // Convert old format into the new format
+    let result: Vec<SqlQuery> = v
+        .into_iter()
+        .map(|item| match item {
+            SqlOrSqlQuery::OldFormat(sql) => SqlQuery {
+                sql,
+                start_time: None,
+                end_time: None,
+                query_fn: None,
+                is_old_format: true,
+            },
+            SqlOrSqlQuery::NewFormat(query) => query,
+        })
+        .collect();
+
+    Ok(result)
 }
 
 impl MultiStreamRequest {
     pub fn to_query_req(&mut self) -> Vec<Request> {
         let mut res = vec![];
         for query in &self.sql {
+            let query_fn = if query.is_old_format {
+                self.query_fn
+                    .as_ref()
+                    .and_then(|v| base64::decode_url(v).ok())
+            } else {
+                query
+                    .query_fn
+                    .as_ref()
+                    .and_then(|v| base64::decode_url(v).ok())
+            };
             res.push(Request {
                 query: Query {
-                    sql: query.to_string(),
+                    sql: query.sql.clone(),
                     from: self.from,
                     size: self.size,
-                    start_time: self.start_time,
-                    end_time: self.end_time,
+                    start_time: query.start_time.unwrap_or(self.start_time),
+                    end_time: query.end_time.unwrap_or(self.end_time),
                     sort_by: self.sort_by.clone(),
                     quick_mode: self.quick_mode,
                     query_type: self.query_type.clone(),
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
-                    query_fn: self.query_fn.clone(),
+                    query_fn,
                     skip_wal: self.skip_wal,
                 },
                 regions: self.regions.clone(),
@@ -929,7 +1014,7 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {} WHERE 1=1", search_stream_name);
+            let mut query = format!("SELECT * FROM {} WHERE event='Search'", search_stream_name);
 
             if let Some(org_id) = self.org_id {
                 if !org_id.is_empty() {

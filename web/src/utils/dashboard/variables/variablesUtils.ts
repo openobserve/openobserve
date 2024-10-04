@@ -117,7 +117,7 @@ export const getTimeInSecondsBasedOnUnit = (seconds: any, unit: any) => {
   }
 };
 
-export const formateRateInterval = (interval: any) => {
+export const formatRateInterval = (interval: any) => {
   let formattedStr = "";
   const days = Math.floor(interval / (3600 * 24));
   if (days > 0) formattedStr += days.toString() + "d";

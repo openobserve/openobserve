@@ -294,7 +294,6 @@ pub async fn merge_by_stream(
         partition_time_level,
         partition_offset_start,
         partition_offset_end,
-        true,
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
@@ -318,7 +317,6 @@ pub async fn merge_by_stream(
             partition_time_level,
             lookback_offset_start,
             lookback_offset_end,
-            true,
         )
         .await
         .map_err(|e| anyhow::anyhow!("query lookback file list failed: {}", e))?;
@@ -355,7 +353,7 @@ pub async fn merge_by_stream(
     // collect stream stats
     let mut stream_stats = StreamStats::default();
 
-    // use mutiple threads to merge
+    // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
     for (prefix, files_with_size) in partition_files_with_size.into_iter() {
@@ -654,7 +652,7 @@ pub async fn merge_files(
         let schema_latest = SchemaCache::new(schema_latest);
         let schema_latest =
             generate_schema_for_defined_schema_fields(&schema_latest, &defined_schema_fields);
-        Arc::new(schema_latest.schema().clone())
+        schema_latest.schema().clone()
     } else {
         Arc::new(schema_latest)
     };
@@ -690,7 +688,7 @@ pub async fn merge_files(
             if schema_ver_id == schema_latest_id {
                 continue;
             }
-            // cacluate the diff between latest schema and current schema
+            // calculate the diff between latest schema and current schema
             let schema = schema_versions[schema_ver_id]
                 .clone()
                 .with_metadata(HashMap::new());
@@ -729,7 +727,6 @@ pub async fn merge_files(
                 &mut buf,
                 Arc::new(schema),
                 &bloom_filter_fields,
-                &full_text_search_fields,
                 diff_fields,
                 FileType::PARQUET,
             )
@@ -771,7 +768,6 @@ pub async fn merge_files(
         new_schema.clone(),
         &new_batches,
         &bloom_filter_fields,
-        &full_text_search_fields,
         &new_file_meta,
     )
     .await?;

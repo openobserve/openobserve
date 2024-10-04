@@ -35,7 +35,6 @@ pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
-    full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
@@ -61,12 +60,6 @@ pub fn new_parquet_writer<'a>(
                 metadata.original_size.to_string(),
             ),
         ]));
-    for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-        writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
-    }
-    for field in full_text_search_fields.iter() {
-        writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
-    }
     // Bloom filter stored by row_group, set NDV to reduce the memory usage.
     // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
@@ -94,17 +87,10 @@ pub async fn write_recordbatch_to_parquet(
     schema: Arc<Schema>,
     record_batches: &[RecordBatch],
     bloom_filter_fields: &[String],
-    full_text_search_fields: &[String],
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(
-        &mut buf,
-        &schema,
-        bloom_filter_fields,
-        full_text_search_fields,
-        metadata,
-    );
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
     for batch in record_batches {
         writer.write(batch).await?;
     }

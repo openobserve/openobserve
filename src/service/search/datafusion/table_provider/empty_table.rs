@@ -26,7 +26,7 @@ use datafusion::{
     prelude::Expr,
 };
 
-use crate::service::search::datafusion::physical_plan::empty_exec::NewEmptyExec;
+use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
 /// An empty plan that is useful for testing and generating plans
 /// without mapping them to actual data.
@@ -39,18 +39,24 @@ pub struct NewEmptyTable {
 
 impl NewEmptyTable {
     /// Initialize a new `EmptyTable` from a schema.
-    pub fn new(name: &str, schema: SchemaRef, sorted_by_time: bool) -> Self {
+    pub fn new(name: &str, schema: SchemaRef) -> Self {
         Self {
             name: name.to_string(),
             schema,
             partitions: 1,
-            sorted_by_time,
+            sorted_by_time: false,
         }
     }
 
     /// Creates a new EmptyTable with specified partition number.
     pub fn with_partitions(mut self, partitions: usize) -> Self {
         self.partitions = partitions;
+        self
+    }
+
+    /// Creates a new EmptyTable with specified sorted_by_time.
+    pub fn with_sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
         self
     }
 }
@@ -76,13 +82,13 @@ impl TableProvider for NewEmptyTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        // even though there is no data, projections apply
+        // TODO: remove projection in protobuf
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
             NewEmptyExec::new(
                 &self.name,
                 projected_schema,
-                projection,
+                None,
                 filters,
                 limit,
                 self.sorted_by_time,

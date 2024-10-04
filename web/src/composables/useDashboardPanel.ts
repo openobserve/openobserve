@@ -77,6 +77,8 @@ const getDefaultDashboardPanelData: any = () => ({
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
+      table_transpose: false,
+      table_dynamic_columns: false,
     },
     htmlContent: "",
     markdownContent: "",
@@ -113,6 +115,7 @@ const getDefaultDashboardPanelData: any = () => ({
           // gauge min and max values
           min: 0,
           max: 100,
+          time_shift: [],
         },
       },
     ],
@@ -753,6 +756,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
 
       case "area":
@@ -826,6 +832,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "geomap":
         dashboardPanelData.data.queries[
@@ -850,16 +859,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit = 0;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "sankey":
         dashboardPanelData.data.queries[
@@ -891,6 +909,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit = 0;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
       default:
         break;
     }
@@ -1902,7 +1923,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             selector += `approx_percentile_cont(${field?.column}, 0.99)`;
             break;
           case "histogram": {
-            // if inteval is not null, then use it
+            // if interval is not null, then use it
             if (field?.args && field?.args?.length && field?.args[0].value) {
               selector += `${field?.aggregationFunction}(${field?.column}, '${field?.args[0]?.value}')`;
             } else {

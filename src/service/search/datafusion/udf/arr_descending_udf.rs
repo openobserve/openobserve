@@ -55,7 +55,7 @@ pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<
         ));
     }
     let args = ColumnarValue::values_to_arrays(args)?;
-    log::debug!("Got the args: {:#?}", args);
+    // log::debug!("Got the args: {:#?}", args);
 
     // 1. cast the argument to Union. This cast MUST be aligned with the signature or this function
     //    panics!

@@ -15,6 +15,7 @@
 
 import { generateTraceContext } from "@/utils/zincutils";
 import http from "./http";
+import stream from "./stream";
 
 const search = {
   search: (
@@ -193,6 +194,27 @@ const search = {
     const url = `/api/clusters`;
     return http().get(url);
   },
+  get_history: (org_identifier: string, startTime = null, endTime = null) => {
+    const payload: any = {
+      stream_type : "logs",
+      org_identifier,
+      user_email : null,
+    };
+    // Add startTime and endTime to the payload if provided
+    if (startTime) {
+      payload.start_time = startTime;
+    }
+  
+    if (endTime) {
+      payload.end_time = endTime;
+    }
+  
+    return http().post(
+      `/api/${org_identifier}/_search_history`,
+      payload // Send the payload as the request body
+    );
+  },
+  
 };
 
 export default search;
