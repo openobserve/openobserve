@@ -49,6 +49,7 @@ const getDefaultDashboardPanelData: any = () => ({
       unit_custom: null,
       decimals: 2,
       axis_label_rotation: 0,
+      axis_label_width: 0,
       top_results: null,
       top_results_others: false,
       axis_width: null,
