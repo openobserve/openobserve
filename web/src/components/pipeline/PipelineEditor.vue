@@ -179,7 +179,6 @@ const PipelineFlow = defineAsyncComponent(
 );
 
 onInit((vueFlowInstance) => {
-  console.log("this is triggered every tme")
   // instance is the same as the return of `useVueFlow`
   vueFlowInstance.fitView({ padding: 1})
 })
@@ -392,6 +391,7 @@ onBeforeMount(() => {
   } else {
     pipelineObj.isEditPipeline = false;
     resetPipelineData();
+    console.log( pipelineObj.hasInputNode,"pipelineObj.hasInputNode")
   }
   getFunctions();
 });
@@ -430,6 +430,11 @@ const getPipeline = () => {
       }
 
       pipelineObj.currentSelectedPipeline = _pipeline;
+      pipelineObj.pipelineWithoutChange = JSON.parse(
+        JSON.stringify(_pipeline),
+      );
+      console.log("pipelineObj.currentSelectedPipeline", pipelineObj.currentSelectedPipeline);
+      console.log("pipelineObj.pipelineWithoutChange", pipelineObj.pipelineWithoutChange);
     });
 };
 
@@ -449,7 +454,6 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
-        console.log(func,"func");
         functions.value[func.name] = func;
         functionOptions.value.push(func.name);
       });

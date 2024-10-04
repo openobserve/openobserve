@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { getUUID } from "@/utils/zincutils";
+import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useVueFlow } from "@vue-flow/core";
 import { watch, reactive } from "vue";
 
@@ -53,6 +53,7 @@ const defaultObject = {
   dialog: dialogObj,
   nodeTypes: null,
   currentSelectedPipeline: defaultPipelineObj,
+  pipelineWithoutChange: defaultPipelineObj,
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
@@ -61,9 +62,12 @@ export default function useDragAndDrop() {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
     useVueFlow();
 
-  watch(pipelineObj.isDragging, (dragging) => {
-    document.body.style.userSelect = dragging ? "none" : "";
-  });
+    watch(
+      () => pipelineObj.isDragging,
+      (dragging) => {
+        document.body.style.userSelect = dragging ? "none" : "";
+      }
+    );
 
   function hasInputNodeFn() {
     pipelineObj.hasInputNode = pipelineObj.currentSelectedPipeline.nodes.some(
@@ -124,7 +128,6 @@ export default function useDragAndDrop() {
 
     const nodeId = getUUID();
 
-    console.log("pipelineObj.draggedNode", pipelineObj);
     const newNode = {
       id: nodeId,
       type: pipelineObj.draggedNode.io_type || "default",
@@ -162,10 +165,10 @@ export default function useDragAndDrop() {
   function onNodesChange(changes) {
     hasInputNodeFn();
 
-    console.log("Nodes change", changes);
   }
 
   function onEdgesChange(changes) {
+    pipelineObj.dirtyFlag = true;
     console.log("Edges change", changes);
   }
 
@@ -210,6 +213,9 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode) {
+    if(pipelineObj.isEditPipeline == true ){
+      pipelineObj.dirtyFlag = true;
+    }
     let currentSelectedNode = pipelineObj.currentSelectedNodeData;
     if (pipelineObj.isEditNode == true && currentSelectedNode.id != "") {
       if (currentSelectedNode) {
@@ -246,11 +252,25 @@ export default function useDragAndDrop() {
       };
     }
   }
+  const comparePipelinesById = (pipeline1, pipeline2) => {
+    const compareIds = (items1, items2) => {
+      const extractAndSortIds = (items) =>
+        items.map(item => item.id).sort();
+
+      const ids1 = extractAndSortIds(items1);
+      const ids2 = extractAndSortIds(items2);
+  
+      return JSON.stringify(ids1) === JSON.stringify(ids2);
+    };
+  
+    const nodesEqual = compareIds(pipeline1.nodes, pipeline2.nodes);
+  
+    return nodesEqual;
+  };
 
   // delete the node from pipelineObj.currentSelectedPipeline.nodes and pipelineObj.currentSelectedPipeline.edges all reference associated with target and source
   // also empty pipelineObj.currentSelectedNodeData
   function deletePipelineNode(nodeId) {
-    pipelineObj.dirtyFlag = true;
     pipelineObj.currentSelectedPipeline.nodes =
       pipelineObj.currentSelectedPipeline.nodes.filter(
         (node) => node.id !== nodeId,
@@ -261,15 +281,35 @@ export default function useDragAndDrop() {
       );
     pipelineObj.currentSelectedNodeData = null;
     hasInputNodeFn();
+    console.log(pipelineObj.currentSelectedPipeline,"current")
+    console.log(pipelineObj.pipelineWithoutChange,"past")
+
+    const arePipelinesEqualById = comparePipelinesById(
+      pipelineObj.currentSelectedPipeline,
+      pipelineObj.pipelineWithoutChange
+    );
+    if(arePipelinesEqualById == true){
+      pipelineObj.dirtyFlag = false;
+    }
+    if(arePipelinesEqualById == false){
+      pipelineObj.dirtyFlag = true;
+    }
+    console.log(arePipelinesEqualById, "compare");
+    
+    
   }
 
   const resetPipelineData = () => {
-    pipelineObj.currentSelectedPipeline = defaultPipelineObj;
-    pipelineObj.currentSelectedNodeData = dialogObj;
+    pipelineObj.currentSelectedPipeline = JSON.parse(JSON.stringify(defaultPipelineObj));
+    pipelineObj.currentSelectedNodeData = JSON.parse(JSON.stringify(dialogObj));
     pipelineObj.isEditPipeline = false;
     pipelineObj.isEditNode = false;
     pipelineObj.dirtyFlag = false;
-  }
+    pipelineObj.hasInputNode = false;
+    pipelineObj.draggedNode = null;
+    console.log(pipelineObj.currentSelectedPipeline, "pipeline");
+  };
+ 
 
   return {
     pipelineObj,
@@ -286,5 +326,6 @@ export default function useDragAndDrop() {
     editNode,
     deletePipelineNode,
     resetPipelineData,
+    comparePipelinesById,
   };
 }

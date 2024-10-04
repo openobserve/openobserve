@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="add-stream-type-input">
           <q-select
             v-model="streamInputs.stream_type"
-            :options="streamTypes"
+            :options="filteredStreamTypes"
             :label="t('alerts.streamType') + ' *'"
             :popup-content-style="{ textTransform: 'capitalize' }"
             color="input-border"
@@ -143,6 +143,10 @@ const streamTypes = [
 ];
 
 const emits = defineEmits(["streamAdded", "close","added:stream-aded"]);
+const props = defineProps<{
+  isInPipeline: boolean;
+}>();
+
 
 const { addStream, getStream, getUpdatedSettings } = useStreams();
 
@@ -167,9 +171,15 @@ const getDefaultField = () => {
   };
 };
 
+
 const isSchemaEvolutionEnabled = computed(() => {
   return store.state.zoConfig.user_defined_schemas_enabled;
 });
+
+const filteredStreamTypes = computed(() => {
+  return props.isInPipeline ? streamTypes.filter(type => type.value === 'logs') : streamTypes;
+});
+
 
 const showDataRetention = computed(
   () =>

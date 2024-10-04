@@ -57,6 +57,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.delete')"
               @click="openDeleteDialog(props.row)"
             ></q-btn>
+            <q-btn
+              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
+              :icon="props.row.isEnabled ? outlinedPause : outlinedPlayArrow"
+              class="q-ml-xs material-symbols-outlined"
+              padding="sm"
+              unelevated
+              size="sm"
+              :color="props.row.isEnabled ? 'negative' : 'positive'"
+              round
+              flat
+              :title="props.row.isEnabled ? t('alerts.pause') : t('alerts.start')"
+              @click="toggleAlertState(props.row)"
+            />
           </q-td>
         </template>
 
@@ -141,7 +154,7 @@ import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
 import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { outlinedDelete , outlinedPause , outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -161,6 +174,7 @@ const showCreatePipeline = ref(false);
 const pipelines = ref([]);
 
 const store = useStore();
+const isEnabled = ref(false);
 
 const { pipelineObj } = useDragAndDrop();
 
@@ -202,6 +216,10 @@ const changePagination = (val: { label: string; value: any }) => {
 const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
+
+const toggleAlertState = (row) =>{
+  row.isEnabled = !row.isEnabled;
+}
 
 const editingPipeline = ref<any | null>(null);
 
@@ -264,6 +282,12 @@ const getPipelines = () => {
       resultTotal.value = response.data.list.length;
       pipelines.value = response.data.list.map(
         (pipeline: any, index: number) => {
+          const updatedEdges = pipeline.edges.map(edge => ({
+              ...edge,
+              markerEnd: {
+                type: "arrowclosed"
+              }}))
+          pipeline.edges = updatedEdges;
           return {
             ...pipeline,
             "#": index + 1,
@@ -282,6 +306,7 @@ const editPipeline = (pipeline: any) => {
   });
 
   pipelineObj.currentSelectedPipeline = pipeline;
+  pipelineObj.pipelineWithoutChange = pipeline;
   router.push({
     name: "pipelineEditor",
     query: {

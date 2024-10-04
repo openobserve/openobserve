@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-select
               v-model="stream_type"
-              :options="streamTypes"
+              :options="filteredStreamTypes"
               :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'lowercase' }"
               color="input-border"
@@ -125,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div v-else class="pipeline-add-stream">
+      <div v-else class="pipeline-add-stream ">
         <AddStream
         ref="addStreamRef"
         @added:stream-aded="getLogStream"
-
+        :is-in-pipeline = "true"
          />
       </div>
       </q-form>
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref, defineEmits, onMounted, watch, defineAsyncComponent } from "vue";
+import { ref, type Ref, defineEmits, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
@@ -176,6 +176,7 @@ const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
+const outputStreamTypes = ["logs"];
 const stream_name = ref(pipelineObj.currentSelectedNodeData?.data.stream_name);
 const stream_type = ref(pipelineObj.currentSelectedNodeData?.data.stream_type || "logs"); ;
 const selectedNodeType = ref(pipelineObj.currentSelectedNodeData.io_type)
@@ -231,6 +232,11 @@ const updateStreams = () => {
   // pipelineObj.currentSelectedNodeData.data.stream_type = stream_type.value;
   
 };
+
+const filteredStreamTypes = computed(() => {
+      return selectedNodeType.value === 'output' ? outputStreamTypes : streamTypes;
+    });
+
 const getLogStream = (data) =>{
   // pipelineObj.currentSelectedNodeData.data.stream_name = data.name;
   // pipelineObj.currentSelectedNodeData.data.stream_type = data.stream_type;
@@ -334,7 +340,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 };
 </script>
 
-<style  >
+<style >
 .stream-routing-title {
   font-size: 20px;
   padding-top: 16px;
@@ -343,9 +349,17 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   .add-stream-header.row {
     display: none ;
   }
+  .add-stream-inputs :nth-child(5){
+    /* background-color: red; */
+    justify-content: flex-start;
+  }
+
+
 
   .q-separator {
     display: none !important;
   }
 }
+
+
 </style>

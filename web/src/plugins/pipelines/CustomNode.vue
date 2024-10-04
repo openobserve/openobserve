@@ -55,8 +55,6 @@ const deleteNode = (id) => {
   openCancelDialog(id);
 };
 const  functionInfo = (data) =>  {
-  console.log(data,"data i am ")
-  console.log(pipelineObj.functions[data.name],"fun to be displayed")
 
       return pipelineObj.functions[data.name] || null;
   }
@@ -86,7 +84,6 @@ const resetConfirmDialog = () => {
 };
 
 function getIcon(data, ioType) {
-  console.log(data,"data in getIcon")
   const searchTerm = data.node_type;
 
   const node = this.pipelineObj.nodeTypes.find(

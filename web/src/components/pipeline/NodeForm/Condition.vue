@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-            v-if="isUpdating"
+          v-if="pipelineObj.isEditNode"
             data-test="stream-routing-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
@@ -163,7 +163,7 @@ const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 
-const { addNode, pipelineObj } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 let parser: any;
 
@@ -369,21 +369,23 @@ const openDeleteDialog = () => {
 };
 
 const deleteRoute = () => {
-  emit("delete:node", {
-    data: {
-      ...props.editingRoute,
-      name: props.editingRoute.name,
-    },
-    type: "streamRoute",
-  });
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name,
+  //   },
+  //   type: "streamRoute",
+  // });
 
-  emit("delete:node", {
-    data: {
-      ...props.editingRoute,
-      name: props.editingRoute.name + ":" + "condition",
-    },
-    type: "condition",
-  });
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name + ":" + "condition",
+  //   },
+  //   type: "condition",
+  // });
+
+  deletePipelineNode(pipelineObj.currentSelectedNodeID);
 
   emit("cancel:hideform");
 };

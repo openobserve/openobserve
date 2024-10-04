@@ -214,6 +214,7 @@ const isUpdating = ref(false);
 const selectedFunction = ref(pipelineObj.currentSelectedNodeData?.data.name || "");
 
 const functionOrder = ref(props.defaultOrder);
+const loading = ref(false);
 
 const afterFlattening = ref(pipelineObj.currentSelectedNodeData?.data.after_flatten || false);
 
