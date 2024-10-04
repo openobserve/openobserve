@@ -17,7 +17,6 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use bytes::Bytes;
-use config::utils::json;
 use infra::{
     db::{Event, NEED_WATCH},
     short_url,
@@ -57,6 +56,7 @@ pub async fn set(short_id: &str, original_url: &str) -> Result<(), anyhow::Error
 }
 
 pub async fn get_by_original_url(original_url: &str) -> Option<String> {
+    // TODO: need to optimize this for larger number of short URLs
     if let Some(short_id) = SHORT_URLS.iter().find_map(|entry| {
         let (k, v) = entry.pair();
         if v == original_url {
@@ -68,21 +68,8 @@ pub async fn get_by_original_url(original_url: &str) -> Option<String> {
     }
 
     let original_url = original_url.to_string();
-    // TODO: Verify this operation
-    match db::get(&format!("{SHORT_URL_KEY}{original_url}")).await {
-        Ok(val) => match json::from_slice::<String>(&val) {
-            Ok(short_id) => {
-                SHORT_URLS.insert(short_id.clone(), original_url.clone());
-                Some(short_id)
-            }
-            Err(e) => {
-                log::error!(
-                    "Failed to deserialize short_id for original_url from db: {}",
-                    e
-                );
-                None
-            }
-        },
+    match short_url::get_by_original_url(&original_url).await {
+        Ok(row) => Some(row.short_id),
         Err(e) => {
             log::error!("Original URL not found in db: {}", e);
             None
@@ -109,7 +96,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match short_url::get(&item_key).await {
+                let item_value = match short_url::get(item_key).await {
                     Ok(val) => val.original_url,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
@@ -124,16 +111,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Empty => {}
         }
+
+        // TODO: Implement gc for SHORT_URLS cache based on ZO_COMPACT_DATA_RETENTION_DAYS
     }
 }
 
 /// Preload all short URLs from the database into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = SHORT_URL_KEY;
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let short_id = item_key.strip_prefix(key).unwrap();
-        let original_url: String = json::from_slice(&item_value).unwrap();
+    let ret = short_url::list().await?;
+    for row in ret {
+        let short_id = row.short_id;
+        let original_url = row.original_url;
         SHORT_URLS.insert(short_id.to_owned(), original_url);
     }
     log::info!("Short URLs Cached");

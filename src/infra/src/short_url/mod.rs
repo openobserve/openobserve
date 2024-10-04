@@ -78,6 +78,11 @@ pub async fn get(short_id: &str) -> Result<ShortUrlRecord> {
 }
 
 #[inline]
+pub async fn get_by_original_url(original_url: &str) -> Result<ShortUrlRecord> {
+    CLIENT.get_by_original_url(original_url).await
+}
+
+#[inline]
 pub async fn list() -> Result<Vec<ShortUrlRecord>> {
     CLIENT.list().await
 }
