@@ -69,7 +69,6 @@ pub async fn convert_parquet_file(
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
-    full_text_search_fields: &[String],
     rules: HashMap<String, DataType>,
     file_type: FileType,
 ) -> Result<()> {
@@ -137,13 +136,7 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(
-        buf,
-        &schema,
-        bloom_filter_fields,
-        full_text_search_fields,
-        &file_meta,
-    );
+    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch).await?;
     }

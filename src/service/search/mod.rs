@@ -16,15 +16,14 @@
 use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
-use cache::cacher::get_ts_col;
 use chrono::Duration;
 use config::{
     get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
-        sql::OrderBy,
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        sql::{OrderBy, SqlOperator},
+        stream::{FileKey, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
@@ -217,6 +216,11 @@ pub async fn search(
                     response_time: time,
                     size: res.scan_size as f64,
                     request_body: Some(req_query.sql.clone()),
+                    function: if req_query.query_fn.is_empty() {
+                        None
+                    } else {
+                        Some(req_query.query_fn.clone())
+                    },
                     user_email: user_id,
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),
@@ -282,8 +286,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
-
+    let ts_column = cache::cacher::get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
     let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     let mut files = Vec::new();
@@ -293,15 +296,18 @@ pub async fn search_partition(
         let partition_time_level =
             unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         if !skip_get_file_list {
-            let stream_files = get_file_list(
-                &sql,
-                stream,
+            let stream_files = crate::service::file_list::query_ids(
+                &sql.org_id,
                 stream_type,
+                stream,
                 partition_time_level,
-                &stream_settings.partition_keys,
+                sql.time_range,
             )
-            .await;
-            max_query_range = max(max_query_range, stream_settings.max_query_range);
+            .await?;
+            max_query_range = max(
+                max_query_range,
+                stream_settings.max_query_range * 3600 * 1_000_000,
+            );
             files.extend(stream_files);
         }
     }
@@ -331,22 +337,15 @@ pub async fn search_partition(
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
-    let (records, original_size, compressed_size) =
-        files
-            .iter()
-            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
-                (
-                    records + f.meta.records,
-                    original_size + f.meta.original_size,
-                    compressed_size + f.meta.compressed_size,
-                )
-            });
+    let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
+        (records + f.records, original_size + f.original_size)
+    });
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
         records: records as usize,
         original_size: original_size as usize,
-        compressed_size: compressed_size as usize,
+        compressed_size: 0, // there is no compressed size in file list
         histogram_interval: sql.histogram_interval,
         max_query_range,
         partitions: vec![],
@@ -369,6 +368,10 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    // if the partition number is too large, we limit it to 1000
+    if part_num > 1000 {
+        part_num = 1000;
+    }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
@@ -377,13 +380,29 @@ pub async fn search_partition(
     if step % min_step > 0 {
         step = step - step % min_step;
     }
+    // this is to ensure we create partitions less than max_query_range
+    if max_query_range > 0 && step > max_query_range {
+        step = if min_step < max_query_range {
+            max_query_range - max_query_range % min_step
+        } else {
+            max_query_range
+        };
+    }
 
     // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
+    let duration = req.end_time - req.start_time;
     while end > req.start_time {
-        let start = max(end - step - last_partition_step, req.start_time);
+        let mut start = max(end - step, req.start_time);
+        if last_partition_step > 0 && duration > min_step && part_num > 1 {
+            partitions.push([end - last_partition_step, end]);
+            start -= last_partition_step;
+            end -= last_partition_step;
+        } else {
+            start = max(start - last_partition_step, req.start_time);
+        }
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
@@ -690,6 +709,12 @@ pub async fn match_file(
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
+    // fast path
+    if partition_keys.is_empty() || !source.key.contains('=') {
+        return true;
+    }
+
+    // slow path
     let mut filters = generate_filter_from_equal_items(equal_items);
     let partition_keys: HashMap<&String, &StreamPartition> =
         partition_keys.iter().map(|v| (&v.field, v)).collect();
@@ -851,30 +876,6 @@ pub async fn search_partition_multi(
     Ok(res)
 }
 
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
-async fn get_file_list(
-    sql: &Sql,
-    stream_name: &str,
-    stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Vec<FileKey> {
-    let (time_min, time_max) = sql.time_range.unwrap();
-    let mut files = super::file_list::query(
-        &sql.org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await
-    .unwrap_or_default();
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    files
-}
-
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
@@ -946,10 +947,28 @@ pub fn filter_index_fields(
     result
 }
 
+pub fn generate_filter_from_quick_text(
+    data: &[(String, String, SqlOperator)],
+) -> Vec<(&str, Vec<String>)> {
+    let quick_text_len = data.len();
+    let mut filters = HashMap::with_capacity(quick_text_len);
+    for i in 0..quick_text_len {
+        let (k, v, op) = &data[i];
+        if op == &SqlOperator::And
+            || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+        {
+            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+            entry.push(v.to_string());
+        } else {
+            filters.clear();
+            break;
+        }
+    }
+    filters.into_iter().collect::<Vec<(_, _)>>()
+}
+
 #[cfg(test)]
 mod tests {
-    use config::meta::sql::SqlOperator;
-
     use super::*;
 
     #[test]
@@ -1056,26 +1075,6 @@ mod tests {
         for (filter, expected) in filters {
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
         }
-    }
-
-    pub fn generate_filter_from_quick_text(
-        data: &[(String, String, SqlOperator)],
-    ) -> Vec<(&str, Vec<String>)> {
-        let quick_text_len = data.len();
-        let mut filters = HashMap::with_capacity(quick_text_len);
-        for i in 0..quick_text_len {
-            let (k, v, op) = &data[i];
-            if op == &SqlOperator::And
-                || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
-            {
-                let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
-                entry.push(v.to_string());
-            } else {
-                filters.clear();
-                break;
-            }
-        }
-        filters.into_iter().collect::<Vec<(_, _)>>()
     }
 
     #[test]

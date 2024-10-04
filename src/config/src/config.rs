@@ -948,6 +948,18 @@ pub struct Limit {
         help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_ID_BATCH_SIZE",
+        default = 5000,
+        help = "batch size of file list query"
+    )]
+    pub file_list_id_batch_size: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -990,7 +1002,7 @@ pub struct Compact {
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
-    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
+    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
@@ -1220,6 +1232,8 @@ pub struct S3 {
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
     pub max_retries: usize,
+    #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
+    pub max_idle_per_host: usize,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1332,6 +1346,10 @@ pub fn init() -> Config {
     cfg.limit.sql_db_connections_max =
         max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
 
+    if cfg.limit.file_list_id_batch_size == 0 {
+        cfg.limit.file_list_id_batch_size = 5000;
+    }
+
     if cfg.limit.consistent_hash_vnodes == 0 {
         cfg.limit.consistent_hash_vnodes = 100;
     }
@@ -1430,7 +1448,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
     if cfg.common.local_mode
-        || (cfg.common.meta_store != "sqlite" && cfg.common.meta_store != "etcd")
+        || cfg.common.meta_store.starts_with("mysql")
+        || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.meta_store_external = true;
     }

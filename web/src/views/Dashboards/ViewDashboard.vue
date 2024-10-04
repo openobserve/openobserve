@@ -671,8 +671,8 @@ export default defineComponent({
         end: new Date(event.end),
       };
       // Truncate seconds and milliseconds from the dates
-      selectedDateObj.start.setSeconds(0, 0);
-      selectedDateObj.end.setSeconds(0, 0);
+      selectedDateObj.start.setMilliseconds(0);
+      selectedDateObj.end.setMilliseconds(0);
 
       // Compare the truncated dates
       if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {

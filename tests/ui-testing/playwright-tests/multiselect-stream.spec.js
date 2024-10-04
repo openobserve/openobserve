@@ -158,7 +158,7 @@ await page.waitForTimeout(1000);
   }) => {
     await multistreamselect(page);
     await page.route("**/logData.ValueQuery", (route) => route.continue());
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
@@ -191,7 +191,7 @@ await page.waitForTimeout(1000);
     page,
   }) => {
     await multistreamselect(page);
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="menu-link-/streams-item"]')
       .click({ force: true });
