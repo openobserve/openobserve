@@ -67,6 +67,8 @@ pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
+pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -1327,6 +1329,8 @@ pub fn init() -> Config {
     if cfg.limit.sql_db_connections_max == 0 {
         cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
     }
+    cfg.limit.sql_db_connections_max =
+        max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
 
     if cfg.limit.consistent_hash_vnodes == 0 {
         cfg.limit.consistent_hash_vnodes = 100;
