@@ -198,6 +198,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_label_rotation: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    axis_label_width: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
