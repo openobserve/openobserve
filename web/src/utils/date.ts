@@ -194,7 +194,7 @@ export const getDurationObjectFromParams = (params: any) => {
 };
 
 export const getConsumableRelativeTime = (period: string) => {
-  const periodString = period?.match(/(\d+)([mhdwM])/);
+  const periodString = period?.match(/(\d+)([smhdwM])/);
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];
@@ -228,6 +228,7 @@ export const getConsumableRelativeTime = (period: string) => {
 
 export const getRelativePeriod = (period: string) => {
   const mapping: { [key: string]: string } = {
+    s: "Seconds",
     m: "Minutes",
     h: "Hours",
     d: "Days",
