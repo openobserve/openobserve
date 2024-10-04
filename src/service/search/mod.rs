@@ -254,7 +254,7 @@ pub async fn search_multi(
                             fields: program.fields.clone(),
                         },
                         &json::Value::Array(multi_res.hits),
-                        &org_id,
+                        org_id,
                         &[stream_name.clone()],
                     );
                     ret_val
