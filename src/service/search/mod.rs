@@ -971,7 +971,6 @@ pub fn generate_filter_from_quick_text(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
