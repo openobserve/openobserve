@@ -60,20 +60,38 @@ pub async fn set(short_id: &str, original_url: &str) -> Result<(), anyhow::Error
 }
 
 pub async fn get_by_original_url(original_url: &str) -> Option<String> {
-    let val = URL_MAP.iter().find_map(|entry| {
+    if let Some(short_id) = URL_MAP.iter().find_map(|entry| {
         let (k, v) = entry.pair();
         if v == original_url {
             return Some(k.clone());
         }
         None
-    });
-
-    if val.is_none() {
-        // TODO: Implement a database query to find the original URL if not in cache
+    }) {
+        return Some(short_id);
     }
 
-    val
+    let original_url = original_url.to_string();
+    // TODO: Verify this operation
+    match db::get(&format!("{SHORT_URL_KEY}{original_url}")).await {
+        Ok(val) => {
+            match json::from_slice::<String>(&val) {
+                Ok(short_id) => {
+                    URL_MAP.insert(short_id.clone(), original_url.clone());
+                    Some(short_id)
+                }
+                Err(e) => {
+                    log::error!("Failed to deserialize short_id for original_url from db: {}", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Original URL not found in db: {}", e);
+            None
+        }
+    }
 }
+
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = SHORT_URL_KEY;
