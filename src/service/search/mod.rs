@@ -22,7 +22,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
-        sql::OrderBy,
+        sql::{OrderBy, SqlOperator},
         stream::{FileKey, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -214,6 +214,11 @@ pub async fn search(
                     response_time: time,
                     size: res.scan_size as f64,
                     request_body: Some(req_query.sql.clone()),
+                    function: if req_query.query_fn.is_empty() {
+                        None
+                    } else {
+                        Some(req_query.query_fn.clone())
+                    },
                     user_email: user_id,
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),
@@ -295,7 +300,10 @@ pub async fn search_partition(
                 sql.time_range,
             )
             .await?;
-            max_query_range = max(max_query_range, stream_settings.max_query_range);
+            max_query_range = max(
+                max_query_range,
+                stream_settings.max_query_range * 3600 * 1_000_000,
+            );
             files.extend(stream_files);
         }
     }
@@ -368,13 +376,29 @@ pub async fn search_partition(
     if step % min_step > 0 {
         step = step - step % min_step;
     }
+    // this is to ensure we create partitions less than max_query_range
+    if max_query_range > 0 && step > max_query_range {
+        step = if min_step < max_query_range {
+            max_query_range - max_query_range % min_step
+        } else {
+            max_query_range
+        };
+    }
 
     // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
+    let duration = req.end_time - req.start_time;
     while end > req.start_time {
-        let start = max(end - step - last_partition_step, req.start_time);
+        let mut start = max(end - step, req.start_time);
+        if last_partition_step > 0 && duration > min_step && part_num > 1 {
+            partitions.push([end - last_partition_step, end]);
+            start -= last_partition_step;
+            end -= last_partition_step;
+        } else {
+            start = max(start - last_partition_step, req.start_time);
+        }
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
@@ -919,10 +943,28 @@ pub fn filter_index_fields(
     result
 }
 
+pub fn generate_filter_from_quick_text(
+    data: &[(String, String, SqlOperator)],
+) -> Vec<(&str, Vec<String>)> {
+    let quick_text_len = data.len();
+    let mut filters = HashMap::with_capacity(quick_text_len);
+    for i in 0..quick_text_len {
+        let (k, v, op) = &data[i];
+        if op == &SqlOperator::And
+            || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+        {
+            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+            entry.push(v.to_string());
+        } else {
+            filters.clear();
+            break;
+        }
+    }
+    filters.into_iter().collect::<Vec<(_, _)>>()
+}
+
 #[cfg(test)]
 mod tests {
-    use config::meta::sql::SqlOperator;
-
     use super::*;
 
     #[test]
@@ -1029,26 +1071,6 @@ mod tests {
         for (filter, expected) in filters {
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
         }
-    }
-
-    pub fn generate_filter_from_quick_text(
-        data: &[(String, String, SqlOperator)],
-    ) -> Vec<(&str, Vec<String>)> {
-        let quick_text_len = data.len();
-        let mut filters = HashMap::with_capacity(quick_text_len);
-        for i in 0..quick_text_len {
-            let (k, v, op) = &data[i];
-            if op == &SqlOperator::And
-                || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
-            {
-                let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
-                entry.push(v.to_string());
-            } else {
-                filters.clear();
-                break;
-            }
-        }
-        filters.into_iter().collect::<Vec<(_, _)>>()
     }
 
     #[test]
