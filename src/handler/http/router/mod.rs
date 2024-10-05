@@ -230,7 +230,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/short")
             .wrap(cors.clone())
             .service(short_url::shorten)
-            .service(short_url::retrieve)
+            .service(short_url::retrieve),
     );
 
     if get_config().common.swagger_enabled {
@@ -494,7 +494,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::multi_streams::search_multi)
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
-            .service(stream::delete_stream_cache)
+            .service(stream::delete_stream_cache),
     );
 }
 
