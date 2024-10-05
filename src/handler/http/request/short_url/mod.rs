@@ -23,7 +23,7 @@ use crate::service::short_url::ShortUrl;
 /// Shorten a URL
 #[utoipa::path(
     post,
-    context_path = "/short",
+    context_path = "/api",
     request_body(
         content = ShortenUrlRequest,
         description = "The original URL to shorten",
@@ -46,7 +46,7 @@ use crate::service::short_url::ShortUrl;
     ),
     tag = "Short Url"
 )]
-#[post("")]
+#[post("/short")]
 pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
     let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
     let short_url_service = ShortUrl::new(None);
@@ -63,7 +63,7 @@ pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
     get,
     context_path = "/short",
     params(
-        ("short_id" = String, Path, description = "The short ID to retrieve the original URL")
+        ("short_id" = String, Path, description = "The short ID to retrieve the original URL", example = "ddbffcea3ad44292")
     ),
     responses(
         (status = 302, description = "Redirect to the original URL", headers(
