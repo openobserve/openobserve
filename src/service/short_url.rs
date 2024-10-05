@@ -38,7 +38,7 @@ impl ShortUrl {
     pub async fn shorten(&self, original_url: &str) -> String {
         // Check if the original_url already exists in the database
         if let Some(existing_short_id) = db::short_url::get_by_original_url(original_url).await {
-            return format!("{}/api/short/{}", self.base_url, existing_short_id);
+            return format!("{}/short/{}", self.base_url, existing_short_id);
         }
 
         let mut short_id = md5::short_hash(original_url);
@@ -54,7 +54,7 @@ impl ShortUrl {
         // Store the short_id and original_url in the database
         db::short_url::set(&short_id, original_url).await.ok();
 
-        format!("{}/api/short/{}", self.base_url, short_id)
+        format!("{}/short/{}", self.base_url, short_id)
     }
 
     /// Retrieves the original URL corresponding to the given short ID
@@ -64,7 +64,7 @@ impl ShortUrl {
 
     /// Extracts the short ID from the shortened URL
     pub fn get_short_id_from_url(&self, short_url: &str) -> Option<String> {
-        let prefix = format!("{}/api/short/", self.base_url);
+        let prefix = format!("{}/short/", self.base_url);
         short_url.strip_prefix(&prefix).map(|s| s.to_string())
     }
 }
@@ -81,7 +81,7 @@ mod tests {
         let short_id = short_url_service
             .get_short_id_from_url(&short_url)
             .expect("Failed to extract short_id");
-        let expected_short_url = format!("http://localhost:5080/api/short/{}", short_id);
+        let expected_short_url = format!("http://localhost:5080/short/{}", short_id);
         assert_eq!(short_url, expected_short_url);
 
         let retrieved_url = short_url_service

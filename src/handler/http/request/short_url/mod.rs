@@ -23,15 +23,30 @@ use crate::service::short_url::ShortUrl;
 /// Shorten a URL
 #[utoipa::path(
     post,
-    path = "/short",
-    request_body(content = ShortenUrlRequest, description = "The original URL to shorten", content_type = "application/json"),
-    responses(
-        (status = 200, description = "Shortened URL", body = ShortenUrlResponse),
-        (status = 400, description = "Invalid request")
+    context_path = "/short",
+    request_body(
+        content = ShortenUrlRequest,
+        description = "The original URL to shorten",
+        content_type = "application/json",
+        example = json!({
+            "original_url": "https://example.com/some/long/url"
+        })
     ),
-    tag = "short_url"
+    responses(
+        (
+            status = 200,
+            description = "Shortened URL",
+            body = ShortenUrlResponse,
+            content_type = "application/json",
+            example = json!({
+                "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
+            })
+        ),
+        (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    tag = "Short Url"
 )]
-#[post("/short")]
+#[post("")]
 pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
     let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
     let short_url_service = ShortUrl::new(None);
@@ -46,7 +61,7 @@ pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
 /// Retrieve the original URL from a short_id
 #[utoipa::path(
     get,
-    path = "/short/{short_id}",
+    context_path = "/short",
     params(
         ("short_id" = String, Path, description = "The short ID to retrieve the original URL")
     ),
@@ -54,11 +69,11 @@ pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
         (status = 302, description = "Redirect to the original URL", headers(
             ("Location" = String, description = "The original URL to which the client is redirected")
         )),
-        (status = 404, description = "Short URL not found")
+        (status = 404, description = "Short URL not found", content_type = "text/plain")
     ),
-    tag = "short_url"
+    tag = "Short Url"
 )]
-#[get("/short/{short_id}")]
+#[get("/{short_id}")]
 pub async fn retrieve(short_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let short_id = short_id.into_inner();
     let short_url_service = ShortUrl::new(None);
