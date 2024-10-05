@@ -44,8 +44,8 @@ impl ShortUrl for PostgresShortUrl {
         let query = r#"
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                original_url VARCHAR(2048) NOT NULL UNIQUE,
-                short_id VARCHAR(32) NOT NULL UNIQUE,
+                original_url VARCHAR(2048) NOT NULL,
+                short_id VARCHAR(32) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             "#;

@@ -48,8 +48,8 @@ impl ShortUrl for SqliteShortUrl {
                 CREATE TABLE IF NOT EXISTS short_urls
                 (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                    original_url VARCHAR(2048) NOT NULL UNIQUE,
-                    short_id     VARCHAR(32) NOT NULL UNIQUE,
+                    original_url VARCHAR(2048) NOT NULL,
+                    short_id     VARCHAR(32) NOT NULL,
                     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 "#,
