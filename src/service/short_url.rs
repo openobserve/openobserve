@@ -18,55 +18,43 @@ use config::{get_config, utils::md5};
 
 use crate::service::db;
 
-pub struct ShortUrl {
-    base_url: String,
+pub fn get_base_url() -> String {
+    let config = get_config();
+    format!("{}{}", config.common.web_url, config.common.base_uri)
 }
 
-impl ShortUrl {
-    pub fn new(base_url: Option<String>) -> Self {
-        let base_url = if let Some(base_url) = base_url {
-            base_url
-        } else {
-            let config = get_config();
-            format!("{}{}", config.common.web_url, config.common.base_uri)
-        };
-
-        Self { base_url }
+/// Shortens the given original URL and stores it in the database
+pub async fn shorten(original_url: &str) -> String {
+    // Check if the original_url already exists in the database
+    if let Some(existing_short_id) = db::short_url::get_by_original_url(original_url).await {
+        return format!("{}/short/{}", get_base_url(), existing_short_id);
     }
 
-    /// Shortens the given original URL and stores it in the database
-    pub async fn shorten(&self, original_url: &str) -> String {
-        // Check if the original_url already exists in the database
-        if let Some(existing_short_id) = db::short_url::get_by_original_url(original_url).await {
-            return format!("{}/short/{}", self.base_url, existing_short_id);
-        }
+    let mut short_id = md5::short_hash(original_url);
 
-        let mut short_id = md5::short_hash(original_url);
-
-        // Check if the generated short_id is already present in the database
-        if db::short_url::get(short_id.as_str()).await.is_ok() {
-            // Handle hash conflict - create a new hash using the timestamp
-            let timestamp = Utc::now().timestamp();
-            let input = format!("{}{}", original_url, timestamp);
-            short_id = md5::short_hash(&input);
-        }
-
-        // Store the short_id and original_url in the database
-        db::short_url::set(&short_id, original_url).await.ok();
-
-        format!("{}/short/{}", self.base_url, short_id)
+    // Check if the generated short_id is already present in the database
+    if db::short_url::get(short_id.as_str()).await.is_ok() {
+        // Handle hash conflict - create a new hash using the timestamp
+        let timestamp = Utc::now().timestamp();
+        let input = format!("{}{}", original_url, timestamp);
+        short_id = md5::short_hash(&input);
     }
 
-    /// Retrieves the original URL corresponding to the given short ID
-    pub async fn retrieve(&self, short_id: &str) -> Option<String> {
-        db::short_url::get(short_id).await.ok()
-    }
+    // Store the short_id and original_url in the database
+    db::short_url::set(&short_id, original_url).await.ok();
 
-    /// Extracts the short ID from the shortened URL
-    pub fn get_short_id_from_url(&self, short_url: &str) -> Option<String> {
-        let prefix = format!("{}/short/", self.base_url);
-        short_url.strip_prefix(&prefix).map(|s| s.to_string())
-    }
+    format!("{}/short/{}", get_base_url(), short_id)
+}
+
+/// Retrieves the original URL corresponding to the given short ID
+pub async fn retrieve(short_id: &str) -> Option<String> {
+    db::short_url::get(short_id).await.ok()
+}
+
+/// Extracts the short ID from the shortened URL
+pub fn get_short_id_from_url(short_url: &str) -> Option<String> {
+    let prefix = format!("{}/short/", get_base_url());
+    short_url.strip_prefix(&prefix).map(|s| s.to_string())
 }
 
 #[cfg(test)]
@@ -76,26 +64,19 @@ mod tests {
     #[tokio::test]
     async fn test_shorten_and_retrieve() {
         let original_url = "https://www.example.com/some/long/url";
-        let short_url_service = ShortUrl::new(None);
-        let short_url = short_url_service.shorten(original_url).await;
-        let short_id = short_url_service
-            .get_short_id_from_url(&short_url)
-            .expect("Failed to extract short_id");
-        let expected_short_url = format!("http://localhost:5080/short/{}", short_id);
-        assert_eq!(short_url, expected_short_url);
+        let short_url = shorten(original_url).await;
+        let short_id = get_short_id_from_url(&short_url).unwrap();
 
-        let retrieved_url = short_url_service
-            .retrieve(&short_id)
-            .await
-            .expect("Failed to retrieve URL");
+        let retrieved_url = retrieve(&short_id).await.expect("Failed to retrieve URL");
         assert_eq!(retrieved_url, original_url);
+
+        let short_id = get_short_id_from_url(&short_url).unwrap();
         assert_eq!(short_id.len(), 16);
     }
 
     #[tokio::test]
     async fn test_retrieve_nonexistent_short_id() {
-        let short_url_service = ShortUrl::new(None);
-        let retrieved_url = short_url_service.retrieve("nonexistent_id").await;
+        let retrieved_url = retrieve("nonexistent_id").await;
         assert!(retrieved_url.is_none());
     }
 
@@ -103,9 +84,8 @@ mod tests {
     async fn test_unique_original_urls() {
         let original_url = "https://www.example.com/some/long/url";
 
-        let short_url_service = ShortUrl::new(None);
-        let short_url1 = short_url_service.shorten(original_url).await;
-        let short_url2 = short_url_service.shorten(original_url).await;
+        let short_url1 = shorten(original_url).await;
+        let short_url2 = shorten(original_url).await;
 
         // Should return the same short_id
         assert_eq!(short_url1, short_url2);

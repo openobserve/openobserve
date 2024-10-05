@@ -56,7 +56,13 @@ impl ShortUrl for MysqlShortUrl {
     /// Create index for short_urls at short_id and original_url
     async fn create_table_index(&self) -> Result<()> {
         create_index("short_id_idx", "short_urls", true, &["short_id"]).await?;
-        create_index("original_url_idx", "short_urls", false, &["original_url(255)"]).await?;
+        create_index(
+            "original_url_idx",
+            "short_urls",
+            false,
+            &["original_url(255)"],
+        )
+        .await?;
         Ok(())
     }
 

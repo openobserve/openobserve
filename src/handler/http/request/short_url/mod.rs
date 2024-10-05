@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{get, post, web, HttpResponse};
 use config::meta::short_url::ShortenUrlResponse;
 
-use crate::service::short_url::ShortUrl;
+use crate::service::short_url;
 
 /// Shorten a URL
 #[utoipa::path(
@@ -49,8 +49,7 @@ use crate::service::short_url::ShortUrl;
 #[post("/short")]
 pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
     let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
-    let short_url_service = ShortUrl::new(None);
-    let short_url = short_url_service.shorten(&req.original_url).await;
+    let short_url = short_url::shorten(&req.original_url).await;
     let response = ShortenUrlResponse {
         short_url: short_url.clone(),
     };
@@ -76,8 +75,7 @@ pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
 #[get("/{short_id}")]
 pub async fn retrieve(short_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let short_id = short_id.into_inner();
-    let short_url_service = ShortUrl::new(None);
-    let original_url = short_url_service.retrieve(&short_id).await;
+    let original_url = short_url::retrieve(&short_id).await;
 
     if let Some(url) = original_url {
         // Use MovedPermanently (301) or Found (302)
