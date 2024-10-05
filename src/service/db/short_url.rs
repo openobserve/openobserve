@@ -17,13 +17,18 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
+use chrono::Utc;
+use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
     short_url,
 };
 
 use crate::{
-    common::{infra::config::SHORT_URLS, meta::short_url::ShortUrlCacheEntry},
+    common::{
+        infra::config::{ORIGINAL_URLS, SHORT_URLS},
+        meta::short_url::ShortUrlCacheEntry,
+    },
     service::db,
 };
 
@@ -46,9 +51,12 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
 
 pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow::Error> {
     SHORT_URLS.insert(short_id.to_string(), entry.clone());
+    ORIGINAL_URLS.insert(entry.original_url.to_string(), short_id.to_string());
+
     if let Err(e) = short_url::add(short_id, &entry.original_url).await {
         // roll back
         SHORT_URLS.remove(short_id);
+        ORIGINAL_URLS.remove(&entry.original_url);
         return Err(e).context("Failed to add short URL to DB");
     };
 
@@ -64,15 +72,8 @@ pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow
 }
 
 pub async fn get_by_original_url(original_url: &str) -> Result<String, anyhow::Error> {
-    // TODO: need to optimize this for larger number of short URLs
-    if let Some(short_id) = SHORT_URLS.iter().find_map(|entry| {
-        let (k, v) = entry.pair();
-        if v.original_url == original_url {
-            return Some(k.clone());
-        }
-        None
-    }) {
-        return Ok(short_id);
+    if let Some(short_id) = ORIGINAL_URLS.get(original_url) {
+        return Ok(short_id.to_string());
     }
 
     let original_url = original_url.to_string();
@@ -87,6 +88,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching short URLs");
+
+    // Spawn a background task for garbage collection
+    let config = get_config();
+    tokio::spawn(run_gc_task(
+        days_to_minutes(config.compact.data_gc_interval_days),
+        days_to_minutes(config.compact.data_retention_days),
+    ));
 
     loop {
         let ev = match events.recv().await {
@@ -115,8 +123,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Empty => {}
         }
-
-        // TODO: Implement gc for SHORT_URLS cache based on ZO_COMPACT_DATA_RETENTION_DAYS
     }
 }
 
@@ -129,4 +135,94 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("Short URLs Cached");
     Ok(())
+}
+
+// Background task to run GC at a regular interval
+async fn run_gc_task(gc_interval_minutes: i64, retention_days: i64) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+        gc_interval_minutes as u64 * 60,
+    ));
+
+    loop {
+        interval.tick().await;
+
+        if let Err(e) = gc_cache(retention_days).await {
+            log::error!("Error during garbage collection: {}", e);
+        }
+    }
+}
+
+// Garbage Collection to clean up expired entries from cache
+pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error> {
+    log::info!(
+        "Garbage collection start. Cache size SHORT_URLS: {}, ORIGINAL_URLS: {}",
+        SHORT_URLS.len(),
+        ORIGINAL_URLS.len()
+    );
+    let retention_period = chrono::Duration::minutes(retention_period_minutes);
+    let now = Utc::now();
+    let mut original_urls_to_remove = Vec::new();
+    SHORT_URLS.retain(|_short_id, entry| {
+        let is_valid = now - entry.timestamp < retention_period;
+
+        if !is_valid {
+            original_urls_to_remove.push(entry.original_url.clone());
+        }
+
+        is_valid
+    });
+
+    for original_url in original_urls_to_remove {
+        ORIGINAL_URLS.remove(&original_url);
+    }
+    log::info!(
+        "Garbage collection completed. Cache size SHORT_URLS: {}, ORIGINAL_URLS: {}",
+        SHORT_URLS.len(),
+        ORIGINAL_URLS.len()
+    );
+    Ok(())
+}
+
+fn days_to_minutes(days: i64) -> i64 {
+    days * 24 * 60
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_gc_removes_expired_entries_and_retains_valid_entries() {
+        let retention_minutes = 60; // 1 hour retention period
+        let now = Utc::now();
+
+        // Insert an expired entry (2 hours old)
+        let expired_entry = ShortUrlCacheEntry {
+            short_id: "expired".to_string(),
+            original_url: "https://expired.com".to_string(),
+            timestamp: now - chrono::Duration::hours(2),
+        };
+        SHORT_URLS.insert("expired".to_string(), expired_entry.clone());
+        ORIGINAL_URLS.insert(expired_entry.original_url.clone(), "expired".to_string());
+
+        // Insert a valid entry (30 minutes old)
+        let valid_entry = ShortUrlCacheEntry {
+            short_id: "valid".to_string(),
+            original_url: "https://valid.com".to_string(),
+            timestamp: now - chrono::Duration::minutes(30),
+        };
+        SHORT_URLS.insert("valid".to_string(), valid_entry.clone());
+        ORIGINAL_URLS.insert(valid_entry.original_url.clone(), "valid".to_string());
+
+        // Run garbage collection
+        gc_cache(retention_minutes).await.unwrap();
+
+        // Assert expired entry is removed
+        assert!(SHORT_URLS.get("expired").is_none());
+        assert!(ORIGINAL_URLS.get("https://expired.com").is_none());
+
+        // Assert valid entry is still present
+        assert!(SHORT_URLS.get("valid").is_some());
+        assert!(ORIGINAL_URLS.get("https://valid.com").is_some());
+    }
 }

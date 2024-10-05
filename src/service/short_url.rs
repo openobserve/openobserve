@@ -50,10 +50,6 @@ pub async fn shorten(original_url: &str) -> Result<String, anyhow::Error> {
                     Error::DbError(DbError::UniqueViolation) => {
                         let existing_short_id =
                             db::short_url::get_by_original_url(original_url).await?;
-                        log::info!(
-                            "Original Url already exists in db fetching existing short id: {}",
-                            &existing_short_id
-                        );
                         Ok(format!("{}/short/{}", get_base_url(), existing_short_id))
                     }
                     _ => Err(e),

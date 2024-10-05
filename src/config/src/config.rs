@@ -1004,6 +1004,8 @@ pub struct Compact {
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_DATA_GC_INTERVAL_DAYS", default = 30)] // days
+    pub data_gc_interval_days: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
