@@ -18,7 +18,7 @@ use sqlx::Row;
 
 use crate::{
     db::postgres::{create_index, CLIENT},
-    errors::Result,
+    errors::{DbError, Error, Result},
     short_url::{ShortUrl, ShortUrlRecord},
 };
 
@@ -44,8 +44,8 @@ impl ShortUrl for PostgresShortUrl {
         let query = r#"
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                original_url VARCHAR(2048) NOT NULL,
-                short_id VARCHAR(32) NOT NULL,
+                original_url VARCHAR(2048) NOT NULL UNIQUE,
+                short_id VARCHAR(32) NOT NULL UNIQUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             "#;
@@ -63,18 +63,27 @@ impl ShortUrl for PostgresShortUrl {
     /// Add a new entry to the short_urls table
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"
-            INSERT INTO short_urls (original_url, short_id)
-            VALUES ($1, $2)
-            ON CONFLICT (original_url) DO NOTHING;
-            "#;
 
-        sqlx::query(query)
+        // Insert query with ON CONFLICT clause to handle unique violations
+        let query = r#"
+        INSERT INTO short_urls (original_url, short_id)
+        VALUES ($1, $2)
+        ON CONFLICT (short_id) DO NOTHING;
+    "#;
+
+        let result = sqlx::query(query)
             .bind(original_url)
             .bind(short_id)
             .execute(&pool)
-            .await?;
-        Ok(())
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
+                Err(Error::DbError(DbError::UniqueViolation))
+            }
+            Err(e) => Err(Error::SqlxError(e)),
+        }
     }
 
     /// Remove an entry from the short_urls table

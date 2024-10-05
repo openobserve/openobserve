@@ -49,12 +49,19 @@ use crate::service::short_url;
 #[post("/short")]
 pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
     let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
-    let short_url = short_url::shorten(&req.original_url).await;
-    let response = ShortenUrlResponse {
-        short_url: short_url.clone(),
-    };
+    match short_url::shorten(&req.original_url).await {
+        Ok(short_url) => {
+            let response = ShortenUrlResponse {
+                short_url: short_url.clone(),
+            };
 
-    Ok(HttpResponse::Ok().json(response))
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => {
+            log::error!("Failed to shorten URL: {:?}", e);
+            Ok(HttpResponse::InternalServerError().finish())
+        }
+    }
 }
 
 /// Retrieve the original URL from a short_id

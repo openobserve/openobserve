@@ -15,8 +15,12 @@
 
 use chrono::Utc;
 use config::{get_config, utils::md5};
+use infra::errors::{DbError, Error};
 
-use crate::{common::meta::short_url::ShortUrlCacheEntry, service::db};
+use crate::{
+    common::{infra::config::SHORT_URLS, meta::short_url::ShortUrlCacheEntry},
+    service::db,
+};
 
 pub fn get_base_url() -> String {
     let config = get_config();
@@ -24,12 +28,7 @@ pub fn get_base_url() -> String {
 }
 
 /// Shortens the given original URL and stores it in the database
-pub async fn shorten(original_url: &str) -> String {
-    // Check if the original_url already exists in the database
-    if let Some(existing_short_id) = db::short_url::get_by_original_url(original_url).await {
-        return format!("{}/short/{}", get_base_url(), existing_short_id);
-    }
-
+pub async fn shorten(original_url: &str) -> Result<String, anyhow::Error> {
     let mut short_id = md5::short_hash(original_url);
 
     // Check if the generated short_id is already present in the database
@@ -43,9 +42,30 @@ pub async fn shorten(original_url: &str) -> String {
     let entry = ShortUrlCacheEntry::new(short_id.clone(), original_url.to_string());
 
     // Store the short_id and original_url in the database
-    db::short_url::set(&short_id, entry.clone()).await.ok();
+    let result = db::short_url::set(&short_id, entry.clone()).await;
 
-    format!("{}/short/{}", get_base_url(), entry.short_id)
+    match result {
+        Ok(_) => Ok(format!("{}/short/{}", get_base_url(), entry.short_id)),
+        Err(e) => {
+            // Try to downcast the error to `infra::errors::Error`
+            if let Some(infra_error) = e.downcast_ref::<infra::errors::Error>() {
+                match infra_error {
+                    Error::DbError(DbError::UniqueViolation) => {
+                        let existing_short_id =
+                            db::short_url::get_by_original_url(original_url).await?;
+                        log::info!(
+                            "Original Url already exists in db fetching existing short id: {}",
+                            &existing_short_id
+                        );
+                        Ok(format!("{}/short/{}", get_base_url(), existing_short_id))
+                    }
+                    _ => Err(e),
+                }
+            } else {
+                Err(e)
+            }
+        }
+    }
 }
 
 /// Retrieves the original URL corresponding to the given short ID
@@ -66,7 +86,7 @@ mod tests {
     #[tokio::test]
     async fn test_shorten_and_retrieve() {
         let original_url = "https://www.example.com/some/long/url";
-        let short_url = shorten(original_url).await;
+        let short_url = shorten(original_url).await.unwrap();
         let short_id = get_short_id_from_url(&short_url).unwrap();
 
         let retrieved_url = retrieve(&short_id).await.expect("Failed to retrieve URL");
@@ -86,8 +106,8 @@ mod tests {
     async fn test_unique_original_urls() {
         let original_url = "https://www.example.com/some/long/url";
 
-        let short_url1 = shorten(original_url).await;
-        let short_url2 = shorten(original_url).await;
+        let short_url1 = shorten(original_url).await.unwrap();
+        let short_url2 = shorten(original_url).await.unwrap();
 
         // Should return the same short_id
         assert_eq!(short_url1, short_url2);

@@ -18,7 +18,7 @@ use sqlx::Row;
 
 use crate::{
     db::mysql::{create_index, CLIENT},
-    errors::Result,
+    errors::{DbError, Error, Result},
     short_url::{ShortUrl, ShortUrlRecord},
 };
 
@@ -45,7 +45,7 @@ impl ShortUrl for MysqlShortUrl {
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 original_url TEXT NOT NULL,
-                short_id VARCHAR(32) NOT NULL,
+                short_id VARCHAR(32) NOT NULL UNIQUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         "#;
@@ -59,7 +59,7 @@ impl ShortUrl for MysqlShortUrl {
         create_index(
             "original_url_idx",
             "short_urls",
-            false,
+            true,
             &["original_url(255)"],
         )
         .await?;
@@ -70,16 +70,23 @@ impl ShortUrl for MysqlShortUrl {
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let query = r#"
-            INSERT IGNORE INTO short_urls (original_url, short_id)
+            INSERT INTO short_urls (original_url, short_id)
             VALUES (?, ?);
         "#;
 
-        sqlx::query(query)
+        let result = sqlx::query(query)
             .bind(original_url)
             .bind(short_id)
             .execute(&pool)
-            .await?;
-        Ok(())
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
+                Err(Error::DbError(DbError::UniqueViolation))
+            }
+            Err(e) => Err(Error::SqlxError(e)),
+        }
     }
 
     /// Remove an entry from the short_urls table

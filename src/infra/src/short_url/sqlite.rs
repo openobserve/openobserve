@@ -18,7 +18,7 @@ use sqlx::Row;
 
 use crate::{
     db::sqlite::{create_index, CLIENT_RO, CLIENT_RW},
-    errors::Result,
+    errors::{DbError, Error, Result},
     short_url::{ShortUrl, ShortUrlRecord},
 };
 
@@ -48,8 +48,8 @@ impl ShortUrl for SqliteShortUrl {
                 CREATE TABLE IF NOT EXISTS short_urls
                 (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                    original_url VARCHAR(2048) NOT NULL,
-                    short_id     VARCHAR(32) NOT NULL,
+                    original_url VARCHAR(2048) NOT NULL UNIQUE,
+                    short_id     VARCHAR(32) NOT NULL UNIQUE,
                     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 "#,
@@ -73,23 +73,31 @@ impl ShortUrl for SqliteShortUrl {
         let client = client.lock().await;
         let mut tx = client.begin().await?;
 
-        sqlx::query(
+        let result = sqlx::query(
             r#"
                 INSERT INTO short_urls (original_url, short_id)
-                VALUES ($1, $2)
-                ON CONFLICT(original_url) DO NOTHING;
+                VALUES ($1, $2);
                 "#,
         )
         .bind(original_url)
         .bind(short_id)
         .execute(&mut *tx)
-        .await?;
+        .await;
 
-        tx.commit().await?;
+        if result.is_ok() {
+            tx.commit().await?;
+        }
+
         // release lock
         drop(client);
 
-        Ok(())
+        match result {
+            Ok(_) => Ok(()),
+            Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
+                Err(Error::DbError(DbError::UniqueViolation))
+            }
+            Err(e) => Err(Error::SqlxError(e)),
+        }
     }
 
     /// Removes a short URL entry by short_id

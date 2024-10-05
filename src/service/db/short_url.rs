@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use infra::{
     db::{Event, NEED_WATCH},
@@ -46,7 +46,11 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
 
 pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow::Error> {
     SHORT_URLS.insert(short_id.to_string(), entry.clone());
-    short_url::add(short_id, &entry.original_url).await?;
+    if let Err(e) = short_url::add(short_id, &entry.original_url).await {
+        // roll back
+        SHORT_URLS.remove(short_id);
+        return Err(e).context("Failed to add short URL to DB");
+    };
 
     // trigger watch event
     db::put(
@@ -59,7 +63,7 @@ pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow
     Ok(())
 }
 
-pub async fn get_by_original_url(original_url: &str) -> Option<String> {
+pub async fn get_by_original_url(original_url: &str) -> Result<String, anyhow::Error> {
     // TODO: need to optimize this for larger number of short URLs
     if let Some(short_id) = SHORT_URLS.iter().find_map(|entry| {
         let (k, v) = entry.pair();
@@ -68,20 +72,13 @@ pub async fn get_by_original_url(original_url: &str) -> Option<String> {
         }
         None
     }) {
-        return Some(short_id);
+        return Ok(short_id);
     }
 
     let original_url = original_url.to_string();
-    match short_url::get_by_original_url(&original_url).await {
-        Ok(row) => {
-            SHORT_URLS.insert(row.short_id.to_owned(), row.clone().into());
-            Some(row.short_id)
-        }
-        Err(e) => {
-            log::error!("Original URL not found in db: {}", e);
-            None
-        }
-    }
+    let row = short_url::get_by_original_url(&original_url).await?;
+    SHORT_URLS.insert(row.short_id.to_owned(), row.clone().into());
+    Ok(row.short_id)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
