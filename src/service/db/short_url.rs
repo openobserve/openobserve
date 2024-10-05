@@ -43,22 +43,19 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
                 .await
                 .map_err(|_| anyhow!("Short URL not found in db"))?;
             SHORT_URLS.insert(short_id.to_string(), val.clone().into());
-
+            ORIGINAL_URLS.insert(val.original_url.to_string(), short_id.to_string());
             Ok(val.original_url)
         }
     }
 }
 
 pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow::Error> {
+    if let Err(e) = short_url::add(short_id, &entry.original_url).await {
+        return Err(e).context("Failed to add short URL to DB");
+    }
+
     SHORT_URLS.insert(short_id.to_string(), entry.clone());
     ORIGINAL_URLS.insert(entry.original_url.to_string(), short_id.to_string());
-
-    if let Err(e) = short_url::add(short_id, &entry.original_url).await {
-        // roll back
-        SHORT_URLS.remove(short_id);
-        ORIGINAL_URLS.remove(&entry.original_url);
-        return Err(e).context("Failed to add short URL to DB");
-    };
 
     // trigger watch event
     db::put(
@@ -79,6 +76,8 @@ pub async fn get_by_original_url(original_url: &str) -> Result<String, anyhow::E
     let original_url = original_url.to_string();
     let row = short_url::get_by_original_url(&original_url).await?;
     SHORT_URLS.insert(row.short_id.to_owned(), row.clone().into());
+    ORIGINAL_URLS.insert(row.original_url, row.short_id.clone());
+
     Ok(row.short_id)
 }
 
