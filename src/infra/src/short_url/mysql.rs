@@ -64,9 +64,8 @@ impl ShortUrl for MysqlShortUrl {
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let query = r#"
-            INSERT INTO short_urls (original_url, short_id)
-            VALUES (?, ?)
-            ON DUPLICATE KEY UPDATE original_url = original_url;
+            INSERT IGNORE INTO short_urls (original_url, short_id)
+            VALUES (?, ?);
         "#;
 
         sqlx::query(query)
@@ -137,11 +136,9 @@ impl ShortUrl for MysqlShortUrl {
     async fn contains(&self, short_id: &str) -> Result<bool> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT EXISTS (
                 SELECT 1
                 FROM short_urls
-                WHERE short_id = ?
-            );
+                WHERE short_id = ?;
         "#;
         let row: (bool,) = sqlx::query_as(query)
             .bind(short_id)

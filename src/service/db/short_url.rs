@@ -71,7 +71,7 @@ pub async fn get_by_original_url(original_url: &str) -> Option<String> {
     match short_url::get_by_original_url(&original_url).await {
         Ok(row) => Some(row.short_id),
         Err(e) => {
-            log::error!("Original URL not found in db: {}", e);
+            log::debug!("Original URL not found in db: {}", e);
             None
         }
     }
