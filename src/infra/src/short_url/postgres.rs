@@ -19,7 +19,7 @@ use sqlx::Row;
 use crate::{
     db::postgres::{create_index, CLIENT},
     errors::{DbError, Error, Result},
-    short_url::{ShortUrl, ShortUrlRecord},
+    short_url::{PgShortUrlRecord, ShortUrl, ShortUrlRecord},
 };
 
 pub struct PostgresShortUrl {}
@@ -101,43 +101,44 @@ impl ShortUrl for PostgresShortUrl {
     async fn get(&self, short_id: &str) -> Result<ShortUrlRecord> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT short_id, original_url
+            SELECT short_id, original_url, created_at
             FROM short_urls
             WHERE short_id = $1;
             "#;
-        let row = sqlx::query_as::<_, ShortUrlRecord>(query)
+        let row = sqlx::query_as::<_, PgShortUrlRecord>(query)
             .bind(short_id)
             .fetch_one(&pool)
             .await?;
 
-        Ok(row)
+        Ok(row.into())
     }
 
     /// Get an entry from the short_urls table by original_url
     async fn get_by_original_url(&self, original_url: &str) -> Result<ShortUrlRecord> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT short_id, original_url
+            SELECT short_id, original_url, created_at
             FROM short_urls
             WHERE original_url = $1;
             "#;
-        let row = sqlx::query_as::<_, ShortUrlRecord>(query)
+        let row = sqlx::query_as::<_, PgShortUrlRecord>(query)
             .bind(original_url)
             .fetch_one(&pool)
             .await?;
-        Ok(row)
+        Ok(row.into())
     }
 
     /// List all entries from the short_urls table
     async fn list(&self) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT short_id, original_url
+            SELECT short_id, original_url, created_at
             FROM short_urls;
             "#;
-        let rows = sqlx::query_as::<_, ShortUrlRecord>(query)
+        let mut rows = sqlx::query_as::<_, PgShortUrlRecord>(query)
             .fetch_all(&pool)
             .await?;
+        let rows = rows.drain(..).map(|r| r.into()).collect();
 
         Ok(rows)
     }

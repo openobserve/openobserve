@@ -22,13 +22,11 @@ use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
     short_url,
+    short_url::ShortUrlRecord,
 };
 
 use crate::{
-    common::{
-        infra::config::{ORIGINAL_URLS, SHORT_URLS},
-        meta::short_url::ShortUrlCacheEntry,
-    },
+    common::infra::config::{ORIGINAL_URLS, SHORT_URLS},
     service::db,
 };
 
@@ -42,14 +40,14 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
             let val = short_url::get(short_id)
                 .await
                 .map_err(|_| anyhow!("Short URL not found in db"))?;
-            SHORT_URLS.insert(short_id.to_string(), val.clone().into());
+            SHORT_URLS.insert(short_id.to_string(), val.clone());
             ORIGINAL_URLS.insert(val.original_url.to_string(), short_id.to_string());
             Ok(val.original_url)
         }
     }
 }
 
-pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow::Error> {
+pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Error> {
     if let Err(e) = short_url::add(short_id, &entry.original_url).await {
         return Err(e).context("Failed to add short URL to DB");
     }
@@ -75,7 +73,7 @@ pub async fn get_by_original_url(original_url: &str) -> Result<String, anyhow::E
 
     let original_url = original_url.to_string();
     let row = short_url::get_by_original_url(&original_url).await?;
-    SHORT_URLS.insert(row.short_id.to_owned(), row.clone().into());
+    SHORT_URLS.insert(row.short_id.to_owned(), row.clone());
     ORIGINAL_URLS.insert(row.original_url, row.short_id.clone());
 
     Ok(row.short_id)
@@ -114,7 +112,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                SHORT_URLS.insert(item_key.to_string(), item_value.into());
+                SHORT_URLS.insert(item_key.to_string(), item_value);
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -129,12 +127,21 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 /// Preload all short URLs from the database into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
-    // FIXME: get only entries that are with it retention period
+    let config = get_config();
+    let retention_minutes = days_to_minutes(config.compact.data_retention_days);
+    let retention_period = chrono::Duration::minutes(retention_minutes);
+    let now = Utc::now();
+
+    // FIXME: len of records in list needs to be restricted
     let ret = short_url::list().await?;
     for row in ret.into_iter() {
-        SHORT_URLS.insert(row.short_id.to_owned(), row.into());
+        if now - row.created_at < retention_period {
+            SHORT_URLS.insert(row.short_id.to_owned(), row.clone());
+            ORIGINAL_URLS.insert(row.original_url, row.short_id);
+        }
     }
-    log::info!("Short URLs Cached");
+    log::info!("[SHORT_URLS] Cached with len: {}", SHORT_URLS.len());
+    log::info!("[ORIGINAL_URLS] Cached with len: {}", ORIGINAL_URLS.len());
     Ok(())
 }
 
@@ -164,7 +171,7 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
     let now = Utc::now();
     let mut original_urls_to_remove = Vec::new();
     SHORT_URLS.retain(|_short_id, entry| {
-        let is_valid = now - entry.timestamp < retention_period;
+        let is_valid = now - entry.created_at < retention_period;
 
         if !is_valid {
             original_urls_to_remove.push(entry.original_url.clone());
@@ -198,19 +205,19 @@ mod tests {
         let now = Utc::now();
 
         // Insert an expired entry (2 hours old)
-        let expired_entry = ShortUrlCacheEntry {
+        let expired_entry = ShortUrlRecord {
             short_id: "expired".to_string(),
             original_url: "https://expired.com".to_string(),
-            timestamp: now - chrono::Duration::hours(2),
+            created_at: now - chrono::Duration::hours(2),
         };
         SHORT_URLS.insert("expired".to_string(), expired_entry.clone());
         ORIGINAL_URLS.insert(expired_entry.original_url.clone(), "expired".to_string());
 
         // Insert a valid entry (30 minutes old)
-        let valid_entry = ShortUrlCacheEntry {
+        let valid_entry = ShortUrlRecord {
             short_id: "valid".to_string(),
             original_url: "https://valid.com".to_string(),
-            timestamp: now - chrono::Duration::minutes(30),
+            created_at: now - chrono::Duration::minutes(30),
         };
         SHORT_URLS.insert("valid".to_string(), valid_entry.clone());
         ORIGINAL_URLS.insert(valid_entry.original_url.clone(), "valid".to_string());

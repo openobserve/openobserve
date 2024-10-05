@@ -104,7 +104,7 @@ impl ShortUrl for MysqlShortUrl {
     async fn get(&self, short_id: &str) -> Result<ShortUrlRecord> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT short_id, original_url
+            SELECT short_id, original_url, created_at
             FROM short_urls
             WHERE short_id = ?;
         "#;
@@ -120,7 +120,7 @@ impl ShortUrl for MysqlShortUrl {
     async fn get_by_original_url(&self, original_url: &str) -> Result<ShortUrlRecord> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT short_id, original_url
+            SELECT short_id, original_url, created_at
             FROM short_urls
             WHERE original_url = ?;
         "#;
@@ -135,7 +135,7 @@ impl ShortUrl for MysqlShortUrl {
     async fn list(&self) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT short_id, original_url
+            SELECT short_id, original_url, created_at
             FROM short_urls;
         "#;
         let rows = sqlx::query_as::<_, ShortUrlRecord>(query)

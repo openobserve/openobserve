@@ -19,7 +19,7 @@ use sqlx::Row;
 use crate::{
     db::sqlite::{create_index, CLIENT_RO, CLIENT_RW},
     errors::{DbError, Error, Result},
-    short_url::{ShortUrl, ShortUrlRecord},
+    short_url::{ShortUrl, ShortUrlRecord, SqliteShortUrlRecord},
 };
 
 pub struct SqliteShortUrl {}
@@ -125,16 +125,17 @@ impl ShortUrl for SqliteShortUrl {
         let client = CLIENT_RO.clone();
 
         let query = r#"
-                            SELECT short_id, original_url
+                            SELECT short_id, original_url, created_at
                             FROM short_urls
                             WHERE short_id = $1;
                             "#;
 
-        let row = sqlx::query_as::<_, ShortUrlRecord>(query)
+        let row = sqlx::query_as::<_, SqliteShortUrlRecord>(query)
             .bind(short_id)
             .fetch_one(&client)
             .await?;
 
+        let row = row.try_into()?;
         Ok(row)
     }
 
@@ -143,16 +144,16 @@ impl ShortUrl for SqliteShortUrl {
         let client = CLIENT_RO.clone();
 
         let query = r#"
-                        SELECT short_id, original_url
+                        SELECT short_id, original_url, created_at
                         FROM short_urls
                         WHERE original_url = $1;
                         "#;
 
-        let row = sqlx::query_as::<_, ShortUrlRecord>(query)
+        let row = sqlx::query_as::<_, SqliteShortUrlRecord>(query)
             .bind(original_url)
             .fetch_one(&client)
             .await?;
-
+        let row = row.try_into()?;
         Ok(row)
     }
 
@@ -160,13 +161,17 @@ impl ShortUrl for SqliteShortUrl {
     async fn list(&self) -> Result<Vec<ShortUrlRecord>> {
         let client = CLIENT_RO.clone();
         let query = r#"
-                            SELECT short_id, original_url
+                            SELECT short_id, original_url, created_at
                             FROM short_urls;
                             "#;
 
-        let rows = sqlx::query_as::<_, ShortUrlRecord>(query)
+        let rows = sqlx::query_as::<_, SqliteShortUrlRecord>(query)
             .fetch_all(&client)
             .await?;
+        let rows = rows
+            .into_iter()
+            .map(|r| r.try_into())
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(rows)
     }

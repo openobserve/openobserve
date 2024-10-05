@@ -15,9 +15,12 @@
 
 use chrono::Utc;
 use config::{get_config, utils::md5};
-use infra::errors::{DbError, Error};
+use infra::{
+    errors::{DbError, Error},
+    short_url::ShortUrlRecord,
+};
 
-use crate::{common::meta::short_url::ShortUrlCacheEntry, service::db};
+use crate::service::db;
 
 pub fn get_base_url() -> String {
     let config = get_config();
@@ -36,7 +39,7 @@ pub async fn shorten(original_url: &str) -> Result<String, anyhow::Error> {
         short_id = md5::short_hash(&input);
     }
 
-    let entry = ShortUrlCacheEntry::new(short_id.clone(), original_url.to_string());
+    let entry = ShortUrlRecord::new(short_id.clone(), original_url.to_string());
 
     // Store the short_id and original_url in the database
     let result = db::short_url::set(&short_id, entry.clone()).await;
