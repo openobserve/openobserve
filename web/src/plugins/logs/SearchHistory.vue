@@ -44,14 +44,14 @@
         </div>
       </div>
   
-      <div class="full-width">
+      <div class="">
     <q-page>
       <q-table
         ref="qTable"
+        dense
         :rows="dataToBeLoaded"
         :columns="columnsToBeRendered"
-        :pagination="pagination"
-        hide-bottom
+        :pagination.sync="pagination"
         row-key="trace_id"
         :rows-per-page-options="[]"
         class="custom-table"
@@ -61,7 +61,30 @@
 
 
       <template v-slot:body="props">
-  <q-tr :props="props" @click="triggerExpand(props)">
+        <q-tr
+          :data-test="`stream-association-table-${props.row.trace_id}-row`"
+          :props="props"
+          style="cursor: pointer"
+          @click="triggerExpand(props)"
+        >
+          <q-td >
+            <q-btn
+              dense
+              flat
+              size="xs"
+              :icon="
+                expandedRow != props.row.trace_id
+                  ? 'expand_more'
+                  : 'expand_less'
+              "
+            />
+          </q-td>
+          
+          <q-td v-for="col in columnsToBeRendered.slice(1)" :key="col.name" :props="props">
+          {{ props.row[col.field] }}
+        </q-td>
+        </q-tr>
+  <!-- <q-tr :props="props" @click="triggerExpand(props)">
     <q-td 
       :class="`column-${col.name}`"
       v-for="col in props.cols"
@@ -71,21 +94,40 @@
       {{ col.value }}
     </q-td>
     
-  </q-tr>
+  </q-tr> -->
   <q-tr v-show="expandedRow === props.row.trace_id" :props="props" >
 
-    <q-td colspan="100%">
+    <q-td  colspan="100%">
 
-      <div class="text-left tw-px-2 expanded-content">
-        <strong >SQL Query:</strong>
-
-        <div class="tw-flex tw-items-start tw-justify-center" >
+      <div class="text-left tw-px-2 q-mb-sm  expanded-content">
+       <div class="tw-flex tw-items-center q-py-sm  ">
+        <strong >SQL Query : <span>  <q-btn
+            @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
+            size="xs"
+            dense
+            flat
+            icon="content_copy"
+            class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
+          /></span></strong>
+          <q-btn
+            @click.stop="goToLogs(props.row)"
+            size="xs"
+            label="Logs"
+            dense
+            class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+            icon="search"
+            flat
+            style="color: #F2452F; border: #F2452F 1px solid;font-weight:bolder;"
+          />
+       </div>
+        <div class="tw-flex tw-items-start  tw-justify-center" >
        
-         <div class="scrollable-content  ">
+         <div class="scrollable-content  expanded-sql ">
           <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
 
          </div>
-         <div class="tw-pl-2">
+
+         <!-- <div class="tw-pl-2">
           <q-btn
             @click.stop="copyToClipboard(props.row.sql)"
             size="xs"
@@ -98,21 +140,81 @@
             label="Go To Logs"
             class="copy-btn tw-py-3 tw-mx-2"
           />
-         </div>
+         </div> -->
         
          
         </div>
       </div>
+      <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
+        <div class="tw-flex tw-items-center q-py-sm ">
+        <strong >Function Definition : <span>  <q-btn
+            @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
+            size="xs"
+            dense
+            flat
+            icon="content_copy"
+            class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2 "
+          /></span></strong>
+
+       </div>
+
+        <div class="tw-flex tw-items-start tw-justify-center" >
+       
+         <div class="scrollable-content expanded-function  ">
+          <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
+
+         </div>
+<!-- 
+         <div class="tw-pl-2 tw-flex tw-my-auto">
+          <q-btn
+            @click.stop="copyToClipboard(props.row.function)"
+            size="xs"
+            icon="content_copy"
+            class="copy-btn tw-py-3"
+          />
+          <q-btn
+            @click.stop="goToLogs(props.row)"
+            size="xs"
+            label="Go To Logs"
+            class="copy-btn tw-py-3 tw-mx-2"
+          />
+         </div> -->
+        
+         
+        </div>
+
+
+
+      </div>
+
     </q-td>
   </q-tr>
       </template>
+      <template #bottom="scope">
+        <div class="tw-ml-auto tw-mr-2">
+          Max Limit : <b>1000</b> 
+        </div>
+        <q-separator style="height: 1.5rem; margin: auto 0; " vertical inset class="q-mr-md" />
 
+         <div class="q-pl-md" >
 
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+         </div>
+        </template>
+        <template #no-data>
+       <div v-if="!isLoading" class="tw-flex tw-mx-auto">
+        <NoData />
+       </div>
+        </template>
 
       </q-table>
-      <div v-if="!isLoading && dataToBeLoaded.length === 0">
-        <NoData />
-      </div>
+
       <div
             v-if="isLoading"
             class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
@@ -144,11 +246,14 @@
   import { useI18n } from 'vue-i18n';
   import { date , QTable , useQuasar } from 'quasar';
   import type { Ref } from "vue";
+  import QTablePagination from "@/components/shared/grid/Pagination.vue";
+
   export default defineComponent({
     name: "SearchHistoryComponent",
     components: {
       DateTime,
       NoData,
+      QTablePagination,
     },
     props: {
       isClicked: {
@@ -177,16 +282,33 @@
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
 
-      const pagination = {
+
+      const perPageOptions: any = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "All", value: 0 },
+    ];
+
+      const resultTotal = ref<number>(0);
+
+      const pagination = ref({
             page: 1,
-              rowsPerPage: 50 
-      }
+              rowsPerPage: 100 
+      })
+      const selectedPerPage = ref(pagination.value.rowsPerPage);
+
       const generateColumns = (data: any) => {
      if (data.length === 0) return [];
 
   // Define the desired column order and names
   const desiredColumns = [
+    {key : '#' , label : '#',align: 'center',sortable: false},
     { key: 'trace_id', label: 'Trace ID' },
+    { key: 'executed_time', label: 'Executed At' },
+
     { key: 'start_time', label: 'Start Time' },
     { key: 'end_time', label: 'End Time' },
     { key: 'duration', label: 'Duration' },
@@ -195,6 +317,7 @@
     { key: 'scan_records', label: 'Scan Records' },
     { key: 'cached_ratio', label: 'Cached Ratio' },
     { key: 'sql', label: 'SQL Query' },
+
   ];
 
   return desiredColumns.map(({ key, label }) => {
@@ -207,35 +330,39 @@
 
     }
     if(key == "scan_size"){
-      columnWidth = 80
+      columnWidth = 100
     }
     if(key == "duration"){
+      align='left'
       columnWidth = 100
     }
     if( key == 'start_time' || key == 'end_time'){
       columnWidth = 200
     }
     if(key == 'sql'){
-      columnWidth = 350
+      columnWidth = 300
       sortable = false;
     }
     if(key == "trace_id"){
       columnWidth = 250
-      align = "left"
       sortable = false;
+    }
+    if(key == "#"){
+      columnWidth = 100
+      sortable = false;
+      align = "left"
     }
    // Custom width for each column
     return {
       name: key,        // Field name
       label: label,     // Column label
       field: key,       // Field accessor
-      align: 'center',
+      align: align,
       sortable: sortable,
       style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
     };
   });
 };
-    
 
       const fetchSearchHistory = async ( ) => {
         columnsToBeRendered.value = [];
@@ -249,8 +376,13 @@
         const response = await searchService.get_history( org_identifier,startTime,endTime,
            );
            const limitedHits = response.data.hits;
-           columnsToBeRendered.value = generateColumns(limitedHits);
-           limitedHits.forEach((hit:any)=>{
+           const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
+           if(filteredHits.length > 0){
+            resultTotal.value = filteredHits.length;
+           }
+           columnsToBeRendered.value = generateColumns(filteredHits);
+           filteredHits.forEach((hit:any)=>{
+
             const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
             hit.duration = formatted;
             hit.rawDuration = raw;
@@ -261,12 +393,25 @@
             hit.rawTook = hit.took;
             hit.took  = formatTime(hit.took);
             hit.rawScanRecords = hit.scan_records;
+            hit.scan_records = hit.scan_records;
             hit.rawScanSize = hit.scan_size;
+            hit.scan_size = hit.scan_size + hit.unit;
+            hit.cached_ratio = hit.cached_ratio;
             hit.rawCachedRatio = hit.cached_ratio;
+            hit.sql = hit.sql;
+            hit.function = hit.function;
+            hit.rawExecutedTime = hit._timestamp;
+            hit.executed_time =  timestampToTimezoneDate(hit._timestamp / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
+            
             })
-           dataToBeLoaded.value = response.data.hits;
+           dataToBeLoaded.value = filteredHits;
           isLoading.value = false;
      } catch (error) {
+          $q.notify({
+            type: "negative",
+            message: "Failed to fetch search history. Please try again later.",
+            timeout: 5000,
+          });
       console.log(error, "error")
       isLoading.value = false;
      } finally {
@@ -275,7 +420,7 @@
         
 
       };
-
+    //this method needs to revamped / can be made shorter
       const   sortMethod = (rows, sortBy, descending) => {
         const data = [...rows];
         if(sortBy === 'duration'){
@@ -297,13 +442,6 @@
           }
           // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
           return data.sort((a, b) => a.rawScanRecords - b.rawScanRecords);
-        }
-        if(sortBy === "scan_size"){
-          if (descending) {
-            return data.sort((a, b) => b.rawScanSize - a.rawScanSize);
-          }
-          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
-          return data.sort((a, b) => a.rawScanSize - b.rawScanSize);
         }
         if(sortBy === "scan_size"){
           if (descending) {
@@ -334,6 +472,13 @@
           return data.sort((a, b) => a.toBeStoredEndTime - b.toBeStoredEndTime);
 
         }
+        if(sortBy == "executed_time"){
+          if (descending) {
+            return data.sort((a, b) => b.rawExecutedTime - a.rawExecutedTime);
+          }
+          return data.sort((a, b) => a.rawExecutedTime - b.rawExecutedTime);
+
+        }
 
 
 
@@ -341,11 +486,11 @@
 
         // return a.rawDuration - b.rawDuration;
       }
-      const  copyToClipboard = (text) => {
+      const  copyToClipboard = (text,type) => {
       navigator.clipboard.writeText(text).then(() => {
         $q.notify({
             type: "positive",
-            message: "Content Copied Successfully!",
+            message: `${type} Copied Successfully!`,
             timeout: 5000,
           });
       }).catch(() => {
@@ -451,25 +596,44 @@
 
       const query = b64EncodeUnicode(row.sql);
 
+      const queryObject = {
+        stream_type: "logs",
+        stream,
+        period: '15m',
+        refresh,
+        sql_mode: "true",
+        query,
+        defined_schemas: "user_defined_schema",
+        org_identifier: row.org_id,
+        quick_mode: "false",
+        show_histogram: "true",
+        type: "search_history_re_apply"
+      };
+
+      if(row.hasOwnProperty('function') && row.function){
+        const functionContent = b64EncodeUnicode(row.function);
+        queryObject['functionContent'] = functionContent;
+      }
+
+
       router.push({
         path: "/logs",
-        query: {
-          stream_type: "logs",
-          stream,
-          period: '15m',
-          refresh,
-          sql_mode: "true",
-          query,
-          defined_schemas:"user_defined_schema",
-          org_identifier: row.org_id,
-          quick_mode: "false",
-          show_histogram: "true",
-          type: "search_history_re_apply"
-
-        },
+        query: queryObject,
       });
     };
+    const changePagination = (val: { label: string; value: any }) => {
+      if(val.label == "All"){
+        val.value = dataToBeLoaded.value.length;
+        val.label  = 'All';
 
+      }
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value.setPagination(pagination.value);
+
+      // pagination.value.page = 1;
+      
+    };
 
       watch(() => props.isClicked, (value) => {
         if(value == true && !isLoading.value){
@@ -497,6 +661,10 @@
         formatTime,
         delayMessage,
         sortMethod,
+        resultTotal,
+        perPageOptions,
+        changePagination,
+        selectedPerPage,
       };
       // Watch the searchObj for changes
       
@@ -505,7 +673,8 @@
   </script>
  <style lang="scss" scoped >
 .expanded-content {
-  min-width: 100vh;
+  padding: 0  3rem;
+  min-width: 100vw;
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
@@ -519,20 +688,43 @@
   max-height: 200px;
    /* Use the full height of the parent */
   text-wrap: normal;
+  background-color: #e8e8e8;
+  color: black;
 }
+
+
 .q-td {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.custom-table .q-tr > .q-td:first-child {
+
+.custom-table .q-tr > .q-td:nth-child(2){
   text-align: left;
 }
+
+.copy-btn-sql{
+  
+  border: #7A54A2 1px solid;
+color: #7A54A2;
+}
+
+.copy-btn-function{
+  border: #0A7EBC 1px solid;
+color: #0A7EBC;
+}
+
+
 .warning-text {
   color: #F5A623;
   border: 1px solid #F5A623;
   border-radius: 2px ;
 }
-
+.expanded-sql{
+  border-left: #7A54A2 3px solid;
+}
+.expanded-function{
+  border-left: #0A7EBC 3px solid;
+}
 
  </style>

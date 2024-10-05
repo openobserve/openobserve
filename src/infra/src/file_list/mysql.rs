@@ -821,7 +821,18 @@ UPDATE stream_stats
         };
 
         let pool = CLIENT.clone();
-        let mut tx = pool.begin().await?;
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
         // get pending jobs group by stream and order by num desc
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
