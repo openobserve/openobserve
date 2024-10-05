@@ -373,8 +373,4 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? ORDER BY id;
             .await?;
         Ok(())
     }
-
-    async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        todo!("taiming")
-    }
 }

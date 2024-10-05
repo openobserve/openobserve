@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
@@ -22,9 +20,8 @@ use config::meta::{
     stream::StreamParams,
 };
 use once_cell::sync::Lazy;
-use tokio::sync::mpsc;
 
-use crate::{db::Event, errors::Result};
+use crate::errors::Result;
 
 pub mod mysql;
 pub mod postgres;
@@ -53,7 +50,6 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn delete(&self, pipeline_id: &str) -> Result<()>;
-    async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
 }
 
 /// Initializes the PipelineTable - creates table and index
