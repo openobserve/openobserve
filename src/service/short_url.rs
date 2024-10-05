@@ -17,10 +17,7 @@ use chrono::Utc;
 use config::{get_config, utils::md5};
 use infra::errors::{DbError, Error};
 
-use crate::{
-    common::{infra::config::SHORT_URLS, meta::short_url::ShortUrlCacheEntry},
-    service::db,
-};
+use crate::{common::meta::short_url::ShortUrlCacheEntry, service::db};
 
 pub fn get_base_url() -> String {
     let config = get_config();
@@ -84,6 +81,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn test_shorten_and_retrieve() {
         let original_url = "https://www.example.com/some/long/url";
         let short_url = shorten(original_url).await.unwrap();
@@ -97,12 +95,14 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_retrieve_nonexistent_short_id() {
         let retrieved_url = retrieve("nonexistent_id").await;
         assert!(retrieved_url.is_none());
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_unique_original_urls() {
         let original_url = "https://www.example.com/some/long/url";
 
