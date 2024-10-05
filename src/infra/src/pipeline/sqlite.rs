@@ -373,7 +373,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
     async fn delete(&self, pipeline_id: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(r#"DELETE FROM pipeline WHERE id = $2;"#)
+        sqlx::query(r#"DELETE FROM pipeline WHERE id = $1;"#)
             .bind(pipeline_id)
             .execute(&*client)
             .await?;

@@ -618,18 +618,21 @@ async fn handle_derived_stream_triggers(
 
     let is_real_time = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
+
+    let mut new_trigger = db::scheduler::Trigger {
+        next_run_at: Utc::now().timestamp_micros(),
+        is_silenced: false,
+        status: db::scheduler::TriggerStatus::Waiting,
+        retries: 0,
+        ..trigger.clone()
+    };
+
     if is_real_time && is_silenced {
         log::debug!(
             "Realtime derived_stream needs to wake up, {}/{}",
             org_id,
             trigger.module_key
         );
-        let new_trigger = db::scheduler::Trigger {
-            next_run_at: Utc::now().timestamp_micros(),
-            is_silenced: false,
-            status: db::scheduler::TriggerStatus::Waiting,
-            ..trigger.clone()
-        };
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
@@ -643,6 +646,12 @@ async fn handle_derived_stream_triggers(
             pipeline_id
         ));
     };
+
+    if !pipeline.enabled {
+        log::info!("Pipeline associated with trigger not enabled.");
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
         return Err(anyhow::anyhow!(
@@ -661,13 +670,6 @@ async fn handle_derived_stream_triggers(
         } else {
             None
         }
-    };
-    let mut new_trigger = db::scheduler::Trigger {
-        next_run_at: Utc::now().timestamp_micros(),
-        is_silenced: false,
-        status: db::scheduler::TriggerStatus::Waiting,
-        retries: 0,
-        ..trigger.clone()
     };
 
     // evaluate trigger and configure trigger next run time

@@ -218,8 +218,6 @@ const loading = ref(false);
 
 const afterFlattening = ref(pipelineObj.currentSelectedNodeData?.data.after_flatten || false);
 
-const afterFlattening = ref(pipelineObj.currentSelectedNodeData?.data.after_flatten || false);
-
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);

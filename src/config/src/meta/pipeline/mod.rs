@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
 use components::{DerivedStream, Edge, Node, NodeData, PipelineSource};
@@ -124,7 +124,14 @@ impl Pipeline {
         let source_node_id = self.nodes[0].id.as_str();
         let node_map = self.get_node_map();
         let adjacency_list = self.build_adjacency_list(&node_map)?;
-        dfs_traversal_check(source_node_id, &adjacency_list, &node_map, false)?;
+        let mut visited = HashSet::new();
+        dfs_traversal_check(
+            source_node_id,
+            &adjacency_list,
+            &node_map,
+            false,
+            &mut visited,
+        )?;
 
         Ok(())
     }
@@ -271,7 +278,12 @@ fn dfs_traversal_check(
     graph: &HashMap<String, Vec<String>>,
     node_map: &HashMap<String, Node>,
     mut flattened: bool,
+    visited: &mut HashSet<String>,
 ) -> Result<()> {
+    if visited.contains(current_id) {
+        return Err(anyhow!("Cyclical pipeline detected."));
+    }
+    visited.insert(current_id.to_string());
     // Check if the current node is a leaf node
     if !graph.contains_key(current_id) {
         // Ensure leaf nodes are Stream nodes
@@ -282,6 +294,7 @@ fn dfs_traversal_check(
         } else {
             return Err(anyhow!("Node with id {} not found in node_map", current_id));
         }
+        visited.remove(current_id);
         return Ok(());
     }
 
@@ -289,13 +302,14 @@ fn dfs_traversal_check(
         if let NodeData::Function(func_params) = &node_map.get(next_node_id).unwrap().data {
             if flattened && func_params.after_flatten {
                 return Err(anyhow!(
-                    "After Flatten unchecked FunctionNode following After Flatten checked FunctionNode in the same branch"
+                    "After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
                 ));
             }
             flattened |= func_params.after_flatten;
         };
-        dfs_traversal_check(next_node_id, graph, node_map, flattened)?;
+        dfs_traversal_check(next_node_id, graph, node_map, flattened, visited)?;
     }
+    visited.remove(current_id);
 
     Ok(())
 }
