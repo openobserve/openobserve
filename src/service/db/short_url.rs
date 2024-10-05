@@ -119,7 +119,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                SHORT_URLS.remove(item_key);
+                if let Some(entry) = SHORT_URLS.remove(item_key) {
+                    ORIGINAL_URLS.remove(&entry.1.original_url);
+                }
             }
             Event::Empty => {}
         }
