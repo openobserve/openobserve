@@ -85,6 +85,10 @@ impl ShortUrl for SqliteShortUrl {
         .execute(&mut *tx)
         .await?;
 
+        tx.commit().await?;
+        // release lock
+        drop(client);
+
         Ok(())
     }
 
@@ -102,6 +106,8 @@ impl ShortUrl for SqliteShortUrl {
         .bind(short_id)
         .execute(&*client)
         .await?;
+
+        drop(client);
 
         Ok(())
     }
@@ -163,11 +169,9 @@ impl ShortUrl for SqliteShortUrl {
 
         let result: (bool,) = sqlx::query_as(
             r#"
-                SELECT EXISTS (
                     SELECT 1
                     FROM short_urls
                     WHERE short_id = $1;
-                );
                 "#,
         )
         .bind(short_id)
@@ -210,6 +214,8 @@ impl ShortUrl for SqliteShortUrl {
         sqlx::query(r#"DELETE FROM short_urls;"#)
             .execute(&*client)
             .await?;
+
+        drop(client);
 
         Ok(())
     }

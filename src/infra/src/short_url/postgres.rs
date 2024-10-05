@@ -137,11 +137,9 @@ impl ShortUrl for PostgresShortUrl {
     async fn contains(&self, short_id: &str) -> Result<bool> {
         let pool = CLIENT.clone();
         let query = r#"
-            SELECT EXISTS (
                 SELECT 1
                 FROM short_urls
                 WHERE short_id = $1
-            );
         "#;
         let row: (bool,) = sqlx::query_as(query)
             .bind(short_id)

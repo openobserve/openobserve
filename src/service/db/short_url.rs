@@ -22,28 +22,32 @@ use infra::{
     short_url,
 };
 
-use crate::{common::infra::config::SHORT_URLS, service::db};
+use crate::{
+    common::{infra::config::SHORT_URLS, meta::short_url::ShortUrlCacheEntry},
+    service::db,
+};
 
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";
 
 pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
     match SHORT_URLS.get(short_id) {
-        Some(val) => Ok(val.to_string()),
+        Some(val) => Ok(val.original_url.to_string()),
         None => {
             let val = short_url::get(short_id)
                 .await
                 .map_err(|_| anyhow!("Short URL not found in db"))?;
-            SHORT_URLS.insert(short_id.to_string(), val.original_url.to_string());
+            SHORT_URLS.insert(short_id.to_string(), val.clone().into());
 
             Ok(val.original_url)
         }
     }
 }
 
-pub async fn set(short_id: &str, original_url: &str) -> Result<(), anyhow::Error> {
-    SHORT_URLS.insert(short_id.to_string(), original_url.to_string());
-    short_url::add(short_id, original_url).await?;
+pub async fn set(short_id: &str, entry: ShortUrlCacheEntry) -> Result<(), anyhow::Error> {
+    SHORT_URLS.insert(short_id.to_string(), entry.clone());
+    short_url::add(short_id, &entry.original_url).await?;
+
     // trigger watch event
     db::put(
         &format!("{SHORT_URL_KEY}{short_id}"),
@@ -59,7 +63,7 @@ pub async fn get_by_original_url(original_url: &str) -> Option<String> {
     // TODO: need to optimize this for larger number of short URLs
     if let Some(short_id) = SHORT_URLS.iter().find_map(|entry| {
         let (k, v) = entry.pair();
-        if v == original_url {
+        if v.original_url == original_url {
             return Some(k.clone());
         }
         None
@@ -69,9 +73,12 @@ pub async fn get_by_original_url(original_url: &str) -> Option<String> {
 
     let original_url = original_url.to_string();
     match short_url::get_by_original_url(&original_url).await {
-        Ok(row) => Some(row.short_id),
+        Ok(row) => {
+            SHORT_URLS.insert(row.short_id.to_owned(), row.clone().into());
+            Some(row.short_id)
+        }
         Err(e) => {
-            log::debug!("Original URL not found in db: {}", e);
+            log::error!("Original URL not found in db: {}", e);
             None
         }
     }
@@ -97,13 +104,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value = match short_url::get(item_key).await {
-                    Ok(val) => val.original_url,
+                    Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
                         continue;
                     }
                 };
-                SHORT_URLS.insert(item_key.to_string(), item_value);
+                SHORT_URLS.insert(item_key.to_string(), item_value.into());
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -118,11 +125,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 /// Preload all short URLs from the database into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
+    // FIXME: get only entries that are with it retention period
     let ret = short_url::list().await?;
-    for row in ret {
-        let short_id = row.short_id;
-        let original_url = row.original_url;
-        SHORT_URLS.insert(short_id.to_owned(), original_url);
+    for row in ret.into_iter() {
+        SHORT_URLS.insert(row.short_id.to_owned(), row.into());
     }
     log::info!("Short URLs Cached");
     Ok(())

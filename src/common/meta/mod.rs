@@ -28,6 +28,7 @@ pub mod proxy;
 pub mod saved_view;
 pub mod search;
 pub mod service;
+pub mod short_url;
 pub mod stream;
 pub mod syslog;
 pub mod telemetry;
