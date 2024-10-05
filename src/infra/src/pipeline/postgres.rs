@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use config::{
     meta::{
@@ -23,10 +21,9 @@ use config::{
     },
     utils::json,
 };
-use tokio::sync::mpsc;
 
 use crate::{
-    db::{postgres::CLIENT, Event},
+    db::postgres::CLIENT,
     errors::{DbError, Error, Result},
 };
 

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use config::{
     meta::{
@@ -23,13 +21,9 @@ use config::{
     },
     utils::json,
 };
-use tokio::sync::mpsc;
 
 use crate::{
-    db::{
-        sqlite::{CLIENT_RO, CLIENT_RW},
-        Event,
-    },
+    db::sqlite::{CLIENT_RO, CLIENT_RW},
     errors::{DbError, Error, Result},
 };
 
