@@ -158,16 +158,27 @@ impl ShortUrl for SqliteShortUrl {
     }
 
     /// Lists all short URL entries
-    async fn list(&self) -> Result<Vec<ShortUrlRecord>> {
+    async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let client = CLIENT_RO.clone();
-        let query = r#"
+        let mut query = r#"
                             SELECT short_id, original_url, created_at
-                            FROM short_urls;
-                            "#;
+                            FROM short_urls
+                            ORDER BY created_at DESC
+                            "#
+        .to_string();
+        if limit.is_some() {
+            query.push_str(" LIMIT $1");
+        }
 
-        let rows = sqlx::query_as::<_, SqliteShortUrlRecord>(query)
-            .fetch_all(&client)
-            .await?;
+        let query_builder = sqlx::query_as::<_, SqliteShortUrlRecord>(&query);
+        let query_builder = if let Some(limit_value) = limit {
+            query_builder.bind(limit_value)
+        } else {
+            query_builder
+        };
+
+        let rows = query_builder.fetch_all(&client).await?;
+
         let rows = rows
             .into_iter()
             .map(|r| r.try_into())

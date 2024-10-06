@@ -132,16 +132,27 @@ impl ShortUrl for MysqlShortUrl {
     }
 
     /// List all entries from the short_urls table
-    async fn list(&self) -> Result<Vec<ShortUrlRecord>> {
+    async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
-        let query = r#"
+        let mut query = r#"
             SELECT short_id, original_url, created_at
-            FROM short_urls;
-        "#;
-        let rows = sqlx::query_as::<_, ShortUrlRecord>(query)
-            .fetch_all(&pool)
-            .await?;
+            FROM short_urls
+            ORDER BY created_at DESC
+        "#
+        .to_string();
 
+        if limit.is_some() {
+            query.push_str(" LIMIT ?");
+        }
+
+        let query_builder = sqlx::query_as::<_, ShortUrlRecord>(&query);
+        let query_builder = if let Some(limit_value) = limit {
+            query_builder.bind(limit_value)
+        } else {
+            query_builder
+        };
+
+        let rows = query_builder.fetch_all(&pool).await?;
         Ok(rows)
     }
 

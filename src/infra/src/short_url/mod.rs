@@ -42,7 +42,7 @@ pub trait ShortUrl: Sync + Send + 'static {
     async fn remove(&self, short_id: &str) -> Result<()>;
     async fn get(&self, short_id: &str) -> Result<ShortUrlRecord>;
     async fn get_by_original_url(&self, original_url: &str) -> Result<ShortUrlRecord>;
-    async fn list(&self) -> Result<Vec<ShortUrlRecord>>;
+    async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>>;
     async fn contains(&self, short_id: &str) -> Result<bool>;
     async fn len(&self) -> usize;
     async fn clear(&self) -> Result<()>;
@@ -84,8 +84,8 @@ pub async fn get_by_original_url(original_url: &str) -> Result<ShortUrlRecord> {
 }
 
 #[inline]
-pub async fn list() -> Result<Vec<ShortUrlRecord>> {
-    CLIENT.list().await
+pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
+    CLIENT.list(limit).await
 }
 
 #[inline]

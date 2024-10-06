@@ -132,8 +132,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let retention_period = chrono::Duration::minutes(retention_minutes);
     let now = Utc::now();
 
-    // FIXME: len of records in list needs to be restricted
-    let ret = short_url::list().await?;
+    // List limited to 10k records
+    let ret = short_url::list(Some(10_000)).await?;
     for row in ret.into_iter() {
         if now - row.created_at < retention_period {
             SHORT_URLS.insert(row.short_id.to_owned(), row.clone());
