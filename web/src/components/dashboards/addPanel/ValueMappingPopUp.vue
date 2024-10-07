@@ -177,17 +177,16 @@
           dense
           data-test="dashboard-addpanel-config-value-mapping-add-btn"
         />
-        <div>
-          <q-btn
-            @click="applyValueMapping"
-            color="primary"
-            label="Apply"
-            no-caps
-            outline
-            dense
-            data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-          />
-        </div>
+        <q-btn
+          @click="applyValueMapping"
+          color="primary"
+          label="Apply"
+          style="margin-right: 10px"
+          padding="5px 14px"
+          no-caps
+          dense
+          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+        />
       </div>
     </div>
   </div>
