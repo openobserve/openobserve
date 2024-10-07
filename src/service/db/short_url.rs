@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
+use chrono::Utc;
 use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
@@ -49,8 +50,6 @@ pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Er
     if let Err(e) = short_url::add(short_id, &entry.original_url).await {
         return Err(e).context("Failed to add short URL to DB");
     }
-
-    SHORT_URLS.insert(short_id.to_string(), entry);
 
     // trigger watch event
     db::put(
@@ -119,7 +118,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 // Background task to run GC at a regular interval
-async fn run_gc_task(gc_interval_minutes: i64, retention_days: i64) {
+async fn run_gc_task(gc_interval_minutes: i64, retention_period_minutes: i64) {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
         gc_interval_minutes as u64 * 60,
     ));
@@ -127,23 +126,41 @@ async fn run_gc_task(gc_interval_minutes: i64, retention_days: i64) {
     loop {
         interval.tick().await;
 
-        if let Err(e) = gc_cache(retention_days).await {
+        if let Err(e) = gc_cache(retention_period_minutes).await {
             log::error!("Error during garbage collection: {}", e);
         }
     }
 }
 
-// Garbage Collection to clean up expired entries from cache
-pub async fn gc_cache(_retention_period_minutes: i64) -> Result<(), anyhow::Error> {
+// Garbage Collection to clean up expired entries from cache and db
+pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error> {
     log::info!(
         "[SHORT_URLS] Garbage collection start with cache size: {}",
         SHORT_URLS.len(),
     );
 
-    // TODO, remove from db
-    // let retention_period = chrono::Duration::minutes(retention_period_minutes);
-    // let now = Utc::now();
-    // SHORT_URLS.retain(|_short_id, entry| now - entry.created_at < retention_period);
+    let retention_period = chrono::Duration::minutes(retention_period_minutes);
+    let expired_before = Utc::now() - retention_period;
+
+    // get expired ids
+    if let Ok(expired_short_ids) =
+        short_url::get_expired(expired_before, Some(SHORT_URL_CACHE_LIMIT)).await
+    {
+        if !expired_short_ids.is_empty() {
+            // delete from db
+            short_url::batch_remove(expired_short_ids.clone()).await?;
+
+            // delete from cache
+            for short_id in expired_short_ids {
+                db::delete(
+                    &format!("{SHORT_URL_KEY}{short_id}"),
+                    false,
+                    db::NEED_WATCH,
+                    None,
+                ).await?;
+            }
+        }
+    }
 
     log::info!(
         "[SHORT_URLS] Garbage collection end with cache size: {}",

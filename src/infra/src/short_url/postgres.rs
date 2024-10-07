@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 use crate::{
@@ -174,5 +175,51 @@ impl ShortUrl for PostgresShortUrl {
     /// Check if the short_urls table is empty
     async fn is_empty(&self) -> bool {
         self.len().await == 0
+    }
+
+    async fn get_expired(
+        &self,
+        expired_before: DateTime<Utc>,
+        limit: Option<i64>,
+    ) -> Result<Vec<String>> {
+        let pool = CLIENT.clone();
+
+        let mut query = r#"
+            SELECT short_id FROM short_urls
+            WHERE created_at < $1
+            "#
+        .to_string();
+
+        if limit.is_some() {
+            query.push_str(" LIMIT $2");
+        }
+
+        let mut query = sqlx::query_as(&query).bind(expired_before);
+
+        if let Some(limit_value) = limit {
+            query = query.bind(limit_value);
+        }
+
+        let expired_short_ids: Vec<(String,)> = query.fetch_all(&pool).await?;
+        let expired_short_ids: Vec<String> = expired_short_ids
+            .into_iter()
+            .map(|(short_id,)| short_id)
+            .collect();
+        Ok(expired_short_ids)
+    }
+
+    async fn batch_remove(&self, short_ids: Vec<String>) -> Result<()> {
+        if short_ids.is_empty() {
+            return Ok(());
+        }
+        let pool = CLIENT.clone();
+
+        let query = r#"
+            DELETE FROM short_urls
+            WHERE short_id = ANY($1)
+        "#;
+
+        sqlx::query(query).bind(&short_ids).execute(&pool).await?;
+        Ok(())
     }
 }

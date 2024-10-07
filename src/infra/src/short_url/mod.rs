@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use config::meta::meta_store::MetaStore;
 use once_cell::sync::Lazy;
 
@@ -45,6 +46,12 @@ pub trait ShortUrl: Sync + Send + 'static {
     async fn len(&self) -> usize;
     async fn clear(&self) -> Result<()>;
     async fn is_empty(&self) -> bool;
+    async fn get_expired(
+        &self,
+        expired_before: DateTime<Utc>,
+        limit: Option<i64>,
+    ) -> Result<Vec<String>>;
+    async fn batch_remove(&self, short_ids: Vec<String>) -> Result<()>;
 }
 
 pub async fn init() -> Result<()> {
@@ -99,6 +106,16 @@ pub async fn clear() -> Result<()> {
 #[inline]
 pub async fn is_empty() -> bool {
     CLIENT.is_empty().await
+}
+
+#[inline]
+pub async fn get_expired(expired_before: DateTime<Utc>, limit: Option<i64>) -> Result<Vec<String>> {
+    CLIENT.get_expired(expired_before, limit).await
+}
+
+#[inline]
+pub async fn batch_remove(short_ids: Vec<String>) -> Result<()> {
+    CLIENT.batch_remove(short_ids).await
 }
 
 #[derive(Debug, sqlx::FromRow)]
