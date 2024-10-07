@@ -89,8 +89,10 @@ async fn update_dashboard(
     req: HttpRequest,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    let folder = get_folder(req);
-    dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let folder = crate::common::utils::http::get_folder(&query);
+    let hash = query.get("hash").map(|h| h.as_str());
+    dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body, hash).await
 }
 
 /// ListDashboards
