@@ -49,6 +49,7 @@ use crate::{
         alerts::{build_sql, destinations},
         db,
         search::sql::RE_ONLY_SELECT,
+        short_url,
     },
 };
 
@@ -800,6 +801,15 @@ async fn process_dest_template(
             alert.org_id,
             function_content,
         )
+    };
+
+    // Shorten the alert url
+    let alert_url = match short_url::shorten(&alert_url).await {
+        Ok(short_url) => short_url,
+        Err(e) => {
+            log::error!("Error shortening alert url: {e}");
+            alert_url
+        }
     };
 
     let mut resp = tpl
