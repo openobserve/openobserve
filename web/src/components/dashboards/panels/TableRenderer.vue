@@ -125,7 +125,7 @@ export default defineComponent({
       const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
       const foundValue = props?.valueMapping?.find((v: any) => {
         if (v.type == "value") {
-          return v.value == value;
+          return (v.value == value || v.text == value) && v.color;
         } else if (v.type == "range") {
           if (
             v.from &&
@@ -133,12 +133,20 @@ export default defineComponent({
             !Number.isNaN(+v.from) &&
             !Number.isNaN(+v.to)
           ) {
-            return +v.from <= +value && +v.to >= +value;
+            return (
+              ((+v.from <= +value && +v.to >= +value) ||
+                (+v.from >= +v.text && +v.to <= +v.text)) &&
+              v.color
+            );
           }
           return false;
         } else if (v.type == "regex") {
           // check/test if the value matches the regex
-          return new RegExp(v?.pattern ?? "").test(value);
+          return (
+            (new RegExp(v?.pattern ?? "").test(value) ||
+              new RegExp(v?.pattern ?? "").test(v.text)) &&
+            v.color
+          );
         }
         return false;
       });
