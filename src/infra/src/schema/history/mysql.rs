@@ -56,7 +56,9 @@ impl super::SchemaHistory for MysqlSchemaHistory {
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
         let pool = CLIENT.clone();
-        DB_QUERY_NUMS.with_label_values(&["insert", "schema_history"]).inc();
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "schema_history"])
+            .inc();
         match sqlx::query(
             r#"
 INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, value)
@@ -86,7 +88,9 @@ INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, valu
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS.with_label_values(&["create", "schema_history"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "schema_history"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
