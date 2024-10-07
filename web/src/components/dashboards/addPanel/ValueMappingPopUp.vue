@@ -27,6 +27,7 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>Value Mappings</span>
       </div>
+      <q-icon name="cancel" class="cursor-pointer" v-close-popup="true" />
     </div>
     <div class="tw-mb-4">
       <draggable
