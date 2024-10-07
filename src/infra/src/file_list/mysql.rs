@@ -708,7 +708,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         );
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "stream_stats"])
+            .with_label_values(&["delete", "stream_stats"])
             .inc();
         sqlx::query(&sql).execute(&pool).await?;
         Ok(())
