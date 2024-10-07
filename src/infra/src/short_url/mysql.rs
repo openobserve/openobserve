@@ -116,21 +116,6 @@ impl ShortUrl for MysqlShortUrl {
         Ok(row)
     }
 
-    /// Get an entry from the short_urls table by original_url
-    async fn get_by_original_url(&self, original_url: &str) -> Result<ShortUrlRecord> {
-        let pool = CLIENT.clone();
-        let query = r#"
-            SELECT short_id, original_url, created_at
-            FROM short_urls
-            WHERE original_url = ?;
-        "#;
-        let row = sqlx::query_as::<_, ShortUrlRecord>(query)
-            .bind(original_url)
-            .fetch_one(&pool)
-            .await?;
-        Ok(row)
-    }
-
     /// List all entries from the short_urls table
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();

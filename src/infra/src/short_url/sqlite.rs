@@ -145,24 +145,6 @@ impl ShortUrl for SqliteShortUrl {
         Ok(row)
     }
 
-    /// Retrieves a short URL entry by original_url
-    async fn get_by_original_url(&self, original_url: &str) -> Result<ShortUrlRecord> {
-        let client = CLIENT_RO.clone();
-
-        let query = r#"
-                        SELECT short_id, original_url, created_at
-                        FROM short_urls
-                        WHERE original_url = $1;
-                        "#;
-
-        let row = sqlx::query_as::<_, SqliteShortUrlRecord>(query)
-            .bind(original_url)
-            .fetch_one(&client)
-            .await?;
-        let row = row.try_into()?;
-        Ok(row)
-    }
-
     /// Lists all short URL entries
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let client = CLIENT_RO.clone();

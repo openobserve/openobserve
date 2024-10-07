@@ -61,14 +61,6 @@ pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Er
     Ok(())
 }
 
-pub async fn get_by_original_url(original_url: &str) -> Result<String, anyhow::Error> {
-    let original_url = original_url.to_string();
-    let row = short_url::get_by_original_url(&original_url).await?;
-    SHORT_URLS.insert(row.short_id.to_owned(), row.clone());
-
-    Ok(row.short_id)
-}
-
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = SHORT_URL_KEY;
     let cluster_coordinator = db::get_coordinator().await;
