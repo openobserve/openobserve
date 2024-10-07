@@ -113,6 +113,7 @@ const picker = reactive({
 
 // Periods for selection
 const relativePeriods = [
+  { label: "Seconds", value: "s" },
   { label: "Minutes", value: "m" },
   { label: "Hours", value: "h" },
   { label: "Days", value: "d" },
@@ -121,6 +122,7 @@ const relativePeriods = [
 ];
 
 const relativeDates = {
+  s: [1, 5, 10, 15, 30, 45],
   m: [1, 5, 10, 15, 30, 45],
   h: [1, 2, 3, 6, 8, 12],
   d: [1, 2, 3, 4, 5, 6],
@@ -130,6 +132,7 @@ const relativeDates = {
 
 // Options for custom period input
 const relativePeriodsSelect = ref([
+  { label: "Seconds", value: "s" },
   { label: "Minutes", value: "m" },
   { label: "Hours", value: "h" },
   { label: "Days", value: "d" },
