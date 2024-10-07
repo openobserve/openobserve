@@ -161,7 +161,7 @@ interface StreamRoute {
   trigger_condition: {
     period: number;
     frequency_type: string;
-    frequency: number;
+    frequency: string;
     cron: string;
   };
   context_attributes: any;
@@ -400,7 +400,7 @@ const saveQueryData = async () => {
       period: formData.trigger_condition.period || 1,
       operator: "=",
       threshold: 0,
-      frequency: formData.trigger_condition.frequency,
+      frequency: parseInt(formData.trigger_condition.frequency),
       cron: formData.trigger_condition.cron,
       frequency_type: formData.trigger_condition.frequency_type,
       silence: 0,

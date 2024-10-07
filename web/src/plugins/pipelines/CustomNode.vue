@@ -84,11 +84,14 @@ const resetConfirmDialog = () => {
 };
 
 function getIcon(data, ioType) {
+  console.log(data,"data in get icon 1 hello")
+  console.log(ioType,"data in get icon 1 hello io type")
   const searchTerm = data.node_type;
-
+console.log(this.pipelineObj.nodeTypes,"data in get icon 1 hello data that needs to be compare")
   const node = this.pipelineObj.nodeTypes.find(
     (node) => node.subtype === searchTerm && node.io_type === ioType,
   );
+  console.log(node ,"data in get icon 1 hello after")
   return node ? node.icon : undefined;
 }
 </script>

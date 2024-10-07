@@ -16,11 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="currentRouteName === 'pipelines'">
-    <div class="full-wdith">
+    <div
+    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+     class="full-wdith pipeline-list-table">
       <q-table
         data-test="pipeline-list-table"
         ref="qTableRef"
-        :rows="pipelines"
+        :rows="filteredPipelines"
         :columns="columns"
         row-key="name"
         :pagination="pagination"
@@ -28,10 +30,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-method="filterData"
         style="width: 100%"
       >
+      <template v-slot:body="props">
+        <q-tr
+          :data-test="`stream-association-table-${props.row.pipeline_id}-row`"
+          :props="props"
+          style="cursor: pointer"
+          @click="triggerExpand(props)"
+        >
+          <q-td v-if="activeTab == 'scheduled'"  >
+            <q-btn
+              dense
+              flat
+              size="xs"
+              :icon="
+                expandedRow != props.row.pipeline_id
+                  ? 'expand_more'
+                  : 'expand_less'
+              "
+            />
+          </q-td>
+          <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
+          <template v-if="col.name !== 'actions'">
+            {{ props.row[col.field] }}
+          </template>
+          <template v-else>
+            <!-- Actions Buttons -->
+            <q-btn
+              :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
+              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+              class="q-ml-xs material-symbols-outlined"
+              padding="sm"
+              unelevated
+              size="sm"
+              :color="props.row.enabled ? 'negative' : 'positive'"
+              round
+              flat
+              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+              @click.stop="toggleAlertState(props.row)"
+            />
+            <q-btn
+              :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
+              icon="edit"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.edit')"
+              @click.stop="editPipeline(props.row)"
+            ></q-btn>
+            <q-btn
+              :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
+              :icon="outlinedDelete"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.delete')"
+              @click.stop="openDeleteDialog(props.row)"
+            ></q-btn>
+            <q-btn
+              :data-test="`pipeline-list-${props.row.name}-view-details`"
+              icon="visibility"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              >
+              <q-tooltip position="bottom">
+                <PipelineView :pipeline="props.row" />
+              </q-tooltip>
+            </q-btn>
+
+          
+          </template>
+</q-td>
+
+        </q-tr>
+        <q-tr v-show="expandedRow === props.row.pipeline_id" :props="props" >
+
+          <q-td  colspan="100%">
+
+            <div  class="text-left tw-px-2 q-mb-sm  expanded-content">
+            <div class="tw-flex tw-items-center q-py-sm  ">
+              <strong >SQL Query : <span></span></strong>
+            </div>
+              <div class="tw-flex tw-items-start  tw-justify-center" >
+            
+              <div class="scrollable-content  expanded-sql ">
+                <pre style="text-wrap: wrap;">{{ props.row?.sql_query }}</pre>
+
+              </div>
+              
+              
+              </div>
+            </div>
+
+          </q-td>
+        </q-tr>
+      </template>
         <template #no-data>
           <no-data />
         </template>
-        <template v-slot:body-cell-actions="props">
+        <!-- <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
               :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
@@ -58,20 +164,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openDeleteDialog(props.row)"
             ></q-btn>
             <q-btn
-              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.isEnabled ? outlinedPause : outlinedPlayArrow"
+              :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
+              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
               class="q-ml-xs material-symbols-outlined"
               padding="sm"
               unelevated
               size="sm"
-              :color="props.row.isEnabled ? 'negative' : 'positive'"
+              :color="props.row.enabled ? 'negative' : 'positive'"
               round
               flat
-              :title="props.row.isEnabled ? t('alerts.pause') : t('alerts.start')"
+              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
               @click="toggleAlertState(props.row)"
             />
           </q-td>
-        </template>
+        </template> -->
 
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
@@ -84,14 +190,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #top="scope">
           <div class="q-table__title" data-test="pipeline-list-title">
             {{ t("pipeline.header") }}
+            
           </div>
+          <div class="tw-flex tw-items-center report-list-tabs q-ml-auto">
+
+          <app-tabs
+                class="q-mr-md "
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="updateActiveTab"
+              />
           <q-input
             data-test="pipeline-list-search-input"
             v-model="filterQuery"
             borderless
             filled
             dense
-            class="q-ml-auto q-mb-xs no-border"
+            class=" q-mb-xs no-border"
             :placeholder="t('pipeline.search')"
           >
             <template #prepend>
@@ -107,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`pipeline.addPipeline`)"
             :to="{ name: 'createPipeline' }"
           />
+        </div>
 
           <q-table-pagination
             :scope="scope"
@@ -146,18 +262,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script setup lang="ts">
-import { ref, onBeforeMount, computed, watch } from "vue";
+import { ref, onBeforeMount, computed, watch, reactive, onActivated, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar, type QTableProps  } from "quasar";
+import type { QTableColumn } from 'quasar';
+
 import NoData from "../shared/grid/NoData.vue";
 import { outlinedDelete , outlinedPause , outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import AppTabs from "@/components/common/AppTabs.vue";
+import PipelineView from "./PipelineView.vue";
+
+import { update } from "lodash-es";
 
 
 const { t } = useI18n();
@@ -171,6 +293,8 @@ const filterQuery = ref("");
 
 const showCreatePipeline = ref(false);
 
+const  expandedRow = ref( []); // Array to track expanded rows
+
 const pipelines = ref([]);
 
 const store = useStore();
@@ -180,8 +304,9 @@ const { pipelineObj } = useDragAndDrop();
 
 watch(
   () => router.currentRoute.value,
-  () => {
-    getPipelines();
+  async () => {
+    await getPipelines();
+    updateActiveTab();
   },
 );
 
@@ -192,6 +317,31 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
+const activeTab = ref("all");
+const filteredPipelines = ref([]);
+const columns = ref([]);
+const updateActiveTab = () =>{
+  filteredPipelines.value = pipelines.value.filter((pipeline) => {
+    return pipeline.source.source_type === activeTab.value;
+  });
+  resultTotal.value = filteredPipelines.value.length;
+  columns.value = getColumnsForActiveTab(activeTab.value);
+
+}
+const tabs = reactive ([
+{
+    label: "All",
+    value: "all",
+  },
+  {
+    label: "Realtime",
+    value: "realtime",
+  },
+  {
+    label: "Scheduled",
+    value: "scheduled",
+  },
+]);
 
 const perPageOptions: any = [
   { label: "5", value: 5 },
@@ -217,92 +367,139 @@ const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
 
+const filterColumns = () => {
+  if(activeTab.value === "realtime"){
+    return columns.value;
+  }
+  return columns.value.slice(1);
+};
+
 const toggleAlertState = (row) =>{
-  row.isEnabled = !row.isEnabled;
+  row.enabled = !row.enabled;
+  console.log(row)
+  pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
+    const message = row.enabled 
+    ? `${row.name} state resumed successfully` 
+    : `${row.name} state paused successfully`;
+    q.notify({
+      message: message,
+      color: "positive",
+      position: "bottom",
+      timeout: 3000,
+    });
+  }).catch((error) => {
+    q.notify({
+      message: error.response?.data?.message || "Error while updating pipeline state",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+  });
+}
+
+const triggerExpand = (props) =>{
+  if (expandedRow.value === props.row.pipeline_id) {
+      expandedRow.value = null;
+    } else {
+      // Otherwise, expand the clicked row and collapse any other row
+      expandedRow.value = props.row.pipeline_id;
+  }
 }
 
 const editingPipeline = ref<any | null>(null);
 
-const columns: any = ref<QTableProps["columns"]>([
-  {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
-  },
-  {
-    name: "name",
-    field: "name",
-    label: t("common.name"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "description",
-    field: "description",
-    label: t("common.description"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "stream_name",
-    field: "stream_name",
-    label: t("alerts.stream_name"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "stream_type",
-    field: "stream_type",
-    label: t("alerts.streamType"),
-    align: "left",
-    sortable: true,
-  },
-  {
+
+// const updateActiveTab = (tab: string) => {
+//   isRealTime.value = tab === "realTime";
+// };
+
+
+const getColumnsForActiveTab = (tab) => {
+  let realTimeColumns = [
+  { name: "#", label: "#", field: "#", align: "left" },
+
+  { name: "name", field: "name", label: t("common.name"), align: "left", sortable: true },
+    { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true },
+    { name: "stream_type", field: "stream_type", label: t("alerts.streamType"), align: "left", sortable: true },
+  ];
+
+  let scheduledColumns = [
+    { name: "#", label: "#", field: "#", align: "left" },
+
+    { name: "name", field: "name", label: t("common.name"), align: "left", sortable: true },
+    { name: "stream_type", field: "stream_type", label: "Stream Type", align: "left", sortable: true },
+    { name: "frequency", field: "frequency", label: "Frequency", align: "left", sortable: true },
+    { name: "period", field: "period", label: "Period", align: "left", sortable: true },
+    { name: "silence", field: "silence", label: "Silence", align: "left", sortable: true },
+    { name: "cron", field: "cron", label: "Cron", align: "left", sortable: false },
+    { name: "sql_query", field: "sql_query", label: "SQL Query", align: "left", sortable: false
+      ,
+      style: "white-space: no-wrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;"
+
+     },
+  ];
+
+  const actionsColumn = {
     name: "actions",
     field: "actions",
     label: t("alerts.actions"),
     align: "center",
     sortable: false,
-  },
-]);
+  };
+if(tab === "all"){
+  const stream_name = { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true };
+  scheduledColumns.splice(2, 0, stream_name);
+  return [ ...scheduledColumns,, actionsColumn];
+}
+  return tab === "realtime"
+    ? [ ...realTimeColumns, actionsColumn]
+    : [ ...scheduledColumns, actionsColumn];
+};
 
-onBeforeMount(() => {
-  getPipelines();
-});
+
+onMounted(async () => {
+      await getPipelines(); // Ensure pipelines are fetched before updating
+      updateActiveTab();
+    });
 
 const createPipeline = () => {
   showCreatePipeline.value = true;
 };
 
-const getPipelines = () => {
-  pipelineService
-    .getPipelines(store.state.selectedOrganization.identifier)
-    .then((response) => {
-      resultTotal.value = response.data.list.length;
-      pipelines.value = response.data.list.map(
-        (pipeline: any, index: number) => {
+const getPipelines = async () => {
+      try {
+        const response = await pipelineService.getPipelines(store.state.selectedOrganization.identifier);
+        // resultTotal.value = response.data.list.length;
+        pipelines.value = response.data.list.map((pipeline, index) => {
           const updatedEdges = pipeline.edges.map(edge => ({
-              ...edge,
-              markerEnd: {
-                type: "arrowclosed"
-              }}))
-              // pipeline.stream_name = pipeline.nodes[0].data.stream_name
-              // pipeline.stream_type = pipeline.nodes[0].data.stream_type
+            ...edge,
+            markerEnd: {
+              type: "arrowclosed"
+            }
+          }));
+
+          if (pipeline.source.source_type === 'realtime') {
+            pipeline.stream_name = pipeline.source.stream_name;
+            pipeline.stream_type = pipeline.source.stream_type;
+          } else {
+            pipeline.stream_type = pipeline.source.stream_type;
+            pipeline.frequency = pipeline.source.trigger_condition.frequency + " Mins";
+            pipeline.period = pipeline.source.trigger_condition.period + " Mins";
+            pipeline.silence = pipeline.source.trigger_condition.silence + " Mins";
+            pipeline.cron = pipeline.cron && pipeline.cron !== "" ? pipeline.source.trigger_condition.cron : 'False';
+            pipeline.sql_query = pipeline.source.query_condition.sql;
+          }
 
           pipeline.edges = updatedEdges;
           return {
             ...pipeline,
             "#": index + 1,
           };
-        },
-      );
-    })
-    .catch((error) => {
-      console.error(error);
-    });
-};
-
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    };
 const editPipeline = (pipeline: any) => {
   pipeline.nodes.forEach(node => {
     node.type = node.io_type;
@@ -423,4 +620,108 @@ const filterData = (rows: any, terms: any) => {
   return filtered;
 };
 </script>
-<style lang=""></style>
+<style lang="scss" scoped>
+.pipeline-list-table {
+  th:last-child,
+  td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+    width: 100px;
+    
+  }
+}
+
+.dark-theme {
+  th:last-child,
+  td:last-child {
+    background: var(--q-dark);
+    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+    width: 100px;
+
+
+  }
+}
+
+.light-theme {
+  th:last-child,
+  td:last-child {
+    background: #ffffff;
+    width: 100px;
+
+  }
+}
+.dark-mode {
+  background-color: $dark-page;
+
+  .report-list-tabs {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+}
+  .report-list-tabs {
+  height: fit-content;
+
+  :deep(.rum-tabs) {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
+}
+
+.expanded-content {
+  padding: 0  3rem;
+  max-height: 100vh; /* Set a fixed height for the container */
+  overflow: hidden; /* Hide overflow by default */
+}
+
+.scrollable-content {
+  width: 100%; /* Use the full width of the parent */
+  overflow-y: auto; /* Enable vertical scrolling for long content */
+  padding: 10px; /* Optional: padding for aesthetics */
+  border: 1px solid #ddd; /* Optional: border for visibility */
+  height: 100%;
+  max-height: 200px;
+   /* Use the full height of the parent */
+  text-wrap: normal;
+  background-color: #e8e8e8;
+  color: black;
+}
+.expanded-sql{
+  border-left: #7A54A2 3px solid;
+}
+
+
+
+</style>

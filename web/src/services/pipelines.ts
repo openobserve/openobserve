@@ -17,6 +17,14 @@ const pipelines = {
     const url = `/api/${org_identifier}/pipelines/${name}`;
     return http().get(url);
   },
+  toggleState: (
+    org_identifier: string,
+    pipeline_id: string,
+    enable: boolean,
+  ) => {
+    const url = `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}`;
+    return http().put(url);
+  },
 
   deletePipeline: ({
     pipeline_id,
