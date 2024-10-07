@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{collections::HashMap, io::Error, sync::Arc, time::Instant};
 
 use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
@@ -41,6 +41,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
+use super::{logs::O2IngestJsonData, pipeline::execution::PipelinedExt};
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
@@ -157,18 +158,19 @@ pub async fn handle_trace_request(
             .expect("configuration error: too large ingest_allowed_upto"))
     .timestamp_micros();
 
-    // Start Register Transforms for stream
+    // Start retrieving associated pipeline and construct pipeline params
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+    let pipeline_params = crate::service::ingestion::get_stream_pipeline_params(
         org_id,
-        &StreamType::Traces,
         &traces_stream_name,
-    );
-    // End Register Transforms for stream
+        &StreamType::Traces,
+    )
+    .await;
+    // End pipeline params construction
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
-    let mut json_data = Vec::with_capacity(res_spans.len());
+    let mut json_data_by_stream = HashMap::new();
     let mut span_metrics = Vec::with_capacity(res_spans.len());
     let mut partial_success = ExportTracePartialSuccess::default();
     for res_span in res_spans {
@@ -299,87 +301,141 @@ pub async fn handle_trace_request(
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
 
-                // JSON Flattening
-                value = flatten::flatten(value).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                })?;
+                if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) = pipeline_params.as_ref() {
+                    match pipeline.execute(value, pl_node_map, pl_graph, vrl_map, &mut runtime) {
+                        Err(e) => {
+                            log::error!(
+                                "[Pipeline] {}/{}/{}: Execution error: {}. Skip this record",
+                                pipeline.org,
+                                pipeline.name,
+                                pipeline.id,
+                                e
+                            );
+                            partial_success.rejected_spans += 1;
+                            partial_success.error_message =
+                                format!("Pipeline execution error: {}", e);
+                        }
+                        Ok(pl_results) => {
+                            for (stream_params, (mut res, is_flattened)) in pl_results {
+                                if stream_params.stream_type != StreamType::Traces {
+                                    continue;
+                                }
 
-                // Start row based transform
-                if !local_trans.is_empty() {
-                    value = crate::service::ingestion::apply_stream_functions(
-                        &local_trans,
-                        value,
-                        &stream_vrl_map,
-                        org_id,
-                        &traces_stream_name,
-                        &mut runtime,
-                    )
-                    .map_err(|e| {
+                                if !is_flattened {
+                                    // JSON Flattening
+                                    res = flatten::flatten(res).map_err(|e| {
+                                        std::io::Error::new(
+                                            std::io::ErrorKind::InvalidData,
+                                            e.to_string(),
+                                        )
+                                    })?;
+                                }
+
+                                // get json object
+                                let mut record_val = match res.take() {
+                                    json::Value::Object(mut v) => {
+                                        // build span metrics item
+                                        let sm = crate::job::metrics::TraceMetricsItem {
+                                            organization: org_id.to_string(),
+                                            traces_stream_name: traces_stream_name.clone(),
+                                            service_name: service_name.clone(),
+                                            span_name: v
+                                                .remove("o2_span_metrics_name")
+                                                .map_or(span.name.clone(), |name| {
+                                                    name.as_str().unwrap().to_string()
+                                                }),
+                                            span_status: span_status_for_spanmetric.clone(),
+                                            span_kind: span.kind.to_string(),
+                                            duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
+                                            span_id: v["span_id"].to_string(),
+                                        };
+                                        span_metrics.push(sm);
+                                        v
+                                    }
+                                    _ => {
+                                        return Ok(HttpResponse::InternalServerError().json(
+                                            MetaHttpResponse::error(
+                                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                                "stream pipeline did not return valid json object"
+                                                    .into(),
+                                            ),
+                                        ));
+                                    }
+                                };
+
+                                // add timestamp
+                                record_val.insert(
+                                    cfg.common.column_timestamp.clone(),
+                                    json::Value::Number(timestamp.into()),
+                                );
+
+                                let func_num = pipeline.num_of_func();
+                                let (ts_data, fn_num) = json_data_by_stream
+                                    .entry(traces_stream_name.to_string())
+                                    .or_insert((Vec::new(), None));
+                                ts_data.push((timestamp, record_val));
+                                *fn_num = Some(func_num);
+                            }
+                        }
+                    }
+                } else {
+                    // JSON Flattening
+                    value = flatten::flatten(value).map_err(|e| {
                         std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                     })?;
+
+                    // get json object
+                    let mut record_val = match value.take() {
+                        json::Value::Object(mut v) => {
+                            // build span metrics item
+                            let sm = crate::job::metrics::TraceMetricsItem {
+                                organization: org_id.to_string(),
+                                traces_stream_name: traces_stream_name.clone(),
+                                service_name: service_name.clone(),
+                                span_name: v
+                                    .remove("o2_span_metrics_name")
+                                    .map_or(span.name.clone(), |name| {
+                                        name.as_str().unwrap().to_string()
+                                    }),
+                                span_status: span_status_for_spanmetric,
+                                span_kind: span.kind.to_string(),
+                                duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
+                                span_id: v["span_id"].to_string(),
+                            };
+                            span_metrics.push(sm);
+                            v
+                        }
+                        _ => {
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    "stream functions did not return valid json object".into(),
+                                ),
+                            ));
+                        }
+                    };
+
+                    // add timestamp
+                    record_val.insert(
+                        cfg.common.column_timestamp.clone(),
+                        json::Value::Number(timestamp.into()),
+                    );
+                    let (ts_data, _) = json_data_by_stream
+                        .entry(traces_stream_name.to_string())
+                        .or_insert((Vec::new(), None));
+                    ts_data.push((timestamp, record_val));
                 }
-                // End row based transform
-
-                // get json object
-                let mut record_val = match value.take() {
-                    json::Value::Object(mut v) => {
-                        // build span metrics item
-                        let sm = crate::job::metrics::TraceMetricsItem {
-                            organization: org_id.to_string(),
-                            traces_stream_name: traces_stream_name.clone(),
-                            service_name: service_name.clone(),
-                            span_name: v
-                                .remove("o2_span_metrics_name")
-                                .map_or(span.name.clone(), |name| {
-                                    name.as_str().unwrap().to_string()
-                                }),
-                            span_status: span_status_for_spanmetric,
-                            span_kind: span.kind.to_string(),
-                            duration: ((end_time - start_time) / 1_000_000) as f64, // milliseconds
-                            span_id: v["span_id"].to_string(),
-                        };
-                        span_metrics.push(sm);
-                        v
-                    }
-                    _ => {
-                        return Ok(HttpResponse::InternalServerError().json(
-                            MetaHttpResponse::error(
-                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                "stream functions did not return valid json object".into(),
-                            ),
-                        ));
-                    }
-                };
-
-                // add timestamp
-                record_val.insert(
-                    cfg.common.column_timestamp.clone(),
-                    json::Value::Number(timestamp.into()),
-                );
-                json_data.push((timestamp, record_val));
             }
         }
     }
 
     // if no data, fast return
-    if json_data.is_empty() {
+    if json_data_by_stream.is_empty() {
         return format_response(partial_success, req_type);
     }
 
-    let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error while writing traces: {}", e);
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("error while writing trace data: {e}",),
-                )),
-            );
-        }
-    };
+    write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await;
     let time = start.elapsed().as_secs_f64();
-    req_stats.response_time = time;
 
     let ep = match req_type {
         RequestType::Grpc => "/grpc/otlp/traces",
@@ -425,18 +481,6 @@ pub async fn handle_trace_request(
             StreamType::Traces.to_string().as_str(),
         ])
         .inc();
-
-    // metric + data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        &traces_stream_name,
-        StreamType::Traces,
-        UsageType::Traces,
-        0,
-        started_at,
-    )
-    .await;
 
     format_response(partial_success, req_type)
 }
@@ -486,11 +530,34 @@ fn format_response(
     }
 }
 
+async fn write_traces_by_stream(
+    org_id: &str,
+    time_stats: (i64, &Instant),
+    json_data_by_stream: HashMap<String, O2IngestJsonData>,
+) {
+    for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        let mut req_stats = write_traces(org_id, &traces_stream_name, json_data).await;
+        let time = time_stats.1.elapsed().as_secs_f64();
+        req_stats.response_time = time;
+        // metric + data usage
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+            UsageType::Traces,
+            fn_num.map_or(0, |cnt| cnt as u16),
+            time_stats.0,
+        )
+        .await;
+    }
+}
+
 async fn write_traces(
     org_id: &str,
     stream_name: &str,
     json_data: Vec<(i64, json::Map<String, json::Value>)>,
-) -> Result<RequestStats, Error> {
+) -> RequestStats {
     let cfg = get_config();
     // get schema and stream settings
     let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -675,7 +742,7 @@ async fn write_traces(
     // only one trigger per request
     evaluate_trigger(triggers).await;
 
-    Ok(req_stats)
+    req_stats
 }
 
 #[cfg(test)]
