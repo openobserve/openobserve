@@ -31,13 +31,13 @@
     </div>
     <div class="tw-mb-4">
       <draggable
-        v-model="valueMapping"
+        v-model="editedValueMapping"
         :options="dragOptions"
         @mousedown.stop="() => {}"
         data-test="dashboard-addpanel-config-value-mapping-drag"
       >
         <div
-          v-for="(mapping, index) in valueMapping"
+          v-for="(mapping, index) in editedValueMapping"
           :key="index"
           class="draggable-row"
         >
@@ -166,15 +166,28 @@
           dense
           data-test="dashboard-addpanel-config-value-mapping-add-btn"
         />
-        <q-btn
-          v-close-popup="true"
-          color="primary"
-          label="Apply"
-          no-caps
-          flat
-          dense
-          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-        />
+        <div>
+          <q-btn
+            icon="close"
+            class="q-ml-xs"
+            unelevated
+            size="sm"
+            round
+            flat
+            :title="t('dashboard.cancel')"
+            @click.stop="cancelEdit"
+            data-test="dashboard-tab-settings-tab-name-edit-cancel"
+          ></q-btn>
+          <q-btn
+            @click="applyValueMapping"
+            color="primary"
+            label="Apply"
+            no-caps
+            flat
+            dense
+            data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -196,10 +209,12 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["close"],
+  emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+
+    const editedValueMapping = ref(props.valueMapping);
 
     const dragOptions = ref({
       animation: 200,
@@ -221,7 +236,7 @@ export default defineComponent({
     ];
 
     const addValueMapping = () => {
-      props.valueMapping.push({
+      editedValueMapping.value.push({
         type: "value",
         value: "",
         color: null,
@@ -229,22 +244,30 @@ export default defineComponent({
     };
 
     const removeValueMappingByIndex = (index: number) => {
-      props.valueMapping.splice(index, 1);
+      editedValueMapping.value.splice(index, 1);
     };
 
     onMounted(() => {
       // if mappings is empty, add default value mapping
-      if (props.valueMapping.length == 0) {
+      if (editedValueMapping.value.length == 0) {
         addValueMapping();
       }
     });
 
     const setColorByIndex = (index: number) => {
-      props.valueMapping[index].color = "#000000";
+      editedValueMapping.value[index].color = "#000000";
     };
 
     const removeColorByIndex = (index: number) => {
-      props.valueMapping[index].color = null;
+      editedValueMapping.value[index].color = null;
+    };
+
+    const applyValueMapping = () => {
+      emit("save", editedValueMapping.value);
+    };
+
+    const cancelEdit = () => {
+      emit("close");
     };
 
     return {
@@ -257,6 +280,9 @@ export default defineComponent({
       outlinedDelete,
       setColorByIndex,
       removeColorByIndex,
+      applyValueMapping,
+      cancelEdit,
+      editedValueMapping,
     };
   },
 });

@@ -85,7 +85,11 @@
     />
     <q-dialog v-model="showValueMappingPopUp">
       <ValueMappingPopUp
-        :value-mapping="dashboardPanelData.data.config.mappings"
+        :value-mapping="
+          JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
+        "
+        @close="showValueMappingPopUp = false"
+        @save="saveValueMappingConfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
     </q-dialog>
@@ -126,11 +130,17 @@ export default defineComponent({
       }
     });
 
+    const saveValueMappingConfig = (valueMapping: any) => {
+      dashboardPanelData.data.config.mappings = valueMapping;
+      showValueMappingPopUp.value = false;
+    };
+
     return {
       store,
       dashboardPanelData,
       showValueMappingPopUp,
       openValueMappingPopUp,
+      saveValueMappingConfig,
     };
   },
 });
