@@ -33,6 +33,7 @@
       <draggable
         v-model="editedValueMapping"
         :options="dragOptions"
+        @end.stop="handleDragEnd"
         @mousedown.stop="() => {}"
         data-test="dashboard-addpanel-config-value-mapping-drag"
       >
@@ -199,10 +200,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { onMounted } from "vue";
+import { VueDraggableNext } from "vue-draggable-next";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: {},
+  components: { draggable: VueDraggableNext },
   props: {
     valueMapping: {
       type: Array,
@@ -239,6 +241,7 @@ export default defineComponent({
       editedValueMapping.value.push({
         type: "value",
         value: "",
+        text: "",
         color: null,
       });
     };
@@ -270,6 +273,10 @@ export default defineComponent({
       emit("close");
     };
 
+    const handleDragEnd = async () => {
+      console.log("handleDragEnd");
+    };
+
     return {
       t,
       store,
@@ -283,6 +290,7 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
+      handleDragEnd,
     };
   },
 });
