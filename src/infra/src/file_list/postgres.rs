@@ -25,7 +25,6 @@ use config::{
         parquet::parse_file_key_columns,
         time::{end_of_the_day, DAY_MICRO_SECS},
     },
-    
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
@@ -459,8 +458,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 let pool = CLIENT.clone();
                 let cfg = get_config();
                 DB_QUERY_NUMS
-                .with_label_values(&["select", "file_list"])
-                .inc();
+                    .with_label_values(&["select", "file_list"])
+                    .inc();
                 if cfg.limit.use_upper_bound_for_max_ts {
                     // TODO: if partition is daily, we need to remove this logic
                     let max_ts_upper_bound =
@@ -1405,6 +1404,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
     ];
     for (table, sql) in sqls {
+        DB_QUERY_NUMS.with_label_values(&["create", table]).inc();
         if let Err(e) = sqlx::query(sql).execute(&pool).await {
             log::error!("[POSTGRES] create table {} index error: {}", table, e);
             return Err(e.into());
@@ -1412,6 +1412,7 @@ pub async fn create_table_index() -> Result<()> {
     }
 
     // create UNIQUE index for file_list
+    DB_QUERY_NUMS.with_label_values(&["create", "file_list"]).inc();
     let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
     if let Err(e) = sqlx::query(unique_index_sql).execute(&pool).await {
         if !e.to_string().contains("could not create unique index") {
@@ -1455,6 +1456,7 @@ pub async fn create_table_index() -> Result<()> {
             ret.len()
         );
         // create index again
+        DB_QUERY_NUMS.with_label_values(&["create", "file_list"]).inc();
         sqlx::query(unique_index_sql).execute(&pool).await?;
         log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) succeed");
     }

@@ -1429,6 +1429,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
     ];
     for (table, sql) in sqls {
+        DB_QUERY_NUMS.with_label_values(&["create", table]).inc();
         if let Err(e) = sqlx::query(sql).execute(&pool).await {
             if e.to_string().contains("Duplicate key") {
                 // index already exists
@@ -1440,6 +1441,9 @@ pub async fn create_table_index() -> Result<()> {
     }
 
     // create UNIQUE index for file_list
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "file_list"])
+        .inc();
     let unique_index_sql =
         r#"CREATE UNIQUE INDEX file_list_stream_file_idx on file_list (stream, date, file);"#;
     if let Err(e) = sqlx::query(unique_index_sql).execute(&pool).await {
@@ -1476,6 +1480,9 @@ pub async fn create_table_index() -> Result<()> {
                 ret.len()
             );
             // create index again
+            DB_QUERY_NUMS
+                .with_label_values(&["create", "file_list"])
+                .inc();
             sqlx::query(unique_index_sql).execute(&pool).await?;
             log::warn!("[MYSQL] create table index(file_list_stream_file_idx) succeed");
         } else {

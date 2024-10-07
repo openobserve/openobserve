@@ -653,7 +653,9 @@ CREATE TABLE IF NOT EXISTS meta
         "CREATE UNIQUE INDEX meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
     )
     .await?;
-
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "meta"])
+        .inc_by(3);
     Ok(())
 }
 
@@ -695,6 +697,7 @@ async fn add_start_dt_column() -> Result<()> {
     };
 
     // create new index meta_module_start_dt_idx
+    DB_QUERY_NUMS.with_label_values(&["create", "meta"]).inc();
     if let Err(e) = create_index_item(
         "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
     )
@@ -709,6 +712,7 @@ async fn add_start_dt_column() -> Result<()> {
 
     // delete old index meta_module_key2_idx
     let mut tx = pool.begin().await?;
+    DB_QUERY_NUMS.with_label_values(&["drop", "meta"]).inc();
     if let Err(e) = sqlx::query(r#"DROP INDEX meta_module_key2_idx ON meta;"#)
         .execute(&mut *tx)
         .await
