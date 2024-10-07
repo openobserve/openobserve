@@ -183,7 +183,7 @@
             color="primary"
             label="Apply"
             no-caps
-            flat
+            outline
             dense
             data-test="dashboard-addpanel-config-value-mapping-apply-btn"
           />
