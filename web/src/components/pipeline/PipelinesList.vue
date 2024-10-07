@@ -110,12 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           
           </template>
-</q-td>
+        </q-td>
 
         </q-tr>
         <q-tr v-show="expandedRow === props.row.pipeline_id" :props="props" >
 
-          <q-td  colspan="100%">
+          <q-td v-if="props.row?.sql_query"  colspan="100%">
 
             <div  class="text-left tw-px-2 q-mb-sm  expanded-content">
             <div class="tw-flex tw-items-center q-py-sm  ">
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-flex tw-items-start  tw-justify-center" >
             
               <div class="scrollable-content  expanded-sql ">
-                <pre style="text-wrap: wrap;">{{ props.row?.sql_query }}</pre>
+                <pre style="text-wrap: wrap;">{{ props.row?.sql_query  }} </pre>
 
               </div>
               
@@ -138,48 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #no-data>
           <no-data />
         </template>
-        <!-- <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="editPipeline(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="openDeleteDialog(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleAlertState(props.row)"
-            />
-          </q-td>
-        </template> -->
-
+ 
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
             <q-tooltip>
@@ -409,6 +368,15 @@ const toggleAlertState = (row) =>{
 }
 
 const triggerExpand = (props) =>{
+  if(props.row.source.source_type === 'realtime' && activeTab.value !== "realtime"){
+    q.notify({
+      message: "Realtime pipelines do not have SQL queries",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
   if (expandedRow.value === props.row.pipeline_id) {
       expandedRow.value = null;
     } else {
