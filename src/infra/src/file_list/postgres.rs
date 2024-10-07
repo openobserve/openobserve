@@ -73,7 +73,7 @@ impl super::FileList for PostgresFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
 
         DB_QUERY_NUMS
-            .with_label_values(&["DELETE", "file_list"])
+            .with_label_values(&["delete", "file_list"])
             .inc();
         sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
             .bind(stream_key)
@@ -105,7 +105,7 @@ impl super::FileList for PostgresFileList {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
                 DB_QUERY_NUMS
-                    .with_label_values(&["SELECT", "file_list"])
+                    .with_label_values(&["select", "file_list"])
                     .inc();
                 let start = std::time::Instant::now();
                 let query_res = sqlx::query_scalar(
@@ -142,7 +142,7 @@ impl super::FileList for PostgresFileList {
             // delete files by ids
             if !ids.is_empty() {
                 DB_QUERY_NUMS
-                    .with_label_values(&["DELETE", "file_list"])
+                    .with_label_values(&["delete", "file_list"])
                     .inc();
                 let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
                 let start = std::time::Instant::now();
@@ -184,7 +184,7 @@ impl super::FileList for PostgresFileList {
                     .push_bind(created_at);
             });
             DB_QUERY_NUMS
-                .with_label_values(&["INSERT", "file_list_deleted"])
+                .with_label_values(&["insert", "file_list_deleted"])
                 .inc();
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
                 if let Err(e) = tx.rollback().await {
@@ -216,7 +216,7 @@ impl super::FileList for PostgresFileList {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
                 DB_QUERY_NUMS
-                    .with_label_values(&["SELECT", "file_list_deleted"])
+                    .with_label_values(&["select", "file_list_deleted"])
                     .inc();
                 let ret: Option<i64> = match
                     sqlx
@@ -249,7 +249,7 @@ impl super::FileList for PostgresFileList {
             // delete files by ids
             if !ids.is_empty() {
                 DB_QUERY_NUMS
-                    .with_label_values(&["DELETE", "file_list"])
+                    .with_label_values(&["delete", "file_list"])
                     .inc();
                 let sql = format!(
                     "DELETE FROM file_list_deleted WHERE id IN({});",
@@ -266,7 +266,7 @@ impl super::FileList for PostgresFileList {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
@@ -291,7 +291,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret = sqlx::query(
@@ -317,7 +317,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "file_list"])
+            .with_label_values(&["update", "file_list"])
             .inc();
         sqlx::query(
             r#"UPDATE file_list SET flattened = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
@@ -354,7 +354,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret = if flattened.is_some() {
@@ -459,7 +459,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 let pool = CLIENT.clone();
                 let cfg = get_config();
                 DB_QUERY_NUMS
-                .with_label_values(&["SELECT", "file_list"])
+                .with_label_values(&["select", "file_list"])
                 .inc();
                 if cfg.limit.use_upper_bound_for_max_ts {
                     // TODO: if partition is daily, we need to remove this logic
@@ -552,7 +552,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         }
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list_deleted"])
+            .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let ret = sqlx
             ::query_as::<_, super::FileDeletedRecord>(
@@ -583,7 +583,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let ret: Option<i64> = sqlx::query_scalar(
             r#"SELECT MIN(min_ts)::BIGINT AS id FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
@@ -598,7 +598,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let ret: Option<i64> =
             sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
@@ -644,7 +644,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         };
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
             .fetch_all(&pool)
@@ -673,7 +673,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         };
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "stream_stats"])
+            .with_label_values(&["select", "stream_stats"])
             .inc();
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
             .fetch_all(&pool)
@@ -696,7 +696,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         );
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["DELETE", "stream_stats"])
+            .with_label_values(&["delete", "stream_stats"])
             .inc();
         sqlx::query(&sql).execute(&pool).await?;
         Ok(())
@@ -728,7 +728,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         for stream_key in new_streams {
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
             DB_QUERY_NUMS
-                .with_label_values(&["INSERT", "stream_stats"])
+                .with_label_values(&["insert", "stream_stats"])
                 .inc();
             if let Err(e) = sqlx::query(
                 r#"
@@ -756,7 +756,7 @@ INSERT INTO stream_stats
         let mut tx = pool.begin().await?;
         for (stream_key, stats) in update_streams {
             DB_QUERY_NUMS
-                .with_label_values(&["UPDATE", "stream_stats"])
+                .with_label_values(&["update", "stream_stats"])
                 .inc();
             if
                 let Err(e) = sqlx
@@ -793,7 +793,7 @@ UPDATE stream_stats
     async fn reset_stream_stats(&self) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "stream_stats"])
+            .with_label_values(&["update", "stream_stats"])
             .inc();
         sqlx
             ::query(
@@ -811,7 +811,7 @@ UPDATE stream_stats
     ) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "stream_stats"])
+            .with_label_values(&["update", "stream_stats"])
             .inc();
         sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
             .bind(min_ts)
@@ -819,7 +819,7 @@ UPDATE stream_stats
             .execute(&pool)
             .await?;
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "stream_stats"])
+            .with_label_values(&["update", "stream_stats"])
             .inc();
         sqlx::query(
             r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = $1 AND max_ts < min_ts;"#,
@@ -833,7 +833,7 @@ UPDATE stream_stats
     async fn len(&self) -> usize {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let ret = match sqlx::query(r#"SELECT COUNT(*)::BIGINT AS num FROM file_list;"#)
             .fetch_one(&pool)
@@ -869,7 +869,7 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["INSERT", "file_list_jobs"])
+            .with_label_values(&["insert", "file_list_jobs"])
             .inc();
         match
             sqlx
@@ -903,7 +903,7 @@ UPDATE stream_stats
             lock_id as i64
         };
         let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
-        DB_QUERY_NUMS.with_label_values(&["GET_LOCK", ""]).inc();
+        DB_QUERY_NUMS.with_label_values(&["get_lock", ""]).inc();
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {
                 log::error!("[POSTGRES] rollback get_pending_jobs error: {}", e);
@@ -912,7 +912,7 @@ UPDATE stream_stats
         }
         // get pending jobs group by stream and order by num desc
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list_jobs"])
+            .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
@@ -952,7 +952,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         );
         let now = config::utils::time::now_micros();
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         if let Err(e) = sqlx::query(&sql)
             .bind(super::FileListJobStatus::Running)
@@ -969,7 +969,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         }
         // get jobs by ids
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list_jobs"])
+            .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let sql = format!(
             "SELECT * FROM file_list_jobs WHERE id IN ({});",
@@ -1004,7 +1004,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
                 .join(",")
         );
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         sqlx::query(&sql)
             .bind(super::FileListJobStatus::Pending)
@@ -1016,7 +1016,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
     async fn set_job_done(&self, id: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         sqlx::query(r#"UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id = $3;"#)
             .bind(super::FileListJobStatus::Done)
@@ -1030,7 +1030,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
     async fn update_running_jobs(&self, id: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         sqlx::query(r#"UPDATE file_list_jobs SET updated_at = $1 WHERE id = $2;"#)
             .bind(config::utils::time::now_micros())
@@ -1043,7 +1043,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["UPDATE", "file_list_jobs"])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         let ret = sqlx::query(
             r#"UPDATE file_list_jobs SET status = $1 WHERE status = $2 AND updated_at < $3;"#,
@@ -1062,7 +1062,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["DELETE", "file_list_jobs"])
+            .with_label_values(&["delete", "file_list_jobs"])
             .inc();
         let ret =
             sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = $1 AND updated_at < $2;"#)
@@ -1080,7 +1080,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         let pool = CLIENT.clone();
 
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list_jobs"])
+            .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret = sqlx
             ::query(
@@ -1122,7 +1122,7 @@ impl PostgresFileList {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        DB_QUERY_NUMS.with_label_values(&["INSERT", table]).inc();
+        DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         match
             sqlx
                 ::query(
@@ -1186,7 +1186,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
                     .push_bind(item.meta.compressed_size)
                     .push_bind(item.meta.flattened);
             });
-            DB_QUERY_NUMS.with_label_values(&["INSERT", table]).inc();
+            DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
             let need_single_insert = match query_builder.build().execute(&mut *tx).await {
                 Ok(_) => false,
                 Err(sqlx::Error::Database(e)) => {
@@ -1229,7 +1229,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
     DB_QUERY_NUMS
-        .with_label_values(&["CREATE", "file_list"])
+        .with_label_values(&["create", "file_list"])
         .inc();
     sqlx::query(
         r#"
@@ -1254,7 +1254,7 @@ CREATE TABLE IF NOT EXISTS file_list
     .await?;
 
     DB_QUERY_NUMS
-        .with_label_values(&["CREATE", "file_list_history"])
+        .with_label_values(&["create", "file_list_history"])
         .inc();
     sqlx::query(
         r#"
@@ -1279,7 +1279,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     .await?;
 
     DB_QUERY_NUMS
-        .with_label_values(&["CREATE", "file_list_deleted"])
+        .with_label_values(&["create", "file_list_deleted"])
         .inc();
     sqlx::query(
         r#"
@@ -1299,7 +1299,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     .await?;
 
     DB_QUERY_NUMS
-        .with_label_values(&["CREATE", "file_list_jobs"])
+        .with_label_values(&["create", "file_list_jobs"])
         .inc();
     sqlx::query(
         r#"
@@ -1320,7 +1320,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     .await?;
 
     DB_QUERY_NUMS
-        .with_label_values(&["CREATE", "stream_stats"])
+        .with_label_values(&["create", "stream_stats"])
         .inc();
     sqlx::query(
         r#"
@@ -1420,7 +1420,7 @@ pub async fn create_table_index() -> Result<()> {
         // delete duplicate records
         log::warn!("[POSTGRES] starting delete duplicate records");
         DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
+            .with_label_values(&["select", "file_list"])
             .inc();
         let ret = sqlx
             ::query(
@@ -1434,7 +1434,7 @@ pub async fn create_table_index() -> Result<()> {
             let file = r.get::<String, &str>("file");
             let id = r.get::<i64, &str>("id");
             DB_QUERY_NUMS
-                .with_label_values(&["DELETE", "file_list"])
+                .with_label_values(&["delete", "file_list"])
                 .inc();
             sqlx
                 ::query(
@@ -1465,7 +1465,7 @@ pub async fn create_table_index() -> Result<()> {
 async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT.clone();
     DB_QUERY_NUMS
-        .with_label_values(&["SELECT", "information_schema.columns"])
+        .with_label_values(&["select", "information_schema.columns"])
         .inc();
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
@@ -1477,7 +1477,7 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
         return Ok(());
     }
 
-    DB_QUERY_NUMS.with_label_values(&["ALTER", table]).inc();
+    DB_QUERY_NUMS.with_label_values(&["alter", table]).inc();
     let alert_sql = format!("ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {data_type};");
     let mut tx = pool.begin().await?;
     if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
