@@ -328,8 +328,11 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
 
     let moment: any = () => {};
 
@@ -671,8 +674,8 @@ export default defineComponent({
         end: new Date(event.end),
       };
       // Truncate seconds and milliseconds from the dates
-      selectedDateObj.start.setSeconds(0, 0);
-      selectedDateObj.end.setSeconds(0, 0);
+      selectedDateObj.start.setMilliseconds(0);
+      selectedDateObj.end.setMilliseconds(0);
 
       // Compare the truncated dates
       if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
@@ -768,9 +771,17 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Panel deletion failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Panel deletion failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Panel deletion failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
 
@@ -791,9 +802,17 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Panel move failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Panel move failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Panel move failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
 

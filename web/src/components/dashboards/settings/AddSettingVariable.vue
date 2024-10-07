@@ -624,7 +624,10 @@ export default defineComponent({
     const route = useRoute();
     const title = ref("Add Variable");
     const { getStreams, getStream } = useStreams();
-    const { showErrorNotification } = useNotifications();
+    const {
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -893,9 +896,17 @@ export default defineComponent({
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable update failed", {
-            timeout: 2000,
-          });
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                "Variable update failed",
+            );
+          } else {
+            showErrorNotification(error.message ?? "Variable update failed", {
+              timeout: 2000,
+            });
+          }
         }
       } else {
         try {
@@ -907,9 +918,17 @@ export default defineComponent({
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable creation failed", {
-            timeout: 2000,
-          });
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                "Variable creation failed",
+            );
+          } else {
+            showErrorNotification(error.message ?? "Variable creation failed", {
+              timeout: 2000,
+            });
+          }
         }
       }
     };
@@ -1092,7 +1111,7 @@ export default defineComponent({
       () => variableData?.multiSelect,
       (newVal) => {
         if (!newVal) {
-          variableData.selectAllValueForMultiSelect = 'first';
+          variableData.selectAllValueForMultiSelect = "first";
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {

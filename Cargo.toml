@@ -273,7 +273,7 @@ parking_lot = "0.12"
 prometheus = "0.13"
 prost = "0.13.1"
 rand = "0.8"
-rayon = "1.7.0"
+rayon = "1.10"
 regex = "1.7"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [

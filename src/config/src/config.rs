@@ -67,6 +67,8 @@ pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
+pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -947,11 +949,17 @@ pub struct Limit {
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
     #[env_config(
-        name = "ZO_META_ID_BATCH_SIZE",
+        name = "ZO_FILE_LIST_ID_BATCH_SIZE",
         default = 5000,
-        help = "batch size of id processing"
+        help = "batch size of file list query"
     )]
-    pub meta_id_batch_size: usize,
+    pub file_list_id_batch_size: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -1335,9 +1343,11 @@ pub fn init() -> Config {
     if cfg.limit.sql_db_connections_max == 0 {
         cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
     }
+    cfg.limit.sql_db_connections_max =
+        max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
 
-    if cfg.limit.meta_id_batch_size == 0 {
-        cfg.limit.meta_id_batch_size = 5000;
+    if cfg.limit.file_list_id_batch_size == 0 {
+        cfg.limit.file_list_id_batch_size = 5000;
     }
 
     if cfg.limit.consistent_hash_vnodes == 0 {

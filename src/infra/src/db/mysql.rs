@@ -243,7 +243,18 @@ impl super::Db for MysqlDb {
         };
 
         let pool = CLIENT.clone();
-        let mut tx = pool.begin().await?;
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
         let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
             DB_QUERY_NUMS.with_label_values(&["SELECT", "meta"]).inc();

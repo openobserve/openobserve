@@ -20,7 +20,11 @@ use config::{
     get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
-    utils::{hash::Sum64, parquet::parse_file_key_columns},
+    utils::{
+        hash::Sum64,
+        parquet::parse_file_key_columns,
+        time::{end_of_the_day, DAY_MICRO_SECS},
+    },
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
@@ -396,7 +400,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .into_iter()
             .map(|r| {
                 (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     FileMeta::from(&r),
                 )
             })
@@ -410,7 +414,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut ret = Vec::new();
         let pool = CLIENT.clone();
 
-        for chunk in ids.chunks(get_config().limit.meta_id_batch_size) {
+        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -441,7 +445,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .map(|r| {
                 (
                     r.id,
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
                     FileMeta::from(&r),
                 )
             })
@@ -463,42 +467,76 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-
-        let pool = CLIENT.clone();
-
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
-        let cfg = get_config();
-        DB_QUERY_NUMS
-            .with_label_values(&["SELECT", "file_list"])
-            .inc();
         let start = std::time::Instant::now();
-        let ret = if cfg.limit.use_upper_bound_for_max_ts {
-            let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-            sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;"#,
-            )
-            .bind(stream_key)
-            .bind(time_start)
-            .bind(max_ts_upper_bound)
-            .bind(time_end)
-            .fetch_all(&pool)
-            .await
-        } else {
-            sqlx::query_as::<_, super::FileId>(
-                r#"SELECT id, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
-            )
-            .bind(stream_key)
-            .bind(time_start)
-            .bind(time_end)
-            .fetch_all(&pool)
-            .await
-        };
 
+        let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
+            || time_end - time_start > DAY_MICRO_SECS * 30
+            || !get_config().limit.file_list_multi_thread
+        {
+            vec![(time_start, time_end)]
+        } else {
+            let mut partitions = Vec::new();
+            let mut start = time_start;
+            while start < time_end {
+                let end_of_day = std::cmp::min(end_of_the_day(start), time_end);
+                partitions.push((start, end_of_day));
+                start = end_of_day + 1; // next day, use end_of_day + 1 microsecond
+            }
+            partitions
+        };
+        log::debug!("file_list day_partitions: {:?}", day_partitions);
+
+        let mut tasks = Vec::with_capacity(day_partitions.len());
+        for (time_start, time_end) in day_partitions {
+            let stream_key = stream_key.clone();
+            tasks.push(tokio::task::spawn(async move {
+                let pool = CLIENT.clone();
+                let cfg = get_config();
+                DB_QUERY_NUMS
+                .with_label_values(&["SELECT", "file_list"])
+                .inc();
+                 if cfg.limit.use_upper_bound_for_max_ts {
+                    let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                    sqlx::query_as::<_, super::FileId>(
+                        r#"SELECT id, records, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;"#,
+                    )
+                    .bind(stream_key)
+                    .bind(time_start)
+                    .bind(max_ts_upper_bound)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+                } else {
+                    sqlx::query_as::<_, super::FileId>(
+                        r#"SELECT id, records, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;"#,
+                    )
+                    .bind(stream_key)
+                    .bind(time_start)
+                    .bind(time_end)
+                    .fetch_all(&pool)
+                    .await
+                }
+        }));
+        }
+
+        let mut rets = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok(Ok(r)) => rets.extend(r),
+                Ok(Err(e)) => {
+                    return Err(e.into());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
+            };
+        }
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
             .with_label_values(&["get_ids", "file_list"])
             .observe(time);
-        Ok(ret?)
+        Ok(rets)
     }
 
     async fn query_deleted(
@@ -898,7 +936,18 @@ UPDATE stream_stats
         };
 
         let pool = CLIENT.clone();
-        let mut tx = pool.begin().await?;
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
         // get pending jobs group by stream and order by num desc
         DB_QUERY_NUMS
             .with_label_values(&["SELECT", "file_list_jobs"])

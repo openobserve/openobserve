@@ -35,6 +35,7 @@ pub struct Dashboard {
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
     pub version: i32,
+    pub hash: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
