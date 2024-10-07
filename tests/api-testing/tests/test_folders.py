@@ -1,5 +1,6 @@
 def delete_folder(session, base_url, org_id, folder_id):
-    resp_delete_folder = session.delete(f"{base_url}api/{org_id}/folders/{folder_id}")
+    resp_delete_folder = session.delete(
+        f"{base_url}api/{org_id}/folders/{folder_id}")
     assert (
         resp_delete_folder.status_code == 200
     ), f"Deleting this folder: Expected 200, but got {resp_delete_folder.status_code} {resp_delete_folder.content}"
@@ -41,7 +42,8 @@ def test_e2e_createdeletefolder(create_session, base_url):
     org_id = "default"
     url = base_url
     payload = {"description": "newfoldernvp", "name": "pytest-automationtests"}
-    resp_create_folder = session.post(f"{url}api/{org_id}/folders", json=payload)
+    resp_create_folder = session.post(
+        f"{url}api/{org_id}/folders", json=payload)
 
     print(resp_create_folder.content)
 
@@ -65,7 +67,8 @@ def test_e2e_createdeletefolder(create_session, base_url):
     ), f"updating this folder, but got {resp_update_folder.status_code} {resp_update_folder.content}"
     print(resp_update_folder.content)
     # Delete Folder
-    resp_delete_folder = session.delete(f"{base_url}api/{org_id}/folders/{folder_id}")
+    resp_delete_folder = session.delete(
+        f"{base_url}api/{org_id}/folders/{folder_id}")
     assert (
         resp_delete_folder.status_code == 200
     ), f"Deleting this folder, but got {resp_delete_folder.status_code} {resp_delete_folder.content}"
@@ -122,8 +125,9 @@ def test_e2e_createdeletedashboard(create_session, base_url):
         "panels": [],
     }
     dashboard_id = resp_create_dashboard.json()["v1"]["dashboardId"]
+    dashboard_hash = resp_create_dashboard.json()["hash"]
     resp_update_dashboard = session.put(
-        f"{base_url}api/{org_id}/dashboards/{dashboard_id}", json=payload
+        f"{base_url}api/{org_id}/dashboards/{dashboard_id}?hash={dashboard_hash}", json=payload
     )
     assert (
         resp_update_dashboard.status_code == 200
@@ -169,7 +173,8 @@ def test_e2e_movedashboard(create_session, base_url):
     # create folder a
 
     payload = {"description": "newfoldernvp", "name": "pytest-a"}
-    resp_create_folder = session.post(f"{url}api/{org_id}/folders", json=payload)
+    resp_create_folder = session.post(
+        f"{url}api/{org_id}/folders", json=payload)
 
     print(resp_create_folder.content)
 
@@ -180,7 +185,8 @@ def test_e2e_movedashboard(create_session, base_url):
 
     # create folder b
     payload = {"description": "newfoldernvp", "name": "pytest-b"}
-    resp_create_folder = session.post(f"{url}api/{org_id}/folders", json=payload)
+    resp_create_folder = session.post(
+        f"{url}api/{org_id}/folders", json=payload)
 
     print(resp_create_folder.content)
 

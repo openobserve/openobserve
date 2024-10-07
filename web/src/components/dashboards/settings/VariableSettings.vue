@@ -167,8 +167,11 @@ export default defineComponent({
       data: [],
     });
     const $q = useQuasar();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
 
@@ -247,9 +250,9 @@ export default defineComponent({
             await getDashboard(
               store,
               route.query.dashboard,
-              route.query.folder ?? "default"
-            )
-          )
+              route.query.folder ?? "default",
+            ),
+          ),
         )?.variables?.list ?? [];
 
       dashboardVariableData.data = (dashboardVariablesList.value || []).map(
@@ -258,10 +261,10 @@ export default defineComponent({
             "#": index < 9 ? `0${index + 1}` : index + 1,
             name: it.name,
             type: variableTypes.value.find(
-              (type: any) => type.value === it.type
+              (type: any) => type.value === it.type,
             )?.label,
           };
-        }
+        },
       );
     };
 
@@ -284,7 +287,7 @@ export default defineComponent({
             store,
             route.query.dashboard,
             variableName,
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
 
           await getDashboardData();
@@ -295,9 +298,17 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Variable deletion failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Variable deletion failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Variable deletion failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
     const handleSaveVariable = async () => {
