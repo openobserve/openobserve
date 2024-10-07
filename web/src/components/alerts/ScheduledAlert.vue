@@ -198,6 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
+
+
     <div class="q-mt-sm">
       <div
         v-if="
@@ -613,6 +615,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      <div v-if="tab == 'sql'">
+  <div  class="flex items-center q-mr-sm">
+        <div 
+          data-test="multi-time-range-alerts-title"
+          class="text-bold q-py-md flex items-center"
+          style="width: 190px"
+        >
+        Multi Window Selection
+          <q-btn
+          no-caps
+          padding="xs"
+          class=""
+          size="sm"
+          flat
+          icon="info_outline"
+          data-test="multi-time-range-alerts-info-btn">
+           <q-tooltip
+            anchor="bottom middle" self="top middle" 
+              style="font-size: 14px"
+              max-width="300px" >
+             <span>Additional timeframe for query execution: <br />
+                For example, selecting "past 10 hours" means that each time the query runs, it will retrieve data from 10 hours prior, using the last 10 minutes of that period. <br /> If the query is scheduled from 4:00 PM to 4:10 PM, additionally it will pull data from 6:00 AM to 6:10 AM.
+                </span> 
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+    <div
+        v-for="(picker, index) in  dateTimePicker"
+        :key="index"
+        class="q-mb-md"
+      >
+        <div class="flex">
+          <CustomDateTimePicker
+            v-model="picker.offSet"
+            :picker="picker"
+            :isFirstEntry="false"
+            @update:model-value="updateDateTimePicker"
+          />
+          <q-btn
+                data-test="multi-time-range-alerts-delete-btn"
+                :icon="outlinedDelete"
+                class="iconHoverBtn q-ml-xs q-mr-sm"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                padding="xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('alert_templates.delete')"
+                @click="removeTimeShift(index)"
+                style="min-width: auto"
+              />
+        </div>
+      </div>
+<div>
+  <q-btn
+        data-test="multi-time-range-alerts-add-btn"
+        label="Add Time Shift"
+        size="sm"
+        class="text-bold add-variable"
+        icon="add"
+        style="
+          border-radius: 4px;
+          text-transform: capitalize;
+          background: #f2f2f2 !important;
+          color: #000 !important;
+        "
+        @click="addTimeShift"
+      />
+</div>
+</div>
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-cron-toggle-title"
@@ -833,6 +907,8 @@ import {
 import { useStore } from "vuex";
 import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -857,6 +933,7 @@ const props = defineProps([
   "disableQueryTypeSelection",
   "vrlFunctionError",
   "showTimezoneWarning",
+  "multi_time_range"
 ]);
 
 const emits = defineEmits([
@@ -873,6 +950,7 @@ const emits = defineEmits([
   "update:vrl_function",
   "update:showVrlFunction",
   "validate-sql",
+  "update:multi_time_range"
 ]);
 
 const { t } = useI18n();
@@ -936,6 +1014,15 @@ const filteredNumericColumns = ref(getNumericColumns.value);
 const addField = () => {
   emits("field:add");
 };
+
+const updateDateTimePicker = (data : any) =>{
+  emits("update:multi_time_range", dateTimePicker.value);
+  console.log("data",dateTimePicker.value);
+}
+
+const removeTimeShift = (index: any) => {
+  dateTimePicker.value.splice(index, 1);
+    };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
@@ -1003,6 +1090,7 @@ const onFunctionSelect = (_function: any) => {
 };
 
 const functionsList = computed(() => store.state.organizationData.functions);
+const dateTimePicker = ref(props.multi_time_range || []);
 
 const functionOptions = ref<any[]>([]);
 
@@ -1051,6 +1139,23 @@ const updateQuery = () => {
 
   if (tab.value === "sql") query.value = props.sql;
 };
+const addTimeShift = () => {
+      const newTimeShift = {
+        offSet: "15m",
+        data: {
+          selectedDate: {
+            relative: {
+              value: 15,
+              period: "m",
+              label: "Minutes",
+            },
+          },
+        },
+      };
+
+      dateTimePicker.value.push({offSet:newTimeShift.offSet});
+      
+    };
 
 const updatePromqlCondition = () => {
   emits("update:promql_condition", promqlCondition.value);

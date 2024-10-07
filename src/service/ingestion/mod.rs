@@ -283,6 +283,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             retries: 0,
             error: None,
             success_response: None,
+            is_partial: None,
         };
         match alert.send_notification(val, now, None).await {
             Err(e) => {

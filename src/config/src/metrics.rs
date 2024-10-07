@@ -662,6 +662,53 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// This corresponds to mysql or pgsql queries, not sqlite as that is local and can be ignored
+pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new("db_query_nums", "db query number")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["operation", "table"],
+    )
+    .expect("Metric created")
+});
+
+pub static DB_QUERY_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("db_query_time", "db query time. ".to_owned())
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["operation", "table"],
+    )
+    .expect("Metric created")
+});
+
+pub static FILE_LIST_ID_SELECT_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "file_list_id_select_count",
+            "total number of ids returned by file list query",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static FILE_LIST_CACHE_HIT_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "file_list_cache_hit_count",
+            "number of ids returned from file list cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -832,6 +879,22 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_DISK_RESULT_CACHE_FILES.clone()))
+        .expect("Metric registered");
+
+    // db stats
+    registry
+        .register(Box::new(DB_QUERY_NUMS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(DB_QUERY_TIME.clone()))
+        .expect("Metric registered");
+
+    // file list specific metrics
+    registry
+        .register(Box::new(FILE_LIST_ID_SELECT_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FILE_LIST_CACHE_HIT_COUNT.clone()))
         .expect("Metric registered");
 }
 

@@ -341,8 +341,11 @@ export default defineComponent({
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -468,9 +471,18 @@ export default defineComponent({
           },
         });
         return;
-      } catch (err: any) {
+      } catch (error: any) {
         // Show an error notification.
-        showErrorNotification(err?.message ?? "Panel duplication failed");
+
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Panel duplication failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Panel duplication failed");
+        }
       }
       // Hide the loading spinner notification.
       dismiss();

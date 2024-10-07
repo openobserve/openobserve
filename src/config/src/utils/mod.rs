@@ -22,6 +22,7 @@ pub mod flatten;
 pub mod hash;
 pub mod inverted_index;
 pub mod json;
+pub mod md5;
 pub mod parquet;
 pub mod rand;
 pub mod record_batch_ext;

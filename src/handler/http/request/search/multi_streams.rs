@@ -148,7 +148,7 @@ pub async fn search_multi(
     };
 
     // handle encoding for query and aggs
-    let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
+    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
@@ -182,8 +182,10 @@ pub async fn search_multi(
     }
     let queries_len = queries.len();
     let mut vrl_stream_name = "".to_string();
+    let mut sqls = vec![];
 
     for mut req in queries {
+        sqls.push(req.query.sql.clone());
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
         rpc_req.org_id = org_id.to_string();
         rpc_req.stream_type = stream_type.to_string();
@@ -434,6 +436,7 @@ pub async fn search_multi(
         }
     }
 
+    let mut report_function_usage = false;
     multi_res.hits = if query_fn.is_some() && per_query_resp {
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
@@ -460,6 +463,7 @@ pub async fn search_multi(
         };
         match program {
             Some(program) => {
+                report_function_usage = true;
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
@@ -469,7 +473,7 @@ pub async fn search_multi(
                         },
                         &json::Value::Array(multi_res.hits),
                         &org_id,
-                        &[vrl_stream_name],
+                        &[vrl_stream_name.clone()],
                     );
                     ret_val
                         .as_array()
@@ -538,6 +542,35 @@ pub async fn search_multi(
         let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
+
+    let time = start.elapsed().as_secs_f64();
+    if report_function_usage {
+        let req_stats = RequestStats {
+            // For functions, records = records * num_function, in this case num_function = 1
+            records: multi_res.total as i64,
+            response_time: time,
+            size: multi_res.scan_size as f64,
+            request_body: Some(json::to_string(&sqls).unwrap()),
+            user_email: None,
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            trace_id: None,
+            // took_wait_in_queue: multi_res.t,
+            search_type: multi_req.search_type,
+            ..Default::default()
+        };
+        report_request_usage_stats(
+            req_stats,
+            &org_id,
+            &vrl_stream_name,
+            stream_type,
+            UsageType::Functions,
+            0, // The request stats already contains function event
+            started_at,
+        )
+        .await;
+    }
     Ok(HttpResponse::Ok().json(multi_res))
 }
 

@@ -141,8 +141,11 @@ export default defineComponent({
     const addTabForm: any = ref(null);
     let dashboardData: any = ref({});
     const isValidIdentifier: any = ref(true);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const tabData: any = ref(defaultValue());
 
     const loadDashboardData = async () => {
@@ -150,14 +153,14 @@ export default defineComponent({
         dashboardData.value = await getDashboard(
           store,
           props.dashboardId,
-          props.folderId ?? route.query.folder ?? "default"
+          props.folderId ?? route.query.folder ?? "default",
         );
         tabData.value = JSON.parse(
           JSON.stringify(
             dashboardData?.value?.tabs?.find(
-              (tab: any) => tab.tabId === props.tabId
-            )
-          )
+              (tab: any) => tab.tabId === props.tabId,
+            ),
+          ),
         );
       }
     };
@@ -178,7 +181,7 @@ export default defineComponent({
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
               tabData.value.tabId,
-              tabData.value
+              tabData.value,
             );
 
             // emit refresh to rerender
@@ -194,7 +197,7 @@ export default defineComponent({
               store,
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
-              tabData.value
+              tabData.value,
             );
 
             // emit refresh to rerender
@@ -209,14 +212,22 @@ export default defineComponent({
             panels: [],
           };
           await addTabForm.value.resetValidation();
-        } catch (err: any) {
-          showErrorNotification(
-            err?.message ??
-              (props.editMode ? "Failed to update tab" : "Failed to add tab"),
-            {
-              timeout: 2000,
-            }
-          );
+        } catch (error: any) {
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+            );
+          } else {
+            showErrorNotification(
+              error?.message ??
+                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+              {
+                timeout: 2000,
+              },
+            );
+          }
         } finally {
         }
       });

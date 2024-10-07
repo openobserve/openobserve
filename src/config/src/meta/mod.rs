@@ -23,6 +23,7 @@ pub mod meta_store;
 pub mod pipeline;
 pub mod puffin;
 pub mod search;
+pub mod short_url;
 pub mod sql;
 pub mod stream;
 pub mod usage;

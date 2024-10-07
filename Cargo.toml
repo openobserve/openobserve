@@ -311,3 +311,4 @@ utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"
+md5 = "0.7.0"

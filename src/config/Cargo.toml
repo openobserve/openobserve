@@ -66,3 +66,4 @@ tracing-subscriber.workspace = true
 utoipa.workspace = true
 vrl.workspace = true
 zstd.workspace = true
+md5.workspace = true

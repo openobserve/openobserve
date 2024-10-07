@@ -84,6 +84,8 @@ pub enum DbError {
     KeyNotExists(String),
     #[error("error {0} performing operation on key {1}")]
     DBOperError(String, String),
+    #[error("Unique constraint violation")]
+    UniqueViolation,
 }
 
 #[derive(ThisError, Debug)]
