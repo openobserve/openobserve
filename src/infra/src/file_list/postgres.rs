@@ -249,7 +249,7 @@ impl super::FileList for PostgresFileList {
             // delete files by ids
             if !ids.is_empty() {
                 DB_QUERY_NUMS
-                    .with_label_values(&["delete", "file_list"])
+                    .with_label_values(&["delete", "file_list_deleted"])
                     .inc();
                 let sql = format!(
                     "DELETE FROM file_list_deleted WHERE id IN({});",
