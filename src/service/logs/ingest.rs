@@ -24,7 +24,6 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        function::{StreamTransform, VRLResultResolver},
         stream::{StreamParams, StreamType},
         usage::UsageType,
     },
@@ -32,7 +31,6 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use flate2::read::GzDecoder;
-use vrl::compiler::runtime::Runtime;
 
 use crate::{
     common::meta::ingestion::{
@@ -361,33 +359,6 @@ pub async fn ingest(
         http::StatusCode::OK.into(),
         vec![response_body],
     ))
-}
-
-pub fn apply_functions<'a>(
-    item: json::Value,
-    local_trans: &[StreamTransform],
-    stream_vrl_map: &'a HashMap<String, VRLResultResolver>,
-    org_id: &'a str,
-    stream_name: &'a str,
-    runtime: &mut Runtime,
-) -> Result<json::Value> {
-    let mut value = item;
-    if !local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_functions(
-            local_trans,
-            value,
-            stream_vrl_map,
-            org_id,
-            stream_name,
-            runtime,
-        )?;
-    }
-
-    if value.is_null() || !value.is_object() {
-        Err(anyhow::Error::msg("apply functions failure"))
-    } else {
-        Ok(value)
-    }
 }
 
 pub fn handle_timestamp(

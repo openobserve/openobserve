@@ -20,7 +20,8 @@ use anyhow::{anyhow, Result};
 use config::{
     cluster::LOCAL_NODE,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        alerts::alert::Alert,
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -28,7 +29,6 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
-use vrl::compiler::runtime::Runtime;
 
 use super::get_exclude_labels;
 use crate::{
@@ -39,8 +39,10 @@ use crate::{
         stream::SchemaRecords,
     },
     service::{
+        alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{get_write_partition_key, write_file},
+        ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
+        pipeline::execution::PipelinedExt,
         schema::check_for_schema,
         usage::report_request_usage_stats,
     },
@@ -72,11 +74,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         });
     }
 
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
+
+    // associated pipeline
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
+    let mut stream_pipeline_params = HashMap::new();
+
+    // realtime alerts
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
@@ -96,6 +105,17 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 return Err(anyhow::anyhow!("invalid __type__, need to be string"));
             }
         };
+
+        // get stream pipeline
+        if !stream_pipeline_params.contains_key(&stream_name) {
+            let pipeline_params = crate::service::ingestion::get_stream_pipeline_params(
+                org_id,
+                &stream_name,
+                &StreamType::Metrics,
+            )
+            .await;
+            stream_pipeline_params.insert(stream_name.clone(), pipeline_params);
+        }
 
         // check metrics type for Histogram & Summary
         if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
@@ -130,162 +150,227 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             continue;
         }
 
-        // apply functions
+        // apply pipeline
         let record = json::Value::Object(record.to_owned());
-        let mut record = apply_func(&mut runtime, org_id, &stream_name, record)?;
-
-        let record = record.as_object_mut().unwrap();
-
-        let cfg = config::get_config();
-        // check timestamp & value
-        let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
-            None => chrono::Utc::now().timestamp_micros(),
-            Some(json::Value::Number(s)) => {
-                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
-            }
-            Some(_) => {
-                return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-            }
-        };
-        let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
-            json::Value::Number(s) => s.as_f64().unwrap(),
-            _ => {
-                return Err(anyhow::anyhow!("invalid value, need to be number"));
-            }
-        };
-        // reset time & value
-        record.insert(
-            cfg.common.column_timestamp.clone(),
-            json::Value::Number(timestamp.into()),
-        );
-        record.insert(
-            VALUE_LABEL.to_string(),
-            json::Number::from_f64(value).unwrap().into(),
-        );
-        // remove type from labels
-        record.remove(TYPE_LABEL);
-        // add hash
-        let hash = super::signature_without_labels(record, &get_exclude_labels());
-        record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
-
-        // convert every label to string
-        for (k, v) in record.iter_mut() {
-            if k == NAME_LABEL
-                || k == TYPE_LABEL
-                || k == VALUE_LABEL
-                || k == &cfg.common.column_timestamp
-            {
-                continue;
-            }
-            match v {
-                json::Value::String(_) => {}
-                _ => {
-                    *v = json::Value::String(v.to_string());
+        let json_data_by_stream = if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) =
+            stream_pipeline_params.get(&stream_name).unwrap()
+        {
+            let mut json_data_by_stream = vec![];
+            match pipeline.execute(record, pl_node_map, pl_graph, vrl_map, &mut runtime) {
+                Err(e) => {
+                    log::error!(
+                        "[Pipeline] {}/{}/{}: Execution error: {}. Skip this record",
+                        pipeline.org,
+                        pipeline.name,
+                        pipeline.id,
+                        e
+                    );
+                    // update stats
+                    let stream_status = stream_status_map
+                        .entry(stream_name.clone())
+                        .or_insert_with(|| StreamStatus::new(&stream_name));
+                    stream_status.status.failed += 1;
+                }
+                Ok(pl_results) => {
+                    for (stream_params, (res, _)) in pl_results {
+                        if stream_params.stream_type != StreamType::Metrics {
+                            continue;
+                        }
+                        json_data_by_stream.push((stream_params.stream_name.to_string(), res));
+                    }
                 }
             }
-        }
-        let record_str = json::to_string(&record).unwrap();
+            json_data_by_stream
+        } else {
+            vec![(stream_name, record)]
+        };
 
-        // check schema
-        if !stream_schema_map.contains_key(&stream_name) {
-            let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-            if schema.fields().is_empty() {
-                let mut schema_reader = BufReader::new(record_str.as_bytes());
-                let inferred_schema =
-                    infer_json_schema(&mut schema_reader, None, StreamType::Metrics).unwrap();
-                let metadata = Metadata {
-                    metric_family_name: stream_name.clone(),
-                    metric_type: metrics_type.as_str().into(),
-                    help: stream_name.clone().replace('_', " "),
-                    unit: "".to_string(),
-                };
-                let mut extra_metadata: HashMap<String, String> = HashMap::new();
-                extra_metadata.insert(
-                    METADATA_LABEL.to_string(),
-                    json::to_string(&metadata).unwrap(),
-                );
-                schema = inferred_schema.with_metadata(extra_metadata);
-                db::schema::merge(
-                    org_id,
-                    &stream_name,
-                    StreamType::Metrics,
-                    &schema,
-                    Some(timestamp),
-                )
-                .await?;
-                crate::common::utils::auth::set_ownership(
-                    org_id,
-                    &StreamType::Metrics.to_string(),
-                    Authz::new(&stream_name),
+        for (stream_name, mut record) in json_data_by_stream {
+            // Start get stream alerts
+            if !stream_alerts_map.contains_key(&stream_name) {
+                crate::service::ingestion::get_stream_alerts(
+                    &[StreamParams {
+                        org_id: org_id.to_owned().into(),
+                        stream_name: stream_name.to_owned().into(),
+                        stream_type: StreamType::Metrics,
+                    }],
+                    &mut stream_alerts_map,
                 )
                 .await;
             }
-            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
-        }
+            // End get stream alert
 
-        // check for schema evolution
-        let _ = check_for_schema(
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            &mut stream_schema_map,
-            vec![record],
-            timestamp,
-        )
-        .await;
+            let record = record.as_object_mut().unwrap();
 
-        // write into buffer
-        if !stream_partitioning_map.contains_key(&stream_name) {
-            let partition_det = crate::service::ingestion::get_stream_partition_keys(
+            let cfg = config::get_config();
+            // check timestamp & value
+            let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
+                None => chrono::Utc::now().timestamp_micros(),
+                Some(json::Value::Number(s)) => {
+                    time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
+                }
+                Some(_) => {
+                    return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+                }
+            };
+            let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
+                json::Value::Number(s) => s.as_f64().unwrap(),
+                _ => {
+                    return Err(anyhow::anyhow!("invalid value, need to be number"));
+                }
+            };
+            // reset time & value
+            record.insert(
+                cfg.common.column_timestamp.clone(),
+                json::Value::Number(timestamp.into()),
+            );
+            record.insert(
+                VALUE_LABEL.to_string(),
+                json::Number::from_f64(value).unwrap().into(),
+            );
+            // remove type from labels
+            record.remove(TYPE_LABEL);
+            // add hash
+            let hash = super::signature_without_labels(record, &get_exclude_labels());
+            record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+
+            // convert every label to string
+            for (k, v) in record.iter_mut() {
+                if k == NAME_LABEL
+                    || k == TYPE_LABEL
+                    || k == VALUE_LABEL
+                    || k == &cfg.common.column_timestamp
+                {
+                    continue;
+                }
+                match v {
+                    json::Value::String(_) => {}
+                    _ => {
+                        *v = json::Value::String(v.to_string());
+                    }
+                }
+            }
+            let record_str = json::to_string(&record).unwrap();
+
+            // check schema
+            if !stream_schema_map.contains_key(&stream_name) {
+                let mut schema =
+                    infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+                if schema.fields().is_empty() {
+                    let mut schema_reader = BufReader::new(record_str.as_bytes());
+                    let inferred_schema =
+                        infer_json_schema(&mut schema_reader, None, StreamType::Metrics).unwrap();
+                    let metadata = Metadata {
+                        metric_family_name: stream_name.clone(),
+                        metric_type: metrics_type.as_str().into(),
+                        help: stream_name.clone().replace('_', " "),
+                        unit: "".to_string(),
+                    };
+                    let mut extra_metadata: HashMap<String, String> = HashMap::new();
+                    extra_metadata.insert(
+                        METADATA_LABEL.to_string(),
+                        json::to_string(&metadata).unwrap(),
+                    );
+                    schema = inferred_schema.with_metadata(extra_metadata);
+                    db::schema::merge(
+                        org_id,
+                        &stream_name,
+                        StreamType::Metrics,
+                        &schema,
+                        Some(timestamp),
+                    )
+                    .await?;
+                    crate::common::utils::auth::set_ownership(
+                        org_id,
+                        &StreamType::Metrics.to_string(),
+                        Authz::new(&stream_name),
+                    )
+                    .await;
+                }
+                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
+            }
+
+            // check for schema evolution
+            let _ = check_for_schema(
                 org_id,
-                &StreamType::Metrics,
                 &stream_name,
+                StreamType::Metrics,
+                &mut stream_schema_map,
+                vec![record],
+                timestamp,
             )
             .await;
-            stream_partitioning_map.insert(stream_name.to_string(), partition_det.clone());
+
+            // write into buffer
+            if !stream_partitioning_map.contains_key(&stream_name) {
+                let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    org_id,
+                    &StreamType::Metrics,
+                    &stream_name,
+                )
+                .await;
+                stream_partitioning_map.insert(stream_name.to_string(), partition_det);
+            }
+
+            let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
+            let partition_keys = partition_det.partition_keys.clone();
+            let partition_time_level = unwrap_partition_time_level(
+                partition_det.partition_time_level,
+                StreamType::Metrics,
+            );
+
+            let schema = stream_schema_map
+                .get(&stream_name)
+                .unwrap()
+                .schema()
+                .as_ref()
+                .clone()
+                .with_metadata(HashMap::new());
+            let schema_key = schema.hash_key();
+            let hour_key = get_write_partition_key(
+                timestamp,
+                &partition_keys,
+                partition_time_level,
+                record,
+                Some(&schema_key),
+            );
+            let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
+            let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                schema_key,
+                schema: Arc::new(schema),
+                records: vec![],
+                records_size: 0,
+            });
+            hour_buf
+                .records
+                .push(Arc::new(json::Value::Object(record.to_owned())));
+            hour_buf.records_size += record_str.len();
+
+            // update status
+            let stream_status = stream_status_map
+                .entry(stream_name.clone())
+                .or_insert_with(|| StreamStatus::new(&stream_name));
+            stream_status.status.successful += 1;
+
+            // realtime alert
+            let need_trigger = !stream_trigger_map.contains_key(&stream_name);
+            if need_trigger && !stream_alerts_map.is_empty() {
+                // start check for alert trigger
+                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
+                if let Some(alerts) = stream_alerts_map.get(&key) {
+                    let mut trigger_alerts: TriggerAlertData = Vec::new();
+                    for alert in alerts {
+                        if let Ok((Some(v), _)) = alert.evaluate(Some(record), None).await {
+                            trigger_alerts.push((alert.clone(), v));
+                        }
+                    }
+                    stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
+                }
+            }
         }
-
-        let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
-        let partition_keys = partition_det.partition_keys.clone();
-        let partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
-
-        let schema = stream_schema_map
-            .get(&stream_name)
-            .unwrap()
-            .schema()
-            .as_ref()
-            .clone()
-            .with_metadata(HashMap::new());
-        let schema_key = schema.hash_key();
-        let hour_key = get_write_partition_key(
-            timestamp,
-            &partition_keys,
-            partition_time_level,
-            record,
-            Some(&schema_key),
-        );
-        let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            schema_key,
-            schema: Arc::new(schema),
-            records: vec![],
-            records_size: 0,
-        });
-        hour_buf
-            .records
-            .push(Arc::new(json::Value::Object(record.to_owned())));
-        hour_buf.records_size += record_str.len();
-
-        // update status
-        let stream_status = stream_status_map
-            .entry(stream_name.clone())
-            .or_insert_with(|| StreamStatus::new(&stream_name));
-        stream_status.status.successful += 1;
     }
 
     // write data to wal
-    let time = start.elapsed().as_secs_f64();
     for (stream_name, stream_data) in stream_data_buf {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
@@ -301,11 +386,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         let writer =
             ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
-        // if let Err(e) = writer.sync().await {
-        //     log::error!("ingestion error while syncing writer: {}", e);
-        // }
 
-        req_stats.response_time = time;
+        req_stats.response_time = start.elapsed().as_secs_f64();
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -318,6 +400,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         .await;
     }
 
+    let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/metrics/_json",
@@ -337,30 +420,15 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         ])
         .inc();
 
+    // only one trigger per request, as it updates etcd
+    for (_, entry) in stream_trigger_map {
+        if let Some(entry) = entry {
+            evaluate_trigger(entry).await;
+        }
+    }
+
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
         stream_status_map.values().map(|v| v.to_owned()).collect(),
     ))
-}
-
-fn apply_func(
-    runtime: &mut Runtime,
-    org_id: &str,
-    metric_name: &str,
-    value: json::Value,
-) -> Result<json::Value> {
-    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Metrics,
-        metric_name,
-    );
-
-    crate::service::ingestion::apply_stream_functions(
-        &local_trans,
-        value,
-        &stream_vrl_map,
-        org_id,
-        metric_name,
-        runtime,
-    )
 }
