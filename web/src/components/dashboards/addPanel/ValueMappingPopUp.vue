@@ -78,7 +78,7 @@
               <q-input
                 v-model="mapping.value"
                 label="Value"
-                style="width: 120px"
+                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
@@ -88,7 +88,7 @@
               <q-input
                 v-model="mapping.pattern"
                 label="Regex"
-                style="width: 120px"
+                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
@@ -98,7 +98,7 @@
               <q-input
                 v-model="mapping.from"
                 label="From"
-                style="width: 80px"
+                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
@@ -106,7 +106,7 @@
               <q-input
                 v-model="mapping.to"
                 label="To"
-                style="width: 80px"
+                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
@@ -115,7 +115,7 @@
             <q-input
               v-model="mapping.text"
               label="Display Value"
-              style="width: 120px"
+              style="width: 150px"
               class="input-spacing"
               dense
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
@@ -127,7 +127,7 @@
                   filled
                   class="input-spacing"
                   dense
-                  style="width: 80px"
+                  style="width: 116px"
                 >
                   <template v-slot:append>
                     <q-icon name="colorize" class="cursor-pointer">
@@ -147,6 +147,7 @@
               <div v-else>
                 <q-btn
                   label="Set color"
+                  style="width: 150px"
                   no-caps
                   flat
                   dense
