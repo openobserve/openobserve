@@ -225,8 +225,11 @@ export default defineComponent({
           )?.panels ?? [])
         : [];
     });
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const refreshDashboard = () => {
       emit("refresh");
     };
@@ -380,9 +383,17 @@ export default defineComponent({
 
         showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard update failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Dashboard update failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Dashboard update failed", {
+            timeout: 2000,
+          });
+        }
 
         // refresh dashboard
         refreshDashboard();

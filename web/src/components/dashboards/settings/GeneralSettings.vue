@@ -108,8 +108,11 @@ export default defineComponent({
     const store: any = useStore();
     const { t } = useI18n();
     const route = useRoute();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
 
     const addDashboardForm: Ref<any> = ref(null);
     const closeBtn: Ref<any> = ref(null);
@@ -198,9 +201,17 @@ export default defineComponent({
 
         emit("save");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard updation failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Dashboard updation failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Dashboard updation failed", {
+            timeout: 2000,
+          });
+        }
       }
     });
 
