@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::{meta::stream::StreamType, utils::json};
+use config::{meta::stream::StreamType, metrics::DB_QUERY_NUMS, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
@@ -56,6 +56,9 @@ impl super::SchemaHistory for PostgresSchemaHistory {
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "schema_history"])
+            .inc();
         match sqlx::query(
             r#"
 INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
@@ -86,6 +89,9 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "schema_history"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
@@ -122,6 +128,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
     ];
     for (table, sql) in sqls {
+        DB_QUERY_NUMS.with_label_values(&["create", table]).inc();
         if let Err(e) = sqlx::query(sql).execute(&pool).await {
             log::error!("[POSTGRES] create table {} index error: {}", table, e);
             return Err(e.into());
