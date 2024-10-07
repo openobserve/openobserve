@@ -44,8 +44,8 @@ impl ShortUrl for PostgresShortUrl {
         let query = r#"
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                original_url VARCHAR(2048) NOT NULL UNIQUE,
-                short_id VARCHAR(32) NOT NULL UNIQUE,
+                original_url VARCHAR(2048) NOT NULL,
+                short_id VARCHAR(32) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             "#;
@@ -55,8 +55,14 @@ impl ShortUrl for PostgresShortUrl {
 
     /// Create index for short_urls at short_id and original_url
     async fn create_table_index(&self) -> Result<()> {
-        create_index("short_id_idx", "short_urls", true, &["short_id"]).await?;
-        create_index("original_url_idx", "short_urls", true, &["original_url"]).await?;
+        create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
+        create_index(
+            "short_urls_original_url_idx",
+            "short_urls",
+            false,
+            &["original_url"],
+        )
+        .await?;
         Ok(())
     }
 

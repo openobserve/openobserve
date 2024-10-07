@@ -27,33 +27,43 @@ pub fn get_base_url() -> String {
     format!("{}{}", config.common.web_url, config.common.base_uri)
 }
 
+async fn store_short_url(short_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
+    let entry = ShortUrlRecord::new(short_id.to_string(), original_url.to_string());
+    db::short_url::set(short_id, entry.clone()).await?;
+    Ok(format!("{}/short/{}", get_base_url(), entry.short_id))
+}
+
+fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
+    match timestamp {
+        Some(ts) => {
+            let input = format!("{}{}", original_url, ts);
+            md5::short_hash(&input)
+        }
+        None => md5::short_hash(original_url),
+    }
+}
+
 /// Shortens the given original URL and stores it in the database
 pub async fn shorten(original_url: &str) -> Result<String, anyhow::Error> {
-    let mut short_id = md5::short_hash(original_url);
+    let mut short_id = generate_short_id(original_url, None);
 
-    // Check if the generated short_id is already present in the database
-    if db::short_url::get(short_id.as_str()).await.is_ok() {
-        // Handle hash conflict - create a new hash using the timestamp
-        let timestamp = Utc::now().timestamp();
-        let input = format!("{}{}", original_url, timestamp);
-        short_id = md5::short_hash(&input);
+    if let Ok(existing_url) = db::short_url::get(short_id.as_str()).await {
+        if existing_url == original_url {
+            return Ok(format!("{}/short/{}", get_base_url(), short_id));
+        }
     }
 
-    let entry = ShortUrlRecord::new(short_id.clone(), original_url.to_string());
-
-    // Store the short_id and original_url in the database
-    let result = db::short_url::set(&short_id, entry.clone()).await;
+    let result = store_short_url(&short_id, original_url).await;
 
     match result {
-        Ok(_) => Ok(format!("{}/short/{}", get_base_url(), entry.short_id)),
+        Ok(url) => Ok(url),
         Err(e) => {
-            // Try to downcast the error to `infra::errors::Error`
-            if let Some(infra_error) = e.downcast_ref::<infra::errors::Error>() {
+            if let Some(infra_error) = e.downcast_ref::<Error>() {
                 match infra_error {
                     Error::DbError(DbError::UniqueViolation) => {
-                        let existing_short_id =
-                            db::short_url::get_by_original_url(original_url).await?;
-                        Ok(format!("{}/short/{}", get_base_url(), existing_short_id))
+                        let timestamp = Utc::now().timestamp();
+                        short_id = generate_short_id(original_url, Some(timestamp));
+                        store_short_url(&short_id, original_url).await
                     }
                     _ => Err(e),
                 }

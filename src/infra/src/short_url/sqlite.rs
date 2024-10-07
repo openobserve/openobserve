@@ -48,8 +48,8 @@ impl ShortUrl for SqliteShortUrl {
                 CREATE TABLE IF NOT EXISTS short_urls
                 (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                    original_url VARCHAR(2048) NOT NULL UNIQUE,
-                    short_id     VARCHAR(32) NOT NULL UNIQUE,
+                    original_url VARCHAR(2048) NOT NULL,
+                    short_id     VARCHAR(32) NOT NULL,
                     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 "#,
@@ -62,8 +62,14 @@ impl ShortUrl for SqliteShortUrl {
 
     /// Creates indexes on the short_urls table
     async fn create_table_index(&self) -> Result<()> {
-        create_index("short_id_idx", "short_urls", true, &["short_id"]).await?;
-        create_index("original_url_idx", "short_urls", true, &["original_url"]).await?;
+        create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
+        create_index(
+            "short_urls_original_url_idx",
+            "short_urls",
+            false,
+            &["original_url"],
+        )
+        .await?;
         Ok(())
     }
 

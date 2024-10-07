@@ -45,7 +45,7 @@ impl ShortUrl for MysqlShortUrl {
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 original_url TEXT NOT NULL,
-                short_id VARCHAR(32) NOT NULL UNIQUE,
+                short_id VARCHAR(32) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         "#;
@@ -55,12 +55,12 @@ impl ShortUrl for MysqlShortUrl {
 
     /// Create index for short_urls at short_id and original_url
     async fn create_table_index(&self) -> Result<()> {
-        create_index("short_id_idx", "short_urls", true, &["short_id"]).await?;
+        create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
         create_index(
-            "original_url_idx",
+            "short_urls_original_url_idx",
             "short_urls",
-            true,
-            &["original_url(255)"],
+            false,
+            &["original_url(32)"],
         )
         .await?;
         Ok(())
