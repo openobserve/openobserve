@@ -157,7 +157,8 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
                     false,
                     db::NEED_WATCH,
                     None,
-                ).await?;
+                )
+                .await?;
             }
         }
     }

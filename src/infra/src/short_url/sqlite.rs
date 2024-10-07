@@ -18,10 +18,7 @@ use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 use crate::{
-    db::{
-        postgres::CLIENT,
-        sqlite::{create_index, CLIENT_RO, CLIENT_RW},
-    },
+    db::sqlite::{create_index, CLIENT_RO, CLIENT_RW},
     errors::{DbError, Error, Result},
     short_url::{ShortUrl, ShortUrlRecord},
 };
@@ -208,7 +205,7 @@ impl ShortUrl for SqliteShortUrl {
         expired_before: DateTime<Utc>,
         limit: Option<i64>,
     ) -> Result<Vec<String>> {
-        let pool = CLIENT.clone();
+        let client = CLIENT_RO.clone();
 
         let mut query = r#"
             SELECT short_id FROM short_urls
@@ -226,7 +223,7 @@ impl ShortUrl for SqliteShortUrl {
             query = query.bind(limit_value);
         }
 
-        let expired_short_ids: Vec<(String,)> = query.fetch_all(&pool).await?;
+        let expired_short_ids: Vec<(String,)> = query.fetch_all(&client).await?;
         let expired_short_ids: Vec<String> = expired_short_ids
             .into_iter()
             .map(|(short_id,)| short_id)
@@ -238,7 +235,9 @@ impl ShortUrl for SqliteShortUrl {
         if short_ids.is_empty() {
             return Ok(());
         }
-        let pool = CLIENT.clone();
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let mut tx = client.begin().await?;
 
         let query = format!(
             "
@@ -246,10 +245,22 @@ impl ShortUrl for SqliteShortUrl {
             WHERE short_id IN ({})
         ",
             short_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
-            // short_ids.join(",")
         );
 
-        sqlx::query(&query).bind(&short_ids).execute(&pool).await?;
+        let mut sql_query = sqlx::query(&query);
+        for short_id in &short_ids {
+            sql_query = sql_query.bind(short_id);
+        }
+
+        let result = sql_query.execute(&mut *tx).await;
+
+        if result.is_ok() {
+            tx.commit().await?;
+        }
+
+        // release lock
+        drop(client);
+
         Ok(())
     }
 }
