@@ -101,6 +101,8 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+/// Returns Error if the first query is failed, otherwise returns the partial results.
+/// In case one query fails, the remaining queries are not executed.
 #[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
 pub async fn search_multi(
     trace_id: &str,
@@ -157,6 +159,7 @@ pub async fn search_multi(
     let queries_len = queries.len();
     let mut stream_name = "".to_string();
     let mut sqls = vec![];
+    let mut index = 0;
 
     for mut req in queries {
         stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
@@ -182,6 +185,7 @@ pub async fn search_multi(
 
         match res {
             Ok(res) => {
+                index += 1;
                 multi_res.took += res.took;
 
                 if res.total > multi_res.total {
@@ -212,14 +216,22 @@ pub async fn search_multi(
             }
             Err(e) => {
                 log::error!("search_multi: search error: {:?}", e);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
-                return Err(e); // TODO: return partial results
+                if index == 0 {
+                    // Error in the first query, return the error
+                    return Err(e); // TODO: return partial results
+                } else {
+                    // Error in subsequent queries, add the error to the response and break
+                    // No need to run the remaining queries
+                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.is_partial = true;
+                    break;
+                }
             }
         }
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() {
+    multi_res.hits = if query_fn.is_some() && multi_res.hits.len() > 0 && !multi_res.is_partial {
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
