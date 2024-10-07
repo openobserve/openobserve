@@ -30,13 +30,13 @@
     </div>
     <div class="tw-mb-4">
       <draggable
-        v-model="dashboardPanelData.data.config.mappings"
+        v-model="valueMapping"
         :options="dragOptions"
         @mousedown.stop="() => {}"
         data-test="dashboard-addpanel-config-value-mapping-drag"
       >
         <div
-          v-for="(mapping, index) in dashboardPanelData.data.config.mappings"
+          v-for="(mapping, index) in valueMapping"
           :key="index"
           class="draggable-row"
         >
@@ -179,29 +179,26 @@
   </div>
 </template>
 <script lang="ts">
-import { inject, ref } from "vue";
+import { ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { onMounted } from "vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
   components: {},
-  props: {},
+  props: {
+    valueMapping: {
+      type: Array,
+      default: () => [],
+    },
+  },
   emits: ["close"],
-  setup(props, { emit }) {
+  setup(props: any, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
 
     const dragOptions = ref({
       animation: 200,
@@ -223,7 +220,7 @@ export default defineComponent({
     ];
 
     const addValueMapping = () => {
-      dashboardPanelData.data.config.mappings.push({
+      props.valueMapping.push({
         type: "value",
         value: "",
         color: null,
@@ -231,31 +228,26 @@ export default defineComponent({
     };
 
     const removeValueMappingByIndex = (index: number) => {
-      dashboardPanelData.data.config.mappings.splice(index, 1);
+      props.valueMapping.splice(index, 1);
     };
 
     onMounted(() => {
-      if (!dashboardPanelData.data.config.mappings) {
-        dashboardPanelData.data.config.mappings = [];
-      }
-
       // if mappings is empty, add default value mapping
-      if (dashboardPanelData.data.config.mappings.length == 0) {
+      if (props.valueMapping.length == 0) {
         addValueMapping();
       }
     });
 
     const setColorByIndex = (index: number) => {
-      dashboardPanelData.data.config.mappings[index].color = "#000000";
+      props.valueMapping[index].color = "#000000";
     };
 
     const removeColorByIndex = (index: number) => {
-      dashboardPanelData.data.config.mappings[index].color = null;
+      props.valueMapping[index].color = null;
     };
 
     return {
       t,
-      dashboardPanelData,
       store,
       addValueMapping,
       removeValueMappingByIndex,
