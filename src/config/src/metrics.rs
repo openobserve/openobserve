@@ -668,7 +668,7 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("db_query_nums", "db query number")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["type", "table"],
+        &["operation", "table"],
     )
     .expect("Metric created")
 });
@@ -678,7 +678,7 @@ pub static DB_QUERY_TIME: Lazy<HistogramVec> = Lazy::new(|| {
         HistogramOpts::new("db_query_time", "db query time. ".to_owned())
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["kind", "table"],
+        &["operation", "table"],
     )
     .expect("Metric created")
 });
