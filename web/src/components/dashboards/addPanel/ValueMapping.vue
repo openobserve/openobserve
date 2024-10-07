@@ -85,6 +85,7 @@
     />
     <q-dialog v-model="showValueMappingPopUp">
       <ValueMappingPopUp
+        :value-mapping="dashboardPanelData.data.config.mappings"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
     </q-dialog>
