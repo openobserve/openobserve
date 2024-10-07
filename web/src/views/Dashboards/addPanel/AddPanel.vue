@@ -421,8 +421,11 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { showErrorNotification, showPositiveNotification } =
-      useNotifications();
+    const {
+      showErrorNotification,
+      showPositiveNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -961,15 +964,25 @@ export default defineComponent({
           },
         });
       } catch (error: any) {
-        showErrorNotification(
-          error?.message ??
-            (editMode.value
-              ? "Error while updating panel"
-              : "Error while creating panel"),
-          {
-            timeout: 2000,
-          },
-        );
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              (editMode.value
+                ? "Error while updating panel"
+                : "Error while creating panel"),
+          );
+        } else {
+          showErrorNotification(
+            error?.message ??
+              (editMode.value
+                ? "Error while updating panel"
+                : "Error while creating panel"),
+            {
+              timeout: 2000,
+            },
+          );
+        }
       }
     };
 

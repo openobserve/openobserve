@@ -22,6 +22,41 @@ const useNotifications = () => {
     });
   };
 
+  const showConfictErrorNotificationWithRefreshBtn = (
+    message: string,
+    options?: any,
+  ) => {
+    return quasar.notify({
+      type: "negative",
+      message: message,
+      multiLine: false,
+      timeout: 0,
+      actions: [
+        {
+          // icon: "refresh",
+          label: "Refresh",
+          color: "white",
+          style: "font-weight: bold",
+          padding: "4px",
+          handler: () => {
+            // refresh whole page
+            window.location.reload();
+          },
+        },
+        {
+          icon: "close",
+          padding: "4px",
+          style: "font-weight: bold",
+          color: "white",
+          handler: () => {
+            /* ... */
+          },
+        },
+      ],
+      ...(options || {}),
+    });
+  };
+
   const showPositiveNotification = (message: string, options?: any) => {
     return quasar.notify({
       type: "positive",
@@ -44,6 +79,7 @@ const useNotifications = () => {
   return {
     showErrorNotification,
     showPositiveNotification,
+    showConfictErrorNotificationWithRefreshBtn,
   };
 };
 
