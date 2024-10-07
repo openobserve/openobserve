@@ -388,13 +388,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         req_stats.response_time = start.elapsed().as_secs_f64();
+        let fns_length: usize = stream_pipeline_params
+            .get(&stream_name)
+            .map_or(0, |params| {
+                params.as_ref().map_or(0, |(inner, ..)| inner.num_of_func())
+            });
         report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,
             StreamType::Metrics,
             UsageType::JsonMetrics,
-            0,
+            fns_length as _,
             started_at,
         )
         .await;
