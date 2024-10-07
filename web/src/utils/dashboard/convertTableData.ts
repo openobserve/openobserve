@@ -50,6 +50,51 @@ export const convertTableData = (
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
 
+  // value mapping
+  tableRows?.forEach((row: any) => {
+    Object.entries(row).forEach(([key, value]: any) => {
+      const foundValue = panelSchema.config?.mappings?.find((v: any) => {
+        if (v.type == "value") {
+          return (
+            v.value == value &&
+            v.text != null &&
+            v.text != "" &&
+            v.text != undefined
+          );
+        } else if (v.type == "range") {
+          if (
+            v.from &&
+            v.to &&
+            !Number.isNaN(+v.from) &&
+            !Number.isNaN(+v.to)
+          ) {
+            return (
+              +v.from <= +value &&
+              +v.to >= +value &&
+              v.text != null &&
+              v.text != "" &&
+              v.text != undefined
+            );
+          }
+          return false;
+        } else if (v.type == "regex") {
+          // check/test if the value matches the regex
+          return (
+            new RegExp(v?.pattern ?? "").test(value) &&
+            v.text != null &&
+            v.text != "" &&
+            v.text != undefined
+          );
+        }
+        return false;
+      });
+
+      if (foundValue && foundValue.text) {
+        row[key] = foundValue.text;
+      }
+    });
+  });
+
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
     let responseKeys: any = new Set();
