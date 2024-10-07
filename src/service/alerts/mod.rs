@@ -52,7 +52,6 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         stream_name: Option<&str>,
         stream_type: StreamType,
         trigger_condition: &TriggerCondition,
-        query_condition: &QueryCondition,
         start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 }
@@ -295,7 +294,7 @@ impl QueryConditionExt for QueryCondition {
                 per_query_response: false, // Will return results in single array
             };
 
-            SearchService::search_multi(&trace_id, &org_id, stream_type, None, &req).await
+            SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
             // fire the query
             let req = config::meta::search::Request {
@@ -333,7 +332,7 @@ impl QueryConditionExt for QueryCondition {
                                                              * scheduled & inform FE */
                 index_type: "".to_string(),
             };
-            SearchService::search(&trace_id, &org_id, stream_type, None, &req).await
+            SearchService::search(&trace_id, org_id, stream_type, None, &req).await
         };
 
         // Resp hits can be of two types -

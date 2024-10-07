@@ -148,7 +148,6 @@ impl DerivedStreamExt for DerivedStream {
                 None,
                 self.stream_type,
                 &self.trigger_condition,
-                &self.query_condition,
                 start_time,
             )
             .await
