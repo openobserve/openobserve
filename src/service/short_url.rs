@@ -22,6 +22,8 @@ use infra::{
 
 use crate::service::db;
 
+const SHORT_URL_WEB_PATH: &str = "/short/";
+
 pub fn get_base_url() -> String {
     let config = get_config();
     format!("{}{}", config.common.web_url, config.common.base_uri)
@@ -30,7 +32,12 @@ pub fn get_base_url() -> String {
 async fn store_short_url(short_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
     let entry = ShortUrlRecord::new(short_id, original_url);
     db::short_url::set(short_id, entry).await?;
-    Ok(format!("{}/short/{}", get_base_url(), short_id))
+    Ok(format!(
+        "{}{}{}",
+        get_base_url(),
+        SHORT_URL_WEB_PATH,
+        short_id
+    ))
 }
 
 fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
@@ -49,7 +56,12 @@ pub async fn shorten(original_url: &str) -> Result<String, anyhow::Error> {
 
     if let Ok(existing_url) = db::short_url::get(&short_id).await {
         if existing_url == original_url {
-            return Ok(format!("{}/short/{}", get_base_url(), short_id));
+            return Ok(format!(
+                "{}{}{}",
+                get_base_url(),
+                SHORT_URL_WEB_PATH,
+                short_id
+            ));
         }
     }
 
@@ -80,7 +92,7 @@ pub async fn retrieve(short_id: &str) -> Option<String> {
 
 /// Extracts the short ID from the shortened URL
 pub fn get_short_id_from_url(short_url: &str) -> Option<String> {
-    let prefix = format!("{}/short/", get_base_url());
+    let prefix = format!("{}{}", get_base_url(), SHORT_URL_WEB_PATH);
     short_url.strip_prefix(&prefix).map(|s| s.to_string())
 }
 
