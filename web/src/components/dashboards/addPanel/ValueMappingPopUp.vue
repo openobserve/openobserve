@@ -27,13 +27,22 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>Value Mappings</span>
       </div>
-      <q-icon name="cancel" class="cursor-pointer" v-close-popup="true" />
+      <q-btn
+        icon="close"
+        class="q-ml-xs"
+        unelevated
+        size="sm"
+        round
+        outline
+        :title="t('dashboard.cancel')"
+        @click.stop="cancelEdit"
+        data-test="dashboard-tab-settings-tab-name-edit-cancel"
+      ></q-btn>
     </div>
     <div class="tw-mb-4">
       <draggable
         v-model="editedValueMapping"
         :options="dragOptions"
-        @end.stop="handleDragEnd"
         @mousedown.stop="() => {}"
         data-test="dashboard-addpanel-config-value-mapping-drag"
       >
@@ -163,22 +172,11 @@
           @click="addValueMapping"
           label="+ Add a new mapping"
           no-caps
-          flat
+          outline
           dense
           data-test="dashboard-addpanel-config-value-mapping-add-btn"
         />
         <div>
-          <q-btn
-            icon="close"
-            class="q-ml-xs"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('dashboard.cancel')"
-            @click.stop="cancelEdit"
-            data-test="dashboard-tab-settings-tab-name-edit-cancel"
-          ></q-btn>
           <q-btn
             @click="applyValueMapping"
             color="primary"
@@ -273,10 +271,6 @@ export default defineComponent({
       emit("close");
     };
 
-    const handleDragEnd = async () => {
-      console.log("handleDragEnd");
-    };
-
     return {
       t,
       store,
@@ -290,7 +284,6 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
-      handleDragEnd,
     };
   },
 });
