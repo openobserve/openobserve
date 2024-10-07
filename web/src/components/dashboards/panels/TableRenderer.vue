@@ -135,7 +135,8 @@ export default defineComponent({
           ) {
             return (
               ((+v.from <= +value && +v.to >= +value) ||
-                (+v.from >= +v.text && +v.to <= +v.text)) &&
+                (+v.from >= +v.text && +v.to <= +v.text) ||
+                v.text == value) &&
               v.color
             );
           }
