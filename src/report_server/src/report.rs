@@ -369,6 +369,7 @@ pub async fn generate_report(
     browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
+
     Ok((pdf_data, email_dashb_url))
 }
 

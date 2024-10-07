@@ -986,6 +986,8 @@ pub struct Limit {
         help = "use multi thread for file list query"
     )]
     pub file_list_multi_thread: bool,
+    #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
+    pub short_url_retention_days: i64,
 }
 
 #[derive(EnvConfig)]
