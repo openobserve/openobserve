@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="currentRouteName === 'pipelines'">
     <div
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+     :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
      class="full-wdith pipeline-list-table">
       <q-table
         data-test="pipeline-list-table"
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           @click="triggerExpand(props)"
         >
-          <q-td v-if="activeTab == 'scheduled'"  >
+          <q-td v-if="activeTab == 'scheduled' || activeTab == 'all'"  >
             <q-btn
               dense
               flat
@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-td>
           <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
+
           <template v-if="col.name !== 'actions'">
             {{ props.row[col.field] }}
           </template>
@@ -109,12 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           
           </template>
-</q-td>
+        </q-td>
 
         </q-tr>
         <q-tr v-show="expandedRow === props.row.pipeline_id" :props="props" >
 
-          <q-td  colspan="100%">
+          <q-td v-if="props.row?.sql_query"  colspan="100%">
 
             <div  class="text-left tw-px-2 q-mb-sm  expanded-content">
             <div class="tw-flex tw-items-center q-py-sm  ">
@@ -123,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-flex tw-items-start  tw-justify-center" >
             
               <div class="scrollable-content  expanded-sql ">
-                <pre style="text-wrap: wrap;">{{ props.row?.sql_query }}</pre>
+                <pre style="text-wrap: wrap;">{{ props.row?.sql_query  }} </pre>
 
               </div>
               
@@ -137,48 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #no-data>
           <no-data />
         </template>
-        <!-- <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="editPipeline(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="openDeleteDialog(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleAlertState(props.row)"
-            />
-          </q-td>
-        </template> -->
-
+ 
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
             <q-tooltip>
@@ -279,7 +239,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 
-import { update } from "lodash-es";
+import { filter, update } from "lodash-es";
 
 
 const { t } = useI18n();
@@ -321,6 +281,12 @@ const activeTab = ref("all");
 const filteredPipelines = ref([]);
 const columns = ref([]);
 const updateActiveTab = () =>{
+  if(activeTab.value === "all"){
+    filteredPipelines.value = pipelines.value;
+    resultTotal.value = pipelines.value.length;
+    columns.value = getColumnsForActiveTab(activeTab.value);
+    return;
+  }
   filteredPipelines.value = pipelines.value.filter((pipeline) => {
     return pipeline.source.source_type === activeTab.value;
   });
@@ -368,6 +334,10 @@ const currentRouteName = computed(() => {
 });
 
 const filterColumns = () => {
+  // if(activeTab.value === "all"){
+  //   console.log(columns.value)
+  //   return columns.value;
+  // }
   if(activeTab.value === "realtime"){
     return columns.value;
   }
@@ -398,6 +368,15 @@ const toggleAlertState = (row) =>{
 }
 
 const triggerExpand = (props) =>{
+  if(props.row.source.source_type === 'realtime' && activeTab.value !== "realtime"){
+    q.notify({
+      message: "Realtime pipelines do not have SQL queries",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
   if (expandedRow.value === props.row.pipeline_id) {
       expandedRow.value = null;
     } else {
@@ -447,9 +426,7 @@ const getColumnsForActiveTab = (tab) => {
     sortable: false,
   };
 if(tab === "all"){
-  const stream_name = { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true };
-  scheduledColumns.splice(2, 0, stream_name);
-  return [ ...scheduledColumns,, actionsColumn];
+  return [ ...scheduledColumns, actionsColumn];
 }
   return tab === "realtime"
     ? [ ...realTimeColumns, actionsColumn]
