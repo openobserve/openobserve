@@ -17,7 +17,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
-use chrono::Utc;
 use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
@@ -30,19 +29,20 @@ use crate::{common::infra::config::SHORT_URLS, service::db};
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";
 // GC interval for `SHORT_URLS` cache in days
-pub const SHORT_URL_GC_INTERVAL: i64 = 1; // days
+const SHORT_URL_GC_INTERVAL: i64 = 1; // days
+const SHORT_URL_CACHE_LIMIT: i64 = 10_000; // records
 
 pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
-    match SHORT_URLS.get(short_id) {
-        Some(val) => Ok(val.original_url.to_string()),
-        None => {
-            let val = short_url::get(short_id)
-                .await
-                .map_err(|_| anyhow!("Short URL not found in db"))?;
-            SHORT_URLS.insert(short_id.to_string(), val.clone());
-            Ok(val.original_url)
-        }
+    if let Some(v) = SHORT_URLS.get(short_id) {
+        return Ok(v.original_url.to_string());
     }
+
+    let val = short_url::get(short_id)
+        .await
+        .map_err(|_| anyhow!("Short URL not found in db"))?;
+    let original_url = val.original_url.clone();
+    SHORT_URLS.insert(short_id.to_string(), val);
+    Ok(original_url)
 }
 
 pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Error> {
@@ -50,7 +50,7 @@ pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Er
         return Err(e).context("Failed to add short URL to DB");
     }
 
-    SHORT_URLS.insert(short_id.to_string(), entry.clone());
+    SHORT_URLS.insert(short_id.to_string(), entry);
 
     // trigger watch event
     db::put(
@@ -60,6 +60,7 @@ pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Er
         None,
     )
     .await?;
+
     Ok(())
 }
 
@@ -74,7 +75,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let config = get_config();
     tokio::spawn(run_gc_task(
         days_to_minutes(SHORT_URL_GC_INTERVAL),
-        days_to_minutes(config.short_url.short_url_retention_days),
+        days_to_minutes(config.limit.short_url_retention_days),
     ));
 
     loop {
@@ -109,17 +110,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 /// Preload all short URLs from the database into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let config = get_config();
-    let retention_minutes = days_to_minutes(config.compact.data_retention_days);
-    let retention_period = chrono::Duration::minutes(retention_minutes);
-    let now = Utc::now();
-
-    // List limited to 10k records
-    let ret = short_url::list(Some(10_000)).await?;
+    let ret = short_url::list(Some(SHORT_URL_CACHE_LIMIT)).await?;
     for row in ret.into_iter() {
-        if now - row.created_at < retention_period {
-            SHORT_URLS.insert(row.short_id.to_owned(), row.clone());
-        }
+        SHORT_URLS.insert(row.short_id.to_owned(), row);
     }
     log::info!("[SHORT_URLS] Cached with len: {}", SHORT_URLS.len());
     Ok(())
@@ -141,14 +134,16 @@ async fn run_gc_task(gc_interval_minutes: i64, retention_days: i64) {
 }
 
 // Garbage Collection to clean up expired entries from cache
-pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error> {
+pub async fn gc_cache(_retention_period_minutes: i64) -> Result<(), anyhow::Error> {
     log::info!(
         "[SHORT_URLS] Garbage collection start with cache size: {}",
         SHORT_URLS.len(),
     );
-    let retention_period = chrono::Duration::minutes(retention_period_minutes);
-    let now = Utc::now();
-    SHORT_URLS.retain(|_short_id, entry| now - entry.created_at < retention_period);
+
+    // TODO, remove from db
+    // let retention_period = chrono::Duration::minutes(retention_period_minutes);
+    // let now = Utc::now();
+    // SHORT_URLS.retain(|_short_id, entry| now - entry.created_at < retention_period);
 
     log::info!(
         "[SHORT_URLS] Garbage collection end with cache size: {}",
@@ -159,40 +154,4 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
 
 fn days_to_minutes(days: i64) -> i64 {
     days * 24 * 60
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_gc_removes_expired_entries_and_retains_valid_entries() {
-        let retention_minutes = 60; // 1 hour retention period
-        let now = Utc::now();
-
-        // Insert an expired entry (2 hours old)
-        let expired_entry = ShortUrlRecord {
-            short_id: "expired".to_string(),
-            original_url: "https://expired.com".to_string(),
-            created_at: now - chrono::Duration::hours(2),
-        };
-        SHORT_URLS.insert("expired".to_string(), expired_entry.clone());
-
-        // Insert a valid entry (30 minutes old)
-        let valid_entry = ShortUrlRecord {
-            short_id: "valid".to_string(),
-            original_url: "https://valid.com".to_string(),
-            created_at: now - chrono::Duration::minutes(30),
-        };
-        SHORT_URLS.insert("valid".to_string(), valid_entry.clone());
-
-        // Run garbage collection
-        gc_cache(retention_minutes).await.unwrap();
-
-        // Assert expired entry is removed
-        assert!(SHORT_URLS.get("expired").is_none());
-
-        // Assert valid entry is still present
-        assert!(SHORT_URLS.get("valid").is_some());
-    }
 }

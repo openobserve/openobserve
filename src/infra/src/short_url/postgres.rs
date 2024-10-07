@@ -19,7 +19,7 @@ use sqlx::Row;
 use crate::{
     db::postgres::{create_index, CLIENT},
     errors::{DbError, Error, Result},
-    short_url::{PgShortUrlRecord, ShortUrl, ShortUrlRecord},
+    short_url::{ShortUrl, ShortUrlRecord},
 };
 
 pub struct PostgresShortUrl {}
@@ -44,8 +44,8 @@ impl ShortUrl for PostgresShortUrl {
         let query = r#"
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                original_url VARCHAR(2048) NOT NULL,
                 short_id VARCHAR(32) NOT NULL,
+                original_url VARCHAR(2048) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             "#;
@@ -63,23 +63,23 @@ impl ShortUrl for PostgresShortUrl {
             &["original_url"],
         )
         .await?;
+        create_index(
+            "short_urls_created_at_idx",
+            "short_urls",
+            false,
+            &["created_at"],
+        )
+        .await?;
         Ok(())
     }
 
     /// Add a new entry to the short_urls table
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
-
-        // Insert query with ON CONFLICT clause to handle unique violations
-        let query = r#"
-        INSERT INTO short_urls (original_url, short_id)
-        VALUES ($1, $2)
-        ON CONFLICT (short_id) DO NOTHING;
-    "#;
-
+        let query = r#"INSERT INTO short_urls (short_id, original_url) VALUES ($1, $2);"#;
         let result = sqlx::query(query)
-            .bind(original_url)
             .bind(short_id)
+            .bind(original_url)
             .execute(&pool)
             .await;
 
@@ -95,10 +95,7 @@ impl ShortUrl for PostgresShortUrl {
     /// Remove an entry from the short_urls table
     async fn remove(&self, short_id: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"
-            DELETE FROM short_urls
-            WHERE short_id = $1;
-            "#;
+        let query = r#"DELETE FROM short_urls WHERE short_id = $1;"#;
         sqlx::query(query).bind(short_id).execute(&pool).await?;
         Ok(())
     }
@@ -106,34 +103,25 @@ impl ShortUrl for PostgresShortUrl {
     /// Get an entry from the short_urls table
     async fn get(&self, short_id: &str) -> Result<ShortUrlRecord> {
         let pool = CLIENT.clone();
-        let query = r#"
-            SELECT short_id, original_url, created_at
-            FROM short_urls
-            WHERE short_id = $1;
-            "#;
-        let row = sqlx::query_as::<_, PgShortUrlRecord>(query)
+        let query = r#"SELECT short_id, original_url FROM short_urls WHERE short_id = $1;"#;
+        let row = sqlx::query_as::<_, ShortUrlRecord>(query)
             .bind(short_id)
             .fetch_one(&pool)
             .await?;
-
-        Ok(row.into())
+        Ok(row)
     }
 
     /// List all entries from the short_urls table
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
-        let mut query = r#"
-            SELECT short_id, original_url, created_at
-            FROM short_urls
-            ORDER BY created_at DESC
-            "#
-        .to_string();
+        let mut query =
+            r#"SELECT short_id, original_url FROM short_urls ORDER BY id DESC"#.to_string();
 
         if limit.is_some() {
             query.push_str(" LIMIT $1");
         }
 
-        let query_builder = sqlx::query_as::<_, PgShortUrlRecord>(&query);
+        let query_builder = sqlx::query_as::<_, ShortUrlRecord>(&query);
         let query_builder = if let Some(limit_value) = limit {
             query_builder.bind(limit_value)
         } else {
@@ -141,36 +129,23 @@ impl ShortUrl for PostgresShortUrl {
         };
 
         let rows = query_builder.fetch_all(&pool).await?;
-        let rows = rows.into_iter().map(|r| r.into()).collect();
-
         Ok(rows)
     }
 
     /// Check if an entry exists in the short_urls table
     async fn contains(&self, short_id: &str) -> Result<bool> {
         let pool = CLIENT.clone();
-        let query = r#"
-                SELECT 1
-                FROM short_urls
-                WHERE short_id = $1
-        "#;
-        let row: (bool,) = sqlx::query_as(query)
-            .bind(short_id)
-            .fetch_one(&pool)
-            .await?;
-        Ok(row.0)
+        let query = r#"SELECT 1 FROM short_urls WHERE short_id = $1"#;
+        let rows = sqlx::query(query).bind(short_id).fetch_all(&pool).await?;
+        Ok(!rows.is_empty())
     }
 
     /// Get the number of entries in the short_urls table
     async fn len(&self) -> usize {
         let pool = CLIENT.clone();
-        let ret = match sqlx::query(
-            r#"
-        SELECT COUNT(*)::BIGINT AS num FROM short_urls;
-        "#,
-        )
-        .fetch_one(&pool)
-        .await
+        let ret = match sqlx::query(r#"SELECT COUNT(*)::BIGINT AS num FROM short_urls;"#)
+            .fetch_one(&pool)
+            .await
         {
             Ok(r) => r,
             Err(e) => {
@@ -188,9 +163,7 @@ impl ShortUrl for PostgresShortUrl {
     /// Clear all entries from the short_urls table
     async fn clear(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"
-            DELETE FROM short_urls;
-            "#;
+        let query = r#"DELETE FROM short_urls;"#;
         match sqlx::query(query).execute(&pool).await {
             Ok(_) => log::info!("[SHORT_URL] short_urls table cleared"),
             Err(e) => log::error!("[POSTGRES] short_urls table clear error: {}", e),

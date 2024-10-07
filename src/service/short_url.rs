@@ -28,9 +28,9 @@ pub fn get_base_url() -> String {
 }
 
 async fn store_short_url(short_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
-    let entry = ShortUrlRecord::new(short_id.to_string(), original_url.to_string());
-    db::short_url::set(short_id, entry.clone()).await?;
-    Ok(format!("{}/short/{}", get_base_url(), entry.short_id))
+    let entry = ShortUrlRecord::new(short_id, original_url);
+    db::short_url::set(short_id, entry).await?;
+    Ok(format!("{}/short/{}", get_base_url(), short_id))
 }
 
 fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
@@ -47,14 +47,13 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
 pub async fn shorten(original_url: &str) -> Result<String, anyhow::Error> {
     let mut short_id = generate_short_id(original_url, None);
 
-    if let Ok(existing_url) = db::short_url::get(short_id.as_str()).await {
+    if let Ok(existing_url) = db::short_url::get(&short_id).await {
         if existing_url == original_url {
             return Ok(format!("{}/short/{}", get_base_url(), short_id));
         }
     }
 
     let result = store_short_url(&short_id, original_url).await;
-
     match result {
         Ok(url) => Ok(url),
         Err(e) => {

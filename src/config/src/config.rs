@@ -324,7 +324,6 @@ pub struct Config {
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
-    pub short_url: ShortUrl,
 }
 
 #[derive(EnvConfig)]
@@ -987,6 +986,8 @@ pub struct Limit {
         help = "buffer for upper bound in mins"
     )]
     pub upper_bound_for_max_ts: i64,
+    #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
+    pub short_url_retention_days: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1267,12 +1268,6 @@ pub struct RUM {
     pub api_version: String,
     #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
     pub insecure_http: bool,
-}
-
-#[derive(EnvConfig)]
-pub struct ShortUrl {
-    #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
-    pub short_url_retention_days: i64,
 }
 
 pub fn init() -> Config {

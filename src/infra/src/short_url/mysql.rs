@@ -44,8 +44,8 @@ impl ShortUrl for MysqlShortUrl {
         let query = r#"
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                original_url TEXT NOT NULL,
                 short_id VARCHAR(32) NOT NULL,
+                original_url VARCHAR(2048) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         "#;
@@ -63,23 +63,25 @@ impl ShortUrl for MysqlShortUrl {
             &["original_url(32)"],
         )
         .await?;
+        create_index(
+            "short_urls_created_at_idx",
+            "short_urls",
+            false,
+            &["created_at"],
+        )
+        .await?;
         Ok(())
     }
 
     /// Add a new entry to the short_urls table
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"
-            INSERT INTO short_urls (original_url, short_id)
-            VALUES (?, ?);
-        "#;
-
+        let query = r#"INSERT INTO short_urls (short_id, original_url) VALUES (?, ?);"#;
         let result = sqlx::query(query)
-            .bind(original_url)
             .bind(short_id)
+            .bind(original_url)
             .execute(&pool)
             .await;
-
         match result {
             Ok(_) => Ok(()),
             Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
@@ -92,10 +94,7 @@ impl ShortUrl for MysqlShortUrl {
     /// Remove an entry from the short_urls table
     async fn remove(&self, short_id: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"
-            DELETE FROM short_urls
-            WHERE short_id = ?;
-        "#;
+        let query = r#"DELETE FROM short_urls WHERE short_id = ?;"#;
         sqlx::query(query).bind(short_id).execute(&pool).await?;
         Ok(())
     }
@@ -103,28 +102,19 @@ impl ShortUrl for MysqlShortUrl {
     /// Get an entry from the short_urls table
     async fn get(&self, short_id: &str) -> Result<ShortUrlRecord> {
         let pool = CLIENT.clone();
-        let query = r#"
-            SELECT short_id, original_url, created_at
-            FROM short_urls
-            WHERE short_id = ?;
-        "#;
+        let query = r#"SELECT short_id, original_url FROM short_urls WHERE short_id = ?;"#;
         let row = sqlx::query_as::<_, ShortUrlRecord>(query)
             .bind(short_id)
             .fetch_one(&pool)
             .await?;
-
         Ok(row)
     }
 
     /// List all entries from the short_urls table
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
-        let mut query = r#"
-            SELECT short_id, original_url, created_at
-            FROM short_urls
-            ORDER BY created_at DESC
-        "#
-        .to_string();
+        let mut query =
+            r#"SELECT short_id, original_url FROM short_urls ORDER BY id DESC"#.to_string();
 
         if limit.is_some() {
             query.push_str(" LIMIT ?");
@@ -144,28 +134,17 @@ impl ShortUrl for MysqlShortUrl {
     /// Check if an entry exists in the short_urls table
     async fn contains(&self, short_id: &str) -> Result<bool> {
         let pool = CLIENT.clone();
-        let query = r#"
-                SELECT 1
-                FROM short_urls
-                WHERE short_id = ?;
-        "#;
-        let row: (bool,) = sqlx::query_as(query)
-            .bind(short_id)
-            .fetch_one(&pool)
-            .await?;
-        Ok(row.0)
+        let query = r#"SELECT 1 FROM short_urls WHERE short_id = ?;"#;
+        let rows = sqlx::query(query).bind(short_id).fetch_all(&pool).await?;
+        Ok(!rows.is_empty())
     }
 
     /// Get the number of entries in the short_urls table
     async fn len(&self) -> usize {
         let pool = CLIENT.clone();
-        let ret = match sqlx::query(
-            r#"
-            SELECT COUNT(*) AS num FROM short_urls;
-            "#,
-        )
-        .fetch_one(&pool)
-        .await
+        let ret = match sqlx::query(r#"SELECT COUNT(*) AS num FROM short_urls;"#)
+            .fetch_one(&pool)
+            .await
         {
             Ok(r) => r,
             Err(e) => {
@@ -183,9 +162,7 @@ impl ShortUrl for MysqlShortUrl {
     /// Clear all entries from the short_urls table
     async fn clear(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"
-            DELETE FROM short_urls;
-        "#;
+        let query = r#"DELETE FROM short_urls;"#;
         match sqlx::query(query).execute(&pool).await {
             Ok(_) => log::info!("[SHORT_URL] short_urls table cleared"),
             Err(e) => log::error!("[MYSQL] short_urls table clear error: {}", e),
