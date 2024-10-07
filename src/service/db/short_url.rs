@@ -29,6 +29,8 @@ use crate::{common::infra::config::SHORT_URLS, service::db};
 
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";
+// GC interval for `SHORT_URLS` cache in days
+pub const SHORT_URL_GC_INTERVAL: i64 = 1; // days
 
 pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
     match SHORT_URLS.get(short_id) {
@@ -71,8 +73,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     // Spawn a background task for garbage collection
     let config = get_config();
     tokio::spawn(run_gc_task(
-        days_to_minutes(config.compact.data_gc_interval_days),
-        days_to_minutes(config.compact.data_retention_days),
+        days_to_minutes(SHORT_URL_GC_INTERVAL),
+        days_to_minutes(config.short_url.short_url_retention_days),
     ));
 
     loop {
