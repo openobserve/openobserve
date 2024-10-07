@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-    <div v-if="!showAddAlertDialog" class="full-width alert-list-table">
+  
+    <div v-if="!showAddAlertDialog && !showHistoryDialog" class="full-width alert-list-table">
       <q-table
         data-test="alert-list-table"
         ref="qTable"
@@ -143,17 +144,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-clone"
             ></q-btn>
             <q-btn
-              :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
+    :data-test="`alert-list-${props.row.name}-actions`"
+    icon="more_vert"
+    class="q-ml-xs"
+    padding="sm"
+    unelevated
+    size="sm"
+    round
+    flat
+    
+  >
+    <q-menu ref="menuRef" style="width: 150px" class="flex tw-flex-col" v-model="menuVisible[props.row.name]">
+      <q-list style="width:100%"   >
+        <q-item clickable @click="showAddUpdateFn(props)">
+          <!-- Icon for Edit -->
+          <q-item-section  avatar>
+            <q-icon name="edit" />
+          </q-item-section>
+          <q-item-section>
+            {{ t('alerts.edit') }}
+          </q-item-section>
+        </q-item>
+        
+        <q-item clickable @click="showDeleteDialogFn(props)">
+          <!-- Icon for Delete -->
+          <q-item-section avatar>
+            <q-icon name="delete" />
+          </q-item-section>
+          <!-- Text for Delete -->
+          <q-item-section>
+            {{ t('alerts.delete') }}
+          </q-item-section>
+        </q-item>
+        
+        <q-item clickable @click="navigateToHistory(props)">
+          <!-- Icon for History -->
+          <q-item-section avatar>
+            <q-icon name="history" />
+          </q-item-section>
+          <!-- Text for History -->
+          <q-item-section>
+            {{ t('alerts.history') }}
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </q-menu>
+  </q-btn>
+
+
           </q-td>
         </template>
 
@@ -216,13 +254,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
-    <template v-else>
+    <template v-else-if=showAddAlertDialog>
       <AddAlert
         v-model="formData"
         :isUpdated="isUpdated"
         :destinations="destinations"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
+      />
+    </template>
+    <template v-else>
+      <HistoryAlert
+        v-model="showHistoryDialog"
+        @closeDialog="closeDialog"
       />
     </template>
     <ConfirmDialog
@@ -322,7 +366,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { QTable, date, useQuasar, type QTableProps } from "quasar";
+import { QMenu, QTable, date, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -352,6 +396,9 @@ export default defineComponent({
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
+    HistoryAlert: defineAsyncComponent(
+      () => import("@/components/alerts/HistoryAlert.vue"),
+    ),
     NoData,
     ConfirmDialog,
   },
@@ -371,8 +418,12 @@ export default defineComponent({
     const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
+    const menuRef : Ref<InstanceType<typeof QMenu> | null> = ref(null);
+    const menuVisible : any = ref({});
     const selectedDelete: any = ref(null);
+    const selectedAlert = ref({});
     const isUpdated: any = ref(false);
+    const showHistoryDialog = ref(false);
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(220);
     const showForm = ref(false);
@@ -521,6 +572,7 @@ export default defineComponent({
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
+
             showAddUpdateFn({ row: undefined });
           }
           if (router.currentRoute.value.query.action == "update") {
@@ -528,6 +580,11 @@ export default defineComponent({
             showAddUpdateFn({
               row: getAlertByName(alertName),
             });
+          }
+          if(router.currentRoute.value.query.action == "history"){
+            const alertName = router.currentRoute.value.query.name as string;
+
+            navigateToHistory({ row: getAlertByName(alertName) });
           }
           dismiss();
         })
@@ -555,9 +612,14 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
-        if (!action) showAddAlertDialog.value = false;
+        if (!action) {
+          showAddAlertDialog.value = false;
+          showHistoryDialog.value = false;
+        }
       },
+
     );
+  
     const getDestinations = () => {
       destinationService
         .list({
@@ -759,6 +821,44 @@ export default defineComponent({
         });
       }
     };
+    const navigateToHistory = (props : any) => {
+      router.push({
+          name: "alertList",
+          query: {
+            action: "history",
+            name: props.row.name,
+            stream_name: props.row.stream_name,
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }).then(() => {
+          showHistoryDialog.value  = true;
+        });
+      
+      showAlertDetails(props)
+      showHistoryDialog.value  = true;
+
+    };
+
+
+  const showAlertDetails = (props : any) => {
+    showHistoryDialog.value  = true;
+      if(menuVisible.value != null && menuVisible.value[props.row.name] != null){
+        menuVisible.value[props.row.name] = false;
+
+      }
+
+  };
+
+    const closeDialog = () => {
+     showHistoryDialog.value  = false;
+      router.push({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+
+    }
     const refreshList = () => {
       getAlerts();
       hideForm();
@@ -907,6 +1007,8 @@ export default defineComponent({
     return {
       t,
       qTable,
+      menuRef,
+      menuVisible,
       store,
       router,
       alerts,
@@ -915,6 +1017,7 @@ export default defineComponent({
       hideForm,
       confirmDelete,
       selectedDelete,
+      selectedAlert,
       updateStreams,
       updateStreamName,
       getAlerts,
@@ -949,6 +1052,7 @@ export default defineComponent({
       isSubmitting,
       changeMaxRecordToReturn,
       outlinedDelete,
+      navigateToHistory,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -990,12 +1094,15 @@ export default defineComponent({
       alertStateLoadingMap,
       templates,
       routeTo,
+      showHistoryDialog,
+      showAlertDetails,
+      closeDialog,
     };
   },
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
@@ -1048,7 +1155,6 @@ export default defineComponent({
             }
           }
         }
-
         &--active {
           background-color: $accent;
         }
@@ -1059,4 +1165,5 @@ export default defineComponent({
 .clone-alert-popup {
   width: 400px;
 }
+
 </style>
