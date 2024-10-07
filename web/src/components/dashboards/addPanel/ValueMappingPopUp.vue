@@ -56,7 +56,7 @@
               name="drag_indicator"
               color="grey-13"
               class="q-mr-xs"
-              data-test="dashboard-addpanel-config-value-mapping-drag-handle"
+              :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
           <div class="draggable-content">
@@ -65,7 +65,7 @@
               label="Type"
               :options="mappingTypes"
               style="width: 250px"
-              data-test="dashboard-addpanel-config-value-mapping-type-select"
+              :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
               emit-value
               input-debounce="0"
               behavior="menu"
@@ -81,7 +81,7 @@
                 style="width: 120px"
                 class="input-spacing"
                 dense
-                data-test="dashboard-addpanel-config-value-mapping-value-input"
+                :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
               />
             </div>
             <div v-if="mapping.type === 'regex'" class="input-container">
@@ -91,7 +91,7 @@
                 style="width: 120px"
                 class="input-spacing"
                 dense
-                data-test="dashboard-addpanel-config-value-mapping-pattern-input"
+                :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
               />
             </div>
             <div v-if="mapping.type === 'range'" class="input-container">
@@ -101,7 +101,7 @@
                 style="width: 80px"
                 class="input-spacing"
                 dense
-                data-test="dashboard-addpanel-config-value-mapping-from-input"
+                :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
               />
               <q-input
                 v-model="mapping.to"
@@ -109,7 +109,7 @@
                 style="width: 80px"
                 class="input-spacing"
                 dense
-                data-test="dashboard-addpanel-config-value-mapping-to-input"
+                :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
               />
             </div>
             <q-input
@@ -118,7 +118,7 @@
               style="width: 120px"
               class="input-spacing"
               dense
-              data-test="dashboard-addpanel-config-value-mapping-text-input"
+              :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
             />
             <div class="color-section">
               <div v-if="mapping.color !== null" class="flex tw-items-center">
@@ -162,7 +162,7 @@
               flat
               round
               @click="removeValueMappingByIndex(index)"
-              data-test="dashboard-addpanel-config-value-mapping-delete-btn"
+              :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
             />
           </div>
         </div>

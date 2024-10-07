@@ -18,7 +18,7 @@
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
       <span>Value Mappings</span>
-      <q-btn
+      <!-- <q-btn
         no-caps
         padding="xs"
         class=""
@@ -26,8 +26,8 @@
         flat
         icon="info_outline"
         data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <!-- <q-tooltip
+      > -->
+      <!-- <q-tooltip
           class="bg-grey-8"
           anchor="bottom middle"
           self="top middle"
@@ -35,7 +35,7 @@
         >
           Change Display Value or Cell Color
         </q-tooltip> -->
-      </q-btn>
+      <!-- </q-btn> -->
     </div>
     <!-- <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
