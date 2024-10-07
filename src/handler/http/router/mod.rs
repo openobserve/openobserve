@@ -226,10 +226,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .service(status::stream_fields),
     );
 
-    cfg.service(
-        web::scope("/short")
-            .service(short_url::retrieve),
-    );
+    cfg.service(web::scope("/short")
+        .wrap(cors.clone())
+        .service(short_url::retrieve));
 
     if get_config().common.swagger_enabled {
         cfg.service(
