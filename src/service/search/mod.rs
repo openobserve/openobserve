@@ -231,7 +231,7 @@ pub async fn search_multi(
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && multi_res.hits.len() > 0 && !multi_res.is_partial {
+    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
