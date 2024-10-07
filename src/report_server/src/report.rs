@@ -370,15 +370,6 @@ pub async fn generate_report(
     handle.await?;
     log::debug!("done with headless browser");
 
-    // FIXME: Import short_url from service
-    // // convert to short_url
-    // let email_dashb_url = match short_url::shorten(&email_dashb_url).await {
-    //     Ok(short_url) => short_url,
-    //     Err(e) => {
-    //         log::error!("Error shortening email dashboard url: {e}");
-    //         email_dashb_url
-    //     }
-    // };
     Ok((pdf_data, email_dashb_url))
 }
 
