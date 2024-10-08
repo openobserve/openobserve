@@ -46,8 +46,8 @@ use crate::service::short_url;
     ),
     tag = "Short Url"
 )]
-#[post("/short")]
-pub async fn shorten(body: web::Bytes) -> Result<HttpResponse, Error> {
+#[post("/{org_id}/short")]
+pub async fn shorten(_org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
     let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
     match short_url::shorten(&req.original_url).await {
         Ok(short_url) => {
