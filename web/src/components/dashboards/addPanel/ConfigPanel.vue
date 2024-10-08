@@ -460,72 +460,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- </q-input> -->
       <div class="space"></div>
 
-      <q-input
-        v-if="
-          !promqlMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        "
-        v-model.number="dashboardPanelData.data.config.axis_label_rotation"
-        :value="0"
-        :min="0"
-        @update:model-value="
-          (value: any) =>
-            (dashboardPanelData.data.config.axis_label_rotation = value
-              ? value
-              : 0)
-        "
-        label="AxisRotate"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
-        label-slot
-        placeholder="0"
-        :type="'number'"
-        data-test="dashboard-config-axis_label_rotation"
-      >
-      </q-input>
-
-      <div class="space"></div>
-
-      <q-input
-        v-if="
-          !promqlMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        "
-        v-model.number="dashboardPanelData.data.config.axis_label_width"
-        :value="0"
-        :min="0"
-        @update:model-value="
-          (value: any) =>
-            (dashboardPanelData.data.config.axis_label_width = value
-              ? value
-              : 0)
-        "
-        label="Axis Width"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
-        label-slot
-        placeholder="0"
-        :type="'number'"
-        data-test="dashboard-config-axis_label_width"
-      >
-      </q-input>
-
-      <div class="space"></div>
-
       <!-- for auto sql query limit -->
       <!-- it should not be promql and custom query -->
       <q-input
@@ -959,6 +893,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
       />
+
+      <div class="space"></div>
+
+      <q-input
+        v-if="
+          !promqlMode &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        "
+        v-model.number="dashboardPanelData.data.config.axis_label_rotation"
+        :value="0"
+        :min="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.axis_label_rotation = value
+              ? value
+              : 0)
+        "
+        label="Rotate x-axis tick labels"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="0"
+        :type="'number'"
+        data-test="dashboard-config-axis_label_rotation"
+      >
+      </q-input>
+
+      <div class="space"></div>
+
+      <q-input
+        v-if="
+          !promqlMode &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        "
+        v-model.number="dashboardPanelData.data.config.axis_label_width"
+        :value="0"
+        :min="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.axis_label_width = value
+              ? value
+              : 0)
+        "
+        label="X-axis tick label max length"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="0"
+        :type="'number'"
+        data-test="dashboard-config-axis_label_width"
+      >
+      </q-input>
 
       <div class="space"></div>
 
