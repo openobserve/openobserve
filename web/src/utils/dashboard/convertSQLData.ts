@@ -456,6 +456,23 @@ export const convertSQLData = async (
     return Object.values(maxValues).reduce((a: any, b: any) => a + b, 0);
   };
 
+  const getPieChartRadius = () => {
+    const minRadius = Math.min(
+      panelSchema.layout.w * 30,
+      panelSchema.layout.h * 30,
+    );
+
+    const radius = minRadius / 2;
+
+    let multiplier = 110;
+
+    if (radius > 90) multiplier = 130;
+
+    if (radius > 150) multiplier = 150;
+
+    return (radius / minRadius) * multiplier;
+  };
+
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
   );
@@ -1114,6 +1131,10 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
+      if (options.series.length > 0) {
+        options.series[0].radius = `${getPieChartRadius()}%`;
+      }
+
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -1164,6 +1185,14 @@ export const convertSQLData = async (
         };
         return seriesObj;
       });
+
+      if (options.series.length > 0) {
+        const outerRadius: number = getPieChartRadius();
+
+        const innterRadius = outerRadius - 30;
+
+        options.series[0].radius = [`${innterRadius}%`, `${outerRadius}%`];
+      }
 
       options.xAxis = [];
       options.yAxis = [];
