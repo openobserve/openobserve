@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="createNewFunction" class="pipeline-add-function">
           <AddFunction
             ref="addFunctionRef"
-            :model-value="functionData"
             :is-updated="isUpdating"
             @update:list="onFunctionCreation"
             @cancel:hideform="cancelFunctionCreation"
@@ -154,6 +153,7 @@ import {
   watch,
   nextTick,
   defineAsyncComponent,
+  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -174,6 +174,7 @@ interface StreamRoute {
   destinationStreamType: string;
   conditions: RouteCondition[];
 }
+
 
 const AddFunction = defineAsyncComponent(
   () => import("@/components/functions/AddFunction.vue"),
@@ -211,12 +212,11 @@ const addFunctionRef: any = ref(null);
 
 const isUpdating = ref(false);
 
-const selectedFunction = ref(pipelineObj.currentSelectedNodeData?.data.name || "");
+const selectedFunction = ref((pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "");
 
-const functionOrder = ref(props.defaultOrder);
 const loading = ref(false);
 
-const afterFlattening = ref(pipelineObj.currentSelectedNodeData?.data.after_flatten || false);
+const afterFlattening = ref((pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })?.after_flatten || false);
 
 const filteredFunctions: Ref<any[]> = ref([]);
 
@@ -253,17 +253,15 @@ onBeforeMount(() => {
   
 });
 
+
 const openCancelDialog = () => {
-  if(createNewFunction.value == true || !selectedFunction.value === (props.functionData?.name || "")) {
+  if(!isUpdating){
+    if(createNewFunction.value == true  && addFunctionRef.value.formData.name == "" && addFunctionRef.value.formData.function == "") {
     createNewFunction.value = false;
     return;
   }
-  if (
-    selectedFunction.value === (props.functionData?.name || "")
-  ) {
-    emit("cancel:hideform");
-    return;
   }
+
 
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";

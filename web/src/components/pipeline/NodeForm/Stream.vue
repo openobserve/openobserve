@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @filter="filterStreams"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :option-disable="option => option.isDisable"
+            :option-disable="(option : any)  => option.isDisable"
             />
           </div>
         </div>
@@ -177,12 +177,9 @@ const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const outputStreamTypes = ["logs"];
-const stream_name = ref(pipelineObj.currentSelectedNodeData?.data.stream_name);
-const stream_type = ref(pipelineObj.currentSelectedNodeData?.data.stream_type || "logs"); ;
-const selectedNodeType = ref(pipelineObj.currentSelectedNodeData.io_type)
-watch(stream_name, async (newVal) => {
-  console.log(stream_name.value, "stream_name");
-});
+const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
+const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
 onMounted(async () => {
   await getUsedStreamsList();
   await getStreamList();
@@ -206,30 +203,23 @@ async function getStreamList() {
     console.log(stream_type.value,"in  fun")
     const res : any = await getStreams(stream_type.value, false);
     
-    if (res.list.length > 0 && pipelineObj.currentSelectedNodeData.type === "input") {
-      res.list.forEach((stream) => {
+    if (res.list.length > 0 && pipelineObj.currentSelectedNodeData.hasOwnProperty("type") && pipelineObj.currentSelectedNodeData.type === "input") {
+      res.list.forEach((stream : any) => {
         stream.isDisable = usedStreams.value[streamType].some(
-          (usedStream) => usedStream.stream_name === stream.name
+          (usedStream : any) => usedStream.stream_name === stream.name
         );
       });
     }
     
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
-    indexOptions.value = res.list.map((data) => data.name);
-    console.log(streams.value, "streams");
+    indexOptions.value = res.list.map((data : any) => data.name);
   } finally {
     isFetchingStreams.value = false;
   }
 }
-
-// watch(stream_type.value || pipelineObj.currentSelectedNodeData.type, async (newVal) => {
-//   await getStreamList();
-// });
 const updateStreams = () => {
   getStreamList();
-  console.log(stream_type.value,"stream_type")
-  // pipelineObj.currentSelectedNodeData.data.stream_type = stream_type.value;
   
 };
 
@@ -237,15 +227,9 @@ const filteredStreamTypes = computed(() => {
       return selectedNodeType.value === 'output' ? outputStreamTypes : streamTypes;
     });
 
-const getLogStream = (data) =>{
-  // pipelineObj.currentSelectedNodeData.data.stream_name = data.name;
-  // pipelineObj.currentSelectedNodeData.data.stream_type = data.stream_type;
+const getLogStream = (data: any) =>{
   stream_name.value = {label: data.name, value: data.name, isDisable: false};
   stream_type.value = data.stream_type;
-  // stream_name.value = data.name;
-  // stream_type.value = data.stream_type;
-
-
   if(createNewStream.value){
     createNewStream.value = false;
     return;
@@ -295,10 +279,10 @@ const saveStream = () => {
 
 const filterStreams = (val: string, update: any) => {
   const streamType = pipelineObj.currentSelectedNodeData.stream_type || 'logs';
-  if(pipelineObj.currentSelectedNodeData.type === 'input') {
-    const filtered = streams.value[streamType].filter((stream) => {
+  if( pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&  pipelineObj.currentSelectedNodeData.type === 'input') {
+    const filtered = streams.value[streamType].filter((stream :any) => {
     return stream.name.toLowerCase().includes(val.toLowerCase());
-  }).map((stream) => ({
+  }).map((stream : any) => ({
     label: stream.name,
     value: stream.name,  // Use a unique identifier if needed
     isDisable: stream.isDisable
@@ -306,9 +290,9 @@ const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filtered;
   }
   else{
-    const filtered = streams.value[streamType].filter((stream) => {
+    const filtered = streams.value[streamType].filter((stream : any) => {
     return stream.name.toLowerCase().includes(val.toLowerCase());
-  }).map((stream) => ({
+  }).map((stream : any) => ({
     label: stream.name,
     value: stream.name,  // Use a unique identifier if needed
     isDisable: false

@@ -238,7 +238,7 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute = () => {
+const getDefaultStreamRoute : any = () => {
   if (pipelineObj.isEditNode) {
     return pipelineObj.currentSelectedNodeData.data;
   }
@@ -272,7 +272,7 @@ const getDefaultStreamRoute = () => {
 onMounted(() => {
   
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData?.data;
+    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -282,7 +282,7 @@ onMounted(() => {
 
 onActivated(() => {
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData.data;
+    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -292,7 +292,6 @@ const streamTypes = ["logs", "enrichment_tables"];
 
 const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
-console.log(streamRoute.value, "streamRoute.value");
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const filterColumns = (options: any[], val: String, update: Function) => {

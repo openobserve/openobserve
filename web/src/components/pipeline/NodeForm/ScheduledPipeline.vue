@@ -812,7 +812,6 @@ import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar } from "quasar";
 import cronParser from "cron-parser";
-import { isValidCron } from "cron-validator";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),

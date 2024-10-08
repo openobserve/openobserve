@@ -35,6 +35,8 @@ const defaultPipelineObj = {
   },
   nodes: [],
   edges: [],
+  org: "",
+  
 };
 
 const defaultObject = {
@@ -52,11 +54,14 @@ const defaultObject = {
   currentSelectedNodeData: {
     stream_type: "logs",
     stream_name: "",
+    data: {},
+    type:"",
   },
   dialog: dialogObj,
   nodeTypes: null,
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
+  functions: {},
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
@@ -317,7 +322,6 @@ export default function useDragAndDrop() {
     pipelineObj.dirtyFlag = false;
     pipelineObj.hasInputNode = false;
     pipelineObj.draggedNode = null;
-    console.log(pipelineObj.currentSelectedPipeline, "pipeline");
   };
  
 

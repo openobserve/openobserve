@@ -120,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :associated-functions="associatedFunctions"
         @cancel:hideform="resetDialog"
        @add:function = "refreshFunctionList"
-        
       />
 
       <StreamNode
@@ -201,6 +200,7 @@ interface Function {
 }
 
 interface Pipeline {
+  pipeline_id: string;
   name: string;
   description: string;
   stream_name: string;
@@ -257,6 +257,7 @@ const plotChart: any = ref({
 });
 
 const pipeline = ref<Pipeline>({
+  pipeline_id: "",
   name: "",
   stream_type: "",
   description: "",
@@ -346,7 +347,7 @@ const nodes: Ref<Node[]> = ref([]);
 
 const hasInputType = computed(() => {
   return pipelineObj.currentSelectedPipeline.nodes.some(
-    (node) => node.io_type === "input",
+    (node : any) => node.io_type === "input",
   );
 });
 
@@ -409,11 +410,11 @@ const getPipeline = () => {
         (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
 
-      _pipeline.nodes.forEach((node) => {
+      _pipeline.nodes.forEach((node : any) => {
         node.type = node.io_type;
       });
 
-      _pipeline.nodes.forEach((node) => {
+      _pipeline.nodes.forEach((node : any) => {
         node.type = node.io_type;
       });
 
@@ -487,9 +488,9 @@ const savePipeline = async () => {
 
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-    (node) =>
-      node.io_type === "input" &&
-      (node.data.node_type === "stream" || node.data.node_type === "query")
+    (node:any) =>
+      node?.io_type === "input" &&
+      (node.data?.node_type === "stream" || node.data?.node_type === "query")
   );
 
   if (inputNodeIndex === -1) {
@@ -501,15 +502,15 @@ const savePipeline = async () => {
     });
     return;
   } else {
-    pipelineObj.currentSelectedPipeline.nodes.map((node) => {
+    pipelineObj.currentSelectedPipeline.nodes.map((node : any) => {
       if (node.data.node_type === "stream" && node.data.stream_name && node.data.stream_name.hasOwnProperty("value")) {
         node.data.stream_name = node.data.stream_name.value;
       }
     });
-    const inputNode = pipelineObj.currentSelectedPipeline.nodes.splice(inputNodeIndex, 1)[0];
-  
-    pipelineObj.currentSelectedPipeline.nodes.unshift(inputNode);
+    const nodes = pipelineObj.currentSelectedPipeline.nodes as any[];
 
+    const inputNode : any = nodes.splice(inputNodeIndex, 1)[0];
+    nodes.unshift(inputNode);
     if (inputNode.data.node_type === "stream") {
       pipelineObj.currentSelectedPipeline.source.source_type = "realtime";
     } else {
@@ -592,14 +593,6 @@ const onNodeDragStart = (event: any, data: any) => {
 const onNodeDrop = (event: any) => {
   event.preventDefault();
   const nodeType = event.dataTransfer.getData("text");
-
-  if (nodeType === "function") {
-    addFunction();
-  }
-
-  if (nodeType === "streamRoute") {
-    addStream();
-  }
 };
 
 const onNodeDragOver = (event: any) => {

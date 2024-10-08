@@ -1,7 +1,7 @@
 <!-- Flowchart.vue -->
 <script lang="ts" setup>
 import { ref } from "vue";
-import { VueFlow } from "@vue-flow/core";
+import { VueFlow, Edge, MarkerType } from "@vue-flow/core";
 
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
@@ -15,19 +15,19 @@ const nodes = ref([
   { id: "4", label: "Node 4", position: { x: 400, y: 200 } },
 ]);
 
-const edges = ref([
+const edges = ref<Edge<any, any, string>[]>([
   { 
     id: "e1-2", 
     source: "1", 
     target: "2", 
     animated: true, 
-    markerEnd: { type: 'arrowclosed' } // Adding arrow marker
+    markerEnd: { type: MarkerType.ArrowClosed } // Adding arrow marker
   },
   { 
     id: "e1-3", 
     source: "1", 
     target: "3",
-    markerEnd: { type: 'arrowclosed' } // Adding arrow marker
+    markerEnd: { type: MarkerType.ArrowClosed  } // Adding arrow marker
   },
 ]);
 </script>

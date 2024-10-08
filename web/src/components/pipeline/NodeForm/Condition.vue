@@ -123,6 +123,9 @@ interface RouteCondition {
 
 interface StreamRoute {
   conditions: RouteCondition[];
+  name: string;
+  query_condition: any | null;
+
 }
 
 const { t } = useI18n();
@@ -179,7 +182,7 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute = () => {
+const getDefaultStreamRoute  : any = () => {
   if (pipelineObj.isEditNode) {
     return pipelineObj.currentSelectedNodeData.data;
   }
@@ -234,9 +237,9 @@ const importSqlParser = async () => {
 
 const streamTypes = ["logs", "enrichment_tables"];
 
-const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
+const streamRoute:  Ref<StreamRoute> = ref (getDefaultStreamRoute());
 
-const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
+const originalStreamRouting:  Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -262,10 +265,10 @@ const filterStreams = (val: string, update: any) => {
 const isValidStreamName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
   // Check if the role name is valid
-  return roleNameRegex.test(streamRoute.value.name);
+  return roleNameRegex.test(streamRoute.value?.name);
 });
 
-const updateStreamFields = async (streamName, streamType) => {
+const updateStreamFields = async (streamName : any, streamType : any) => {
   let streamCols: any = [];
   const streams: any = await getStream(streamName, streamType, true);
   console.log(streamName, "updateStreamFields");
@@ -284,29 +287,29 @@ const updateStreamFields = async (streamName, streamType) => {
 const getFields = async () => {
   try {
     // find input node
-    const inputStreamNode = pipelineObj.currentSelectedPipeline.nodes.find(
+    const inputStreamNode : any = pipelineObj.currentSelectedPipeline.nodes.find(
       (node: any) => node.io_type === "input" && node.data.node_type === "stream",
     );
 
-    const inputQueryNode = pipelineObj.currentSelectedPipeline.nodes.find(
+    const inputQueryNode :any = pipelineObj.currentSelectedPipeline.nodes.find(
       (node: any) => node.io_type === "input" && node.data.node_type === "query",
     );
 
     if (inputStreamNode) {
       updateStreamFields(
-        inputStreamNode.data.stream_name,
-        inputStreamNode.data.stream_type,
+        inputStreamNode.data?.stream_name,
+        inputStreamNode.data?.stream_type,
       );
     } else {
-      const filteredQuery = inputQueryNode.data.query_condition.sql
+      const filteredQuery : any = inputQueryNode?.data?.query_condition.sql
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
       const parsedSql = parser.astify(filteredQuery);
       if (parsedSql && parsedSql.from) {
-        const streamNames = parsedSql.from.map((item) => item.table);
+        const streamNames = parsedSql.from.map((item : any) => item.table);
         for (const streamName of streamNames) {
-          await updateStreamFields(streamName, inputQueryNode.data.stream_type);
+          await updateStreamFields(streamName, inputQueryNode?.data?.stream_type);
         }
       }
     }
@@ -421,7 +424,7 @@ const validateSqlQuery = () => {
 
   delete query.aggs;
 
-  query.query.sql = streamRoute.value.query_condition.sql;
+  query.query.sql = streamRoute.value.query_condition?.sql || '';
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService

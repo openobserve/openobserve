@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           @click="triggerExpand(props)"
         >
-          <q-td v-if="activeTab == 'scheduled' || activeTab == 'all'"  >
+          <q-td v-if="activeTab == 'scheduled' "  >
             <q-btn
               dense
               flat
@@ -49,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </q-td>
-          <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
+          <q-td v-for="col in filterColumns()" :key="col.name " :props="props">
 
-          <template v-if="col.name !== 'actions'">
+          <template v-if="col.name  !== 'actions'">
             {{ props.row[col.field] }}
           </template>
           <template v-else>
@@ -241,6 +241,15 @@ import PipelineView from "./PipelineView.vue";
 
 import { filter, update } from "lodash-es";
 
+interface Column {
+  name: string;
+  field: string;
+  label: string;
+  align: string;
+  sortable?: boolean;
+}
+
+
 
 const { t } = useI18n();
 const router = useRouter();
@@ -253,7 +262,7 @@ const filterQuery = ref("");
 
 const showCreatePipeline = ref(false);
 
-const  expandedRow = ref( []); // Array to track expanded rows
+const  expandedRow : any = ref( []); // Array to track expanded rows
 
 const pipelines = ref([]);
 
@@ -278,22 +287,9 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 const activeTab = ref("all");
-const filteredPipelines = ref([]);
-const columns = ref([]);
-const updateActiveTab = () =>{
-  if(activeTab.value === "all"){
-    filteredPipelines.value = pipelines.value;
-    resultTotal.value = pipelines.value.length;
-    columns.value = getColumnsForActiveTab(activeTab.value);
-    return;
-  }
-  filteredPipelines.value = pipelines.value.filter((pipeline) => {
-    return pipeline.source.source_type === activeTab.value;
-  });
-  resultTotal.value = filteredPipelines.value.length;
-  columns.value = getColumnsForActiveTab(activeTab.value);
+const filteredPipelines : any = ref([]);
+const columns = ref<Column[]>([]);
 
-}
 const tabs = reactive ([
 {
     label: "All",
@@ -333,18 +329,38 @@ const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
 
-const filterColumns = () => {
-  // if(activeTab.value === "all"){
-  //   console.log(columns.value)
-  //   return columns.value;
-  // }
-  if(activeTab.value === "realtime"){
+const filterColumns   = () : Column[] => {
+  if(activeTab.value === "realtime" || activeTab.value === "all"){
     return columns.value;
   }
+
   return columns.value.slice(1);
 };
 
-const toggleAlertState = (row) =>{
+const updateActiveTab = () => {
+  if (activeTab.value === "all") {
+    filteredPipelines.value = pipelines.value.map((pipeline : any, index : any) => ({
+      ...pipeline,
+      "#": index + 1,
+    }));
+    resultTotal.value = pipelines.value.length;
+    columns.value = getColumnsForActiveTab(activeTab.value);
+    return;
+  }
+
+  filteredPipelines.value = pipelines.value
+    .filter((pipeline : any) => pipeline.source.source_type === activeTab.value)
+    .map((pipeline : any, index) => ({
+      ...pipeline,
+      "#": index + 1,
+    }));
+
+  resultTotal.value = filteredPipelines.value.length;
+  columns.value = getColumnsForActiveTab(activeTab.value);
+};
+
+
+const toggleAlertState = (row : any) =>{
   row.enabled = !row.enabled;
   console.log(row)
   pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
@@ -367,16 +383,7 @@ const toggleAlertState = (row) =>{
   });
 }
 
-const triggerExpand = (props) =>{
-  if(props.row.source.source_type === 'realtime' && activeTab.value !== "realtime"){
-    q.notify({
-      message: "Realtime pipelines do not have SQL queries",
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
-    });
-    return;
-  }
+const triggerExpand = (props : any) =>{
   if (expandedRow.value === props.row.pipeline_id) {
       expandedRow.value = null;
     } else {
@@ -393,7 +400,7 @@ const editingPipeline = ref<any | null>(null);
 // };
 
 
-const getColumnsForActiveTab = (tab) => {
+const getColumnsForActiveTab = (tab : any) => {
   let realTimeColumns = [
   { name: "#", label: "#", field: "#", align: "left" },
 
@@ -426,7 +433,9 @@ const getColumnsForActiveTab = (tab) => {
     sortable: false,
   };
 if(tab === "all"){
-  return [ ...scheduledColumns, actionsColumn];
+  const allColumns = [ ...scheduledColumns, actionsColumn];
+
+  return allColumns;
 }
   return tab === "realtime"
     ? [ ...realTimeColumns, actionsColumn]
@@ -446,13 +455,15 @@ const createPipeline = () => {
 const getPipelines = async () => {
       try {
         const response = await pipelineService.getPipelines(store.state.selectedOrganization.identifier);
+        pipelines.value = [];
         // resultTotal.value = response.data.list.length;
-        pipelines.value = response.data.list.map((pipeline, index) => {
-          const updatedEdges = pipeline.edges.map(edge => ({
+        pipelines.value = response.data.list.map((pipeline : any, index : any) => {
+          const updatedEdges = pipeline.edges.map((edge : any) => ({
             ...edge,
             markerEnd: {
               type: "arrowclosed"
-            }
+            },
+            updatable: true 
           }));
 
           if (pipeline.source.source_type === 'realtime') {
@@ -478,7 +489,7 @@ const getPipelines = async () => {
       }
     };
 const editPipeline = (pipeline: any) => {
-  pipeline.nodes.forEach(node => {
+  pipeline.nodes.forEach((node : any) => {
     node.type = node.io_type;
   });
 
@@ -541,7 +552,6 @@ const savePipeline = (data: any) => {
 };
 
 const deletePipeline = () => {
-  console.log(confirmDialogMeta.value.data,"data");
   const dismiss = q.notify({
     message: "deleting pipeline...",
     position: "bottom",
@@ -572,7 +582,9 @@ const deletePipeline = () => {
       });
     })
     .finally(() => {
-      dismiss();
+      getPipelines();
+      updateActiveTab(); 
+         dismiss();
     });
 
   resetConfirmDialog();
