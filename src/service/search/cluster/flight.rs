@@ -98,7 +98,6 @@ pub async fn search(
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
-        &req.prefixes,
         sql.time_range,
     )
     .await?;
@@ -725,15 +724,13 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[String],
-    prefixes: &[String],
     time_range: Option<(i64, i64)>,
 ) -> Result<HashMap<String, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for name in stream_names {
         // get file list
         let file_id_list =
-            crate::service::file_list::query_ids(org_id, stream_type, name, prefixes, time_range)
-                .await?;
+            crate::service::file_list::query_ids(org_id, stream_type, name, time_range).await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)

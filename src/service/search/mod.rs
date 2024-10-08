@@ -296,7 +296,6 @@ pub async fn search_partition(
                 &sql.org_id,
                 stream_type,
                 stream,
-                &[],
                 sql.time_range,
             )
             .await?;

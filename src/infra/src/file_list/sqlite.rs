@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap as stdHashMap, sync::Arc};
+use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
 use config::{
@@ -409,7 +409,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        prefixes: &[String],
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<super::FileId>> {
         if let Some((start, end)) = time_range {
@@ -440,28 +439,14 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
-        let prefix_cond = if prefixes.is_empty() {
-            "".to_string()
-        } else {
-            let cond = prefixes
-                .iter()
-                .map(|p| format!(" file LIKE 'term={}%'", p))
-                .collect::<Vec<_>>()
-                .join(" OR ");
-            format!(" AND ({}) ", cond)
-        };
-
-        let prefix_cond = Arc::new(prefix_cond);
-
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
-            let cond = prefix_cond.clone();
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
                 let cfg = get_config();
                 if cfg.limit.use_upper_bound_for_max_ts {
                     let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-                    let query = format!("SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 {};",cond);
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
                     sqlx::query_as::<_, super::FileId>(&query)
                     .bind(stream_key)
                     .bind(time_start)
@@ -470,7 +455,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .fetch_all(&pool)
                     .await
                 } else {
-                    let query = format!("SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3 {};",cond);
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;";
                     sqlx::query_as::<_, super::FileId>(&query)
                     .bind(stream_key)
                     .bind(time_start)

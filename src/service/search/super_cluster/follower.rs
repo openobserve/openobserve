@@ -26,9 +26,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
     errors::{Error, Result},
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-    },
+    schema::get_stream_setting_index_fields,
 };
 use proto::cluster_rpc::{FlightSearchRequest, KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -111,16 +109,12 @@ pub async fn search(
         schema_latest_map.insert(field.name(), field);
     }
 
-    let stream_settings = unwrap_stream_settings(schema_latest.as_ref()).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, req.stream_type);
-
     // 1. get file id list
     let file_id_list = crate::service::file_list::query_ids(
         &req.org_id,
         req.stream_type,
         stream_name,
-        partition_time_level,
+        req.prefixes,
         req.time_range,
     )
     .await?;
