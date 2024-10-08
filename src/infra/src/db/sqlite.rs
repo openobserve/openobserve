@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -27,8 +27,9 @@ use sqlx::{
     },
     Pool, Sqlite,
 };
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{mpsc, Mutex, OnceCell, RwLock};
 
+use super::DBIndex;
 use crate::{
     db::{Event, EventData},
     errors::*,
@@ -37,6 +38,7 @@ use crate::{
 pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
 pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
     Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
@@ -94,6 +96,21 @@ fn connect_ro() -> Pool<Sqlite> {
         .max_lifetime(max_lifetime)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
+}
+
+async fn cache_indices() -> HashSet<DBIndex> {
+    let client = CLIENT_RO.clone();
+    let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
+    let res = sqlx::query_as::<_, (String, String)>(sql)
+        .fetch_all(&client)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
 }
 
 pub struct SqliteDbChannel {
@@ -783,5 +800,51 @@ async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
         );
         return Err(e.into());
     }
+    Ok(())
+}
+
+pub async fn create_index(
+    idx_name: &str,
+    table: &str,
+    unique: bool,
+    fields: &[&str],
+) -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    let unique_str = if unique { "UNIQUE" } else { "" };
+    log::info!("[SQLITE] creating index {} on table {}", idx_name, table);
+    let sql = format!(
+        "CREATE {} INDEX IF NOT EXISTS {} ON {} ({});",
+        unique_str,
+        idx_name,
+        table,
+        fields.join(",")
+    );
+    sqlx::query(&sql).execute(&*client).await?;
+    log::info!("[SQLITE] index {} created successfully", idx_name);
+    Ok(())
+}
+
+pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if !indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
+    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
+    sqlx::query(&sql).execute(&*client).await?;
+    log::info!("[SQLITE] index {} deleted successfully", idx_name);
     Ok(())
 }

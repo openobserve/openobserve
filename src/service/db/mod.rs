@@ -36,6 +36,7 @@ pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
 pub mod session;
+pub mod short_url;
 pub mod syslog;
 pub mod user;
 pub mod version;

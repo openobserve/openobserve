@@ -42,7 +42,7 @@ use crate::{
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db,
+    service::{db, short_url},
 };
 
 pub async fn save(
@@ -616,6 +616,15 @@ async fn generate_report(
     browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
+
+    // convert to short_url
+    let email_dashb_url = match short_url::shorten(&email_dashb_url).await {
+        Ok(short_url) => short_url,
+        Err(e) => {
+            log::error!("Error shortening email dashboard url: {e}");
+            email_dashb_url
+        }
+    };
     Ok((pdf_data, email_dashb_url))
 }
 
