@@ -67,6 +67,8 @@ pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
+pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -984,6 +986,8 @@ pub struct Limit {
         help = "buffer for upper bound in mins"
     )]
     pub upper_bound_for_max_ts: i64,
+    #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
+    pub short_url_retention_days: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1341,6 +1345,8 @@ pub fn init() -> Config {
     if cfg.limit.sql_db_connections_max == 0 {
         cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
     }
+    cfg.limit.sql_db_connections_max =
+        max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
 
     if cfg.limit.file_list_id_batch_size == 0 {
         cfg.limit.file_list_id_batch_size = 5000;

@@ -49,6 +49,7 @@ use crate::{
         alerts::{build_sql, destinations},
         db,
         search::sql::RE_ONLY_SELECT,
+        short_url,
     },
 };
 
@@ -358,7 +359,6 @@ impl Alert {
                 .evaluate_scheduled(
                     &self.get_stream_params(),
                     &self.trigger_condition,
-                    &self.query_condition,
                     start_time,
                 )
                 .await
@@ -684,12 +684,21 @@ async fn process_dest_template(
         }
     }
 
+    // Use only the main alert time range if multi_time_range is enabled
+    let use_given_time = alert.query_condition.multi_time_range.is_some()
+        && !alert
+            .query_condition
+            .multi_time_range
+            .as_ref()
+            .unwrap()
+            .is_empty();
     // calculate start and end time
     let (alert_start_time, alert_end_time) = get_alert_start_end_time(
         &vars,
         alert.trigger_condition.period,
         rows_end_time,
         start_time,
+        use_given_time,
     );
 
     let alert_start_time_str = if alert_start_time > 0 {
@@ -794,6 +803,15 @@ async fn process_dest_template(
         )
     };
 
+    // Shorten the alert url
+    let alert_url = match short_url::shorten(&alert_url).await {
+        Ok(short_url) => short_url,
+        Err(e) => {
+            log::error!("Error shortening alert url: {e}");
+            alert_url
+        }
+    };
+
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", &alert.stream_type.to_string())
@@ -884,7 +902,22 @@ pub fn get_alert_start_end_time(
     period: i64,
     rows_end_time: i64,
     start_time: Option<i64>,
+    use_given_time: bool,
 ) -> (i64, i64) {
+    if use_given_time {
+        let start_time = match start_time {
+            Some(start_time) => start_time,
+            None => {
+                rows_end_time
+                    - Duration::try_minutes(period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+            }
+        };
+        return (start_time, rows_end_time);
+    }
+
     let cfg = get_config();
 
     // calculate start and end time
