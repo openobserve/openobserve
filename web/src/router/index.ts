@@ -77,7 +77,6 @@ export default function (store: any) {
           to.path !== "/cb" &&
           to.path != "/web/cb"
         ) {
-          console.log("Path set to localstorage", window.location.href);
           window.sessionStorage.setItem("redirectURI", window.location.href);
         }
         next({ path: "/login" });
