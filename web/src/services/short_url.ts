@@ -16,8 +16,8 @@
 import http from "./http";
 
 const shortURL = {
-  create: (url: string) => {
-    return http().post(`/api/short`, {
+  create: (org_identifier: string, url: string) => {
+    return http().post(`/api/${org_identifier}/short`, {
       original_url: url,
     });
   },
