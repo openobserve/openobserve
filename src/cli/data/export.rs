@@ -71,7 +71,7 @@ impl Context for Export {
             index_type: "".to_string(),
         };
 
-        match SearchService::search("", &c.org, stream_type, None, &req, false).await {
+        match SearchService::search("", &c.org, stream_type, None, &req).await {
             Ok(res) => {
                 if c.file_type != "json" {
                     eprintln!("No other file types are implemented");

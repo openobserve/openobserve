@@ -28,13 +28,8 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
-use proto::cluster_rpc;
 use result_utils::get_ts_value;
 use tracing::Instrument;
-#[cfg(feature = "enterprise")]
-use {
-    crate::service::search::cluster, o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
-};
 
 use crate::{
     common::{
@@ -52,7 +47,7 @@ pub mod multi;
 pub mod result_utils;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
-pub(super) async fn search(
+pub async fn search(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -181,6 +176,7 @@ pub(super) async fn search(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .inc();
+
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -199,6 +195,7 @@ pub(super) async fn search(
             "[trace_id {trace_id}] http search API wait in queue took: {} ms",
             took_wait
         );
+
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
@@ -209,63 +206,33 @@ pub(super) async fn search(
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
 
-        #[cfg(feature = "enterprise")]
-        let req_regions = in_req.regions.clone();
-        #[cfg(feature = "enterprise")]
-        let req_clusters = in_req.clusters.clone();
-        #[cfg(feature = "enterprise")]
-        let local_cluster_search = req_regions == vec!["local"]
-            && !req_clusters.is_empty()
-            && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
-
-        let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
-        req.job.as_mut().unwrap().trace_id = trace_id.to_string();
-        req.org_id = org_id.to_string();
-        req.stype = cluster_rpc::SearchType::Cluster as _;
-        req.stream_type = stream_type.to_string();
-        req.user_id = user_id.clone();
-
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
-            let trace_id = trace_id.to_string();
-
-            #[cfg(feature = "enterprise")]
-            let regions = req_regions.clone();
-            #[cfg(feature = "enterprise")]
-            let clusters = req_clusters.clone();
+            let org_id = org_id.to_string();
+            let trace_id = format!("{}-{}", trace_id, i);
+            let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
             let task = tokio::task::spawn(async move {
                 let trace_id = trace_id.clone();
-                if let Some(ref mut query) = req.query {
-                    query.start_time = delta.delta_start_time;
-                    query.end_time = delta.delta_end_time;
-                }
+                req.query.start_time = delta.delta_start_time;
+                req.query.end_time = delta.delta_end_time;
 
                 let cfg = get_config();
-                if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
+                if cfg.common.result_cache_enabled
+                    && cfg.common.print_key_sql
+                    && c_resp.has_cached_data
+                {
                     log::info!(
-                        "[trace_id {trace_id}] query index: {i}, new start time: {}, end time : {}, has_cached_data: {}",
-                        req.query.as_ref().unwrap().start_time,
-                        req.query.as_ref().unwrap().end_time,
-                        c_resp.has_cached_data
+                        "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                        req.query.start_time,
+                        req.query.end_time
                     );
                 }
 
-                #[cfg(feature = "enterprise")]
-                if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-                    cluster::super_cluster::search(req, regions, clusters).await
-                } else {
-                    crate::service::search::cluster::http::search(req)
-                        .instrument(enter_span)
-                        .await
-                }
-                #[cfg(not(feature = "enterprise"))]
-                {
-                    crate::service::search::cluster::http::search(req)
-                        .instrument(enter_span)
-                        .await
-                }
+                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
+                    .instrument(enter_span)
+                    .await
             });
             tasks.push(task);
         }
