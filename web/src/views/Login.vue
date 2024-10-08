@@ -115,7 +115,11 @@ export default defineComponent({
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
       if (redirectURI != null && redirectURI != "") {
-        router.push({ path: redirectURI });
+        if (redirectURI.includes("http")) {
+          window.location.href = redirectURI;
+        } else {
+          window.location.replace(redirectURI);
+        }
       } else {
         router.push({ path: "/" });
       }
