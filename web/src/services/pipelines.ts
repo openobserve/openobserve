@@ -59,7 +59,6 @@ const pipelines = {
     return http().put(url, data);
   },
   getPipelineStreams: (org_identifier:string) => {
-    console.log(org_identifier,"org_identifier")
     const url = `/api/${org_identifier}/pipelines/streams`;
     return http().get(url);
   },

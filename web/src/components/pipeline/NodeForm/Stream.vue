@@ -200,7 +200,6 @@ async function getStreamList() {
   isFetchingStreams.value = true;
   
   try {
-    console.log(stream_type.value,"in  fun")
     const res : any = await getStreams(stream_type.value, false);
     
     if (res.list.length > 0 && pipelineObj.currentSelectedNodeData.hasOwnProperty("type") && pipelineObj.currentSelectedNodeData.type === "input") {

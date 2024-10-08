@@ -235,14 +235,6 @@ const useRoutes = () => {
           },
         },
         {
-          path: "stream-association",
-          name: "streamFunctions",
-          component: AssociatedStreamFunction,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,

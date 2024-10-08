@@ -947,7 +947,6 @@ const removeField = (field: any) => {
 
 const updateQueryValue = (value: string) => {
   query.value = value;
-  console.log(value,"value in editor")
 
   if (tab.value === "sql") emits("update:sql", value);
   if (tab.value === "promql") emits("update:promql", value);

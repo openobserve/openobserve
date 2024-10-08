@@ -60,7 +60,6 @@ const queryImage = getImageURL("images/pipeline/query.svg");
       pipelineObj,
     } = useDragAndDrop();
       const vueFlowRef = ref(null);
-        console.log(props,"props in vue")
       // Computed properties for nodes and edges
       const lockedNodes = computed(() => {
         return props.pipeline.nodes.map(node => ({
@@ -74,8 +73,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
       });
 
       onMounted(() => {
-        vueFlowRef.value.fitView({ padding: 1});
-        console.log(pipelineObj,"pipeline")
+        vueFlowRef.value.fitView({ padding: 0.1});
         pipelineObj.nodeTypes = [
   {
     label: "Source",

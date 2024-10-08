@@ -457,7 +457,6 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
-        console.log(func,"func");
         functions.value[func.name] = func;
         functionOptions.value.push(func.name);
       });
