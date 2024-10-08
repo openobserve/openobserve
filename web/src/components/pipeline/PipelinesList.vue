@@ -343,10 +343,14 @@ const updateActiveTab = () => {
       ...pipeline,
       "#": index + 1,
     }));
+    filteredPipelines.value = pipelines.value;
     resultTotal.value = pipelines.value.length;
     columns.value = getColumnsForActiveTab(activeTab.value);
     return;
   }
+
+
+
 
   filteredPipelines.value = pipelines.value
     .filter((pipeline : any) => pipeline.source.source_type === activeTab.value)
@@ -357,12 +361,12 @@ const updateActiveTab = () => {
 
   resultTotal.value = filteredPipelines.value.length;
   columns.value = getColumnsForActiveTab(activeTab.value);
+
 };
 
 
 const toggleAlertState = (row : any) =>{
   row.enabled = !row.enabled;
-  console.log(row)
   pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
     const message = row.enabled 
     ? `${row.name} state resumed successfully` 
@@ -551,7 +555,7 @@ const savePipeline = (data: any) => {
     });
 };
 
-const deletePipeline = () => {
+const deletePipeline = async () => {
   const dismiss = q.notify({
     message: "deleting pipeline...",
     position: "bottom",
@@ -564,8 +568,9 @@ const deletePipeline = () => {
       pipeline_id,
       org_id
     })
-    .then(() => {
-      getPipelines();
+    .then(async () => {
+      await getPipelines();
+      updateActiveTab();
       q.notify({
         message: "Pipeline deleted successfully",
         color: "positive",
