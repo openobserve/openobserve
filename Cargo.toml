@@ -305,3 +305,4 @@ url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 zstd = "0.13"
+md5 = "0.7.0"

@@ -1412,7 +1412,9 @@ pub async fn create_table_index() -> Result<()> {
     }
 
     // create UNIQUE index for file_list
-    DB_QUERY_NUMS.with_label_values(&["create", "file_list"]).inc();
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "file_list"])
+        .inc();
     let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
     if let Err(e) = sqlx::query(unique_index_sql).execute(&pool).await {
         if !e.to_string().contains("could not create unique index") {
@@ -1456,7 +1458,9 @@ pub async fn create_table_index() -> Result<()> {
             ret.len()
         );
         // create index again
-        DB_QUERY_NUMS.with_label_values(&["create", "file_list"]).inc();
+        DB_QUERY_NUMS
+            .with_label_values(&["create", "file_list"])
+            .inc();
         sqlx::query(unique_index_sql).execute(&pool).await?;
         log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) succeed");
     }
