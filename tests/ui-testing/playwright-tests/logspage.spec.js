@@ -7,7 +7,7 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+//  await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -133,6 +133,9 @@ test.describe("Logs UI testcases", () => {
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
+    const warningElement = page.locator('text=warning Query execution');
+    await expect(warningElement).toBeHidden()
+  
     await page
       .locator('[data-test="table-row-expand-menu"]')
       .first()
