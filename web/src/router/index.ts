@@ -71,8 +71,10 @@ export default function (store: any) {
         to.path != "/web/cb" &&
         sessionUserInfo === null
       ) {
-        if (to.path !== "/logout") {
-          window.sessionStorage.setItem("redirectURI", to.fullPath);
+        if (to.path !== "/logout" &&
+          to.path !== "/cb" &&
+          to.path != "/web/cb") {
+          window.sessionStorage.setItem("redirectURI", window.location.href);
         }
         next({ path: "/login" });
       } else {
