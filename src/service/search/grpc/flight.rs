@@ -171,7 +171,7 @@ pub async fn search(
             stream_name,
             query_params.time_range,
             &stream_settings.partition_keys,
-            &equal_items,
+            equal_items,
             &req.file_id_list,
             &req.idx_file_list,
         )

@@ -61,7 +61,7 @@ use infra::{
     cache::tmpfs,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, SchemaCache,
+        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
     },
     storage,
 };
@@ -826,6 +826,24 @@ pub(crate) async fn generate_index_on_ingester(
                     e
                 ));
             };
+        }
+
+        // add prefix partition for index
+        if let Some(mut settings) = unwrap_stream_settings(schema.schema()) {
+            let term_partition_exists = settings
+                .partition_keys
+                .iter()
+                .any(|partition| partition.field == "term");
+            if !term_partition_exists {
+                settings
+                    .partition_keys
+                    .push(StreamPartition::new_prefix("term"));
+
+                let mut metadata = schema.schema().metadata().clone();
+                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
+                    .await?;
+            }
         }
     }
     let schema_key = idx_schema.hash_key();
