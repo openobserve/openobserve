@@ -79,7 +79,7 @@ export const redirectUser = (redirectURI: string | null) => {
   const path = getPath();
   if (redirectURI != null && redirectURI != "") {
     if (redirectURI.includes("http")) {
-      window.location = redirectURI;
+      window.location.href = redirectURI;
     } else {
       window.location.replace(redirectURI);
     }
