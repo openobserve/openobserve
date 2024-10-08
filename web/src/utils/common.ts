@@ -78,6 +78,7 @@ export const getDefaultOrganization = async (
 export const redirectUser = (redirectURI: string | null) => {
   const path = getPath();
   if (redirectURI != null && redirectURI != "") {
+    console.log("redirectURI", redirectURI, redirectURI.includes("http"));
     if (redirectURI.includes("http")) {
       window.location.href = redirectURI;
     } else {
