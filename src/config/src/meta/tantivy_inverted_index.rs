@@ -179,7 +179,7 @@ impl PuffinDirectory {
                 segment_id,
                 path.extension().unwrap().to_str().unwrap()
             ));
-            let mut writer = puffin_dir.open_write(puffin_dir_path)?;
+            let mut writer = puffin_dir.open_write(&puffin_dir_path)?;
             writer.write_all(&data.read_bytes()?)?;
             writer.flush()?;
 

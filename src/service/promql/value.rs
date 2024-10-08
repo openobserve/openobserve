@@ -677,7 +677,7 @@ mod tests {
         assert!(approx_eq!(f64, increase, rate * 60.0));
 
         let delta = extrapolate(&samples, ExtrapolationKind::Delta);
-        assert!(approx_eq!(f64, dbg!(delta), 4.0));
+        assert!(approx_eq!(f64, delta, 4.0));
     }
 
     #[test]

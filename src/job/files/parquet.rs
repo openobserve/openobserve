@@ -47,7 +47,7 @@ use config::{
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files_with_channel,
         inverted_index::{
-            convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_folder,
+            convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
             split_token,
         },
         json,
@@ -1319,7 +1319,7 @@ pub(crate) async fn create_tantivy_index(
         for old_parquet_file in file_list {
             // get directory of the parquet file
             if let Some(ttv_idx_file) =
-                convert_parquet_idx_file_name_to_tantivy_folder(&old_parquet_file.key)
+                convert_parquet_idx_file_name_to_tantivy_file(&old_parquet_file.key)
             {
                 if let Err(e) = storage::del(&[&ttv_idx_file]).await {
                     log::info!(
@@ -1351,12 +1351,11 @@ pub(crate) async fn create_tantivy_index(
         index_fields,
     )?;
 
-    let puffin_bytes = dbg!(dir).to_puffin_bytes()?;
+    let puffin_bytes = dir.to_puffin_bytes()?;
     let puffin_bytes_len = puffin_bytes.len();
 
     // write fst bytes into disk
-    let Some(tantivy_file_name) =
-        convert_parquet_idx_file_name_to_tantivy_folder(parquet_file_name)
+    let Some(tantivy_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
         return Ok(());
     };

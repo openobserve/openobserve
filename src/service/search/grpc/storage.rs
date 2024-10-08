@@ -27,7 +27,7 @@ use config::{
         tantivy_inverted_index::PuffinDirectory,
     },
     utils::inverted_index::{
-        convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_folder,
+        convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
         create_index_reader_from_puffin_bytes, split_token,
     },
     FILE_EXT_PARQUET, INDEX_FIELD_NAME_FOR_ALL,
@@ -482,7 +482,7 @@ async fn filter_file_list_by_inverted_index(
         .keys()
         .filter_map(|f| {
             if use_tantivy {
-                convert_parquet_idx_file_name_to_tantivy_folder(f)
+                convert_parquet_idx_file_name_to_tantivy_file(f)
             } else {
                 convert_parquet_idx_file_name(f)
             }
@@ -660,7 +660,7 @@ async fn search_tantivy_index(
 ) -> anyhow::Result<(String, Option<BitVec>)> {
     let cfg = get_config();
     let Some(tantivy_index_file_name) =
-        convert_parquet_idx_file_name_to_tantivy_folder(parquet_file_name)
+        convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
@@ -674,7 +674,7 @@ async fn search_tantivy_index(
     };
 
     // let tantivy_dir_real_path = format!("{}/{}", &cfg.common.data_stream_dir, tantivy_dir);
-    let tantivy_index = tantivy::Index::open(dbg!(puffin_dir))?;
+    let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader().unwrap();
     let tantivy_searcher = tantivy_reader.searcher();

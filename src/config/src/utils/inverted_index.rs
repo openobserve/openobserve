@@ -87,7 +87,7 @@ pub async fn create_index_reader_from_puffin_bytes(
 /// e.g.
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
 /// to:   files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv
-pub fn convert_parquet_idx_file_name_to_tantivy_folder(from: &str) -> Option<String> {
+pub fn convert_parquet_idx_file_name_to_tantivy_file(from: &str) -> Option<String> {
     let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
 
     if parts.len() < 4 {
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_parquet_idx_file_name() {
+    fn test_convert_parquet_idx_file_name_to_tantivy_file() {
         let test_cases = vec![
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
@@ -354,6 +354,49 @@ mod tests {
                 None,
             ),
         ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                convert_parquet_idx_file_name_to_tantivy_file(input),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_convert_parquet_idx_file_name_to_fst() {
+        let test_cases = vec![
+            (
+                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.puffin"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/metrics/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_metrics/2024/02/16/16/7164299619311026293.puffin"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/traces/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_traces/2024/02/16/16/7164299619311026293.puffin"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/metadata/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                None,
+            ),
+            (
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                None,
+            ),
+        ];
+
         for (input, expected) in test_cases {
             assert_eq!(convert_parquet_idx_file_name(input), expected);
         }
