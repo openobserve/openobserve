@@ -2353,11 +2353,20 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Wait while generating shorten URL...",
+        position: "bottom",
+        type: "positive",
+        timeout: 0,
+      });
+
       shortURLService
         .create(store.state.selectedOrganization.identifier, shareURL)
         .then((res: any) => {
           if (res.status == 200) {
             shareURL = res.data.short_url;
+            dismiss();
             copyToClipboard(shareURL)
               .then(() => {
                 $q.notify({
@@ -2376,6 +2385,7 @@ export default defineComponent({
           }
         })
         .catch(() => {
+          dismiss();
           $q.notify({
             type: "negative",
             message: "Error while shortening link.",
