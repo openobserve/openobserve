@@ -1479,7 +1479,10 @@ export const convertSQLData = async (
               type: "text",
               style: {
                 text: formatUnitValue(unitValue),
-                fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
+                fontSize: calculateOptimalFontSize(
+                  formatUnitValue(unitValue),
+                  params.coordSys.cx * 2,
+                ), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
                 align: "center",
                 verticalAlign: "middle",
@@ -2296,4 +2299,24 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "bar",
       };
   }
+};
+
+const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
+  let minFontSize = 1; // Start with the smallest font size
+  let maxFontSize = 90; // Set a maximum possible font size
+  let optimalFontSize = minFontSize;
+
+  while (minFontSize <= maxFontSize) {
+    const midFontSize = Math.floor((minFontSize + maxFontSize) / 2);
+    const textWidth = calculateWidthText(text, `${midFontSize}px`);
+
+    if (textWidth > canvasWidth) {
+      maxFontSize = midFontSize - 1; // Text is too wide, reduce font size
+    } else {
+      optimalFontSize = midFontSize; // Text fits, but we try larger
+      minFontSize = midFontSize + 1;
+    }
+  }
+
+  return optimalFontSize; // Return the largest font size that fits
 };
