@@ -938,6 +938,7 @@ import useLogs from "@/composables/useLogs";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
+import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -2352,18 +2353,32 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
-      copyToClipboard(shareURL)
-        .then(() => {
-          $q.notify({
-            type: "positive",
-            message: "Link Copied Successfully!",
-            timeout: 5000,
-          });
+      shortURLService
+        .create(shareURL)
+        .then((res: any) => {
+          if (res.status == 200) {
+            shareURL = res.data.short_url;
+            copyToClipboard(shareURL)
+              .then(() => {
+                $q.notify({
+                  type: "positive",
+                  message: "Link Copied Successfully!",
+                  timeout: 5000,
+                });
+              })
+              .catch(() => {
+                $q.notify({
+                  type: "negative",
+                  message: "Error while copy link.",
+                  timeout: 5000,
+                });
+              });
+          }
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while copy link.",
+            message: "Error while shortening link.",
             timeout: 5000,
           });
         });
