@@ -2354,7 +2354,7 @@ export default defineComponent({
       }
 
       shortURLService
-        .create(shareURL)
+        .create(store.state.selectedOrganization.identifier, shareURL)
         .then((res: any) => {
           if (res.status == 200) {
             shareURL = res.data.short_url;
