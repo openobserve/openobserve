@@ -820,10 +820,6 @@ export default defineComponent({
     };
 
     const shareLink = useLoading(async () => {
-      const dismiss = quasar.notify({
-        spinner: true,
-        message: "Shortening your link, please wait...",
-      });
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
@@ -852,8 +848,6 @@ export default defineComponent({
           });
       } catch (error) {
         showErrorNotification("Error while sharing link");
-      } finally {
-        dismiss();
       }
     });
 
