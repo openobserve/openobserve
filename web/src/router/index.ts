@@ -72,7 +72,7 @@ export default function (store: any) {
         sessionUserInfo === null
       ) {
         if (to.path !== "/logout") {
-          window.sessionStorage.setItem("redirectURI", to.fullPath);
+          window.sessionStorage.setItem("redirectURI", window.location.href);
         }
         next({ path: "/login" });
       } else {
