@@ -118,7 +118,7 @@ export default defineComponent({
         if (redirectURI.includes("http")) {
           window.location.href = redirectURI;
         } else {
-          window.location.replace(redirectURI);
+          router.push({ path: redirectURI });
         }
       } else {
         router.push({ path: "/" });
