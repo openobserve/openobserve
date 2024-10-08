@@ -430,6 +430,32 @@ export const convertSQLData = async (
     return result;
   };
 
+  const largestStackLabel = (axisKey: string, breakDownkey: string) => {
+    const data =
+      missingValueData?.filter((item: any) => {
+        return (
+          xAxisKeys.every((key: any) => item[key] != null) &&
+          yAxisKeys.every((key: any) => item[key] != null) &&
+          breakDownKeys.every((key: any) => item[key] != null)
+        );
+      }) || [];
+
+    const maxValues: any = {};
+
+    data.forEach((obj: any) => {
+      if (maxValues[obj[breakDownkey]]) {
+        if (obj[axisKey] > maxValues[obj[breakDownkey]]) {
+          maxValues[obj[breakDownkey]] = obj[axisKey];
+        }
+      } else {
+        maxValues[obj[breakDownkey]] =
+          typeof obj[axisKey] === "number" ? obj[axisKey] : 0;
+      }
+    });
+
+    return Object.values(maxValues).reduce((a: any, b: any) => a + b, 0);
+  };
+
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
   );
@@ -642,6 +668,8 @@ export const convertSQLData = async (
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
 
+      console.log("panel schema =====", panelSchema);
+
       return {
         type: "category",
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
@@ -707,7 +735,10 @@ export const convertSQLData = async (
             ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
             : formatUnitValue(
                 getUnitValue(
-                  largestLabel(getAxisDataFromKey(yAxisKeys[0])),
+                  panelSchema.type === "stacked" ||
+                    panelSchema.type === "area-stacked"
+                    ? largestStackLabel(yAxisKeys[0], breakDownKeys[0])
+                    : largestLabel(getAxisDataFromKey(yAxisKeys[0])),
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
@@ -1021,12 +1052,13 @@ export const convertSQLData = async (
       options.yAxis = temp;
 
       options.yAxis.forEach((it: any) => {
-        it.nameGap = calculateWidthText(
-          xAxisKeys.reduce(
-            (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
-            "",
-          ),
-        );
+        it.nameGap =
+          calculateWidthText(
+            xAxisKeys.reduce(
+              (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
+              "",
+            ),
+          ) + 8;
       });
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
@@ -2059,14 +2091,17 @@ const getLegendPosition = (legendPosition: string) => {
  * @param {string} text - The text to calculate the width of.
  * @return {number} The width of the text in pixels.
  */
-const calculateWidthText = (text: string): number => {
+const calculateWidthText = (
+  text: string,
+  fontSize: string = "12px",
+): number => {
   if (!text) return 0;
 
   const span = document.createElement("span");
   document.body.appendChild(span);
 
   span.style.font = "sans-serif";
-  span.style.fontSize = "12px";
+  span.style.fontSize = fontSize || "12px";
   span.style.height = "auto";
   span.style.width = "auto";
   span.style.top = "0px";
@@ -2085,12 +2120,15 @@ const calculateWidthText = (text: string): number => {
  * @param {any[]} data - An array of data.
  * @return {any} The largest label in the data array.
  */
-const largestLabel = (data: any) =>
-  data.reduce((largest: any, label: any) => {
+const largestLabel = (data: any) => {
+  const largestlabel = data.reduce((largest: any, label: any) => {
     return label?.toString().length > largest?.toString().length
       ? label
       : largest;
   }, "");
+
+  return largestlabel;
+};
 
 /**
  * Retrieves the properties for a given chart type and returns them as an object.
