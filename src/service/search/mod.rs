@@ -47,9 +47,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::get_cached_channel,
-    o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
+    o2_enterprise::enterprise::search::TaskStatus,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
-    tracing::{info_span, Instrument},
+    tracing::info_span,
 };
 
 use super::usage::report_request_usage_stats;

@@ -31,6 +31,10 @@ use infra::{
 use proto::cluster_rpc;
 use result_utils::get_ts_value;
 use tracing::Instrument;
+#[cfg(feature = "enterprise")]
+use {
+    crate::service::search::cluster, o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+};
 
 use crate::{
     common::{
