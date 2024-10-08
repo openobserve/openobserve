@@ -114,7 +114,6 @@ pub async fn search(
         &req.org_id,
         req.stream_type,
         stream_name,
-        req.prefixes,
         req.time_range,
     )
     .await?;
