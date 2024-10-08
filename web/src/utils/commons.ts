@@ -542,10 +542,14 @@ export const deleteDashboardById = async (
       [folderId]: newDashboards,
     });
 
+    // remove current dashboard hash from allDashboardListHash
+    delete store.state.organizationData.allDashboardListHash[folderId][
+      dashboardId
+    ];
+
     // update the allDashboardList in the store
     store.dispatch("setAllDashboardListHash", {
-      ...allDashboardList,
-      [folderId]: newDashboards,
+      ...store.state.organizationData.allDashboardListHash,
     });
   } catch (error) {
     throw error;
