@@ -42,6 +42,7 @@ use proto::cluster_rpc;
 use regex::Regex;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
@@ -159,7 +160,7 @@ pub async fn search_multi(
             }
         }
 
-        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
+        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req, false).await;
 
         match res {
             Ok(res) => {
@@ -344,6 +345,7 @@ pub async fn search(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
+    use_cache: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
@@ -382,36 +384,27 @@ pub async fn search(
             .await;
     }
 
-    #[cfg(feature = "enterprise")]
-    let req_regions = in_req.regions.clone();
-    #[cfg(feature = "enterprise")]
-    let req_clusters = in_req.clusters.clone();
-    #[cfg(feature = "enterprise")]
-    let local_cluster_search = req_regions == vec!["local"]
-        && !req_clusters.is_empty()
-        && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
+    let trace_id_move = trace_id.to_string();
+    let user_id_move = user_id.clone();
+    let org_id_move = org_id.to_string();
+    let in_req_move = in_req.clone();
 
-    let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
-    req.job.as_mut().unwrap().trace_id = trace_id.clone();
-    req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::Cluster as _;
-    req.stream_type = stream_type.to_string();
-    req.user_id = user_id.clone();
-
-    let req_query = req.clone().query.unwrap();
-
-    let handle = tokio::task::spawn(async move {
-        #[cfg(feature = "enterprise")]
-        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req, req_regions, req_clusters).await
-        } else {
-            cluster::http::search(req).await
+    let span = tracing::span::Span::current();
+    let handle = tokio::task::spawn(
+        async move {
+            cache::search(
+                &trace_id_move,
+                &org_id_move,
+                stream_type,
+                user_id_move,
+                &in_req_move,
+                use_cache,
+            )
+            .await
         }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            cluster::http::search(req).await
-        }
-    });
+        .instrument(span),
+    );
+
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => Err(e),
@@ -427,6 +420,7 @@ pub async fn search(
         .with_label_values(&[org_id])
         .dec();
 
+    let req_query = in_req.query.clone();
     // do this because of clippy warning
     match res {
         Ok(res) => {
@@ -458,11 +452,7 @@ pub async fn search(
                     response_time: time,
                     size: res.scan_size as f64,
                     request_body: Some(req_query.sql.clone()),
-                    function: if req_query.query_fn.is_empty() {
-                        None
-                    } else {
-                        Some(req_query.query_fn.clone())
-                    },
+                    function: req_query.query_fn.clone(),
                     user_email: user_id,
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),
@@ -479,7 +469,7 @@ pub async fn search(
                     is_partial: res.is_partial,
                     ..Default::default()
                 };
-                let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
+                let num_fn = if req_query.query_fn.is_none() { 0 } else { 1 };
                 report_request_usage_stats(
                     req_stats,
                     org_id,

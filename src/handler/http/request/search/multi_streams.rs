@@ -303,6 +303,7 @@ pub async fn search_multi(
             stream_type,
             Some(user_id.to_string()),
             &req,
+            false,
         )
         .instrument(http_span.clone())
         .await;
@@ -925,10 +926,16 @@ pub async fn around_multi(
             search_type: Some(search::SearchEventType::UI),
             index_type: "".to_string(),
         };
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
+        let search_res = SearchService::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id.clone(),
+            &req,
+            false,
+        )
+        .instrument(http_span.clone())
+        .await;
 
         let resp_forward = match search_res {
             Ok(res) => res,
@@ -998,10 +1005,16 @@ pub async fn around_multi(
             search_type: Some(search::SearchEventType::UI),
             index_type: "".to_string(),
         };
-        let search_res =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-                .instrument(http_span.clone())
-                .await;
+        let search_res = SearchService::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id.clone(),
+            &req,
+            false,
+        )
+        .instrument(http_span.clone())
+        .await;
 
         let resp_backward = match search_res {
             Ok(res) => res,

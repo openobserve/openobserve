@@ -28,6 +28,7 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+use proto::cluster_rpc;
 use result_utils::get_ts_value;
 use tracing::Instrument;
 
@@ -206,17 +207,38 @@ pub async fn search(
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
 
+        #[cfg(feature = "enterprise")]
+        let req_regions = in_req.regions.clone();
+        #[cfg(feature = "enterprise")]
+        let req_clusters = in_req.clusters.clone();
+        #[cfg(feature = "enterprise")]
+        let local_cluster_search = req_regions == vec!["local"]
+            && !req_clusters.is_empty()
+            && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
+
+        let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
+        req.job.as_mut().unwrap().trace_id = trace_id.to_string();
+        req.org_id = org_id.to_string();
+        req.stype = cluster_rpc::SearchType::Cluster as _;
+        req.stream_type = stream_type.to_string();
+        req.user_id = user_id.clone();
+
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
-            let org_id = org_id.to_string();
-            let trace_id = format!("{}-{}", trace_id, i);
-            let user_id = user_id.clone();
+            let trace_id = trace_id.to_string();
+
+            #[cfg(feature = "enterprise")]
+            let regions = req_regions.clone();
+            #[cfg(feature = "enterprise")]
+            let clusters = req_clusters.clone();
 
             let enter_span = tracing::span::Span::current();
             let task = tokio::task::spawn(async move {
                 let trace_id = trace_id.clone();
-                req.query.start_time = delta.delta_start_time;
-                req.query.end_time = delta.delta_end_time;
+                if let Some(ref mut query) = req.query {
+                    query.start_time = delta.delta_start_time;
+                    query.end_time = delta.delta_end_time;
+                }
 
                 let cfg = get_config();
                 if cfg.common.result_cache_enabled
@@ -224,15 +246,26 @@ pub async fn search(
                     && c_resp.has_cached_data
                 {
                     log::info!(
-                        "[trace_id {trace_id}] Query new start time: {}, end time : {}",
-                        req.query.start_time,
-                        req.query.end_time
+                        "[trace_id {trace_id}] query index: {i}, new start time: {}, end time : {}",
+                        req.query.as_ref().unwrap().start_time,
+                        req.query.as_ref().unwrap().end_time
                     );
                 }
 
-                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
-                    .instrument(enter_span)
-                    .await
+                #[cfg(feature = "enterprise")]
+                if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
+                    cluster::super_cluster::search(req, regions, clusters).await
+                } else {
+                    crate::service::search::cluster::http::search(req)
+                        .instrument(enter_span)
+                        .await
+                }
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    crate::service::search::cluster::http::search(req)
+                        .instrument(enter_span)
+                        .await
+                }
             });
             tasks.push(task);
         }

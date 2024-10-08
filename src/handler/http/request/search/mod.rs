@@ -132,7 +132,6 @@ pub async fn search(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -226,7 +225,8 @@ pub async fn search(
     }
 
     // run search with cache
-    let res = SearchService::cache::search(
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    let res = SearchService::search(
         &trace_id,
         &org_id,
         stream_type,
@@ -465,9 +465,16 @@ pub async fn around(
         search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-        .instrument(http_span.clone())
-        .await;
+    let search_res = SearchService::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id.clone(),
+        &req,
+        false,
+    )
+    .instrument(http_span.clone())
+    .await;
 
     let resp_forward = match search_res {
         Ok(res) => res,
@@ -516,9 +523,16 @@ pub async fn around(
         search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-        .instrument(http_span)
-        .await;
+    let search_res = SearchService::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id.clone(),
+        &req,
+        false,
+    )
+    .instrument(http_span)
+    .await;
 
     let resp_backward = match search_res {
         Ok(res) => res,
@@ -1213,6 +1227,7 @@ async fn values_v2(
         StreamType::Metadata,
         Some(user_id.to_string()),
         &req,
+        false,
     )
     .instrument(http_span)
     .await;
@@ -1522,6 +1537,7 @@ pub async fn search_history(
         stream_type,
         user_id.clone(),
         &search_query_req,
+        false,
     )
     .instrument(http_span)
     .await;
