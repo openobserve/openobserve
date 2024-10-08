@@ -838,7 +838,10 @@ export default defineComponent({
       }
 
       try {
-        const res = await shortURLService.create(urlObj?.href);
+        const res = await shortURLService.create(
+          store.state.selectedOrganization.identifier,
+          urlObj?.href,
+        );
         const shortURL = res?.data?.short_url;
         copyToClipboard(shortURL)
           .then(() => {
