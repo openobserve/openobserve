@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
 const shortURL = {
-  create: (url: string) => {
-    return http().post(`/api/short`, {
+  create: (org_identifier: string, url: string) => {
+    return http().post(`/api/${org_identifier}/short`, {
       original_url: url,
     });
   },
