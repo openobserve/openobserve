@@ -26,7 +26,6 @@ use config::{
         stream::StreamType,
         usage::{RequestStats, UsageType, USAGE_STREAM},
     },
-    metrics,
     utils::{base64, json},
     DISTINCT_FIELDS,
 };
@@ -231,7 +230,7 @@ pub async fn search(
     }
 
     // run search with cache
-    let res = SearchService::cache::search(
+    let res = SearchService::search(
         &trace_id,
         &org_id,
         stream_type,
@@ -410,30 +409,6 @@ pub async fn around(
             .collect::<Vec<_>>()
     });
 
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .inc();
-    // get a local search queue lock
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-    log::info!(
-        "http search around API wait in queue took: {} ms",
-        took_wait
-    );
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .dec();
-
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -471,9 +446,16 @@ pub async fn around(
         search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-        .instrument(http_span.clone())
-        .await;
+    let search_res = SearchService::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id.clone(),
+        &req,
+        false,
+    )
+    .instrument(http_span.clone())
+    .await;
 
     let resp_forward = match search_res {
         Ok(res) => res,
@@ -522,9 +504,16 @@ pub async fn around(
         search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
-        .instrument(http_span)
-        .await;
+    let search_res = SearchService::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id.clone(),
+        &req,
+        false,
+    )
+    .instrument(http_span)
+    .await;
 
     let resp_backward = match search_res {
         Ok(res) => res,
@@ -933,7 +922,7 @@ async fn values_v1(
         let mut req = req.clone();
         req.query.sql = sql;
 
-        let search_res = SearchService::cache::search(
+        let search_res = SearchService::search(
             &trace_id,
             org_id,
             stream_type,
@@ -1165,31 +1154,6 @@ async fn values_v2(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[org_id])
-        .inc();
-
-    // get a local search queue lock
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-    log::info!(
-        "http search value_v2 API wait in queue took: {} ms",
-        took_wait
-    );
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
-
     // search
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1219,6 +1183,7 @@ async fn values_v2(
         StreamType::Metadata,
         Some(user_id.to_string()),
         &req,
+        false,
     )
     .instrument(http_span)
     .await;
@@ -1493,34 +1458,6 @@ pub async fn search_history(
         }
     };
 
-    // increment query queue
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .inc();
-
-    // handle search queue lock and timing
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-
-    log::info!(
-        "http search history API wait in queue took: {} ms",
-        took_wait
-    );
-
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
-        .dec();
-
     let history_org_id = &cfg.common.usage_org;
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
@@ -1529,6 +1466,7 @@ pub async fn search_history(
         stream_type,
         user_id.clone(),
         &search_query_req,
+        false,
     )
     .instrument(http_span)
     .await;

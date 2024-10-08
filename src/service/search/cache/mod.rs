@@ -23,12 +23,13 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, str::StringExt},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
 
@@ -48,7 +49,7 @@ pub mod multi;
 pub mod result_utils;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
-pub async fn search(
+pub(super) async fn search(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -213,15 +214,37 @@ pub async fn search(
         c_resp.deltas.sort();
         c_resp.deltas.dedup();
 
+        #[cfg(not(feature = "enterprise"))]
+        let req_regions = vec![];
+        #[cfg(not(feature = "enterprise"))]
+        let req_clusters = vec![];
+        #[cfg(feature = "enterprise")]
+        let req_regions = in_req.regions.clone();
+        #[cfg(feature = "enterprise")]
+        let req_clusters = in_req.clusters.clone();
+
+        let query: SearchQuery = in_req.query.clone().into();
+        let request = crate::service::search::request::Request::new(
+            trace_id.to_string(),
+            org_id.to_string(),
+            stream_type,
+            in_req.timeout,
+            user_id.clone(),
+            Some((query.start_time, query.end_time)),
+            in_req.search_type.map(|v| v.to_string()),
+            in_req.index_type.optional(),
+        );
+
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
-            let mut req = req.clone();
-            let org_id = org_id.to_string();
-            let trace_id = format!("{}-{}", trace_id, i);
-            let user_id = user_id.clone();
+            let request = request.clone();
+            let trace_id = trace_id.to_string();
+            let query = query.clone();
+            let regions = req_regions.clone();
+            let clusters = req_clusters.clone();
 
             let enter_span = tracing::span::Span::current();
             let task = tokio::task::spawn(
-                (async move {
+                async move {
                     let trace_id = trace_id.clone();
                     req.query.start_time = delta.delta_start_time;
                     req.query.end_time = delta.delta_end_time;
@@ -229,17 +252,18 @@ pub async fn search(
                     let cfg = get_config();
                     if cfg.common.result_cache_enabled
                         && cfg.common.print_key_sql
-                        && c_resp.has_cached_data
                     {
                         log::info!(
-                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            "[trace_id {trace_id}] query index: {i}, new start time: {}, end time : {}, has_cached_data: {}",
                             req.query.start_time,
-                            req.query.end_time
+                            req.query.end_time,
+                            c_resp.has_cached_data
                         );
                     }
 
-                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
-                })
+                    crate::service::search::cluster::http::search(request, query, regions, clusters)
+                        .await
+                }
                 .instrument(enter_span),
             );
             tasks.push(task);

@@ -27,11 +27,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{
-        base64, json,
-        sql::is_aggregate_query,
-        str::{find, StringExt},
-    },
+    utils::{base64, json, sql::is_aggregate_query, str::find},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -181,7 +177,7 @@ pub async fn search_multi(
             }
         }
 
-        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
+        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req, false).await;
 
         match res {
             Ok(res) => {
@@ -366,6 +362,7 @@ pub async fn search(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
+    use_cache: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
@@ -405,32 +402,24 @@ pub async fn search(
             .await;
     }
 
-    #[cfg(not(feature = "enterprise"))]
-    let req_regions = vec![];
-    #[cfg(not(feature = "enterprise"))]
-    let req_clusters = vec![];
-    #[cfg(feature = "enterprise")]
-    let req_regions = in_req.regions.clone();
-    #[cfg(feature = "enterprise")]
-    let req_clusters = in_req.clusters.clone();
-
-    let query: SearchQuery = in_req.query.clone().into();
-    let req_query = query.clone();
-    let request = crate::service::search::request::Request::new(
-        trace_id.clone(),
-        org_id.to_string(),
-        stream_type,
-        in_req.timeout,
-        user_id.clone(),
-        Some((query.start_time, query.end_time)),
-        in_req.search_type.map(|v| v.to_string()),
-        in_req.index_type.optional(),
-    );
-
+    let trace_id_move = trace_id.to_string();
+    let user_id_move = user_id.clone();
+    let org_id_move = org_id.to_string();
+    let in_req_move = in_req.clone();
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
-            .instrument(span),
+        async move {
+            cache::search(
+                &trace_id_move,
+                &org_id_move,
+                stream_type,
+                user_id_move,
+                &in_req_move,
+                use_cache,
+            )
+            .await
+        }
+        .instrument(span),
     );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
@@ -448,6 +437,7 @@ pub async fn search(
         .dec();
 
     // do this because of clippy warning
+    let req_query: SearchQuery = in_req.query.clone().into();
     match res {
         Ok(res) => {
             let time = start.elapsed().as_secs_f64();

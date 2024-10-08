@@ -324,6 +324,7 @@ impl QueryCondition {
                 stream_param.stream_type,
                 None,
                 &req,
+                false,
             )
             .await
         };
