@@ -181,7 +181,6 @@ pub(super) async fn search(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .inc();
-
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -200,7 +199,6 @@ pub(super) async fn search(
             "[trace_id {trace_id}] http search API wait in queue took: {} ms",
             took_wait
         );
-
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
