@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -27,11 +27,13 @@ use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPoolOptions},
     ConnectOptions, MySql, Pool,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 
+use super::DBIndex;
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 fn connect() -> Pool<MySql> {
     let cfg = config::get_config();
@@ -51,6 +53,25 @@ fn connect() -> Pool<MySql> {
         .max_connections(cfg.limit.sql_db_connections_max)
         .max_lifetime(max_lifetime)
         .connect_lazy_with(db_opts)
+}
+
+async fn cache_indices() -> HashSet<DBIndex> {
+    let client = CLIENT.clone();
+    DB_QUERY_NUMS
+        .with_label_values(&["select", "information_schema.statistics"])
+        .inc();
+    let var_name = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
+    let sql = var_name;
+    let res = sqlx::query_as::<_, (String, String)>(sql)
+        .fetch_all(&client)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
 }
 
 pub struct MysqlDb {}
@@ -790,5 +811,61 @@ async fn create_meta_backup() -> Result<()> {
         return Err(e.into());
     }
 
+    Ok(())
+}
+
+pub async fn create_index(
+    idx_name: &str,
+    table: &str,
+    unique: bool,
+    fields: &[&str],
+) -> Result<()> {
+    let client = CLIENT.clone();
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    let unique_str = if unique { "UNIQUE" } else { "" };
+    log::info!("[MYSQL] creating index {} on table {}", idx_name, table);
+    DB_QUERY_NUMS.with_label_values(&["create", table]).inc();
+    let sql = format!(
+        "CREATE {} INDEX {} ON {} ({});",
+        unique_str,
+        idx_name,
+        table,
+        fields.join(",")
+    );
+    let start = std::time::Instant::now();
+    sqlx::query(&sql).execute(&client).await?;
+    let time = start.elapsed().as_secs_f64();
+    DB_QUERY_TIME
+        .with_label_values(&["create_index", table])
+        .observe(time);
+    log::info!("[MYSQL] index {} created successfully", idx_name);
+    Ok(())
+}
+
+pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
+    let client = CLIENT.clone();
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if !indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    log::info!("[MYSQL] deleting index {} on table {}", idx_name, table);
+    DB_QUERY_NUMS.with_label_values(&["drop", table]).inc();
+    let sql = format!("DROP INDEX {} ON {};", idx_name, table);
+    let start = std::time::Instant::now();
+    sqlx::query(&sql).execute(&client).await?;
+    let time = start.elapsed().as_secs_f64();
+    DB_QUERY_TIME
+        .with_label_values(&["drop_index", table])
+        .observe(time);
+    log::info!("[MYSQL] index {} deleted successfully", idx_name);
     Ok(())
 }
