@@ -1,5 +1,5 @@
 <template>
-    <div class="pipeline-view container">
+    <div class="pipeline-view-tooltip container">
       <VueFlow 
       ref="vueFlowRef"
         v-model:nodes="lockedNodes"
@@ -39,7 +39,6 @@ import { ControlButton, Controls } from '@vue-flow/controls'
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
-/* import the default theme (optional) */
 import "@vue-flow/core/dist/theme-default.css";
 import '@vue-flow/controls/dist/style.css'
 import useDragAndDrop from '@/plugins/pipelines/useDnD';
@@ -151,12 +150,43 @@ const queryImage = getImageURL("images/pipeline/query.svg");
   });
   </script>
   
-  <style scoped>
-  .pipeline-view {
+  <style >
+  .pipeline-view-tooltip {
     width: 300px; /* Adjust the width */
     height: 200px; /* Adjust the height */
     overflow: auto;
   }
+
+ 
+.o2vf_node {
+  width: auto;
+
+  .vue-flow__node {
+    padding: 0px;
+    width: auto;
+  }
+
+  .o2vf_node_input,
+  .vue-flow__node-input {
+    background-color: #c8d6f5;
+    border-color: 1px solid #2c6b2f;
+    color: black;
+  }
+
+  .o2vf_node_output,
+  .vue-flow__node-output {
+    background-color: #8fd4b8;
+    border-color: 1px solid #3b6f3f;
+    color: black;
+  }
+
+  .o2vf_node_default,
+  .vue-flow__node-default {
+    background-color: #efefef;
+    border-color: 1px solid #171e25;
+    color: black;
+  }
+}
 
 
   </style>
