@@ -437,7 +437,10 @@ const getColumnsForActiveTab = (tab : any) => {
     sortable: false,
   };
 if(tab === "all"){
+  
   const allColumns = [ ...scheduledColumns, actionsColumn];
+
+  allColumns.splice(2,0 , { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true });
 
   return allColumns;
 }
