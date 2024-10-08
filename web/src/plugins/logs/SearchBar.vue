@@ -396,7 +396,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
-          @click="shareLink"
+          @click="shareLink.execute()"
+          :loading="shareLink.isLoading.value"
         ></q-btn>
         <q-btn
           data-test="logs-search-bar-share-link-btn"
@@ -962,6 +963,7 @@ import { inject } from "vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 const defaultValue: any = () => {
   return {
@@ -2338,7 +2340,7 @@ export default defineComponent({
       }
     };
 
-    const shareLink = () => {
+    const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true);
       const queryString = Object.entries(queryObj)
         .map(
@@ -2353,20 +2355,11 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Wait while generating shorten URL...",
-        position: "bottom",
-        type: "positive",
-        timeout: 0,
-      });
-
-      shortURLService
+      await shortURLService
         .create(store.state.selectedOrganization.identifier, shareURL)
         .then((res: any) => {
           if (res.status == 200) {
             shareURL = res.data.short_url;
-            dismiss();
             copyToClipboard(shareURL)
               .then(() => {
                 $q.notify({
@@ -2385,14 +2378,13 @@ export default defineComponent({
           }
         })
         .catch(() => {
-          dismiss();
           $q.notify({
             type: "negative",
             message: "Error while shortening link.",
             timeout: 5000,
           });
         });
-    };
+    });
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
