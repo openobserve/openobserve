@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{
     meta::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
-        function::{StreamFunctionsList, Transform},
+        function::Transform,
     },
     RwAHashMap, RwHashMap,
 };
@@ -46,8 +46,6 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
-pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
-    Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
 pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =

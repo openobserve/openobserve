@@ -251,12 +251,6 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
         format!("{:.0}", (traces_compressed_size / SIZE_IN_MB)).into(),
     );
 
-    let iter = STREAM_FUNCTIONS.iter().clone();
-    let mut ingest_functions = 0;
-    for item in iter {
-        ingest_functions += item.value().list.len()
-    }
-    data.insert("num_ingest_functions".to_string(), ingest_functions.into());
     data.insert(
         "num_query_functions".to_string(),
         QUERY_FUNCTIONS.len().into(),

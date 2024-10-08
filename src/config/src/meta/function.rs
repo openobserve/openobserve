@@ -79,27 +79,6 @@ impl PartialEq for StreamTransform {
     }
 }
 
-impl Transform {
-    pub fn to_stream_transform(&self) -> Vec<StreamTransform> {
-        let mut ret: Vec<StreamTransform> = vec![];
-        if let Some(streams) = &self.streams {
-            let mut func = self.clone();
-            func.streams = None;
-            for stream in streams {
-                ret.push(StreamTransform {
-                    transform: func.clone(),
-                    stream: stream.stream.clone(),
-                    order: stream.order,
-                    stream_type: stream.stream_type,
-                    is_removed: stream.is_removed,
-                    apply_before_flattening: stream.apply_before_flattening,
-                })
-            }
-        }
-        ret
-    }
-}
-
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.function == other.function && self.params == other.params
@@ -116,7 +95,7 @@ pub struct FunctionList {
     pub list: Vec<Transform>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct StreamFunctionsList {
     pub list: Vec<StreamTransform>,
 }
