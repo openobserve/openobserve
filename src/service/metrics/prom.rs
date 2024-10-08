@@ -648,23 +648,22 @@ pub(crate) async fn get_series(
         search_type: None,
         index_type: "".to_string(),
     };
-    let series =
-        match search_service::search("", org_id, StreamType::Metrics, None, &req, false).await {
-            Err(err) => {
-                log::error!("search series error: {err}");
-                return Err(err);
-            }
-            Ok(resp) => resp
-                .hits
-                .into_iter()
-                .map(|mut val| {
-                    if let Some(map) = val.as_object_mut() {
-                        map.remove(HASH_LABEL);
-                    }
-                    val
-                })
-                .collect(),
-        };
+    let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
+        Err(err) => {
+            log::error!("search series error: {err}");
+            return Err(err);
+        }
+        Ok(resp) => resp
+            .hits
+            .into_iter()
+            .map(|mut val| {
+                if let Some(map) = val.as_object_mut() {
+                    map.remove(HASH_LABEL);
+                }
+                val
+            })
+            .collect(),
+    };
     Ok(series)
 }
 
@@ -794,19 +793,18 @@ pub(crate) async fn get_label_values(
         search_type: None,
         index_type: "".to_string(),
     };
-    let mut label_values =
-        match search_service::search("", org_id, stream_type, None, &req, false).await {
-            Ok(resp) => resp
-                .hits
-                .iter()
-                .filter_map(|v| v.as_object().unwrap().get(&label_name))
-                .map(|v| v.as_str().unwrap().to_string())
-                .collect::<Vec<_>>(),
-            Err(err) => {
-                log::error!("search values error: {:?}", err);
-                return Err(err);
-            }
-        };
+    let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
+        Ok(resp) => resp
+            .hits
+            .iter()
+            .filter_map(|v| v.as_object().unwrap().get(&label_name))
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<_>>(),
+        Err(err) => {
+            log::error!("search values error: {:?}", err);
+            return Err(err);
+        }
+    };
     label_values.sort();
     label_values.dedup();
     Ok(label_values)
