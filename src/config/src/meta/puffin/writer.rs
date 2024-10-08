@@ -22,8 +22,8 @@ use std::{
 use anyhow::{Context, Result};
 
 use super::{
-    BlobMetadata, BlobMetadataBuilder, CompressionCodec, PuffinFooterFlags, PuffinMeta, BLOB_TYPE,
-    MAGIC, MAGIC_SIZE, MIN_FOOTER_SIZE,
+    BlobMetadata, BlobMetadataBuilder, CompressionCodec, PuffinFooterFlags, PuffinMeta, MAGIC,
+    MAGIC_SIZE, MIN_FOOTER_SIZE,
 };
 
 pub struct PuffinBytesWriter<W> {
@@ -54,11 +54,13 @@ impl<W> PuffinBytesWriter<W> {
         &self,
         blob_type: String,
         compression_codec: Option<CompressionCodec>,
+        properties: HashMap<String, String>,
         size: u64,
     ) -> BlobMetadata {
         BlobMetadataBuilder::default()
             .blob_type(blob_type)
             .compression_codec(compression_codec)
+            .properties(properties)
             .offset(self.written_bytes as _)
             .length(size as _)
             .build()
@@ -67,27 +69,47 @@ impl<W> PuffinBytesWriter<W> {
 }
 
 impl<W: io::Write> PuffinBytesWriter<W> {
-    pub fn add_blob(&mut self, raw_data: Vec<u8>) -> Result<()> {
+    pub fn add_blob(
+        &mut self,
+        raw_data: Vec<u8>,
+        object_type: String,
+        file_name: String,
+        compress: bool,
+    ) -> Result<()> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
 
-        // compress blob raw data
-        let mut encoder = zstd::Encoder::new(vec![], 3)?;
-        encoder
-            .write_all(&raw_data)
-            .context("Error encoding blob raw data")?;
-        let compressed_bytes = encoder.finish()?;
-        let compressed_size = compressed_bytes.len() as u64;
-        self.writer.write_all(&compressed_bytes)?;
+        let (final_data, final_size, compression_codec) = if compress {
+            // compress blob raw data
+            let mut encoder = zstd::Encoder::new(vec![], 3)?;
+            encoder
+                .write_all(&raw_data)
+                .context("Error encoding blob raw data")?;
+            let compressed_bytes = encoder.finish()?;
+            let compressed_bytes_len = compressed_bytes.len() as u64;
+            (
+                compressed_bytes,
+                compressed_bytes_len,
+                Some(CompressionCodec::Zstd),
+            )
+        } else {
+            let raw_data_len = raw_data.len() as u64;
+            // use raw data directly
+            (raw_data, raw_data_len, None)
+        };
+
+        self.writer.write_all(&final_data)?;
+        let properties = {
+            let mut properties = HashMap::new();
+            properties.insert("file_name".to_string(), file_name);
+            properties
+        };
 
         // add metadata for this blob
-        let blob_metadata = self.add_blob_metadata(
-            BLOB_TYPE.to_string(),
-            Some(CompressionCodec::Zstd),
-            compressed_size,
-        );
+        let blob_metadata =
+            self.add_blob_metadata(object_type, compression_codec, properties, final_size);
         self.blobs_metadata.push(blob_metadata);
-        self.written_bytes += compressed_size;
+        self.written_bytes += final_size;
         Ok(())
     }
 

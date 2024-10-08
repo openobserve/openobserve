@@ -26,7 +26,6 @@ use crate::meta::puffin::{CompressionCodec, MIN_FILE_SIZE};
 
 pub struct PuffinBytesReader<R> {
     source: R,
-
     metadata: Option<PuffinMeta>,
 }
 
@@ -46,17 +45,28 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             .seek(SeekFrom::Start(blob_metadata.offset as _))
             .await?;
 
-        // decompress bytes since OpenObserve InvertedIndex compresses index data by default
-        ensure!(
-            blob_metadata.compression_codec == Some(CompressionCodec::Zstd),
-            anyhow!("Unexpected CompressionCodex found in BlobMetadata")
-        );
         let mut compressed = vec![0u8; blob_metadata.length as usize];
         self.source.read_exact(&mut compressed).await?;
 
-        let mut decompressed = Vec::new();
-        let mut decoder = zstd::Decoder::new(&compressed[..])?;
-        decoder.read_to_end(&mut decompressed)?;
+        let decompressed = match blob_metadata.compression_codec {
+            Some(CompressionCodec::Lz4) => {
+                unimplemented!()
+            }
+            Some(CompressionCodec::Zstd) => {
+                let mut decompressed = Vec::new();
+                let mut decoder = zstd::Decoder::new(&compressed[..])?;
+                decoder.read_to_end(&mut decompressed)?;
+                decompressed
+            }
+            None => compressed,
+        };
+        // decompress bytes since OpenObserve InvertedIndex compresses index data by default
+        // This check should be outside the puffin reader logic
+        // ensure!(
+        //     blob_metadata.compression_codec == Some(CompressionCodec::Zstd),
+        //     anyhow!("Unexpected CompressionCodex found in BlobMetadata")
+        // );
+
         Ok(decompressed)
     }
 

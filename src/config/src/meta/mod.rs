@@ -22,4 +22,5 @@ pub mod puffin;
 pub mod search;
 pub mod sql;
 pub mod stream;
+pub mod tantivy_inverted_index;
 pub mod usage;

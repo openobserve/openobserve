@@ -15,7 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
     time::UNIX_EPOCH,
 };
@@ -37,8 +37,9 @@ use config::{
     meta::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
-        puffin::writer::PuffinBytesWriter,
+        puffin::{writer::PuffinBytesWriter, BLOB_TYPE},
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+        tantivy_inverted_index::PuffinDirectory,
     },
     metrics,
     utils::{
@@ -47,7 +48,7 @@ use config::{
         file::scan_files_with_channel,
         inverted_index::{
             convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_folder,
-            get_tantivy_index_file_names_for_parquet_file, split_token,
+            split_token,
         },
         json,
         parquet::{
@@ -68,7 +69,7 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
-use tantivy::{doc, indexer::NoMergePolicy, schema::*};
+use tantivy::{doc, schema::*, Directory};
 use tokio::{
     sync::{Mutex, RwLock},
     time,
@@ -1313,24 +1314,19 @@ pub(crate) async fn create_tantivy_index(
     file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
                                                   * .idx files */
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     // delete corresponding tantivy files in .ttv folder
     if let Some(file_list) = file_list_to_invalidate {
         for old_parquet_file in file_list {
             // get directory of the parquet file
-            // get files from file list
-            if let Some(ttv_file_list) =
-                get_tantivy_index_file_names_for_parquet_file(&old_parquet_file.key)
+            if let Some(ttv_idx_file) =
+                convert_parquet_idx_file_name_to_tantivy_folder(&old_parquet_file.key)
             {
-                for files in ttv_file_list {
-                    let file_path_str = files.as_path().to_str().unwrap();
-                    if let Err(e) = storage::del(&[&file_path_str]).await {
-                        log::info!(
-                            "[COMPACTOR:JOB] Failed to remove merged tantivy index file from disk: {}, {}",
-                            file_path_str,
-                            e
-                        );
-                    }
+                if let Err(e) = storage::del(&[&ttv_idx_file]).await {
+                    log::info!(
+                        "[COMPACTOR:JOB] Failed to remove merged tantivy index file from disk: {}, {}",
+                        ttv_idx_file,
+                        e
+                    );
                 }
             } else {
                 // TODO: Return err in future when unable to find the tantivy index files
@@ -1341,84 +1337,49 @@ pub(crate) async fn create_tantivy_index(
         }
     }
 
-    // write fst bytes into disk
-    let Some(idx_folder_path_str) =
-        convert_parquet_idx_file_name_to_tantivy_folder(parquet_file_name)
-    else {
-        return Ok(());
-    };
     let caller = if file_list_to_invalidate.is_some() {
         "[COMPACTOR:JOB]"
     } else {
         "[INGESTER:JOB]"
     };
 
-    // Create the folder for the index
-    // QUESTION: Is there a better way to do this?
-    let mut idx_folder_path = PathBuf::from(&cfg.common.data_stream_dir);
-    idx_folder_path.push(PathBuf::from(&idx_folder_path_str));
-
-    // Check if the folder already exists
-    if !idx_folder_path.exists() {
-        std::fs::create_dir_all(&idx_folder_path)?;
-        log::info!(
-            "{} Created folder for index at {}",
-            caller,
-            idx_folder_path.to_str().unwrap()
-        );
-    } else {
-        log::warn!(
-            "{} Folder already exists for index at {}",
-            caller,
-            idx_folder_path.to_str().unwrap()
-        );
-    }
-
+    let dir = PuffinDirectory::new();
     let _ = generate_tantivy_index(
-        PathBuf::from(&idx_folder_path),
+        dir.clone(),
         inverted_idx_batch,
         full_text_search_fields,
         index_fields,
     )?;
 
-    // TODO(Uddhav): Write index to object storage in future
-    // let directory = index.directory();
-    // for file in directory.list_managed_files().iter() {
-    //     // read all files of the index and write to storage
-    //     let path = dbg!(file.as_path());
-    //     let file_slice = directory.open_read(path).unwrap();
-    //     let file_bytes = file_slice.read_bytes().unwrap();
+    let puffin_bytes = dbg!(dir).to_puffin_bytes()?;
+    let puffin_bytes_len = puffin_bytes.len();
 
-    //     let mut tantivy_file_name = idx_folder_path.clone();
-    //     tantivy_file_name.push('/');
-    //     tantivy_file_name.push_str(path.to_str().unwrap());
+    // write fst bytes into disk
+    let Some(tantivy_file_name) =
+        convert_parquet_idx_file_name_to_tantivy_folder(parquet_file_name)
+    else {
+        return Ok(());
+    };
 
-    //     match storage::put(
-    //         &dbg!(tantivy_file_name),
-    //         Bytes::from(file_bytes.as_bytes().to_vec()),
-    //     )
-    //     .await
-    //     {
-    //         Ok(_) => {
-    //             log::info!(
-    //                 "{} Written tantivy index file successfully with size {}",
-    //                 caller,
-    //                 file_bytes.len(),
-    //             );
-    //             // Ok(())
-    //         }
-    //         Err(e) => {
-    //             log::error!("{} Written fst index file error: {}", caller, e.to_string());
-    //             return Err(e);
-    //         }
-    //     }
-    // }
-
+    match storage::put(&tantivy_file_name, Bytes::from(puffin_bytes)).await {
+        Ok(_) => {
+            log::info!(
+                "{} Written tantivy index file successfully with size {}",
+                caller,
+                puffin_bytes_len,
+            );
+        }
+        Err(e) => {
+            log::error!("{} Written fst index file error: {}", caller, e.to_string());
+            return Err(e);
+        }
+    }
     Ok(())
 }
+
 /// Create a tantivy index in the given directory for the record batch
-pub(crate) fn generate_tantivy_index(
-    tantivy_dir: PathBuf,
+pub(crate) fn generate_tantivy_index<D: Directory>(
+    tantivy_dir: D,
     inverted_idx_batch: RecordBatch,
     full_text_search_fields: &[String],
     index_fields: &[String],
@@ -1456,11 +1417,16 @@ pub(crate) fn generate_tantivy_index(
             }
         };
 
+        let custom_options = TextOptions::default()
+            .set_indexing_options(TextFieldIndexing::default().set_fieldnorms(false));
+
         // for each column which is supposed to be considered as full_text_search_fields or
         // index_fields, we create a tantivy field
         let field = match column.data_type() {
             // currently we only support indexing utf8 columns
-            DataType::Utf8 => tantivy_schema_builder.add_text_field(&index_col_name, TEXT | STORED),
+            DataType::Utf8 => {
+                tantivy_schema_builder.add_text_field(&index_col_name, custom_options)
+            }
             _ => {
                 log::warn!("Unsupported data type for indexing: {}", column.data_type());
                 continue;
@@ -1476,14 +1442,10 @@ pub(crate) fn generate_tantivy_index(
         cols.push((field, Some(column_data)));
     }
 
-    // Add a row id field to uniquely identify the row
-    let row_field = tantivy_schema_builder.add_i64_field("row_id", STORED);
-    cols.push((row_field, None));
-
     let tantivy_schema = tantivy_schema_builder.build();
-    let tantivy_index = tantivy::IndexBuilder::new()
+    let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema)
-        .create_in_dir(tantivy_dir)
+        .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
     // docs per row to be added in the tantivy index
@@ -1501,24 +1463,15 @@ pub(crate) fn generate_tantivy_index(
                         log::warn!("Unsupported data type for indexing: {}", data_type);
                     }
                 }
-            } else {
-                // Add row id to the doc
-                doc.add_i64(field, row as i64);
             }
         }
     }
-
-    // We need to maintain the order of the rows
-    let mut index_writer = tantivy_index
-        .writer_with_num_threads(1, 50_000_000)
-        .unwrap();
-    index_writer.set_merge_policy(Box::new(NoMergePolicy));
 
     for (_, doc) in docs.into_iter() {
         index_writer.add_document(doc).unwrap();
     }
 
-    index_writer.commit().unwrap();
+    let tantivy_index = index_writer.finalize().unwrap();
     Ok(tantivy_index)
 }
 
@@ -1642,7 +1595,7 @@ pub(crate) fn prepare_fst_index_bytes(
 
     let mut puffin_buf: Vec<u8> = Vec::new();
     let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
-    puffin_writer.add_blob(writer)?;
+    puffin_writer.add_blob(writer, BLOB_TYPE.to_string(), "".to_string(), true)?;
     puffin_writer.finish()?;
 
     file_meta.original_size = original_size as _;

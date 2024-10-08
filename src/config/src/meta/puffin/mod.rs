@@ -81,7 +81,7 @@ pub struct BlobMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compression_codec: Option<CompressionCodec>,
 
-    /// Additional meta information of the file. Not used for InvertedIndex within OpenObserve
+    /// Additional meta information of the file.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub properties: HashMap<String, String>,
 }
@@ -123,6 +123,11 @@ impl BlobMetadataBuilder {
 
     pub fn compression_codec(mut self, compression_codec: Option<CompressionCodec>) -> Self {
         self.compression_codec = compression_codec;
+        self
+    }
+
+    pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
+        self.properties = properties;
         self
     }
 
