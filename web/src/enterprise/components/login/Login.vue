@@ -128,7 +128,7 @@ export default defineComponent({
       const path = getPath();
       if (redirectURI != null && redirectURI != "") {
         // router.push({ path: redirectURI });
-        window.location.replace(path);
+        window.location.replace(redirectURI);
       } else {
         // router.push({ path: "/" });
         window.location.replace(path);
