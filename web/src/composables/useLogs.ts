@@ -2406,60 +2406,71 @@ const useLogs = () => {
             if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
               partitions.reverse();
             }
+
             if (
-              partitions[0][0] == queryReq.query.start_time &&
-              partitions[0][1] == queryReq.query.end_time
+              searchObj.data.queryResults.aggs.length == 0 &&
+              res.data.hits.length > 0
             ) {
-              histogramResults = [];
-              let date = new Date();
-              const startDateTime =
-                searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+              for (const partition of partitions) {
+                if (
+                  partition[0] == queryReq.query.start_time &&
+                  partition[1] == queryReq.query.end_time
+                ) {
+                  histogramResults = [];
+                  let date = new Date();
+                  const startDateTime =
+                    searchObj.data.customDownloadQueryObj.query.start_time /
+                    1000;
 
-              const endDateTime =
-                searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+                  const endDateTime =
+                    searchObj.data.customDownloadQueryObj.query.end_time / 1000;
 
-              const nowString = res.data.hits[0].zo_sql_key;
-              const now = new Date(nowString);
+                  const nowString = res.data.hits[0].zo_sql_key;
+                  const now = new Date(nowString);
 
-              const day = String(now.getDate()).padStart(2, "0");
-              const month = String(now.getMonth() + 1).padStart(2, "0");
-              const year = now.getFullYear();
+                  const day = String(now.getDate()).padStart(2, "0");
+                  const month = String(now.getMonth() + 1).padStart(2, "0");
+                  const year = now.getFullYear();
 
-              const dateToBePassed = `${day}-${month}-${year}`;
-              const hours = String(now.getHours()).padStart(2, "0");
-              let minutes = String(now.getMinutes()).padStart(2, "0");
-              if (searchObj.data.histogramInterval / 1000 <= 60000) {
-                minutes = String(now.getMinutes() + 1).padStart(2, "0");
-              }
+                  const dateToBePassed = `${day}-${month}-${year}`;
+                  const hours = String(now.getHours()).padStart(2, "0");
+                  let minutes = String(now.getMinutes()).padStart(2, "0");
+                  if (searchObj.data.histogramInterval / 1000 <= 60000) {
+                    minutes = String(now.getMinutes() + 1).padStart(2, "0");
+                  }
 
-              const time = `${hours}:${minutes}`;
+                  const time = `${hours}:${minutes}`;
 
-              const currentTimeToBePassed = convertDateToTimestamp(
-                dateToBePassed,
-                time,
-                "UTC",
-              );
-              for (
-                let currentTime: any = currentTimeToBePassed.timestamp / 1000;
-                currentTime < endDateTime;
-                currentTime += searchObj.data.histogramInterval / 1000
-              ) {
-                date = new Date(currentTime);
-                histogramResults.push({
-                  zo_sql_key: date.toISOString().slice(0, 19),
-                  zo_sql_num: 0,
-                });
-              }
-              for (
-                let currentTime: any = currentTimeToBePassed.timestamp / 1000;
-                currentTime > startDateTime;
-                currentTime -= searchObj.data.histogramInterval / 1000
-              ) {
-                date = new Date(currentTime);
-                histogramResults.push({
-                  zo_sql_key: date.toISOString().slice(0, 19),
-                  zo_sql_num: 0,
-                });
+                  const currentTimeToBePassed = convertDateToTimestamp(
+                    dateToBePassed,
+                    time,
+                    "UTC",
+                  );
+                  for (
+                    let currentTime: any =
+                      currentTimeToBePassed.timestamp / 1000;
+                    currentTime < endDateTime;
+                    currentTime += searchObj.data.histogramInterval / 1000
+                  ) {
+                    date = new Date(currentTime);
+                    histogramResults.push({
+                      zo_sql_key: date.toISOString().slice(0, 19),
+                      zo_sql_num: 0,
+                    });
+                  }
+                  for (
+                    let currentTime: any =
+                      currentTimeToBePassed.timestamp / 1000;
+                    currentTime > startDateTime;
+                    currentTime -= searchObj.data.histogramInterval / 1000
+                  ) {
+                    date = new Date(currentTime);
+                    histogramResults.push({
+                      zo_sql_key: date.toISOString().slice(0, 19),
+                      zo_sql_num: 0,
+                    });
+                  }
+                }
               }
             }
             searchObj.data.queryResults.aggs.push(...res.data.hits);
