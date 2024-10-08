@@ -885,7 +885,6 @@ async fn values_v1(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // search
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql,
@@ -941,7 +940,8 @@ async fn values_v1(
         let mut req = req.clone();
         req.query.sql = sql;
 
-        let search_res = SearchService::cache::search(
+        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
+        let search_res = SearchService::search(
             &trace_id,
             org_id,
             stream_type,

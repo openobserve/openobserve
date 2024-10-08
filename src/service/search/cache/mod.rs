@@ -52,7 +52,7 @@ pub mod multi;
 pub mod result_utils;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
-pub async fn search(
+pub(super) async fn search(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -245,14 +245,12 @@ pub async fn search(
                 }
 
                 let cfg = get_config();
-                if cfg.common.result_cache_enabled
-                    && cfg.common.print_key_sql
-                    && c_resp.has_cached_data
-                {
+                if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
                     log::info!(
-                        "[trace_id {trace_id}] query index: {i}, new start time: {}, end time : {}",
+                        "[trace_id {trace_id}] query index: {i}, new start time: {}, end time : {}, has_cached_data: {}",
                         req.query.as_ref().unwrap().start_time,
-                        req.query.as_ref().unwrap().end_time
+                        req.query.as_ref().unwrap().end_time,
+                        c_resp.has_cached_data
                     );
                 }
 
