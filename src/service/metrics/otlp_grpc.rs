@@ -460,6 +460,11 @@ pub async fn handle_grpc_request(
             ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
+        let fns_length: usize = stream_pipeline_params
+            .get(&stream_name)
+            .map_or(0, |params| {
+                params.as_ref().map_or(0, |(inner, ..)| inner.num_of_func())
+            });
         req_stats.response_time = start.elapsed().as_secs_f64();
         report_request_usage_stats(
             req_stats,
@@ -467,7 +472,7 @@ pub async fn handle_grpc_request(
             &stream_name,
             StreamType::Metrics,
             UsageType::Metrics,
-            0,
+            fns_length as _,
             started_at,
         )
         .await;
