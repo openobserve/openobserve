@@ -126,6 +126,7 @@ export default defineComponent({
      */
     const redirectUser = (redirectURI) => {
       const path = getPath();
+      console.log("redirectURI", redirectURI, redirectURI.includes("http"));
       if (redirectURI != null && redirectURI != "") {
         // router.push({ path: redirectURI });
         if (redirectURI.includes("http")) {
