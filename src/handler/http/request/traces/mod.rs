@@ -217,6 +217,30 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
+    // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !cfg.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!(
+        "http traces latest API wait in queue took: {} ms",
+        took_wait
+    );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
+
     // search
     let query_sql = format!(
         "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
@@ -258,16 +282,9 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
 
-    let search_res = SearchService::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        user_id.clone(),
-        &req,
-        false,
-    )
-    .instrument(http_span.clone())
-    .await;
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+        .instrument(http_span.clone())
+        .await;
 
     let resp_search = match search_res {
         Ok(res) => res,
@@ -355,16 +372,10 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let search_res = SearchService::search(
-            &trace_id,
-            &org_id,
-            stream_type,
-            user_id.clone(),
-            &req,
-            false,
-        )
-        .instrument(http_span.clone())
-        .await;
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
 
         let resp_search = match search_res {
             Ok(res) => res,

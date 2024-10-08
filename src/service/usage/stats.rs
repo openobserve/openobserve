@@ -96,16 +96,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             index_type: "".to_string(),
         };
         // do search
-        match SearchService::search(
-            "",
-            &cfg.common.usage_org,
-            StreamType::Logs,
-            None,
-            &req,
-            false,
-        )
-        .await
-        {
+        match SearchService::search("", &cfg.common.usage_org, StreamType::Logs, None, &req).await {
             Ok(res) => {
                 if !res.hits.is_empty() {
                     match report_stats(res.hits, &org_id, last_query_ts, current_ts).await {
@@ -168,7 +159,6 @@ async fn get_last_stats(
         StreamType::Logs,
         None,
         &req,
-        false,
     )
     .await
     {
