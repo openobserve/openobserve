@@ -22,7 +22,7 @@ const TANTIVY_INDEX_VERSION: &str = "TIIv0.1.0";
 
 // We do not need all of the tantivy files, only the .term and .idx files
 // for getting doc IDs and also the meta.json file
-const ALLOWED_FILE_EXT: &[&str] = &["term", "idx"];
+const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos"];
 const META_JSON: &str = "meta.json";
 
 // Lazy loaded global instance of RAM directory which will contain
@@ -143,8 +143,8 @@ impl PuffinDirectory {
             // Fetch the files names from the blob_meta itself
             if let Some(file_name) = blob_meta.properties.get("file_name") {
                 let path = PathBuf::from(file_name);
-                // get the segment ID from the current blob
-                if segment_id.is_empty() {
+                // get the segment ID from the current blob, ignore metadata files
+                if segment_id.is_empty() && !file_name.contains("json") {
                     segment_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
                 }
                 let mut writer = puffin_dir
@@ -158,10 +158,18 @@ impl PuffinDirectory {
 
         // find the files which are present in the empty puffin dir instance and write them
         // to the new puffin directory
-        for file in empty_puffin_dir.list_files() {
-            let empty_puffin_dir_path = PathBuf::from(&file);
+        for file in empty_puffin_dir
+            .list_files()
+            .iter()
+            .filter(|file_name| !file_name.contains("json"))
+        {
+            let mut empty_puffin_dir_path = PathBuf::from(&file);
 
-            if puffin_dir.exists(&empty_puffin_dir_path)? {
+            // convert the empty puffin dir path to match the current dir file names
+            let ext = empty_puffin_dir_path.extension().unwrap().to_str().unwrap();
+            empty_puffin_dir_path.set_file_name(format!("{}.{}", segment_id, ext));
+
+            if puffin_dir.exists(dbg!(&empty_puffin_dir_path))? {
                 continue;
             }
             let path = PathBuf::from(&file);
@@ -174,12 +182,7 @@ impl PuffinDirectory {
             );
 
             // open the file with corresponding segment id and extension
-            let puffin_dir_path = PathBuf::from(format!(
-                "{}.{}",
-                segment_id,
-                path.extension().unwrap().to_str().unwrap()
-            ));
-            let mut writer = puffin_dir.open_write(&puffin_dir_path)?;
+            let mut writer = puffin_dir.open_write(&empty_puffin_dir_path)?;
             writer.write_all(&data.read_bytes()?)?;
             writer.flush()?;
 

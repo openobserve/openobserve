@@ -1416,8 +1416,11 @@ pub(crate) fn generate_tantivy_index<D: Directory>(
             }
         };
 
-        let custom_options = TextOptions::default()
-            .set_indexing_options(TextFieldIndexing::default().set_fieldnorms(false));
+        let custom_options = TextOptions::default().set_indexing_options(
+            TextFieldIndexing::default()
+                .set_index_option(IndexRecordOption::Basic)
+                .set_fieldnorms(false),
+        );
 
         // for each column which is supposed to be considered as full_text_search_fields or
         // index_fields, we create a tantivy field
