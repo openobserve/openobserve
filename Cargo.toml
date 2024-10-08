@@ -296,7 +296,7 @@ sqlx = { version = "0.7", features = [
 ] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
-tantivy = { version = "0.22.0", features = ["quickwit", "mmap"] }
+tantivy = { version = "0.22.0", features = ["quickwit"] }
 tempfile = "3"
 thiserror = "1.0"
 time = "0.3"

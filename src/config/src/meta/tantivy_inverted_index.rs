@@ -1,14 +1,16 @@
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
-    sync::{Arc, RwLock},
+    sync::{Arc, LazyLock, RwLock},
 };
 
 use ahash::HashSet;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures::{AsyncRead, AsyncSeek};
 use tantivy::{
     directory::{error::OpenReadError, Directory, RamDirectory, WatchCallback, WatchHandle},
+    doc,
+    schema::Schema,
     HasLen,
 };
 
@@ -20,19 +22,31 @@ const TANTIVY_INDEX_VERSION: &str = "TIIv0.1.0";
 
 // We do not need all of the tantivy files, only the .term and .idx files
 // for getting doc IDs and also the meta.json file
-const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "store", "fast"];
+const ALLOWED_FILE_EXT: &[&str] = &["term", "idx"];
 const META_JSON: &str = "meta.json";
 
-// TODO(uddhav): we want to add a lazy loaded global instance of RAM directory which will contain
+// Lazy loaded global instance of RAM directory which will contain
 // all the files of an empty tantivy index. This instance will be used to fill the missing files
 // from the `.ttv` file, as tantivy needs them regardless of the configuration of a field.
+static EMPTY_PUFFIN_DIRECTORY: LazyLock<PuffinDirectory> = LazyLock::new(|| {
+    let puffin_dir = PuffinDirectory::new();
+    let puffin_dir_clone = puffin_dir.clone();
+    let schema = Schema::builder().build();
+    let mut index_writer = tantivy::IndexBuilder::new()
+        .schema(schema)
+        .single_segment_index_writer(puffin_dir_clone, 50_000_000)
+        .unwrap();
+    let _ = index_writer.add_document(doc!());
+    index_writer.finalize().unwrap();
+    puffin_dir
+});
 
 /// Puffin directory is a puffin file which contains all the tantivy files.
 /// Each tantivy file is stored as a blob in the puffin file, along with their file name.
 #[derive(Debug)]
 pub struct PuffinDirectory {
     ram_directory: Arc<RamDirectory>,
-    // record all the files paths in the puffin file
+    /// record all the files paths in the puffin file
     file_paths: Arc<RwLock<HashSet<PathBuf>>>,
 }
 
@@ -44,9 +58,9 @@ impl Clone for PuffinDirectory {
         }
     }
 }
+
 impl PuffinDirectory {
     pub fn new() -> Self {
-        // start emtpy index with empty store, fast files etc
         PuffinDirectory {
             ram_directory: Arc::new(RamDirectory::create()),
             file_paths: Arc::new(RwLock::new(HashSet::default())),
@@ -62,13 +76,13 @@ impl PuffinDirectory {
             .collect()
     }
 
-    // this function will serialize the directory into a single puffin file
+    // This function will serialize the directory into a single puffin file
     pub fn to_puffin_bytes(&self) -> Result<Vec<u8>> {
         let mut puffin_buf: Vec<u8> = Vec::new();
         let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
 
         let file_paths = self.file_paths.read().expect("poisoned lock");
-        let _filtered_file_paths: Vec<&PathBuf> = file_paths
+        let filtered_file_paths: Vec<&PathBuf> = file_paths
             .iter()
             .filter(|path| {
                 let mut allowed = false;
@@ -85,9 +99,13 @@ impl PuffinDirectory {
                 allowed
             })
             .collect();
-        for path in file_paths.iter() {
+        for path in filtered_file_paths.iter() {
             let file_data = self.ram_directory.open_read(path)?;
-            dbg!(file_data.len(), path.to_str().unwrap());
+            log::debug!(
+                "Serializing file to puffin: len: {}, path: {}",
+                file_data.len(),
+                path.to_str().unwrap()
+            );
             puffin_writer
                 .add_blob(
                     file_data
@@ -98,45 +116,80 @@ impl PuffinDirectory {
                     path.to_str().unwrap().to_owned(),
                     false,
                 )
-                .expect("Failed to add blob");
+                .context("Failed to add blob")?;
         }
 
-        puffin_writer.finish().expect("Failed to finish writing");
+        puffin_writer.finish().context("Failed to finish writing")?;
         Ok(puffin_buf)
     }
 
-    // While read from .ttv
+    /// Open a puffin direcotry from the given bytes data
     pub async fn from_bytes<R>(data: R) -> Result<Self>
     where
         R: AsyncRead + AsyncSeek + Unpin + Send,
     {
+        let empty_puffin_dir = &EMPTY_PUFFIN_DIRECTORY;
         let mut puffin_reader = PuffinBytesReader::new(data);
-        let ram_directory = RamDirectory::create();
-        let mut file_paths = HashSet::default();
+        let puffin_dir = PuffinDirectory::new();
 
         let puffin_meta = puffin_reader
             .get_metadata()
             .await
-            .expect("Failed to get blobs meta");
+            .context("Failed to get blobs meta")?;
 
+        let mut segment_id = String::new();
         for blob_meta in puffin_meta.blob_metadata {
             let blob = puffin_reader.read_blob_bytes(&blob_meta).await?;
             // Fetch the files names from the blob_meta itself
             if let Some(file_name) = blob_meta.properties.get("file_name") {
                 let path = PathBuf::from(file_name);
-                let mut writer = ram_directory
+                // get the segment ID from the current blob
+                if segment_id.is_empty() {
+                    segment_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
+                }
+                let mut writer = puffin_dir
                     .open_write(&path)
-                    .expect("Failed to write to RAM directory");
+                    .context("Failed to write to RAM directory")?;
                 writer.write_all(&blob)?;
                 writer.flush()?;
-                file_paths.insert(path);
+                puffin_dir.add_file_path(path);
             }
         }
 
-        Ok(PuffinDirectory {
-            ram_directory: Arc::new(ram_directory),
-            file_paths: Arc::new(RwLock::new(file_paths)),
-        })
+        // find the files which are present in the empty puffin dir instance and write them
+        // to the new puffin directory
+        for file in empty_puffin_dir.list_files() {
+            let empty_puffin_dir_path = PathBuf::from(&file);
+
+            if puffin_dir.exists(&empty_puffin_dir_path)? {
+                continue;
+            }
+            let path = PathBuf::from(&file);
+            let data = empty_puffin_dir.open_read(&path)?;
+
+            log::debug!(
+                "Substituting file for puffin dir: len: {}, path: {}",
+                data.len(),
+                path.to_str().unwrap()
+            );
+
+            // open the file with corresponding segment id and extension
+            let puffin_dir_path = PathBuf::from(format!(
+                "{}.{}",
+                segment_id,
+                path.extension().unwrap().to_str().unwrap()
+            ));
+            let mut writer = puffin_dir.open_write(puffin_dir_path)?;
+            writer.write_all(&data.read_bytes()?)?;
+            writer.flush()?;
+
+            puffin_dir.add_file_path(path);
+        }
+        Ok(puffin_dir)
+    }
+
+    fn add_file_path(&self, path: PathBuf) {
+        self.file_paths.write().unwrap().insert(path);
     }
 }
 
