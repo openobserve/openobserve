@@ -18,8 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
+        <GeoJSONMapRenderer
+          v-if="panelSchema.type == 'maps'"
+          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
+        ></GeoJSONMapRenderer>
         <GeoMapRenderer
-          v-if="panelSchema.type == 'geomap'"
+          v-else-if="panelSchema.type == 'geomap'"
           :data="
             panelData.chartType == 'geomap'
               ? panelData
@@ -66,7 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (data.length &&
               data[0]?.length &&
               panelData.chartType != 'geomap' &&
-              panelData.chartType != 'table')
+              panelData.chartType != 'table' &&
+              panelData.chartType != 'maps')
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -75,7 +80,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onChartClick"
         />
       </div>
-      <div v-if="!errorDetail" class="noData" data-test="no-data">
+      <div
+        v-if="
+          !errorDetail &&
+          panelSchema.type != 'geomap' &&
+          panelSchema.type != 'maps'
+        "
+        class="noData"
+        data-test="no-data"
+      >
         {{ noData }}
       </div>
       <div
@@ -178,6 +191,10 @@ const GeoMapRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/GeoMapRenderer.vue");
 });
 
+const GeoJSONMapRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/GeoJSONMapRenderer.vue");
+});
+
 const HTMLRenderer = defineAsyncComponent(() => {
   return import("./panels/HTMLRenderer.vue");
 });
@@ -192,6 +209,7 @@ export default defineComponent({
     ChartRenderer,
     TableRenderer,
     GeoMapRenderer,
+    GeoJSONMapRenderer,
     HTMLRenderer,
     MarkdownRenderer,
   },
@@ -351,48 +369,48 @@ export default defineComponent({
             0,
           );
 
-          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
+            const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
 
-          const responseFields = Object.keys(recordwithMaxAttribute);
+            const responseFields = Object.keys(recordwithMaxAttribute);
 
-          emit("updated:vrlFunctionFieldList", responseFields);
-        }
-
-        // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (!errorDetail.value) {
-          try {
-            // passing chartpanelref to get width and height of DOM element
-            panelData.value = await convertPanelData(
-              panelSchema.value,
-              data.value,
-              store,
-              chartPanelRef,
-              hoveredSeriesState,
-              resultMetaData,
-              metadata.value,
-            );
-
-            errorDetail.value = "";
-          } catch (error: any) {
-            errorDetail.value = error.message;
+            emit("updated:vrlFunctionFieldList", responseFields);
           }
-        } else {
-          // if no data is available, then show the default data
-          // if there is an error config in the panel schema, then show the default data on error
-          // if no default data on error is set, then show the custom error message
-          if (
-            panelSchema.value?.error_config?.custom_error_handeling &&
-            panelSchema.value?.error_config?.default_data_on_error
-          ) {
-            data.value = JSON.parse(
-              panelSchema.value?.error_config?.default_data_on_error,
-            );
-            errorDetail.value = "";
+
+          // panelData.value = convertPanelData(panelSchema.value, data.value, store);
+          if (!errorDetail.value) {
+            try {
+              // passing chartpanelref to get width and height of DOM element
+              panelData.value = await convertPanelData(
+                panelSchema.value,
+                data.value,
+                store,
+                chartPanelRef,
+                hoveredSeriesState,
+                resultMetaData,
+                metadata.value,
+              );
+
+              errorDetail.value = "";
+            } catch (error: any) {
+              errorDetail.value = error.message;
+            }
+          } else {
+            // if no data is available, then show the default data
+            // if there is an error config in the panel schema, then show the default data on error
+            // if no default data on error is set, then show the custom error message
+            if (
+              panelSchema.value?.error_config?.custom_error_handeling &&
+              panelSchema.value?.error_config?.default_data_on_error
+            ) {
+              data.value = JSON.parse(
+                panelSchema.value?.error_config?.default_data_on_error,
+              );
+              errorDetail.value = "";
+            }
           }
-        }
-      },
-      { deep: true },
-    );
+        },
+        { deep: true },
+      );
 
     // when we get the new metadata from the apis, emit the metadata update
     watch(
@@ -469,6 +487,17 @@ export default defineComponent({
               yAlias.every((y: any) => data.value[0][0][y] != null) &&
               zAlias.every((z: any) => data.value[0][0][z]) != null)
           );
+        }
+        case "pie":
+        case "donut": {
+          return (
+            data.value[0]?.length > 1 ||
+            yAlias.every((y: any) => data.value[0][0][y] != null)
+          );
+        }
+        case "maps":
+        case "geomap": {
+          return true;
         }
         case "sankey": {
           const source = panelSchema.value.queries[0].fields.source.alias;
