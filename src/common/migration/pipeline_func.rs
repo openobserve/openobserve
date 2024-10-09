@@ -34,21 +34,22 @@ use infra::db as infra_db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     migrate_pipelines().await?;
-    migrate_stream_association().await?;
     Ok(())
 }
 
-async fn migrate_stream_association() -> Result<(), anyhow::Error> {
-    let mut stream_funcs: HashMap<StreamParams, Vec<(u8, FunctionParams)>> = HashMap::new();
+async fn migrate_pipelines() -> Result<(), anyhow::Error> {
+    let mut new_pipelines = vec![];
+    let mut func_to_update = vec![];
 
     // load all functions from meta table
+    let mut stream_funcs: HashMap<StreamParams, Vec<(u8, FunctionParams)>> = HashMap::new();
     let db = infra_db::get_db().await;
     let db_key = "/function/";
     let data = db.list(db_key).await?;
     for (key, val) in data {
         let local_key = key.strip_prefix('/').unwrap_or(&key);
         let key_col = local_key.split('/').collect::<Vec<&str>>();
-        let trans: function::Transform = json::from_slice(&val).unwrap();
+        let mut trans: function::Transform = json::from_slice(&val).unwrap();
         if let Some(stream_orders) = trans.streams.clone() {
             for stream_ord in stream_orders {
                 let func_params = FunctionParams {
@@ -65,86 +66,10 @@ async fn migrate_stream_association() -> Result<(), anyhow::Error> {
                     .or_default();
                 entry.push((stream_ord.order, func_params));
             }
+            trans.streams = None;
+            func_to_update.push(trans);
         }
     }
-
-    for (stream_params, mut func_params) in stream_funcs {
-        func_params.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let pipeline_source = PipelineSource::Realtime(stream_params.clone());
-
-        // construct the nodes and edges lists
-        let source_node_data = NodeData::Stream(stream_params.clone());
-        let dest_node_data = NodeData::Stream(stream_params.clone());
-        let (pos_x, pos_y): (f32, f32) = (50.0, 50.0);
-        let pos_offset: f32 = 200.0;
-        let source_node = Node::new(
-            ider::uuid(),
-            source_node_data,
-            pos_x,
-            pos_y,
-            "input".to_string(),
-        );
-
-        let dest_node = Node::new(
-            ider::uuid(),
-            dest_node_data,
-            pos_x + (pos_offset * (func_params.len() + 1) as f32),
-            pos_y + (pos_offset * (func_params.len() + 1) as f32),
-            "output".to_string(),
-        );
-
-        let mut nodes: Vec<Node> = vec![source_node];
-        for (idx, (_, func_param)) in func_params.into_iter().enumerate() {
-            let func_node_data = NodeData::Function(func_param);
-            let func_node = Node::new(
-                ider::uuid(),
-                func_node_data,
-                pos_x + (pos_offset * (idx + 1) as f32),
-                pos_y + (pos_offset * (idx + 1) as f32),
-                "default".to_string(),
-            );
-            nodes.push(func_node);
-        }
-        nodes.push(dest_node);
-
-        let edges = nodes
-            .windows(2)
-            .map(|pair| Edge::new(pair[0].id.clone(), pair[1].id.clone()))
-            .collect::<Vec<_>>();
-
-        let pl_id = ider::uuid();
-        let name = format!("Migrated-{pl_id}");
-        let description = "This pipeline was generated based on Function x Stream Associations found prior to OpenObserve v0.12.2. Please check the correctness of the pipeline and enabling manually".to_string();
-        let pipeline = Pipeline {
-            id: pl_id,
-            version: 0,
-            enabled: false,
-            org: stream_params.org_id.to_string(),
-            name,
-            description,
-            source: pipeline_source,
-            nodes,
-            edges,
-        };
-
-        match crate::service::pipeline::save_pipeline(pipeline).await {
-            Ok(res) if res.status().as_u16() == 200 => {
-                // TODO(taiming): remove `streams` from Trans after done with testing
-            }
-            _ => {
-                log::error!(
-                    "[Migration]: Error migrating Function x Stream association to the new pipeline format introduced in v0.12.2. Original data kept.",
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
-
-async fn migrate_pipelines() -> Result<(), anyhow::Error> {
-    let mut new_pipelines = vec![];
 
     // load all old pipelines from meta table
     let db = infra_db::get_db().await;
@@ -156,7 +81,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
         let old_pipe: crate::common::meta::pipelines::PipeLine = json::from_slice(&val).unwrap();
 
         // two scenarios:
-        // scenario 1: with DerivedStream info
+        // scenario 1: with DerivedStream info -> scheduled
         if let Some(old_derived_streams) = old_pipe.derived_streams {
             for old_derived_stream in old_derived_streams {
                 let new_derived_stream = DerivedStream {
@@ -213,21 +138,16 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             }
         }
 
-        // scenario 2: no DerivedStream info
-        // build a new realtime pipeline: only when there's routing conditions
-        if let Some(routings) = old_pipe.routing {
-            let source_params =
-                StreamParams::new(key_col[1], key_col[3], StreamType::from(key_col[2]));
-
-            let pipeline_source = PipelineSource::Realtime(source_params.clone());
-
-            // construct the nodes and edges lists
-            let source_node_data = NodeData::Stream(source_params);
+        // scenario 2: with functions or routing -> realtime
+        let source_params = StreamParams::new(key_col[1], key_col[3], StreamType::from(key_col[2]));
+        if stream_funcs.contains_key(&source_params) || old_pipe.routing.is_some() {
+            // construct a new pipeline
             let (mut pos_x, mut pos_y): (f32, f32) = (50.0, 50.0);
             let pos_offset: f32 = 200.0;
+            let pipeline_source = PipelineSource::Realtime(source_params.clone());
             let source_node = Node::new(
                 ider::uuid(),
-                source_node_data,
+                NodeData::Stream(source_params.clone()),
                 pos_x,
                 pos_y,
                 "input".to_string(),
@@ -237,34 +157,67 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             let mut nodes = vec![source_node];
             let mut edges = vec![];
 
-            for (dest_stream, routing_conditions) in routings {
-                pos_x += pos_offset;
-                let condition_node = Node::new(
-                    ider::uuid(),
-                    NodeData::Condition(ConditionParams {
-                        conditions: routing_conditions,
-                    }),
-                    pos_x,
-                    pos_y,
-                    "default".to_string(),
-                );
-                pos_x += pos_offset;
+            if let Some(mut func_params) = stream_funcs.remove(&source_params) {
                 let dest_node = Node::new(
                     ider::uuid(),
-                    NodeData::Stream(StreamParams::new(
-                        key_col[1],
-                        &dest_stream,
-                        StreamType::from(key_col[2]),
-                    )),
-                    pos_x,
+                    NodeData::Stream(source_params.clone()),
+                    pos_x + (pos_offset * (func_params.len() + 1) as f32),
                     pos_y,
                     "output".to_string(),
                 );
-                edges.push(Edge::new(source_node_id.clone(), condition_node.id.clone()));
-                edges.push(Edge::new(condition_node.id.clone(), dest_node.id.clone()));
-                nodes.push(condition_node);
+
+                func_params.sort_by(|a, b| a.0.cmp(&b.0));
+                for (idx, (_, func_param)) in func_params.into_iter().enumerate() {
+                    let func_node_data = NodeData::Function(func_param);
+                    let func_node = Node::new(
+                        ider::uuid(),
+                        func_node_data,
+                        pos_x + (pos_offset * (idx + 1) as f32),
+                        pos_y,
+                        "default".to_string(),
+                    );
+                    nodes.push(func_node);
+                }
                 nodes.push(dest_node);
+
+                let func_edges = nodes
+                    .windows(2)
+                    .map(|pair| Edge::new(pair[0].id.clone(), pair[1].id.clone()))
+                    .collect::<Vec<_>>();
+                edges.extend(func_edges);
+            }
+
+            if let Some(routings) = old_pipe.routing {
                 pos_y += pos_offset;
+                for (dest_stream, routing_conditions) in routings {
+                    pos_x += pos_offset;
+                    let condition_node = Node::new(
+                        ider::uuid(),
+                        NodeData::Condition(ConditionParams {
+                            conditions: routing_conditions,
+                        }),
+                        pos_x,
+                        pos_y,
+                        "default".to_string(),
+                    );
+                    pos_x += pos_offset;
+                    let dest_node = Node::new(
+                        ider::uuid(),
+                        NodeData::Stream(StreamParams::new(
+                            key_col[1],
+                            &dest_stream,
+                            StreamType::from(key_col[2]),
+                        )),
+                        pos_x,
+                        pos_y,
+                        "output".to_string(),
+                    );
+                    edges.push(Edge::new(source_node_id.clone(), condition_node.id.clone()));
+                    edges.push(Edge::new(condition_node.id.clone(), dest_node.id.clone()));
+                    nodes.push(condition_node);
+                    nodes.push(dest_node);
+                    pos_y += pos_offset;
+                }
             }
 
             let pl_id = ider::uuid();
@@ -285,18 +238,82 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
         }
     }
 
+    // remaining function stream associations
+    for (stream_params, mut func_params) in stream_funcs {
+        func_params.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let pipeline_source = PipelineSource::Realtime(stream_params.clone());
+
+        // construct the nodes and edges lists
+        let source_node_data = NodeData::Stream(stream_params.clone());
+        let dest_node_data = NodeData::Stream(stream_params.clone());
+        let (pos_x, pos_y): (f32, f32) = (50.0, 50.0);
+        let pos_offset: f32 = 200.0;
+        let source_node = Node::new(
+            ider::uuid(),
+            source_node_data,
+            pos_x,
+            pos_y,
+            "input".to_string(),
+        );
+
+        let dest_node = Node::new(
+            ider::uuid(),
+            dest_node_data,
+            pos_x + (pos_offset * (func_params.len() + 1) as f32),
+            pos_y,
+            "output".to_string(),
+        );
+
+        let mut nodes: Vec<Node> = vec![source_node];
+        for (idx, (_, func_param)) in func_params.into_iter().enumerate() {
+            let func_node_data = NodeData::Function(func_param);
+            let func_node = Node::new(
+                ider::uuid(),
+                func_node_data,
+                pos_x + (pos_offset * (idx + 1) as f32),
+                pos_y,
+                "default".to_string(),
+            );
+            nodes.push(func_node);
+        }
+        nodes.push(dest_node);
+
+        let edges = nodes
+            .windows(2)
+            .map(|pair| Edge::new(pair[0].id.clone(), pair[1].id.clone()))
+            .collect::<Vec<_>>();
+
+        let pl_id = ider::uuid();
+        let name = format!("Migrated-{pl_id}");
+        let description = "This pipeline was generated based on Function x Stream Associations found prior to OpenObserve v0.12.2. Please check the correctness of the pipeline and enabling manually".to_string();
+        let pipeline = Pipeline {
+            id: pl_id,
+            version: 0,
+            enabled: false,
+            org: stream_params.org_id.to_string(),
+            name,
+            description,
+            source: pipeline_source,
+            nodes,
+            edges,
+        };
+        new_pipelines.push(pipeline);
+    }
+
     for pipeline in new_pipelines {
-        match crate::service::pipeline::save_pipeline(pipeline).await {
-            Ok(res) if res.status().as_u16() == 200 => {
-                // TODO(taiming): remove `streams` from Trans after done with testing
-            }
-            _ => {
-                log::error!(
-                    "[Migration]: Error migrating pipeline to the new format introduced in v0.12.2. Original data kept."
-                );
-            }
+        if !crate::service::pipeline::save_pipeline(pipeline)
+            .await
+            .is_ok_and(|res| res.status().as_u16() == 200)
+        {
+            log::error!(
+                "[Migration]: Error migrating pipeline to the new format introduced in v0.12.2. Original data kept."
+            );
+            return Ok(());
         }
     }
+
+    // TODO(taiming): remove old pipeline and save updated functions after done testing
 
     Ok(())
 }
