@@ -842,7 +842,7 @@ async fn merge_grpc_result(
     }
 }
 
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(skip(sql, trace_id), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub(crate) async fn get_file_list(
     trace_id: &str,
     sql: &super::sql::Sql,
