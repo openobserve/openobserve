@@ -204,7 +204,9 @@ pub async fn ingest(
                             _ => unreachable!(),
                         };
 
-                        if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                        if let Some(fields) =
+                            user_defined_schema_map.get(stream_params.stream_name.as_str())
+                        {
                             local_val = crate::service::logs::refactor_map(local_val, fields);
                         }
 
@@ -218,7 +220,7 @@ pub async fn ingest(
                             );
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
-                                &stream_name,
+                                stream_params.stream_name.as_str(),
                                 &StreamType::Logs,
                             );
                             local_val.insert(

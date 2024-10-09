@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     derived_stream  TEXT,
     nodes           TEXT,
     edges           TEXT,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
             "#,
         )
