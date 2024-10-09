@@ -18,7 +18,6 @@ use std::collections::HashMap;
 use config::{
     meta::{
         alerts::derived_streams::DerivedStreamMeta,
-        function::StreamFunctionsList,
         stream::{RoutingCondition, StreamType},
     },
     utils::json::Value,
@@ -41,43 +40,4 @@ pub struct PipeLine {
     pub derived_streams: Option<Vec<DerivedStreamMeta>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, Value>>,
-}
-
-impl PipeLine {
-    pub fn into_response(self, functions: Option<StreamFunctionsList>) -> PipeLineResponse {
-        PipeLineResponse {
-            name: self.name,
-            description: self.description,
-            stream_name: self.stream_name,
-            stream_type: self.stream_type,
-            routing: self.routing,
-            derived_streams: self.derived_streams,
-            functions,
-            meta: self.meta,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
-pub struct PipeLineResponse {
-    pub name: String,
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub stream_name: String,
-    #[serde(default)]
-    pub stream_type: StreamType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub functions: Option<StreamFunctionsList>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub derived_streams: Option<Vec<DerivedStreamMeta>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, Value>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct PipeLineList {
-    pub list: Vec<PipeLineResponse>,
 }

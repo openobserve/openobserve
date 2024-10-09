@@ -54,31 +54,6 @@ pub struct StreamOrder {
     pub apply_before_flattening: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct StreamTransform {
-    #[serde(flatten)]
-    pub transform: Transform,
-    #[serde(default)]
-    pub stream: String,
-    #[serde(default)]
-    pub order: u8,
-    #[serde(default)]
-    pub stream_type: StreamType,
-    #[serde(default)]
-    pub is_removed: bool,
-    #[serde(default)]
-    #[serde(rename = "applyBeforeFlattening")]
-    pub apply_before_flattening: bool,
-}
-
-impl PartialEq for StreamTransform {
-    fn eq(&self, other: &Self) -> bool {
-        self.stream == other.stream
-            && self.transform.name == other.transform.name
-            && self.stream_type == other.stream_type
-    }
-}
-
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.function == other.function && self.params == other.params
@@ -93,11 +68,6 @@ pub struct ZoFunction<'a> {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct FunctionList {
     pub list: Vec<Transform>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct StreamFunctionsList {
-    pub list: Vec<StreamTransform>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

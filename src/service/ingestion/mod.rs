@@ -29,8 +29,7 @@ use config::{
         function::{VRLResultResolver, VRLRuntimeConfig},
         pipeline::PipelineParams,
         stream::{
-            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
-            StreamType,
+            PartitionTimeLevel, PartitioningDetails, StreamParams, StreamPartition, StreamType,
         },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
@@ -49,7 +48,7 @@ use vrl::{
 use super::{pipeline::execution::PipelinedExt, usage::publish_triggers_usage};
 use crate::{
     common::{
-        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_PIPELINES},
+        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
@@ -517,30 +516,6 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
         Value::Null => Value::Null,
     }
 }
-
-pub async fn get_stream_routing(
-    stream_params: StreamParams,
-    stream_routing_map: &mut HashMap<String, Vec<Routing>>,
-) {
-    if let Some(pipeline) = STREAM_PIPELINES.get(&format!(
-        "{}/{}/{}",
-        &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
-    )) {
-        let Some(routing) = pipeline.routing.as_ref() else {
-            return;
-        };
-        let res: Vec<Routing> = routing
-            .iter()
-            .map(|(k, v)| Routing {
-                destination: k.to_string(),
-                routing: v.clone(),
-            })
-            .collect();
-
-        stream_routing_map.insert(stream_params.stream_name.to_string(), res);
-    }
-}
-
 pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, HashSet<String>>,

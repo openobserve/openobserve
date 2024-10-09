@@ -190,11 +190,6 @@ pub async fn ingest(
                 }
                 Ok(pl_results) => {
                     for (stream_params, (mut res, is_flattened)) in pl_results {
-                        // QUESTION(taiming): pipeline destination can have other StreamTypes.
-                        // This is only the logs ingestion flow.
-                        // TODO(taiming)
-                        // We'll need a aggregated write function for all StreamTypes to call from
-                        // all ingestion entry points
                         if stream_params.stream_type != StreamType::Logs {
                             continue;
                         }

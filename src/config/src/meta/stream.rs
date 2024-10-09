@@ -794,11 +794,6 @@ pub struct PartitioningDetails {
     pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
-pub struct Routing {
-    pub destination: String,
-    pub routing: Vec<RoutingCondition>,
-}
-
 // Code Duplicated from alerts
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RoutingCondition {

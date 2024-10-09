@@ -70,6 +70,16 @@ impl PartialEq for Node {
 }
 
 impl Node {
+    pub fn new(id: String, data: NodeData, pos_x: f32, pos_y: f32, io_type: String) -> Self {
+        Self {
+            id,
+            data,
+            position: Position { x: pos_x, y: pos_y },
+            io_type,
+            style: None,
+        }
+    }
+
     pub(crate) fn get_node_data(&self) -> NodeData {
         self.data.clone()
     }
@@ -88,6 +98,13 @@ pub struct Edge {
     id: String,
     pub(crate) source: String,
     pub(crate) target: String,
+}
+
+impl Edge {
+    pub fn new(source: String, target: String) -> Self {
+        let id = format!("e{source}-{target}");
+        Self { id, source, target }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

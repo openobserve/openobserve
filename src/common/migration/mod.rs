@@ -20,6 +20,7 @@ use version_compare::Version;
 pub mod dashboards;
 pub mod file_list;
 pub mod meta;
+pub mod pipeline_func;
 pub mod schema;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
@@ -46,6 +47,11 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         upgrade_092_093().await?;
     }
 
+    let v122 = Version::from("v0.12.2").unwrap();
+    if old_ver < v122 {
+        upgrade_121_122().await?;
+    }
+
     Ok(())
 }
 
@@ -62,6 +68,13 @@ async fn upgrade_052_053() -> Result<(), anyhow::Error> {
 async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     // migration schema
     schema::run().await?;
+
+    Ok(())
+}
+
+async fn upgrade_121_122() -> Result<(), anyhow::Error> {
+    // migrate both functions and pipelines
+    pipeline_func::run().await?;
 
     Ok(())
 }
