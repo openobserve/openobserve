@@ -10,7 +10,7 @@ const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-await page.getByText('Login as internal user').click();
+// await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
