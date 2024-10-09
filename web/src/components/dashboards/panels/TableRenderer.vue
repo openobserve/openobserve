@@ -41,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile } from "quasar";
-import { defineComponent, ref, onMounted, watch } from "vue";
+import { defineComponent, ref } from "vue";
+import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -123,36 +124,15 @@ export default defineComponent({
 
     const getStyle = (rowData: any) => {
       const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
-      const foundValue = props?.valueMapping?.find((v: any) => {
-        if (v.type == "value") {
-          return (v.value == value || v.text == value) && v.color;
-        } else if (v.type == "range") {
-          if (
-            v.from &&
-            v.to &&
-            !Number.isNaN(+v.from) &&
-            !Number.isNaN(+v.to)
-          ) {
-            return (
-              ((+v.from <= +value && +v.to >= +value) ||
-                (+v.from >= +v.text && +v.to <= +v.text) ||
-                v.text == value) &&
-              v.color
-            );
-          }
-          return false;
-        } else if (v.type == "regex") {
-          // check/test if the value matches the regex
-          return (
-            (new RegExp(v?.pattern ?? "").test(value) ||
-              new RegExp(v?.pattern ?? "").test(v.text)) &&
-            v.color
-          );
-        }
-        return false;
-      });
 
-      if (foundValue && foundValue.color) {
+      // Find the first valid mapping with a valid color
+      const foundValue = findFirstValidMappedValue(
+        value,
+        props?.valueMapping,
+        "color",
+      );
+
+      if (foundValue && foundValue?.color) {
         const hex = foundValue.color;
 
         // Check if hex is valid
