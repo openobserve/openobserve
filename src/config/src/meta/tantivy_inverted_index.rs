@@ -14,7 +14,10 @@ use tantivy::{
     HasLen,
 };
 
-use crate::meta::puffin::{reader::PuffinBytesReader, writer::PuffinBytesWriter};
+use crate::{
+    get_config,
+    meta::puffin::{reader::PuffinBytesReader, writer::PuffinBytesWriter},
+};
 
 // This is an identifier for tantivy blobs inside puffin file.
 // Note: Tantivy blobs are not compressed.
@@ -56,6 +59,47 @@ impl Clone for PuffinDirectory {
             ram_directory: self.ram_directory.clone(),
             file_paths: self.file_paths.clone(),
         }
+    }
+}
+
+pub fn convert_puffin_dir_to_tantivy_dir(
+    mut puffin_dir_path: PathBuf,
+    puffin_dir: PuffinDirectory,
+) {
+    // create directory
+    let cfg = get_config();
+    let file_name = puffin_dir_path.file_name().unwrap();
+    let mut file_name = file_name.to_os_string();
+    file_name.push(".folder");
+    puffin_dir_path.set_file_name(file_name);
+    let mut tantivy_folder_path = PathBuf::from(&cfg.common.data_stream_dir);
+    tantivy_folder_path.push(PathBuf::from(&puffin_dir_path));
+
+    // Check if the folder already exists
+    if !tantivy_folder_path.exists() {
+        std::fs::create_dir_all(&tantivy_folder_path).unwrap();
+        log::info!(
+            "Created folder for index at {}",
+            tantivy_folder_path.to_str().unwrap()
+        );
+    } else {
+        log::warn!(
+            "Folder already exists for index at {}",
+            tantivy_folder_path.to_str().unwrap()
+        );
+    }
+
+    for file in puffin_dir.list_files() {
+        let file_data = puffin_dir.open_read(&PathBuf::from(file.clone())).unwrap();
+        let mut file_handle = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(tantivy_folder_path.join(&file))
+            .unwrap();
+        file_handle
+            .write_all(&file_data.read_bytes().unwrap())
+            .unwrap();
+        file_handle.flush().unwrap();
     }
 }
 
@@ -185,8 +229,6 @@ impl PuffinDirectory {
             let mut writer = puffin_dir.open_write(&empty_puffin_dir_path)?;
             writer.write_all(&data.read_bytes()?)?;
             writer.flush()?;
-
-            puffin_dir.add_file_path(path);
         }
         Ok(puffin_dir)
     }

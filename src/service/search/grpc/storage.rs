@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp, sync::Arc};
+use std::{cmp, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -24,7 +24,7 @@ use config::{
         inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
         search::{ScanStats, StorageType},
         stream::FileKey,
-        tantivy_inverted_index::PuffinDirectory,
+        tantivy_inverted_index::{convert_puffin_dir_to_tantivy_dir, PuffinDirectory},
     },
     utils::inverted_index::{
         convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
@@ -673,6 +673,7 @@ async fn search_tantivy_index(
         PuffinDirectory::from_bytes(Cursor::new(index_file_bytes)).await?
     };
 
+    convert_puffin_dir_to_tantivy_dir(PathBuf::from(tantivy_index_file_name), puffin_dir.clone());
     // let tantivy_dir_real_path = format!("{}/{}", &cfg.common.data_stream_dir, tantivy_dir);
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
