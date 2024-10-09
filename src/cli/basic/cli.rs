@@ -247,7 +247,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::dashboards::run().await?
         }
         "migrate-pipeline" => {
-            println!("Running migration dashboard");
+            println!("Running migration pipeline");
             migration::pipeline_func::run().await?;
         }
         "delete-parquet" => {
