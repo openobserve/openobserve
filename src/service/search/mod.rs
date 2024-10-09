@@ -42,6 +42,7 @@ use proto::cluster_rpc;
 use regex::Regex;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
@@ -337,7 +338,7 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
-#[tracing::instrument(name = "service:search:enter", skip(in_req))]
+#[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -400,18 +401,22 @@ pub async fn search(
 
     let req_query = req.clone().query.unwrap();
 
-    let handle = tokio::task::spawn(async move {
-        #[cfg(feature = "enterprise")]
-        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req, req_regions, req_clusters).await
-        } else {
-            cluster::http::search(req).await
+    let span = tracing::span::Span::current();
+    let handle = tokio::task::spawn(
+        async move {
+            #[cfg(feature = "enterprise")]
+            if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
+                cluster::super_cluster::search(req, req_regions, req_clusters).await
+            } else {
+                cluster::http::search(req).await
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                cluster::http::search(req).await
+            }
         }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            cluster::http::search(req).await
-        }
-    });
+        .instrument(span),
+    );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => Err(e),
