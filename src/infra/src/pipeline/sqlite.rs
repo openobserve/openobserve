@@ -248,23 +248,14 @@ UPDATE pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5;
         "#;
-        let pipeline = match sqlx::query_as::<_, Pipeline>(query)
+        let pipeline = sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
             .bind(stream_params.stream_type.as_str())
             .fetch_one(&pool)
-            .await
-        {
-            Ok(pipeline) => pipeline,
-            Err(e) => {
-                log::error!("[SQLITE] get pipeline by stream error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists(format!(
-                    "{org}/{stream_params}",
-                ))));
-            }
-        };
+            .await?;
         Ok(pipeline)
     }
 

@@ -52,6 +52,12 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
         let mut trans: function::Transform = json::from_slice(&val).unwrap();
         if let Some(stream_orders) = trans.streams.clone() {
             for stream_ord in stream_orders {
+                if !matches!(
+                    stream_ord.stream_type,
+                    StreamType::Logs | StreamType::Metrics | StreamType::Traces
+                ) {
+                    continue;
+                }
                 let func_params = FunctionParams {
                     name: trans.name.clone(),
                     num_args: trans.num_args,

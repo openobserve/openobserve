@@ -247,23 +247,14 @@ UPDATE pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND stream_name = ? AND stream_type = ?;
         "#;
-        let pipeline = match sqlx::query_as::<_, Pipeline>(query)
+        let pipeline = sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
             .bind(stream_params.stream_type.as_str())
             .fetch_one(&pool)
-            .await
-        {
-            Ok(pipeline) => pipeline,
-            Err(e) => {
-                log::debug!("[MYSQL] get pipeline by stream error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists(format!(
-                    "{org}/{stream_params}",
-                ))));
-            }
-        };
+            .await?;
         Ok(pipeline)
     }
 
