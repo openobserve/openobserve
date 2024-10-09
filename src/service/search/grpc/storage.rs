@@ -770,35 +770,6 @@ async fn search_tantivy_index(
             "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
         ));
     }
-
-    // following logic is needed if there multiple segments in tantivy
-    // which we do not support as of now.
-
-    // let row_id_field = tantivy_schema.get_field("row_id").unwrap();
-
-    // let mut seg_row_offsets = HashMap::with_capacity(seg_metas.len());
-    // for doc in matched_docs {
-    //     let offset = match seg_row_offsets.entry(doc.segment_ord) {
-    //         Entry::Occupied(offset) => *offset.get(),
-    //         Entry::Vacant(vacant_entry) => {
-    //             let tantivy_doc: TantivyDocument =
-    //                 tantivy_searcher.doc(doc).context("Fetch docs")?;
-    //             let first_row_in_segment = tantivy_doc
-    //                 .get_first(row_id_field)
-    //                 .and_then(|v| v.as_u64())
-    //                 .context("Fetch first row from segment")?;
-    //             let offset = first_row_in_segment as u32 - doc.doc_id;
-    //             vacant_entry.insert(offset);
-    //             offset
-    //         }
-    //     };
-    //     let final_row_id = doc.doc_id + offset;
-    //     if res.len() < final_row_id as usize {
-    //         res.resize(final_row_id as usize + 1, false);
-    //     }
-    //     res.set(final_row_id as usize, true);
-    // }
-    // Ok((parquet_file_name.to_string(), Some(res)))
 }
 
 async fn inverted_index_search_in_file(

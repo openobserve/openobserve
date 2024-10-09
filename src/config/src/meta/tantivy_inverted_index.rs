@@ -169,7 +169,7 @@ impl PuffinDirectory {
             let ext = empty_puffin_dir_path.extension().unwrap().to_str().unwrap();
             empty_puffin_dir_path.set_file_name(format!("{}.{}", segment_id, ext));
 
-            if puffin_dir.exists(dbg!(&empty_puffin_dir_path))? {
+            if puffin_dir.exists(&empty_puffin_dir_path)? {
                 continue;
             }
             let path = PathBuf::from(&file);
