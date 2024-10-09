@@ -234,13 +234,6 @@ pub struct Mapping {
     #[serde(rename = "type")]
     typee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    options: Option<MappingOptions>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MappingOptions {
-    #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     from: Option<String>,
