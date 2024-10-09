@@ -430,6 +430,13 @@ export const convertSQLData = async (
     return result;
   };
 
+  /**
+   * Returns the largest label from the stacked chart data.
+   * Calculates the largest value for each unique breakdown and sums those values.
+   * @param axisKey - key of the yaxis
+   * @param breakDownkey - key of the breakdown
+   * @returns {number} - the largest value
+   */
   const largestStackLabel = (axisKey: string, breakDownkey: string) => {
     const data =
       missingValueData?.filter((item: any) => {
@@ -456,6 +463,10 @@ export const convertSQLData = async (
     return Object.values(maxValues).reduce((a: any, b: any) => a + b, 0);
   };
 
+  /**
+   *
+   * @returns {number} - the largest value
+   */
   const getPieChartRadius = () => {
     const minRadius = Math.min(
       panelSchema.layout.w * 30,
@@ -684,8 +695,6 @@ export const convertSQLData = async (
       for (let i = 0; i < data.length; i++) {
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
-
-      console.log("panel schema =====", panelSchema);
 
       return {
         type: "category",
@@ -2121,6 +2130,7 @@ const getLegendPosition = (legendPosition: string) => {
  * Useful to calculate nameGap for the left axis
  *
  * @param {string} text - The text to calculate the width of.
+ * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
 const calculateWidthText = (
@@ -2330,6 +2340,12 @@ const getPropsByChartTypeForSeries = (type: string) => {
   }
 };
 
+/**
+ * Calculates the optimal font size for a given text that fits the canvas width.
+ * @param text - The text to calculate the font size for.
+ * @param canvasWidth - canvas width in pixels
+ * @returns {number} - The optimal font size in pixels.
+ */
 const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
   let minFontSize = 1; // Start with the smallest font size
   let maxFontSize = 90; // Set a maximum possible font size
