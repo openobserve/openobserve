@@ -30,7 +30,7 @@ use config::{
     },
     utils::json,
 };
-use infra::{db as infra_db, pipeline as infra_pipeline};
+use infra::db as infra_db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     migrate_stream_association().await?;
@@ -292,7 +292,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             }
             _ => {
                 log::error!(
-                    "[Migration]: Error migrating Function x Stream association to the new pipeline format introduced in v0.12.2. Original data kept."
+                    "[Migration]: Error migrating pipeline to the new format introduced in v0.12.2. Original data kept."
                 );
             }
         }
