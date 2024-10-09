@@ -300,7 +300,7 @@ fn dfs_traversal_check(
 
     for next_node_id in graph.get(current_id).unwrap() {
         if let NodeData::Function(func_params) = &node_map.get(next_node_id).unwrap().data {
-            if flattened && func_params.after_flatten {
+            if flattened && !func_params.after_flatten {
                 return Err(anyhow!(
                     "After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
                 ));

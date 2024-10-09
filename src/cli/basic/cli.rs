@@ -246,6 +246,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             println!("Running migration dashboard");
             migration::dashboards::run().await?
         }
+        "migrate-pipeline" => {
+            println!("Running migration dashboard");
+            migration::pipeline_func::run().await?;
+        }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();
             match file_list::delete_parquet_file(file, true).await {

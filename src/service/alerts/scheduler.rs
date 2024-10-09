@@ -658,6 +658,14 @@ async fn handle_derived_stream_triggers(
     }
 
     let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
+        log::warn!(
+            "Pipeline associated with trigger not found: {}/{}/{}/{}. Deleting this trigger",
+            org_id,
+            stream_type,
+            pipeline_name,
+            pipeline_id
+        );
+        db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Err(anyhow::anyhow!(
             "Pipeline associated with trigger not found: {}/{}/{}/{}",
             org_id,
