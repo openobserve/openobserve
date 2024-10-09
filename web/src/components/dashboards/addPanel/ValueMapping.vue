@@ -18,60 +18,7 @@
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
       <span>Value Mappings</span>
-      <!-- <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      > -->
-      <!-- <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          Change Display Value or Cell Color
-        </q-tooltip> -->
-      <!-- </q-btn> -->
     </div>
-    <!-- <div
-      v-for="(data, index) in dashboardPanelData.data.config.drilldown"
-      :key="JSON.stringify(data) + index"
-    >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 5px;
-        "
-      >
-        <div
-          @click="onDrilldownClick(index)"
-          style="
-            cursor: pointer;
-            padding-left: 10px;
-            width: 250px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          "
-          :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
-        >
-          {{ index + 1 }}. {{ data.name }}
-        </div>
-        <q-icon
-          class="q-mr-xs"
-          size="15px"
-          name="close"
-          style="cursor: pointer"
-          @click="removeDrilldownByIndex(index)"
-          :data-test="`dashboard-addpanel-config-drilldown-remove-${index}`"
-        />
-      </div>
-    </div> -->
     <q-btn
       @click="openValueMappingPopUp"
       style="cursor: pointer; padding: 0px 5px"

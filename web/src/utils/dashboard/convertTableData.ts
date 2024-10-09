@@ -15,6 +15,7 @@
 
 import { toZonedTime } from "date-fns-tz";
 import {
+  findFirstValidMappedValue,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -53,41 +54,12 @@ export const convertTableData = (
   // value mapping
   tableRows?.forEach((row: any) => {
     Object.entries(row).forEach(([key, value]: any) => {
-      const foundValue = panelSchema.config?.mappings?.find((v: any) => {
-        if (v.type == "value") {
-          return (
-            v.value == value &&
-            v.text != null &&
-            v.text != "" &&
-            v.text != undefined
-          );
-        } else if (v.type == "range") {
-          if (
-            v.from &&
-            v.to &&
-            !Number.isNaN(+v.from) &&
-            !Number.isNaN(+v.to)
-          ) {
-            return (
-              +v.from <= +value &&
-              +v.to >= +value &&
-              v.text != null &&
-              v.text != "" &&
-              v.text != undefined
-            );
-          }
-          return false;
-        } else if (v.type == "regex") {
-          // check/test if the value matches the regex
-          return (
-            new RegExp(v?.pattern ?? "").test(value) &&
-            v.text != null &&
-            v.text != "" &&
-            v.text != undefined
-          );
-        }
-        return false;
-      });
+      // Find the first valid mapping with a valid text
+      const foundValue = findFirstValidMappedValue(
+        value,
+        panelSchema.config?.mappings,
+        "text",
+      );
 
       if (foundValue && foundValue.text) {
         row[key] = foundValue.text;
