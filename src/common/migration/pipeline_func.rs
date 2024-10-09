@@ -33,8 +33,8 @@ use config::{
 use infra::db as infra_db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    migrate_stream_association().await?;
     migrate_pipelines().await?;
+    migrate_stream_association().await?;
     Ok(())
 }
 
