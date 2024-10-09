@@ -409,7 +409,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        _time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<super::FileId>> {
         if let Some((start, end)) = time_range {
@@ -439,6 +438,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         log::debug!("file_list day_partitions: {:?}", day_partitions);
 
         let mut tasks = Vec::with_capacity(day_partitions.len());
+
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
             tasks.push(tokio::task::spawn(async move {
@@ -446,9 +446,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 let cfg = get_config();
                 if cfg.limit.use_upper_bound_for_max_ts {
                     let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-                    sqlx::query_as::<_, super::FileId>(
-                        r#"SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
-                    )
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
+                    sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
                     .bind(time_start)
                     .bind(max_ts_upper_bound)
@@ -456,9 +455,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .fetch_all(&pool)
                     .await
                 } else {
-                    sqlx::query_as::<_, super::FileId>(
-                        r#"SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
-                    )
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;";
+                    sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
                     .bind(time_start)
                     .bind(time_end)

@@ -38,7 +38,9 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+        stream::{
+            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
+        },
     },
     metrics,
     utils::{
@@ -59,7 +61,7 @@ use infra::{
     cache::tmpfs,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, SchemaCache,
+        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
     },
     storage,
 };
@@ -791,6 +793,7 @@ pub(crate) async fn generate_index_on_ingester(
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
             bloom_filter_fields: vec!["term".to_string()],
+            partition_keys: vec![StreamPartition::new_prefix("term")],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
@@ -824,6 +827,24 @@ pub(crate) async fn generate_index_on_ingester(
                 ));
             };
         }
+
+        // add prefix partition for index
+        if let Some(mut settings) = unwrap_stream_settings(schema.schema()) {
+            let term_partition_exists = settings
+                .partition_keys
+                .iter()
+                .any(|partition| partition.field == "term");
+            if !term_partition_exists {
+                settings
+                    .partition_keys
+                    .push(StreamPartition::new_prefix("term"));
+
+                let mut metadata = schema.schema().metadata().clone();
+                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
+                    .await?;
+            }
+        }
     }
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
@@ -832,11 +853,10 @@ pub(crate) async fn generate_index_on_ingester(
     if json_rows.is_empty() {
         return Ok(());
     }
-    let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    for record_val in recs {
-        let timestamp: i64 = record_val
+    for row in json_rows {
+        let timestamp: i64 = row
             .get(&get_config().common.column_timestamp)
             .unwrap()
             .as_i64()
@@ -844,9 +864,9 @@ pub(crate) async fn generate_index_on_ingester(
 
         let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
-            &Vec::new(),
+            &vec![StreamPartition::new_prefix("term")],
             PartitionTimeLevel::Hourly,
-            &json::Map::new(),
+            &row,
             Some(schema_key_str),
         );
 
@@ -856,7 +876,7 @@ pub(crate) async fn generate_index_on_ingester(
             records: vec![],
             records_size: 0,
         });
-
+        let record_val: json::Value = json::Value::Object(row);
         let record_size = json::estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
@@ -882,7 +902,7 @@ pub(crate) async fn generate_index_on_compactor(
     stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Result<(String, FileMeta), anyhow::Error> {
+) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -898,7 +918,7 @@ pub(crate) async fn generate_index_on_compactor(
         index_fields,
     )?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
-        return Ok((String::new(), FileMeta::default()));
+        return Ok(vec![(String::new(), FileMeta::default())]);
     }
     let schema = record_batches.first().unwrap().schema();
 
@@ -959,7 +979,7 @@ pub(crate) async fn generate_index_on_compactor(
     record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
-    let (filename, filemeta, _stream_type) = write_parquet_index_to_disk(
+    let files = write_parquet_index_to_disk(
         record_batches,
         original_file_size,
         org_id,
@@ -970,8 +990,8 @@ pub(crate) async fn generate_index_on_compactor(
     )
     .await?;
 
-    log::debug!("[COMPACTOR:JOB] Written index file successfully");
-    Ok((filename, filemeta))
+    log::debug!("[COMPACTOR:JOB] Written index files successfully");
+    Ok(files)
 }
 
 fn prepare_index_record_batches(

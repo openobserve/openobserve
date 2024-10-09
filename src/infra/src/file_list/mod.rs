@@ -83,7 +83,6 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<FileId>>;
     async fn query_deleted(
@@ -272,7 +271,6 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<FileId>> {
     if let Some((start, end)) = time_range {
@@ -281,7 +279,7 @@ pub async fn query_ids(
         }
     }
     CLIENT
-        .query_ids(org_id, stream_type, stream_name, time_level, time_range)
+        .query_ids(org_id, stream_type, stream_name, time_range)
         .await
 }
 

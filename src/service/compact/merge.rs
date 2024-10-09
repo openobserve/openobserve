@@ -808,7 +808,7 @@ pub async fn merge_files(
                         index_format,
                         InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
                     ) {
-                        let (index_file_name, filemeta) = generate_index_on_compactor(
+                        let files = generate_index_on_compactor(
                             &retain_file_list,
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
@@ -826,16 +826,16 @@ pub async fn merge_files(
                                 retain_file_list
                             )
                         })?;
-                        if !index_file_name.is_empty() {
+                        for (file_name, filemeta) in files {
                             log::info!(
                                 "Created parquet index file during compaction {}",
-                                index_file_name
+                                file_name
                             );
                             // Notify that we wrote the index file to the db.
                             if let Err(e) = write_file_list(
                                 org_id,
                                 &[FileKey {
-                                    key: index_file_name.clone(),
+                                    key: file_name.clone(),
                                     meta: filemeta,
                                     deleted: false,
                                     segment_ids: None,
@@ -845,7 +845,7 @@ pub async fn merge_files(
                             {
                                 log::error!(
                                     "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
-                                    index_file_name,
+                                    file_name,
                                     e.to_string(),
                                     retain_file_list
                                 );

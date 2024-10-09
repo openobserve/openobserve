@@ -2795,18 +2795,20 @@ pub struct FlightSearchRequest {
     pub end_time: i64,
     #[prost(int64, tag = "13")]
     pub timeout: i64,
+    #[prost(string, repeated, tag = "14")]
+    pub prefixes: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// used for super cluster and enterprise
-    #[prost(bool, tag = "14")]
-    pub is_super_cluster: bool,
     #[prost(bool, tag = "15")]
+    pub is_super_cluster: bool,
+    #[prost(bool, tag = "16")]
     pub use_inverted_index: bool,
-    #[prost(string, optional, tag = "16")]
-    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "17")]
-    pub index_type: ::core::option::Option<::prost::alloc::string::String>,
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "18")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    pub index_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "19")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "20")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
