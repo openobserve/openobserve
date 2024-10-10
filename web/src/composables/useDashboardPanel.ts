@@ -50,6 +50,7 @@ const getDefaultDashboardPanelData: any = () => ({
       decimals: 2,
       axis_label_rotation: 0,
       axis_label_width: 0,
+      line_thickness: 1.5,
       top_results: null,
       top_results_others: false,
       axis_width: null,
