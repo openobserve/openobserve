@@ -31,7 +31,10 @@ use crate::{
                 UserRole,
             },
         },
-        utils::auth::{get_hash, is_root_user, AuthExtractor},
+        utils::{
+            auth::{get_hash, is_root_user, AuthExtractor},
+            redirect_response::RedirectResponse,
+        },
     },
     service::{db, users},
 };
@@ -647,6 +650,31 @@ pub async fn oo_validator(
     oo_validator_internal(req, auth_info, path_prefix).await
 }
 
+/// Validates the authentication result and redirects on failure for requests with the `/short/`
+/// prefix.
+///
+/// This function is a proxy for the `oo_validator_internal` function, setting the `path_prefix` to
+/// "/short/".
+///
+/// # Errors
+/// If authentication fails, the function logs the failure and returns an error that causes a
+/// redirect to a predefined URL.
+pub async fn validate_short_or_redirect(
+    req: ServiceRequest,
+    auth_result: Result<AuthExtractor, Error>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    match auth_result {
+        Ok(auth_info) => {
+            let path_prefix = "/short/";
+            match oo_validator_internal(req, auth_info, path_prefix).await {
+                Ok(req) => Ok(req),
+                Err((err, err_req)) => Err(handle_auth_failure_for_redirect(err_req, &err)),
+            }
+        }
+        Err(err) => Err(handle_auth_failure_for_redirect(req, &err)),
+    }
+}
+
 /// Validates the authentication information in the request and returns the request if valid, or an
 /// error if invalid.
 ///
@@ -770,6 +798,22 @@ pub(crate) async fn list_objects_for_user(
     } else {
         Ok(None)
     }
+}
+
+/// Handles authentication failure by logging the error and returning a redirect response.
+///
+/// This function is responsible for logging the authentication failure and returning a redirect
+/// response. It takes in the request and the error message, and returns a tuple containing the
+/// redirect response and the service request.
+fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
+    let redirect = RedirectResponse::default();
+    log::warn!(
+        "Authentication failed for path: {}, err: {}, redirecting to {}",
+        req.path(),
+        error,
+        &redirect.redirect_relative_uri,
+    );
+    (redirect.into(), req)
 }
 
 #[cfg(test)]
