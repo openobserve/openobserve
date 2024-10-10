@@ -15,10 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use config::meta::short_url::ShortenUrlResponse;
 
-use crate::service::short_url;
+use crate::{common::utils::redirect_response::RedirectResponse, service::short_url};
 
 /// Shorten a URL
 #[utoipa::path(
@@ -80,16 +80,20 @@ pub async fn shorten(_org_id: web::Path<String>, body: web::Bytes) -> Result<Htt
     tag = "Short Url"
 )]
 #[get("/{short_id}")]
-pub async fn retrieve(short_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn retrieve(
+    req: HttpRequest,
+    short_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    log::info!(
+        "short_url::retrieve handler called for path: {}",
+        req.path()
+    );
     let short_id = short_id.into_inner();
     let original_url = short_url::retrieve(&short_id).await;
 
     if let Some(url) = original_url {
-        // Use MovedPermanently (301) or Found (302)
-        let response = HttpResponse::Found()
-            .append_header(("Location", url.clone()))
-            .finish();
-        Ok(response)
+        let redirect_response = RedirectResponse::new(&url);
+        Ok(redirect_response.redirect())
     } else {
         Ok(HttpResponse::NotFound().body("Short URL not found"))
     }
