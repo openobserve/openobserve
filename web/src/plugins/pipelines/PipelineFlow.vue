@@ -105,6 +105,11 @@ export default {
     } = useDragAndDrop();
     const store = useStore();
 
+    onInit((vueFlowInstance) => {
+    // instance is the same as the return of `useVueFlow`
+    vueFlowInstance.fitView()
+  })
+
 const  buttonClass = () => {
       return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
     };
