@@ -677,7 +677,6 @@ export const convertSQLData = async (
           width: 100,
           margin:
             18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5,
-          rotate: panelSchema.config?.axis_label_rotation || 0,
         },
         splitLine: {
           show: true,
