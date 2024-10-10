@@ -922,3 +922,10 @@ export const getTimezonesByOffset = async (offsetMinutes: number) => {
     return zoneOffset === offsetHours;
   });
 };
+
+export const converTimeFromNsToMs = (time: number) => {
+  const nanoseconds = time;
+  const milliseconds = Math.floor(nanoseconds / 1000000);
+  const date = new Date(milliseconds);
+  return date.getTime();
+};
