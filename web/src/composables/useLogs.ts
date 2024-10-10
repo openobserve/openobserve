@@ -554,7 +554,7 @@ const useLogs = () => {
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
     if (
-      query.hasOwnProperty("type") &&
+      Object.hasOwn(query, "type") &&
       query.type == "search_history_re_apply"
     ) {
       delete query.type;
@@ -1028,7 +1028,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !parsedSQL?.limit || parsedSQL?.limit.value.length == 0;
+    return !parsedSQL?.limit || parsedSQL?.limit.value?.length == 0;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -3591,7 +3591,7 @@ const useLogs = () => {
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
       if (
-        router.currentRoute.value.query.hasOwnProperty("type") &&
+        Object.hasOwn(router.currentRoute.value.query, "type") &&
         router.currentRoute.value.query.type == "search_history_re_apply"
       ) {
         delete router.currentRoute.value.query.type;
@@ -3714,7 +3714,7 @@ const useLogs = () => {
 
     searchObj.shouldIgnoreWatcher = false;
     if (
-      queryParams.hasOwnProperty("type") &&
+      Object.hasOwn(queryParams, "type") &&
       queryParams.type == "search_history_re_apply"
     ) {
       delete queryParams.type;
