@@ -2296,7 +2296,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
           : false,
         showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
     case "scatter":
       return {
@@ -2364,7 +2364,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         emphasis: { focus: "series" },
         areaStyle: {},
         showSymbol: panelSchema.config?.show_symbol ?? false,
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
     case "stacked":
       return {
@@ -2405,7 +2405,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
           focus: "series",
         },
         showSymbol: panelSchema.config?.show_symbol ?? false,
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
     case "metric":
       return {
