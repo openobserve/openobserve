@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt;
+
 use actix_web::{HttpResponse, ResponseError};
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web";
