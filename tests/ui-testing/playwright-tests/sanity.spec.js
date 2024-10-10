@@ -950,7 +950,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
   });
 
-  test('should verify user redirected to logs page when click stream explorer and on clicking get history, logs history displayed', async ({ page, context }) => {
+  test('should verify user redirected to logs page when clicking stream explorer and on clicking get history, logs history displayed', async ({ page, context }) => {
     // Step 1: Click on the "Share Link" button
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
@@ -961,8 +961,10 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="add-alert-title"]').click();
     await page.getByText('arrow_back_ios_new').click();
     await page.waitForTimeout(1000);
-    await page.getByText('e2e_automate').click();
-  });
+
+    // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element
+    await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click();
+});
   
 
 });
