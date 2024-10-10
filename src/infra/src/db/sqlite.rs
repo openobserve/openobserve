@@ -225,15 +225,11 @@ impl super::Db for SqliteDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
-        let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;"#,
-        )
-        .bind(module)
-        .bind(key1)
-        .bind(key2)
-        .fetch_one(&pool)
-        .await
-        {
+        let query = format!(
+            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
+            module, key1, key2
+        );
+        let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
