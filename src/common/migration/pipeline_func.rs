@@ -313,7 +313,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             .is_ok_and(|res| res.status().as_u16() == 200)
         {
             log::error!(
-                "[Migration]: Error migrating pipeline to the new format introduced in v0.12.2. Original data kept."
+                "[Migration]: Error migrating pipelines to the new pipeline format introduced in v0.12.2. Original data kept."
             );
             return Ok(());
         }

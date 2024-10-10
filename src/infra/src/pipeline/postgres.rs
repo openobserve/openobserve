@@ -294,7 +294,9 @@ SELECT * FROM pipeline
             }
             PipelineSource::Scheduled(_) => {
                 // only checks for realtime pipelines
-                return Err(Error::from(DbError::KeyNotExists("".to_string())));
+                return Err(Error::from(DbError::KeyNotExists(
+                    "No matching pipeline found for scheduled source".to_string(),
+                )));
             }
         };
 
@@ -304,31 +306,29 @@ SELECT * FROM pipeline
     async fn list(&self) -> Result<Vec<Pipeline>> {
         let pool = CLIENT.clone();
         let query = "SELECT * FROM pipeline ORDER BY id;";
-        let pipelines = match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
-            Ok(pipelines) => pipelines,
+        match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
+            Ok(pipelines) => Ok(pipelines),
             Err(e) => {
                 log::debug!("[POSTGRES] list all pipelines  error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists("".to_string())));
+                Ok(vec![]) // Return empty vector instead of error
             }
-        };
-        Ok(pipelines)
+        }
     }
 
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
         let pool = CLIENT.clone();
         let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
-        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+        match sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
             .fetch_all(&pool)
             .await
         {
-            Ok(pipelines) => pipelines,
+            Ok(pipelines) => Ok(pipelines),
             Err(e) => {
                 log::debug!("[POSTGRES] list pipelines by org error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists(org.to_string())));
+                Ok(vec![])
             }
-        };
-        Ok(pipelines)
+        }
     }
 
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
@@ -336,21 +336,18 @@ SELECT * FROM pipeline
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         "#;
-        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+        match sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
             .bind("realtime")
             .fetch_all(&pool)
             .await
         {
-            Ok(pipelines) => pipelines,
+            Ok(pipelines) => Ok(pipelines),
             Err(e) => {
                 log::debug!("[POSTGRES] list streams with pipelines error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists(format!(
-                    "{org}/realtime"
-                ))));
+                Ok(vec![])
             }
-        };
-        Ok(pipelines)
+        }
     }
 
     async fn delete(&self, pipeline_id: &str) -> Result<()> {
