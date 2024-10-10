@@ -15,6 +15,7 @@
 
 import { toZonedTime } from "date-fns-tz";
 import {
+  findFirstValidMappedValue,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -49,6 +50,22 @@ export const convertTableData = (
   let columnData = [...x, ...y];
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
+
+  // value mapping
+  tableRows?.forEach((row: any) => {
+    Object.entries(row).forEach(([key, value]: any) => {
+      // Find the first valid mapping with a valid text
+      const foundValue = findFirstValidMappedValue(
+        value,
+        panelSchema.config?.mappings,
+        "text",
+      );
+
+      if (foundValue && foundValue.text) {
+        row[key] = foundValue.text;
+      }
+    });
+  });
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
