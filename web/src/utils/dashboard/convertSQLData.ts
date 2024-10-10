@@ -430,6 +430,17 @@ export const convertSQLData = async (
     return result;
   };
 
+  function getLargestLabel() {
+    if (
+      (panelSchema.type === "stacked" || panelSchema.type === "area-stacked") &&
+      breakDownKeys.length > 0
+    ) {
+      return largestStackLabel(yAxisKeys[0], breakDownKeys[0]);
+    } else {
+      return largestLabel(getAxisDataFromKey(yAxisKeys[0]));
+    }
+  }
+
   /**
    * Returns the largest label from the stacked chart data.
    * Calculates the largest value for each unique breakdown and sums those values.
@@ -464,7 +475,7 @@ export const convertSQLData = async (
   };
 
   /**
-   *
+   * Returns the pie chart radius that for
    * @returns {number} - the largest value
    */
   const getPieChartRadius = () => {
@@ -472,6 +483,10 @@ export const convertSQLData = async (
       panelSchema.layout.w * 30,
       panelSchema.layout.h * 30,
     );
+
+    if (minRadius === 0) {
+      return 0;
+    }
 
     const radius = minRadius / 2;
 
@@ -761,10 +776,7 @@ export const convertSQLData = async (
             ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
             : formatUnitValue(
                 getUnitValue(
-                  panelSchema.type === "stacked" ||
-                    panelSchema.type === "area-stacked"
-                    ? largestStackLabel(yAxisKeys[0], breakDownKeys[0])
-                    : largestLabel(getAxisDataFromKey(yAxisKeys[0])),
+                  getLargestLabel(),
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
