@@ -62,7 +62,6 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
-const StreamRouting = () => import("@/components/functions/StreamRouting.vue");
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
@@ -236,14 +235,6 @@ const useRoutes = () => {
           },
         },
         {
-          path: "stream-association",
-          name: "streamFunctions",
-          component: AssociatedStreamFunction,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
@@ -262,6 +253,14 @@ const useRoutes = () => {
             {
               path: "edit",
               name: "pipelineEditor",
+              component: PipelineEditor,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "add",
+              name: "createPipeline",
               component: PipelineEditor,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);

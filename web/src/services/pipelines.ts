@@ -17,40 +17,35 @@ const pipelines = {
     const url = `/api/${org_identifier}/pipelines/${name}`;
     return http().get(url);
   },
+  toggleState: (
+    org_identifier: string,
+    pipeline_id: string,
+    enable: boolean,
+  ) => {
+    const url = `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}`;
+    return http().put(url);
+  },
 
   deletePipeline: ({
-    stream_name,
-    stream_type,
-    name,
-    org_identifier,
+    pipeline_id,
+    org_id,
   }: {
-    stream_name: string;
-    name: string;
-    stream_type: string;
-    org_identifier: string;
+    pipeline_id : string;
+    org_id: string;
   }) => {
-    const url = `/api/${org_identifier}/streams/${stream_name}/pipelines/${name}?type=${stream_type}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}`;
     return http().delete(url);
   },
 
   createPipeline: ({
-    stream_name,
-    name,
-    stream_type,
-    description,
+    data,
     org_identifier,
   }: {
-    stream_name: string;
-    stream_type: string;
-    name: string;
+    data: object;
     org_identifier: string;
-    description: string;
   }) => {
-    const url = `/api/${org_identifier}/streams/${stream_name}/pipelines?type=${stream_type}`;
-    return http({}).post(url, {
-      name,
-      description,
-    });
+    const url = `/api/${org_identifier}/pipelines`;
+    return http({}).post(url, data);
   },
 
   updatePipeline: ({
@@ -60,8 +55,12 @@ const pipelines = {
     org_identifier: string;
     data: any;
   }) => {
-    const url = `/api/${org_identifier}/streams/${data.stream_name}/pipelines/${data.name}?type=${data.stream_type}`;
+    const url = `/api/${org_identifier}/pipelines`;
     return http().put(url, data);
+  },
+  getPipelineStreams: (org_identifier:string) => {
+    const url = `/api/${org_identifier}/pipelines/streams`;
+    return http().get(url);
   },
 };
 

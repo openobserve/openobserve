@@ -47,7 +47,8 @@ def test_e2e_invalidfunction(create_session, base_url):
     session = create_session
     # Create a function
     org_id = "default"
-    payload = {"name": "...", "function": "...", "params": "row", "transType": 0}
+    payload = {"name": "...", "function": "...",
+               "params": "row", "transType": 0}
 
     resp_create_function = session.post(
         f"{base_url}api/{org_id}/functions", json=payload
@@ -170,23 +171,6 @@ def test_e2e_functionnotfound(create_session, base_url):
     ), f"Function not found, but got {resp_delete_function.status_code} {resp_delete_function.content}"
 
 
-def test_e2e_allfunctionstreams(create_session, base_url):
-    """Running an E2E test for all streams under functions."""
-
-    session = create_session
-    org_id = "default"
-    stream_name = "test"
-
-    resp_get_streamfunction = session.get(
-        f"{base_url}api/{org_id}/streams/{stream_name}/functions"
-    )
-
-    print(resp_get_streamfunction.content)
-    assert (
-        resp_get_streamfunction.status_code == 200
-    ), f"Get all functions streams list 200, but got {resp_get_streamfunction.status_code} {resp_get_streamfunction.content}"
-
-
 def test_e2e_addDeleteStreamFunction(create_session, base_url):
     """Running an E2E test for add stream to a function and delete."""
 
@@ -212,31 +196,6 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
         resp_create_function.status_code == 200
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
 
-    resp_get_streamfunction = session.get(
-        f"{base_url}api/{org_id}/streams/{stream_name}/functions"
-    )
-
-    print(resp_get_streamfunction.content)
-    assert (
-        resp_get_streamfunction.status_code == 200
-    ), f"Get all functions streams list 200, but got {resp_get_streamfunction.status_code} {resp_get_streamfunction.content}"
-
-    payload = {"order": 2}
-    resp_add_streamfunction = session.put(
-        f"{base_url}api/{org_id}/streams/{stream_name}/functions/pytestfunction",
-        json=payload,
-    )
-
-    print(resp_add_streamfunction.content)
-    assert (
-        resp_add_streamfunction.status_code == 200
-    ), f"Add stream to function 200, but got {resp_add_streamfunction.status_code} {resp_add_streamfunction.content}"
-    resp_delete_streamfunction = session.delete(
-        f"{base_url}api/{org_id}/streams/{stream_name}/functions/pytestfunction"
-    )
-    assert (
-        resp_delete_streamfunction.status_code == 200
-    ), f"Deleted the function from stream 200, but got {resp_delete_streamfunction.status_code} {resp_delete_streamfunction.content}"
     resp_delete_function = session.delete(
         f"{base_url}api/{org_id}/functions/pytestfunction"
     )

@@ -55,20 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.header')"
               content-class="tab_content"
             />
-
-            <q-route-tab
-              data-test="function-stream-tab"
-              name="streamFunctions"
-              :to="{
-                name: 'streamFunctions',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.associatedWithStream')"
-              content-class="tab_content"
-            />
-
             <q-route-tab
               v-if="
                 !store.state.zoConfig?.custom_hide_menus

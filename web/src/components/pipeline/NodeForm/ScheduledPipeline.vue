@@ -642,6 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   outlined
                   @update:model-value="updateCron"
+                  required
                 />
                 <q-select
                   data-test="add-report-schedule-start-timezone-select"
@@ -779,7 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-alert-period-warning-text"
             v-else
             class="text-primary q-pt-xs"
-            style="font-size: 12px; line-height: 12px"
+            style="font-size: 12px; line-height: 12px ;padding: 8px 0px;"
           >
             Note: The period should be the same as the cron expression.
           </div>
@@ -1170,7 +1171,8 @@ const filterFunctionOptions = (val: string, update: any) => {
 
 const onBlurQueryEditor = () => {
   queryEditorPlaceholderFlag.value = true;
-  emits("validate-sql");
+
+  // emits("validate-sql");
 };
 
 const validateInputs = (notify: boolean = true) => {
@@ -1224,6 +1226,7 @@ const validateInputs = (notify: boolean = true) => {
 
   return true;
 };
+
 defineExpose({
   tab,
   validateInputs,
