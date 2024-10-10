@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
-    utils::hash::Sum64,
+    utils::{hash::Sum64, util::zero_or},
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -41,17 +41,16 @@ fn connect() -> Pool<MySql> {
         .expect("mysql connect options create failed")
         .disable_statement_logging();
 
-    let max_lifetime = if cfg.limit.sql_db_connections_max_lifetime > 0 {
-        Some(std::time::Duration::from_secs(
-            cfg.limit.sql_db_connections_max_lifetime,
-        ))
-    } else {
-        None
-    };
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
+    let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
+
     MySqlPoolOptions::new()
         .min_connections(cfg.limit.sql_db_connections_min)
         .max_connections(cfg.limit.sql_db_connections_max)
-        .max_lifetime(max_lifetime)
+        .acquire_timeout(Duration::from_secs(acquire_timeout))
+        .idle_timeout(Some(Duration::from_secs(idle_timeout)))
+        .max_lifetime(Some(Duration::from_secs(max_lifetime)))
         .connect_lazy_with(db_opts)
 }
 
