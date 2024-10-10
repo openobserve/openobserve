@@ -1057,6 +1057,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }`"
         data-test="dashboard-config-show_symbol"
       >
+        <template v-slot:option="scope">
+          <q-item v-bind="scope.itemProps">
+            <q-item-section avatar style="height: 20px">
+              <q-icon
+                ><component :is="scope.opt.iconComponent"></component
+              ></q-icon>
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ scope.opt.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
       </q-select>
 
       <div class="space"></div>
@@ -1085,7 +1097,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }`"
         data-test="dashboard-config-line_interpolation"
       >
+        <template v-slot:option="scope">
+          <q-item v-bind="scope.itemProps">
+            <q-item-section avatar>
+              <q-icon
+                ><component :is="scope.opt.iconComponent"></component
+              ></q-icon>
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ scope.opt.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
       </q-select>
+      <div class="space"></div>
+
+      <q-input
+        v-if="
+          !promqlMode &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        "
+        v-model.number="dashboardPanelData.data.config.line_thickness"
+        :value="1.5"
+        :min="1.5"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.line_thickness = value
+              ? value
+              : 1.5)
+        "
+        label="Line Style Max Width"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="1.5"
+        :type="'number'"
+        data-test="dashboard-config-line_thickness"
+      >
+      </q-input>
 
       <div class="space"></div>
 
@@ -1214,6 +1270,14 @@ import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import { getImageURL } from "../../../utils/zincutils";
+import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
+import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
+import Smooth from "@/components/icons/dashboards/Smooth.vue";
+import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
+import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
+import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
+import { markRaw } from "vue";
 
 export default defineComponent({
   components: {
@@ -1222,6 +1286,12 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    LinearIcon,
+    NoSymbol,
+    Smooth,
+    StepBefore,
+    StepAfter,
+    StepMiddle,
   },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
@@ -1486,10 +1556,12 @@ export default defineComponent({
       {
         label: t("dashboard.yes"),
         value: true,
+        iconComponent: markRaw(LinearIcon),
       },
       {
         label: t("dashboard.no"),
         value: false,
+        iconComponent: markRaw(NoSymbol),
       },
     ];
 
@@ -1497,22 +1569,27 @@ export default defineComponent({
       {
         label: t("dashboard.linear"),
         value: "linear",
+        iconComponent: markRaw(LinearIcon),
       },
       {
         label: t("dashboard.smooth"),
         value: "smooth",
+        iconComponent: markRaw(Smooth),
       },
       {
         label: t("dashboard.stepBefore"),
         value: "step-start",
+        iconComponent: markRaw(StepBefore),
       },
       {
         label: t("dashboard.stepAfter"),
         value: "step-end",
+        iconComponent: markRaw(StepAfter),
       },
       {
         label: t("dashboard.stepMiddle"),
         value: "step-middle",
+        iconComponent: markRaw(StepMiddle),
       },
     ];
     const isWeightFieldPresent = computed(() => {
