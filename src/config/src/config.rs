@@ -931,6 +931,18 @@ pub struct Limit {
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_db_connections_max: u32,
     #[env_config(
+        name = "ZO_META_CONNECTION_POOL_ACQUIRE_TIMEOUT",
+        default = 0,
+        help = "Seconds, Maximum acquire timeout of individual connections."
+    )]
+    pub sql_db_connections_acquire_timeout: u64,
+    #[env_config(
+        name = "ZO_META_CONNECTION_POOL_IDLE_TIMEOUT",
+        default = 0,
+        help = "Seconds, Maximum idle timeout of individual connections."
+    )]
+    pub sql_db_connections_idle_timeout: u64,
+    #[env_config(
         name = "ZO_META_CONNECTION_POOL_MAX_LIFETIME",
         default = 0,
         help = "Seconds, Maximum lifetime of individual connections."
