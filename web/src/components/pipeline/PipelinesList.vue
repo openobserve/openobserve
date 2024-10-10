@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="currentRouteName === 'pipelines'">
     <div
-     :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
+      :class="store.state.theme === 'dark' ? 'dark-mode dark-theme' : 'light-theme light-mode'"
      class="full-wdith pipeline-list-table">
       <q-table
         data-test="pipeline-list-table"
@@ -437,10 +437,12 @@ const getColumnsForActiveTab = (tab : any) => {
     sortable: false,
   };
 if(tab === "all"){
+
   
   const allColumns = [ ...scheduledColumns, actionsColumn];
+  allColumns.splice(2,0 , { name: "type", field: "type", label: 'Type', align: "left", sortable: true });
 
-  allColumns.splice(2,0 , { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true });
+  allColumns.splice(3,0 , { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true });
 
   return allColumns;
 }
@@ -472,7 +474,7 @@ const getPipelines = async () => {
             },
             updatable: true 
           }));
-
+          pipeline.type = pipeline.source.source_type;
           if (pipeline.source.source_type === 'realtime') {
             pipeline.stream_name = pipeline.source.stream_name;
             pipeline.stream_type = pipeline.source.stream_type;
@@ -642,6 +644,7 @@ const filterData = (rows: any, terms: any) => {
 }
 
 .light-theme {
+
   th:last-child,
   td:last-child {
     background: #ffffff;
@@ -718,6 +721,23 @@ const filterData = (rows: any, terms: any) => {
 .expanded-sql{
   border-left: #7A54A2 3px solid;
 }
+
+
+:deep(.pipeline-list-table thead th:last-child) {
+  position: sticky;
+  right: 0;
+    z-index: 1;
+    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+    width: 100px;
+}
+
+:deep(.dark-theme.pipeline-list-table thead th:last-child) {
+  background: var(--q-dark);
+}
+:deep(.light-theme.pipeline-list-table thead th:last-child) {
+  background: #ffffff;
+}
+
 
 
 
