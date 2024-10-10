@@ -671,7 +671,7 @@ pub async fn validate_short_or_redirect(
                 Err((err, err_req)) => Err(handle_auth_failure_for_redirect(err_req, &err)),
             }
         }
-        Err(e) => Err(handle_auth_failure_for_redirect(req, &e)),
+        Err(err) => Err(handle_auth_failure_for_redirect(req, &err)),
     }
 }
 
