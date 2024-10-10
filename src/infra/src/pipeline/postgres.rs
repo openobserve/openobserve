@@ -76,8 +76,7 @@ CREATE TABLE IF NOT EXISTS pipeline
 
         let queries = vec![
             "CREATE INDEX IF NOT EXISTS pipeline_org_idx ON pipeline (org);",
-            "CREATE INDEX IF NOT EXISTS pipeline_id_idx ON pipeline (id);",
-            "CREATE UNIQUE INDEX IF NOT EXISTS pipeline_org_src_type_stream_params_idx ON pipeline (org, source_type, stream_org, stream_name, stream_type);",
+            "CREATE INDEX IF NOT EXISTS pipeline_org_src_type_stream_params_idx ON pipeline (org, source_type, stream_org, stream_name, stream_type);",
         ];
 
         for query in queries {
