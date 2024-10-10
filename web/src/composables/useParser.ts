@@ -1,7 +1,7 @@
 const useParser = () => {
   const sqlParser = async () => {
     const Parser: any = await import(
-      "@openobserve/node-sql-parser/build/DatafusionSQL"
+      "@openobserve/node-sql-parser/build/datafusionsql"
     );
 
     if (Parser) {
