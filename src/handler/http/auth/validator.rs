@@ -650,19 +650,22 @@ pub async fn oo_validator(
     oo_validator_internal(req, auth_info, path_prefix).await
 }
 
-/// Validates the authentication result and redirects on failure.
+
+/// Validates the authentication result and redirects on failure for requests with the `/short/` prefix.
 ///
-/// This function takes a `ServiceRequest` and an `auth_result` (which is the result of an
-/// authentication attempt). If the authentication is successful, it allows the request to
-/// proceed. If authentication fails, it logs the failure and returns an error that redirects
-/// the user to a specified URL.
-pub async fn validate_auth_or_redirect(
+/// This function is a proxy for the `oo_validator_internal` function, setting the `path_prefix` to
+/// "/short/".
+///
+/// # Errors
+/// If authentication fails, the function logs the failure and returns an error that causes a
+/// redirect to a predefined URL.
+pub async fn validate_short_or_redirect(
     req: ServiceRequest,
     auth_result: Result<AuthExtractor, Error>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     match auth_result {
         Ok(auth_info) => {
-            let path_prefix = "/api/";
+            let path_prefix = "/short/";
             match oo_validator_internal(req, auth_info, path_prefix).await {
                 Ok(req) => Ok(req),
                 Err((err, err_req)) => Err(handle_auth_failure_for_redirect(err_req, &err)),
