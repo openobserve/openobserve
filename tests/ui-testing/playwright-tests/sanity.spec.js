@@ -10,7 +10,7 @@ const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-// await page.getByText('Login as internal user').click();
+await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -922,11 +922,10 @@ test.describe("Sanity testcases", () => {
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(60000);
     await page.getByRole('button', { name: 'Search History' }).click();
     await page.locator('[data-test="search-history-date-time"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
-    await page.locator('[data-test="date-time-relative-2-d-btn"]').click();
-    await page.waitForTimeout(60000);
     await page.getByRole('button', { name: 'Get History' }).click();
     await page.getByRole('cell', { name: 'Trace ID' }).click();
     // Locate the row using a known static value like the SQL query
