@@ -878,7 +878,6 @@ export default defineComponent({
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
-        console.log("item", item);
         if (item.expr) {
           if (
             item.expr.type === "column_ref" &&
