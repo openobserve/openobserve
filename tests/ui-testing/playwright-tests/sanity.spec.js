@@ -960,6 +960,7 @@ test.describe("Sanity testcases", () => {
     await page.getByRole('button', { name: 'Search History' }).click();
     await page.locator('[data-test="add-alert-title"]').click();
     await page.getByText('arrow_back_ios_new').click();
+    await page.waitForTimeout(1000);
     await page.getByText('e2e_automate').click();
   });
   
