@@ -834,7 +834,6 @@ export const convertSQLData = async (
     },
     series: [],
   };
-  console.log("options", options);
 
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema);
 
