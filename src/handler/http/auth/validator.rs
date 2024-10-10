@@ -650,8 +650,8 @@ pub async fn oo_validator(
     oo_validator_internal(req, auth_info, path_prefix).await
 }
 
-
-/// Validates the authentication result and redirects on failure for requests with the `/short/` prefix.
+/// Validates the authentication result and redirects on failure for requests with the `/short/`
+/// prefix.
 ///
 /// This function is a proxy for the `oo_validator_internal` function, setting the `path_prefix` to
 /// "/short/".
