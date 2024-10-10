@@ -798,7 +798,7 @@ const useLogs = () => {
 
         histogramParsedSQL.where = parsedSQL.where;
 
-        let histogramQuery = parser.sqlify(histogramParsedSQL);
+        let histogramQuery = fnUnparsedSQL(histogramParsedSQL);
         histogramQuery = histogramQuery.replace(/`/g, '"');
         req.aggs.histogram = histogramQuery;
 
@@ -807,21 +807,6 @@ const useLogs = () => {
           return false;
         }
 
-        // if (
-        //   hasTimeStampColumn(parsedSQL.columns) &&
-        //   parsedSQL.orderby == null
-        // ) {
-        //   // showErrorNotification("Order by clause is required in SQL mode");
-        //   notificationMsg.value = "Order by clause is required in SQL mode";
-        //   return false;
-        // }
-
-        // if (!hasTimeStampColumn(parsedSQL.columns)) {
-        //   // showErrorNotification("Timestamp column is required in SQL mode");
-        //   notificationMsg.value = "Timestamp column is required in SQL mode";
-        //   return false;
-        // }
-
         if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
           req.query.size = parsedSQL.limit.value[0].value;
 
@@ -829,9 +814,7 @@ const useLogs = () => {
             req.query.from = parsedSQL.limit.value[1].value || 0;
           }
 
-          // parsedSQL.limit = null;
-
-          query = parser.sqlify(parsedSQL);
+          query = fnUnparsedSQL(parsedSQL);
 
           //replace backticks with \" for sql_mode
           query = query.replace(/`/g, '"');
@@ -998,19 +981,7 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream[0],
           );
         }
-
-        // const parsedSQL = parser.astify(req.query.sql);
-        // const unparsedSQL = parser.sqlify(parsedSQL);
       }
-
-      // in case of sql mode or disable histogram to get total records we need to set track_total_hits to true
-      // because histogram query will not be executed
-      // if (
-      //   searchObj.data.resultGrid.currentPage == 1 &&
-      //   (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
-      // ) {
-      //   req.query.track_total_hits = true;
-      // }
 
       if (
         searchObj.data.resultGrid.currentPage > 1 ||
@@ -1161,43 +1132,6 @@ const useLogs = () => {
                 paginations: [],
               };
 
-              // searchObj.data.queryResults.total = res.data.records;
-              // const partitions = res.data.partitions;
-
-              // searchObj.data.queryResults.partitionDetail.partitions =
-              //   partitions;
-
-              // let pageObject: any = [];
-              // partitions.forEach((item: any, index: number) => {
-              //   pageObject = [
-              //     {
-              //       startTime: item[0],
-              //       endTime: item[1],
-              //       from: 0,
-              //       size: searchObj.meta.resultGrid.rowsPerPage,
-              //     },
-              //   ];
-              //   searchObj.data.queryResults.partitionDetail.paginations.push(
-              //     pageObject
-              //   );
-              //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-              // });
-              // for (const [index, item] of partitions.entries()) {
-              //   pageObject = [
-              //     {
-              //       startTime: item[0],
-              //       endTime: item[1],
-              //       from: 0,
-              //       size: searchObj.meta.resultGrid.rowsPerPage,
-              //     },
-              //   ];
-              //   searchObj.data.queryResults.partitionDetail.paginations.push(
-              //     pageObject
-              //   );
-              //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(
-              //     -1
-              //   );
-              // }
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
                 let partitions = [];
@@ -1314,22 +1248,6 @@ const useLogs = () => {
         ];
 
         let pageObject: any = [];
-        // searchObj.data.queryResults.partitionDetail.partitions.forEach(
-        //   (item: any, index: number) => {
-        //     pageObject = [
-        //       {
-        //         startTime: item[0],
-        //         endTime: item[1],
-        //         from: 0,
-        //         size: searchObj.meta.resultGrid.rowsPerPage,
-        //       },
-        //     ];
-        //     searchObj.data.queryResults.partitionDetail.paginations.push(
-        //       pageObject
-        //     );
-        //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-        //   }
-        // );
         for (const [
           index,
           item,
@@ -1880,17 +1798,6 @@ const useLogs = () => {
       }
 
       const startTime = startTimeDate.getTime() * 1000;
-      // for (
-      //   let currentTime: any = startTime;
-      //   currentTime < searchObj.data.customDownloadQueryObj.query.end_time;
-      //   currentTime += intervalMs
-      // ) {
-      //   date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
-      //   histogramResults.push({
-      //     zo_sql_key: date.toISOString().slice(0, 19),
-      //     zo_sql_num: 0,
-      //   });
-      // }
     }
   }
 
@@ -1905,24 +1812,6 @@ const useLogs = () => {
     return false; // No aggregation function or non-null groupby property found
   }
 
-  function hasTimeStampColumn(columns: any) {
-    for (const column of columns) {
-      if (
-        column.expr &&
-        (column.expr.column === store.state.zoConfig.timestamp_column ||
-          column.expr.column === "*" ||
-          (column.expr.hasOwnProperty("args") &&
-            column.expr?.args?.expr?.column ===
-              store.state.zoConfig.timestamp_column) ||
-          (column.hasOwnProperty("as") &&
-            column.as === store.state.zoConfig.timestamp_column))
-      ) {
-        return true; // Found _timestamp column
-      }
-    }
-    return false; // No aggregation function or non-null groupby property found
-  }
-
   const fnParsedSQL = () => {
     try {
       const filteredQuery = searchObj.data.query
@@ -1930,6 +1819,8 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
       return parser.astify(filteredQuery);
+
+      // return convertPostgreToMySql(parser.astify(filteredQuery));
     } catch (e: any) {
       return {
         columns: [],
@@ -1941,6 +1832,14 @@ const useLogs = () => {
     }
   };
 
+  const fnUnparsedSQL = (parsedObj: any) => {
+    try {
+      return parser.sqlify(parsedObj);
+    } catch (e: any) {
+      return "";
+    }
+  };
+
   const fnHistogramParsedSQL = (query: string) => {
     try {
       const filteredQuery = query
@@ -1948,6 +1847,7 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
       return parser.astify(filteredQuery);
+      // return convertPostgreToMySql(parser.astify(filteredQuery));
     } catch (e: any) {
       return {
         columns: [],
@@ -2192,7 +2092,6 @@ const useLogs = () => {
               hasAggregation(parsedSQL?.columns) ||
               parsedSQL.groupby != null
             ) {
-              const parsedSQL: any = fnParsedSQL();
               searchAggData.total = res.data.total;
               searchAggData.hasAggregation = true;
               searchObj.meta.resultGrid.showPagination = false;
@@ -3468,24 +3367,6 @@ const useLogs = () => {
       const query = searchObj.data.query;
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL: any = parser.astify(query);
-        //removing this change as datafusion not supporting *, _timestamp. It was working but now throwing error.
-        //hack add time stamp column to parsedSQL if not already added
-        // if (
-        //   !(parsedSQL.columns === "*") &&
-        //   parsedSQL.columns.filter(
-        //     (e: any) => e.expr.column === store.state.zoConfig.timestamp_column
-        //   ).length === 0
-        // ) {
-        //   const ts_col = {
-        //     expr: {
-        //       type: "column_ref",
-        //       table: null,
-        //       column: store.state.zoConfig.timestamp_column,
-        //     },
-        //     as: null,
-        //   };
-        //   parsedSQL.columns.push(ts_col);
-        // }
         parsedSQL.where = null;
         sqlContext.push(
           b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
@@ -4066,55 +3947,6 @@ const useLogs = () => {
     }
   };
 
-  const addOrderByToQuery = (
-    sql: string,
-    column: string,
-    type: "ASC" | "DESC",
-    streamName: string,
-  ) => {
-    // Parse the SQL query into an AST
-    try {
-      const parsedQuery: any = parser.astify(sql);
-
-      if (!parsedQuery.columns.length || !parsedQuery.from) {
-        return sql;
-      }
-
-      // Check for the presence of an ORDER BY clause
-      const hasOrderBy = !!(
-        parsedQuery.orderby && parsedQuery.orderby.length > 0
-      );
-
-      // Check if _timestamp is in the SELECT clause if not SELECT *
-      const includesTimestamp = !!parsedQuery.columns.find(
-        (col: any) => col?.expr?.column === column || col?.expr?.column === "*",
-      );
-
-      // If ORDER BY is present and doesn't include _timestamp, append it
-      if (!hasOrderBy) {
-        // If no ORDER BY clause, add it
-        parsedQuery.orderby = [
-          {
-            expr: {
-              type: "column_ref",
-              table: null,
-              column: column,
-            },
-            type: type,
-          },
-        ];
-      }
-
-      // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-      return quoteTableNameDirectly(
-        parser.sqlify(parsedQuery).replace(/`/g, ""),
-        streamName,
-      );
-    } catch (err) {
-      return sql;
-    }
-  };
-
   function quoteTableNameDirectly(sql: string, streamName: string) {
     // This regular expression looks for the FROM keyword followed by
     // an optional schema name, a table name, and handles optional spaces.
@@ -4327,7 +4159,6 @@ const useLogs = () => {
     getHistogramQueryData,
     generateHistogramSkeleton,
     fnParsedSQL,
-    addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
