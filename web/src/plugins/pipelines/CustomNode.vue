@@ -84,9 +84,8 @@ const resetConfirmDialog = () => {
 };
 
 function getIcon(data, ioType) {
-
   const searchTerm = data.node_type;
-  const node = this.pipelineObj.nodeTypes.find(
+  const node = pipelineObj.nodeTypes.find(
     (node) => node.subtype === searchTerm && node.io_type === ioType,
   );
   return node ? node.icon : undefined;

@@ -149,7 +149,6 @@ import {
 import { getImageURL } from "@/utils/zincutils";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
-import { VueFlow, useVueFlow } from "@vue-flow/core";
 
 import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
@@ -170,17 +169,12 @@ const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
-const { onInit } = useVueFlow();
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
 
 );
 
-onInit((vueFlowInstance) => {
-  // instance is the same as the return of `useVueFlow`
-  vueFlowInstance.fitView({ padding: 1})
-})
 
 interface Routing {
   [key: string]: RouteCondition[];

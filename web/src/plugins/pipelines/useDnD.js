@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
-import { useVueFlow } from "@vue-flow/core";
+import { useVueFlow  } from "@vue-flow/core";
 import { watch, reactive } from "vue";
 
 const dialogObj = {
@@ -226,7 +226,6 @@ export default function useDragAndDrop() {
 
   function addNode(newNode) {
     if(pipelineObj.isEditPipeline == true ){
-      console.log("this is working")
       pipelineObj.dirtyFlag = true;
       pipelineObj.nodesChange = true;
     }

@@ -33,7 +33,7 @@
   import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { defineComponent, computed, onBeforeMount } from 'vue';
-  import { VueFlow, useVueFlow } from "@vue-flow/core";
+  import { VueFlow } from "@vue-flow/core";
   import { ref, onMounted, onActivated, watch } from "vue";
 import { ControlButton, Controls } from '@vue-flow/controls'
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
