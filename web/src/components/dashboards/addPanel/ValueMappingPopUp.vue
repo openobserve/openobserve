@@ -157,7 +157,7 @@
               </div>
             </div>
             <q-btn
-              :icon="outlinedDelete"
+              icon="close"
               class="delete-btn"
               dense
               flat
@@ -196,7 +196,6 @@ import { ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 
@@ -278,7 +277,6 @@ export default defineComponent({
       removeValueMappingByIndex,
       mappingTypes,
       dragOptions,
-      outlinedDelete,
       setColorByIndex,
       removeColorByIndex,
       applyValueMapping,
