@@ -31,7 +31,10 @@ use crate::{
                 UserRole,
             },
         },
-        utils::auth::{get_hash, is_root_user, AuthExtractor},
+        utils::{
+            auth::{get_hash, is_root_user, AuthExtractor},
+            redirect_response::RedirectResponse,
+        },
     },
     service::{db, users},
 };
@@ -641,8 +644,20 @@ fn get_user_details(decoded: String) -> Option<(String, String)> {
 /// If the authentication is invalid, it returns an `ErrorUnauthorized` error.
 pub async fn oo_validator(
     req: ServiceRequest,
-    auth_info: AuthExtractor,
+    auth_result: Result<AuthExtractor, Error>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let auth_info = match auth_result {
+        Ok(info) => info,
+        Err(e) => {
+            let redirect = RedirectResponse::default();
+            log::warn!(
+                "Authentication failed for path: {}, err: {e}, redirecting to {}",
+                req.path(),
+                &redirect.redirect_relative_uri,
+            );
+            return Err((redirect.into(), req));
+        }
+    };
     let path_prefix = "/api/";
     oo_validator_internal(req, auth_info, path_prefix).await
 }

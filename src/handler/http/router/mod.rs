@@ -228,6 +228,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 
     cfg.service(
         web::scope("/short")
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::oo_validator,
+            ))
             .wrap(cors.clone())
             .service(short_url::retrieve),
     );
