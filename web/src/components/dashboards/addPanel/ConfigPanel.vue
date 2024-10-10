@@ -896,72 +896,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
-      <q-input
-        v-if="
-          !promqlMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        "
-        v-model.number="dashboardPanelData.data.config.axis_label_rotation"
-        :value="0"
-        :min="0"
-        @update:model-value="
-          (value: any) =>
-            (dashboardPanelData.data.config.axis_label_rotation = value
-              ? value
-              : 0)
-        "
-        label="Rotate x-axis tick labels"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
-        label-slot
-        placeholder="0"
-        :type="'number'"
-        data-test="dashboard-config-axis_label_rotation"
-      >
-      </q-input>
-
-      <div class="space"></div>
-
-      <q-input
-        v-if="
-          !promqlMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        "
-        v-model.number="dashboardPanelData.data.config.axis_label_width"
-        :value="0"
-        :min="0"
-        @update:model-value="
-          (value: any) =>
-            (dashboardPanelData.data.config.axis_label_width = value
-              ? value
-              : 0)
-        "
-        label="X-axis tick label max length"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
-        label-slot
-        placeholder="0"
-        :type="'number'"
-        data-test="dashboard-config-axis_label_width"
-      >
-      </q-input>
-
-      <div class="space"></div>
-
       <q-select
         v-if="
           [
@@ -1117,7 +1051,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !promqlMode &&
           !dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
+          ].customQuery &&
+          ['area', 'area-stacked', 'line'].includes(
+            dashboardPanelData.data.type,
+          )
         "
         v-model.number="dashboardPanelData.data.config.line_thickness"
         :value="1.5"
