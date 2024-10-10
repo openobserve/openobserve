@@ -479,6 +479,9 @@ export const convertSQLData = async (
    * @returns {number} - the largest value
    */
   const getPieChartRadius = () => {
+    if (!panelSchema.layout) {
+      return 80;
+    }
     const minRadius = Math.min(
       panelSchema.layout.w * 30,
       panelSchema.layout.h * 30,
@@ -1152,7 +1155,7 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
-      if (options.series.length > 0) {
+      if (options.series.length > 0 && panelSchema.layout) {
         options.series[0].radius = `${getPieChartRadius()}%`;
       }
 
@@ -1207,7 +1210,7 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
-      if (options.series.length > 0) {
+      if (options.series.length > 0 && panelSchema.layout) {
         const outerRadius: number = getPieChartRadius();
 
         const innterRadius = outerRadius - 30;
