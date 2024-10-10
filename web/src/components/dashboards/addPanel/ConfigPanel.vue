@@ -994,9 +994,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:option="scope">
           <q-item v-bind="scope.itemProps">
             <q-item-section avatar style="height: 20px">
-              <q-icon
-                ><component :is="scope.opt.iconComponent"></component
-              ></q-icon>
+              <q-icon>
+                <component :is="scope.opt.iconComponent"></component>
+              </q-icon>
             </q-item-section>
             <q-item-section>
               <q-item-label>{{ scope.opt.label }}</q-item-label>
@@ -1034,9 +1034,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:option="scope">
           <q-item v-bind="scope.itemProps">
             <q-item-section avatar>
-              <q-icon
-                ><component :is="scope.opt.iconComponent"></component
-              ></q-icon>
+              <q-icon>
+                <component :is="scope.opt.iconComponent"></component>
+              </q-icon>
             </q-item-section>
             <q-item-section>
               <q-item-label>{{ scope.opt.label }}</q-item-label>
@@ -1065,7 +1065,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? value
               : 1.5)
         "
-        label="Line Style Max Width"
+        label="Line Thickness"
         color="input-border"
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
@@ -1074,7 +1074,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filled
         dense
         label-slot
-        placeholder="1.5"
+        placeholder="Default: 1.5"
         :type="'number'"
         data-test="dashboard-config-line_thickness"
       >
@@ -1491,27 +1491,27 @@ export default defineComponent({
 
     const showSymbol = [
       {
-        label: t("dashboard.yes"),
-        value: true,
-        iconComponent: markRaw(LinearIcon),
-      },
-      {
         label: t("dashboard.no"),
         value: false,
         iconComponent: markRaw(NoSymbol),
+      },
+      {
+        label: t("dashboard.yes"),
+        value: true,
+        iconComponent: markRaw(LinearIcon),
       },
     ];
 
     const lineInterpolationOptions = [
       {
-        label: t("dashboard.linear"),
-        value: "linear",
-        iconComponent: markRaw(LinearIcon),
-      },
-      {
         label: t("dashboard.smooth"),
         value: "smooth",
         iconComponent: markRaw(Smooth),
+      },
+      {
+        label: t("dashboard.linear"),
+        value: "linear",
+        iconComponent: markRaw(LinearIcon),
       },
       {
         label: t("dashboard.stepBefore"),
