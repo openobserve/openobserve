@@ -17,7 +17,7 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, FxIndexMap};
+use config::{cluster, utils::util::zero_or, FxIndexMap};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -54,19 +54,26 @@ fn connect_rw() -> Pool<Sqlite> {
         _ = std::fs::remove_file(format!("{url}-shm"));
         _ = std::fs::remove_file(format!("{url}-wal"));
     }
+
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
+    let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
+
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
         .locking_mode(SqliteLockingMode::Normal)
-        .busy_timeout(Duration::from_secs(30))
+        .busy_timeout(Duration::from_secs(acquire_timeout))
         // .disable_statement_logging()
         .create_if_missing(true);
 
     SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(1)
-        .acquire_timeout(Duration::from_secs(30))
+        .acquire_timeout(Duration::from_secs(acquire_timeout))
+        .idle_timeout(Some(Duration::from_secs(idle_timeout)))
+        .max_lifetime(Some(Duration::from_secs(max_lifetime)))
         .connect_lazy_with(db_opts)
 }
 
@@ -217,15 +224,11 @@ impl super::Db for SqliteDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
-        let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;"#,
-        )
-        .bind(module)
-        .bind(key1)
-        .bind(key2)
-        .fetch_one(&pool)
-        .await
-        {
+        let query = format!(
+            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
+            module, key1, key2
+        );
+        let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
