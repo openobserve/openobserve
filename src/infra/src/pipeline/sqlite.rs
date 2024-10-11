@@ -46,10 +46,6 @@ impl super::PipelineTable for SqlitePipelineTable {
     async fn create_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        // TODO(taiming): remove after done testing
-        sqlx::query("DROP TABLE IF EXISTS pipeline")
-            .execute(&*client)
-            .await?;
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
