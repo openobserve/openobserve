@@ -52,6 +52,7 @@ pub async fn validator(
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
+    // /short/
     let path = match req
         .request()
         .path()
@@ -644,23 +645,33 @@ fn get_user_details(decoded: String) -> Option<(String, String)> {
 /// If the authentication is invalid, it returns an `ErrorUnauthorized` error.
 pub async fn oo_validator(
     req: ServiceRequest,
-    auth_info: AuthExtractor,
+    auth_result: Result<AuthExtractor, Error>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/api/";
-    let path =
-        match req.request().path().strip_prefix(
-            format!("{}{}", config::get_config().common.base_uri, path_prefix).as_str(),
-        ) {
-            Some(path) => path,
-            None => req.request().path(),
-        };
-
+    let path = extract_relative_path(req.request().path(), path_prefix);
     let path_columns = path.split('/').collect::<Vec<&str>>();
+    let is_short_url = is_short_url_path(&path_columns);
 
-    if path_columns.get(1).unwrap_or(&"").eq(&"short") {
-        validate_short_or_redirect(req, Ok(auth_info)).await
-    } else {
-        oo_validator_internal(req, auth_info, path_prefix).await
+    let auth_info = match auth_result {
+        Ok(info) => info,
+        Err(e) => {
+            return if is_short_url {
+                Err(handle_auth_failure_for_redirect(req, &e))
+            } else {
+                Err((e, req))
+            }
+        }
+    };
+
+    match oo_validator_internal(req, auth_info, path_prefix).await {
+        Ok(service_req) => Ok(service_req),
+        Err((err, err_req)) => {
+            if is_short_url {
+                Err(handle_auth_failure_for_redirect(err_req, &err))
+            } else {
+                Err((err, err_req))
+            }
+        }
     }
 }
 
@@ -673,6 +684,7 @@ pub async fn oo_validator(
 /// # Errors
 /// If authentication fails, the function logs the failure and returns an error that causes a
 /// redirect to a predefined URL.
+// TODO: Remove this no longer used
 pub async fn validate_short_or_redirect(
     req: ServiceRequest,
     auth_result: Result<AuthExtractor, Error>,
@@ -812,6 +824,23 @@ pub(crate) async fn list_objects_for_user(
     } else {
         Ok(None)
     }
+}
+
+/// Helper function to extract the relative path after the base URI and path prefix
+fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
+    let base_uri = config::get_config().common.base_uri.clone();
+    let full_prefix = format!("{}{}", base_uri, path_prefix);
+    full_path
+        .strip_prefix(&full_prefix)
+        .unwrap_or(full_path)
+        .to_string()
+}
+
+/// Helper function to check if the path corresponds to a short URL
+fn is_short_url_path(path_columns: &[&str]) -> bool {
+    path_columns
+        .get(1)
+        .map_or(false, |&segment| segment.to_lowercase() == "short")
 }
 
 /// Handles authentication failure by logging the error and returning a redirect response.
