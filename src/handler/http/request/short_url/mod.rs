@@ -15,10 +15,17 @@
 
 use std::io::Error;
 
+use actix_http::StatusCode;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use config::meta::short_url::ShortenUrlResponse;
 
-use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::short_url};
+use crate::{
+    common::{
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::redirect_response::RedirectResponseBuilder,
+    },
+    service::short_url,
+};
 
 /// Shorten a URL
 #[utoipa::path(
@@ -48,7 +55,11 @@ use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::
 )]
 #[post("/{org_id}/short")]
 pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
-    let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
+    let req: config::meta::short_url::ShortenUrlRequest = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
     match short_url::shorten(&org_id, &req.original_url).await {
         Ok(short_url) => {
             let response = ShortenUrlResponse {
@@ -59,7 +70,12 @@ pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<Http
         }
         Err(e) => {
             log::error!("Failed to shorten URL: {:?}", e);
-            Ok(HttpResponse::InternalServerError().finish())
+            Ok(
+                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            )
         }
     }
 }
