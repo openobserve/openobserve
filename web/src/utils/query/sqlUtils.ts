@@ -428,7 +428,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.args?.value[0]?.column ?? "",
+          column: condition?.args?.value[0]?.column?.expr?.value ?? "",
           operator: conditionName,
           value: condition?.args?.value[1]?.value ?? "",
           logicalOperator: "AND",
