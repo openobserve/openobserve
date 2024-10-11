@@ -232,15 +232,16 @@ function extractFields(parsedAst: any, timeField: string) {
     };
 
     if (column.expr.type === "column_ref") {
-      field.column = column?.expr?.column ?? timeField;
+      field.column = column?.expr?.column?.expr?.value ?? timeField;
     } else if (column.expr.type === "aggr_func") {
-      field.column = column?.expr?.args?.expr?.column ?? timeField;
+      field.column = column?.expr?.args?.expr?.column?.expr?.value ?? timeField;
       field.aggregationFunction = column?.expr?.name?.toLowerCase() ?? "count";
     } else if (column.expr.type === "function") {
       // histogram field
-      field.column = column?.expr?.args?.value[0]?.column ?? timeField;
+      field.column =
+        column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
       field.aggregationFunction =
-        column?.expr?.name?.[0]?.value?.toLowerCase() ?? "histogram";
+        column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
