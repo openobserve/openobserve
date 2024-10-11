@@ -18,15 +18,25 @@
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
       <span>Value Mappings</span>
-      <q-tooltip
-        class="bg-grey-8"
-        anchor="bottom middle"
-        self="top middle"
-        max-width="250px"
+      <q-btn
+        no-caps
+        padding="xs"
+        class=""
+        size="sm"
+        flat
+        icon="info_outline"
+        data-test="dashboard-addpanel-config-drilldown-info"
       >
-        Enhance table readability by mapping values to custom text and
-        backgorund colors for clearer data visualization.
-      </q-tooltip>
+        <q-tooltip
+          class="bg-grey-8"
+          anchor="bottom middle"
+          self="top middle"
+          max-width="250px"
+        >
+          Enhance table readability by mapping values to custom text and
+          backgorund colors for clearer data visualization.
+        </q-tooltip>
+      </q-btn>
     </div>
     <q-btn
       @click="openValueMappingPopUp"
