@@ -723,9 +723,9 @@ export const convertSQLData = async (
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         label: {
-          show: panelSchema.config?.label?.position == null ? false : true,
-          position: panelSchema.config?.label?.position || "None",
-          rotate: panelSchema.config?.label?.rotate || 0,
+          show: panelSchema.config?.label_option?.position == null ? false : true,
+          position: panelSchema.config?.label_option?.position || "None",
+          rotate: panelSchema.config?.label_option?.rotate || 0,
         },
         nameLocation: "middle",
         nameGap: 25,
@@ -910,9 +910,9 @@ export const convertSQLData = async (
                 ...defaultSeriesProps,
                 label: {
                   show:
-                    panelSchema.config?.label?.position == null ? false : true,
-                  position: panelSchema.config?.label?.position || "None",
-                  rotate: panelSchema.config?.label?.rotate || 0,
+                    panelSchema.config?.label_option?.position == null ? false : true,
+                  position: panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
                 },
                 // markLine if exist
                 markLine: {
@@ -941,9 +941,9 @@ export const convertSQLData = async (
               (it: any) => it.alias == key
             )?.label,
             label: {
-              show: panelSchema.config?.label?.position == null ? false : true,
-              position: panelSchema.config?.label?.position || "None",
-              rotate: panelSchema.config?.label?.rotate || 0,
+              show: panelSchema.config?.label_option?.position == null ? false : true,
+              position: panelSchema.config?.label_option?.position || "None",
+              rotate: panelSchema.config?.label_option?.rotate || 0,
             },
             // color:
             //   panelSchema.queries[0]?.fields?.y.find(
@@ -1039,9 +1039,9 @@ export const convertSQLData = async (
               (it: any) => it.alias == key
             )?.label,
             label: {
-              show: panelSchema.config?.label?.position == null ? false : true,
-              position: panelSchema.config?.label?.position || "None",
-              rotate: panelSchema.config?.label?.rotate || 0,
+              show: panelSchema.config?.label_option?.position == null ? false : true,
+              position: panelSchema.config?.label_option?.position || "None",
+              rotate: panelSchema.config?.label_option?.rotate || 0,
             },
             // color:
             //   panelSchema.queries[0]?.fields?.y.find(
@@ -1076,9 +1076,9 @@ export const convertSQLData = async (
           opacity: 0.8,
           ...defaultSeriesProps,
           label: {
-            show: panelSchema.config?.label?.position == null ? false : true,
-            position: panelSchema.config?.label?.position || "None",
-            rotate: panelSchema.config?.label?.rotate || 0,
+            show: panelSchema.config?.label_option?.position == null ? false : true,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
           },
           // markLine if exist
           markLine: {
@@ -1122,9 +1122,9 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           label: {
-            show: panelSchema.config?.label?.position == null ? false : true,
-            position: panelSchema.config?.label?.position || "None",
-            rotate: panelSchema.config?.label?.rotate || 0,
+            show: panelSchema.config?.label_option?.position == null ? false : true,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
           },
           data: getAxisDataFromKey(key),
           barMinHeight: 1,
@@ -1329,9 +1329,9 @@ export const convertSQLData = async (
           name: key,
           ...defaultSeriesProps,
           label: {
-            show: panelSchema.config?.label?.position == null ? false : true,
-            position: panelSchema.config?.label?.position || "None",
-            rotate: panelSchema.config?.label?.rotate || 0,
+            show: panelSchema.config?.label_option?.position == null ? false : true,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
           },
           // markLine if exist
           markLine: {
@@ -1545,9 +1545,9 @@ export const convertSQLData = async (
           name: key,
           ...defaultSeriesProps,
           label: {
-            show: panelSchema.config?.label?.position == null ? false : true,
-            position: panelSchema.config?.label?.position || "None",
-            rotate: panelSchema.config?.label?.rotate || 0,
+            show: panelSchema.config?.label_option?.position == null ? false : true,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
           },
           // markLine if exist
           markLine: {
