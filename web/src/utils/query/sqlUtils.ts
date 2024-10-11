@@ -213,7 +213,7 @@ export const isGivenFieldInOrderBy = async (
 
   if (ast?.orderby) {
     for (const item of ast.orderby) {
-      if (item?.expr?.column === fieldAlias) {
+      if (item?.expr?.column?.expr?.value === fieldAlias) {
         return item.type; // 'ASC' or 'DESC'
       }
     }
@@ -255,6 +255,9 @@ function extractFields(parsedAst: any, timeField: string) {
   );
 
   if (allFieldsSelected) {
+    // empty fields array
+    fields = [];
+
     // Add histogram(_timestamp) and count(_timestamp) to the fields array
     fields.push(
       {
@@ -332,7 +335,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: condition?.operator,
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -342,7 +345,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "<>",
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -357,7 +360,7 @@ function parseCondition(condition: any) {
         return {
           type: "list",
           values: values,
-          column: condition?.left?.column ?? "",
+          column: condition?.left?.column?.expr?.value ?? "",
           operator: null,
           value: null,
           logicalOperator: "AND",
@@ -368,7 +371,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Is Null",
           value: null,
           logicalOperator: "AND",
@@ -379,7 +382,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Is Not Null",
           value: null,
           logicalOperator: "AND",
@@ -389,7 +392,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Contains",
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -399,7 +402,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Not Contains",
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
