@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use config::meta::short_url::ShortenUrlResponse;
 
-use crate::{common::utils::redirect_response::RedirectResponse, service::short_url};
+use crate::{common::utils::redirect_response::RedirectResponseBuilder, service::short_url};
 
 /// Shorten a URL
 #[utoipa::path(
@@ -92,8 +92,8 @@ pub async fn retrieve(
     let original_url = short_url::retrieve(&short_id).await;
 
     if let Some(url) = original_url {
-        let redirect_response = RedirectResponse::new(&url);
-        Ok(redirect_response.redirect())
+        let redirect_http = RedirectResponseBuilder::new(&url).build().redirect_http();
+        Ok(redirect_http)
     } else {
         Ok(HttpResponse::NotFound().body("Short URL not found"))
     }
