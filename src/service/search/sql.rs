@@ -67,6 +67,7 @@ pub struct Sql {
     pub stream_names: Vec<String>,
     pub match_items: Option<Vec<String>>, // match_all, only for single stream
     pub equal_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
+    pub prefix_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
     pub columns: HashMap<String, HashSet<String>>, // table_name -> [field_name]
     pub aliases: Vec<(String, String)>,   // field_name, alias
     pub schemas: HashMap<String, Arc<SchemaCache>>,
@@ -171,7 +172,11 @@ impl Sql {
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         statement.visit(&mut partition_column_visitor);
 
-        // 7. pick up histogram interval
+        // 7. get prefix column value
+        let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
+        statement.visit(&mut prefix_column_visitor);
+
+        // 8. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
@@ -183,6 +188,7 @@ impl Sql {
             stream_names,
             match_items: match_visitor.match_items,
             equal_items: partition_column_visitor.equal_items,
+            prefix_items: prefix_column_visitor.prefix_items,
             columns,
             aliases,
             schemas: used_schemas,
@@ -590,6 +596,86 @@ impl<'a> VisitorMut for PartitionColumnVisitor<'a> {
     }
 }
 
+/// get all equal items from where clause
+struct PrefixColumnVisitor<'a> {
+    prefix_items: HashMap<String, Vec<(String, String)>>, // filed like 'value%'
+    schemas: &'a HashMap<String, Arc<SchemaCache>>,
+}
+
+impl<'a> PrefixColumnVisitor<'a> {
+    fn new(schemas: &'a HashMap<String, Arc<SchemaCache>>) -> Self {
+        Self {
+            prefix_items: HashMap::new(),
+            schemas,
+        }
+    }
+}
+
+impl<'a> VisitorMut for PrefixColumnVisitor<'a> {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            if let Some(expr) = select.selection.as_ref() {
+                let exprs = split_conjunction(expr);
+                for e in exprs {
+                    if let Expr::Like {
+                        negated: false,
+                        expr,
+                        pattern,
+                        escape_char: _,
+                    } = e
+                    {
+                        match expr.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
+                                    }
+                                }
+                                if count == 1 {
+                                    let pattern = trim_quotes(pattern.to_string().as_str());
+                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                        self.prefix_items.entry(table_name).or_default().push((
+                                            field_name,
+                                            pattern.trim_end_matches('%').to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                            Expr::CompoundIdentifier(idents) => {
+                                let name = idents
+                                    .iter()
+                                    .map(|ident| ident.value.clone())
+                                    .collect::<Vec<_>>();
+                                let table_name = name[0].clone();
+                                let field_name = name[1].clone();
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    let pattern = trim_quotes(pattern.to_string().as_str());
+                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                        self.prefix_items.entry(table_name).or_default().push((
+                                            field_name,
+                                            pattern.trim_end_matches('%').to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 /// get all item from match_all functions
 struct MatchVisitor {
     pub match_items: Option<Vec<String>>, // filed = value
@@ -762,6 +848,7 @@ fn split_conjunction_inner<'a>(expr: &'a Expr, mut exprs: Vec<&'a Expr>) -> Vec<
             let exprs = split_conjunction_inner(left, exprs);
             split_conjunction_inner(right, exprs)
         }
+        Expr::Nested(expr) => split_conjunction_inner(expr, exprs),
         other => {
             exprs.push(other);
             exprs

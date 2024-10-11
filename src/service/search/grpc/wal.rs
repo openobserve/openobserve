@@ -55,7 +55,7 @@ use crate::{
 pub async fn search_parquet(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
-    search_partition_keys: Option<Vec<(String, String)>>,
+    search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
@@ -294,7 +294,7 @@ pub async fn search_parquet(
 pub async fn search_memtable(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
-    search_partition_keys: Option<Vec<(String, String)>>,
+    search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
 ) -> super::SearchTable {
     let mut scan_stats = ScanStats::new();
@@ -304,7 +304,7 @@ pub async fn search_memtable(
         &query.stream_type.to_string(),
         &query.stream_name,
         query.time_range,
-        search_partition_keys.clone(),
+        search_partition_keys,
     )
     .await
     .unwrap_or_default();
@@ -314,7 +314,7 @@ pub async fn search_memtable(
             &query.stream_type.to_string(),
             &query.stream_name,
             query.time_range,
-            search_partition_keys.clone(),
+            search_partition_keys,
         )
         .await
         .unwrap_or_default(),
@@ -392,7 +392,7 @@ async fn get_file_list_inner(
     _partition_time_level: &PartitionTimeLevel,
     _partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
-    search_partition_keys: Option<Vec<(String, String)>>,
+    search_partition_keys: &[(String, String)],
     wal_dir: &str,
     file_ext: &str,
 ) -> Result<Vec<FileKey>, Error> {
@@ -436,8 +436,7 @@ async fn get_file_list_inner(
     wal::lock_files(&files);
 
     let stream_params = StreamParams::new(&query.org_id, &query.stream_name, query.stream_type);
-    let search_partition_keys = search_partition_keys.unwrap_or_default();
-    let search_partition_keys = generate_filter_from_equal_items(&search_partition_keys);
+    let search_partition_keys = generate_filter_from_equal_items(search_partition_keys);
 
     let mut result = Vec::with_capacity(files.len());
     let (min_ts, max_ts) = query.time_range.unwrap_or((0, 0));
@@ -486,7 +485,7 @@ async fn get_file_list(
     partition_time_level: &PartitionTimeLevel,
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
-    search_partition_keys: Option<Vec<(String, String)>>,
+    search_partition_keys: &[(String, String)],
 ) -> Result<Vec<FileKey>, Error> {
     get_file_list_inner(
         query,

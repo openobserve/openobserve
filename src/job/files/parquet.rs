@@ -802,6 +802,8 @@ pub(crate) async fn generate_index_on_ingester(
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
+        // update stream setting
+        stream_setting = Some(settings);
 
         crate::common::utils::auth::set_ownership(
             org_id,

@@ -274,7 +274,7 @@ async fn get_inverted_index_file_lists(
         .iter()
         .map(|v| (v.key.to_string(), v.value.to_string()))
         .collect::<Vec<_>>();
-    // filter euqal_items with index_fields
+    // filter equal_items with index_fields
     let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&schema);
     let index_fields = get_stream_setting_index_fields(&stream_settings);

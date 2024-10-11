@@ -325,7 +325,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let equal_keys = sql
+    let mut equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -338,6 +338,18 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
+
+    // check inverted index prefix search
+    if sql.stream_type == StreamType::Index
+        && cfg.common.inverted_index_search_format.to_lowercase() != "contains"
+    {
+        for (stream, items) in sql.prefix_items.iter() {
+            equal_keys
+                .entry(stream.to_string())
+                .or_insert_with(Vec::new)
+                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
+        }
+    }
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -883,7 +895,7 @@ pub async fn get_inverted_index_file_list(
             format!("{}_{}", stream_name, stream_type)
         };
     let sql = format!(
-        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE (deleted IS TRUE) OR ({})",
+        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
         index_stream_name, search_condition,
     );
 
