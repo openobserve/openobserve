@@ -309,7 +309,7 @@ const nodeTypes: any = [
     isSectionHeader: false,
   },
   {
-    label: "Conditions",
+    label: "Condition",
     subtype: "condition",
     io_type: "default",
     icon: "img:" + conditionImage,
