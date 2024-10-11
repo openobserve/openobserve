@@ -17,7 +17,7 @@ use std::{collections::HashMap, fmt};
 
 use actix_web::{HttpResponse, ResponseError};
 
-const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web";
+const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
 #[derive(Debug)]
 pub struct RedirectResponse {
