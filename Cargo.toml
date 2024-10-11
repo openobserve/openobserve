@@ -286,7 +286,7 @@ serde_json = "1"
 sha256 = "1.4.0"
 snafu = "0.7.5"
 snap = "1"
-sqlx = { version = "0.7", features = [
+sqlx = { version = "0.8.1", features = [
   "runtime-tokio-rustls",
   "postgres",
   "mysql",
@@ -300,7 +300,7 @@ thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
-tonic = { version = "0.12.0", features = ["prost", "gzip"] }
+tonic = { version = "0.12.3", features = ["prost", "gzip"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
