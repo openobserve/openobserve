@@ -868,6 +868,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
