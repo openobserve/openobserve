@@ -105,10 +105,14 @@ export default {
     } = useDragAndDrop();
     const store = useStore();
 
+    const vueFlowRef = ref(null);
+
+
     onInit((vueFlowInstance) => {
     // instance is the same as the return of `useVueFlow`
     vueFlowInstance.fitView()
   })
+
 
 const  buttonClass = () => {
       return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
@@ -125,12 +129,18 @@ watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
         pipelineObj.dirtyFlag = false;
       }
     });
+onMounted(async () => {
+     setTimeout(() => {
+      if (vueFlowRef.value) {
+        vueFlowRef.value.fitView({ padding: 1});
+      }
+     }, 100);
+    });
 
     
 function resetTransform() {
   setViewport({ x: 0, y: 0, zoom: 1 })
 }
-    const vueFlowRef = ref(null);
     const zoomIn = () => {
       vueFlowRef.value.zoomIn();
     };
