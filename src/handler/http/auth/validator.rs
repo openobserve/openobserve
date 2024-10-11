@@ -824,7 +824,7 @@ fn is_short_url_path(path_columns: &[&str]) -> bool {
 fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
     let full_url = extract_full_url(&req);
     let redirect_http = RedirectResponseBuilder::default()
-        .with_query_param("redirect_url", &full_url)
+        .with_query_param("short_url", &full_url)
         .build();
     log::warn!(
         "Authentication failed for path: {}, err: {}, {}",
