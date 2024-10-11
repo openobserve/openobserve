@@ -335,19 +335,17 @@ pub async fn logs_json_handler(
                             continue;
                         }
                         Ok(pl_results) => {
-                            for (stream_params, (mut value, is_flattened)) in pl_results {
+                            for (stream_params, mut value) in pl_results {
                                 if stream_params.stream_type != StreamType::Logs {
                                     continue;
                                 }
 
-                                if !is_flattened {
-                                    // JSON Flattening
-                                    value = flatten::flatten_with_level(
-                                        value,
-                                        cfg.limit.ingest_flatten_level,
-                                    )
-                                    .unwrap();
-                                }
+                                // JSON Flattening
+                                value = flatten::flatten_with_level(
+                                    value,
+                                    cfg.limit.ingest_flatten_level,
+                                )
+                                .unwrap();
 
                                 // get json object
                                 let mut local_val = match value.take() {

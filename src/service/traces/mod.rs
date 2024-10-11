@@ -316,20 +316,18 @@ pub async fn handle_trace_request(
                                 format!("Pipeline execution error: {}", e);
                         }
                         Ok(pl_results) => {
-                            for (stream_params, (mut res, is_flattened)) in pl_results {
+                            for (stream_params, mut res) in pl_results {
                                 if stream_params.stream_type != StreamType::Traces {
                                     continue;
                                 }
 
-                                if !is_flattened {
-                                    // JSON Flattening
-                                    res = flatten::flatten(res).map_err(|e| {
-                                        std::io::Error::new(
-                                            std::io::ErrorKind::InvalidData,
-                                            e.to_string(),
-                                        )
-                                    })?;
-                                }
+                                // JSON Flattening
+                                res = flatten::flatten(res).map_err(|e| {
+                                    std::io::Error::new(
+                                        std::io::ErrorKind::InvalidData,
+                                        e.to_string(),
+                                    )
+                                })?;
 
                                 // get json object
                                 let mut record_val = match res.take() {

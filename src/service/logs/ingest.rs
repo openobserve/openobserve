@@ -189,15 +189,14 @@ pub async fn ingest(
                     stream_status.status.error = format!("Pipeline execution error: {}", e);
                 }
                 Ok(pl_results) => {
-                    for (stream_params, (mut res, is_flattened)) in pl_results {
+                    for (stream_params, mut res) in pl_results {
                         if stream_params.stream_type != StreamType::Logs {
                             continue;
                         }
 
-                        if !is_flattened {
-                            // JSON Flattening
-                            res = flatten::flatten_with_level(res, cfg.limit.ingest_flatten_level)?;
-                        }
+                        // JSON Flattening
+                        res = flatten::flatten_with_level(res, cfg.limit.ingest_flatten_level)?;
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,

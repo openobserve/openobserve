@@ -219,17 +219,15 @@ pub async fn handle_grpc_request(
                             continue;
                         }
                         Ok(pl_results) => {
-                            for (stream_params, (mut rec, is_flattened)) in pl_results {
+                            for (stream_params, mut rec) in pl_results {
                                 if stream_params.stream_type != StreamType::Logs {
                                     continue;
                                 }
-                                if !is_flattened {
-                                    // flattening
-                                    rec = flatten::flatten_with_level(
-                                        rec,
-                                        cfg.limit.ingest_flatten_level,
-                                    )?;
-                                }
+                                // flattening
+                                rec = flatten::flatten_with_level(
+                                    rec,
+                                    cfg.limit.ingest_flatten_level,
+                                )?;
 
                                 // get json object
                                 let mut local_val = match rec.take() {

@@ -23,7 +23,7 @@ use config::{
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::json,
+    utils::{flatten, json},
 };
 use cron::Schedule;
 use futures::future::try_join_all;
@@ -776,6 +776,7 @@ async fn handle_derived_stream_triggers(
         is_partial: None,
     };
 
+    let cfg = get_config();
     // ingest evaluation result into destination
     if let Some(data) = ret {
         let local_val = data
@@ -814,7 +815,12 @@ async fn handle_derived_stream_triggers(
                             break;
                         }
                         Ok(pl_results) => {
-                            for (stream_params, (record, _)) in pl_results {
+                            for (stream_params, mut record) in pl_results {
+                                // JSON Flattening
+                                record = flatten::flatten_with_level(
+                                    record,
+                                    cfg.limit.ingest_flatten_level,
+                                )?;
                                 json_data_by_stream
                                     .entry(stream_params)
                                     .or_insert_with(Vec::new)
@@ -872,7 +878,7 @@ async fn handle_derived_stream_triggers(
             match ingestion_error_msg {
                 None => db::scheduler::update_trigger(new_trigger).await?,
                 Some(err) => {
-                    if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+                    if trigger.retries + 1 >= cfg.limit.scheduler_max_retries {
                         // It has been tried the maximum time, just update the
                         // next_run_at to the next expected trigger time
                         log::debug!(

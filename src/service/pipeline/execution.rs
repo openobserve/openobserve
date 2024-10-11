@@ -48,7 +48,7 @@ pub trait PipelinedExt: Sync + Send + 'static {
     /// valid.
     ///
     /// `node_map` and `graph` to be constructed prior to pipeline execution to avoid repeated work.
-    /// Returned hashmap indicates pairs of `DestinationStream: (output, flattened)`
+    /// Returned hashmap indicates pairs of `DestinationStream: output`
     fn execute(
         &self,
         input: Value,
@@ -56,7 +56,7 @@ pub trait PipelinedExt: Sync + Send + 'static {
         graph: &HashMap<String, Vec<String>>,
         vrl_map: &HashMap<String, VRLResultResolver>,
         runtime: &mut Runtime,
-    ) -> Result<HashMap<StreamParams, (Value, bool)>>;
+    ) -> Result<HashMap<StreamParams, Value>>;
 }
 
 #[async_trait]
@@ -93,7 +93,7 @@ impl PipelinedExt for Pipeline {
         graph: &HashMap<String, Vec<String>>,
         vrl_map: &HashMap<String, VRLResultResolver>,
         runtime: &mut Runtime,
-    ) -> Result<HashMap<StreamParams, (Value, bool)>> {
+    ) -> Result<HashMap<StreamParams, Value>> {
         let source_node_id = self.nodes[0].get_node_id();
         let mut results = HashMap::new();
 
@@ -132,7 +132,7 @@ fn dfs(
     graph: &HashMap<String, Vec<String>>,
     vrl_map: &HashMap<String, VRLResultResolver>,
     runtime: &mut Runtime,
-    results: &mut HashMap<StreamParams, (Value, bool)>,
+    results: &mut HashMap<StreamParams, Value>,
 ) -> Result<()> {
     if current_value.is_null() || !current_value.is_object() {
         return Ok(());
@@ -144,7 +144,7 @@ fn dfs(
         NodeData::Stream(stream_params) => {
             if !graph.contains_key(current_node_id) {
                 // leaf node
-                results.insert(stream_params.clone(), (current_value, flattened));
+                results.insert(stream_params.clone(), current_value);
             } else {
                 let next_nodes = graph.get(current_node_id).unwrap();
                 process_next_nodes(
@@ -247,7 +247,7 @@ fn process_next_nodes(
     graph: &HashMap<String, Vec<String>>,
     vrl_map: &HashMap<String, VRLResultResolver>,
     runtime: &mut Runtime,
-    results: &mut HashMap<StreamParams, (Value, bool)>,
+    results: &mut HashMap<StreamParams, Value>,
 ) -> Result<()> {
     if next_nodes.len() == 1 {
         // HACK to avoid cloning the json record

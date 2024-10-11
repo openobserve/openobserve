@@ -192,17 +192,13 @@ pub async fn ingest(
                         );
                     }
                     Ok(pl_results) => {
-                        for (stream_params, (mut value, is_flattened)) in pl_results {
+                        for (stream_params, mut value) in pl_results {
                             if stream_params.stream_type != StreamType::Logs {
                                 continue;
                             }
 
-                            if !is_flattened {
-                                value = flatten::flatten_with_level(
-                                    value,
-                                    cfg.limit.ingest_flatten_level,
-                                )?;
-                            }
+                            value =
+                                flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
                             // get json object
                             let mut local_val = match value.take() {
                                 json::Value::Object(val) => val,

@@ -153,15 +153,13 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                 ))); // just return
             }
             Ok(pl_results) => {
-                for (stream_params, (mut value, is_flattened)) in pl_results {
+                for (stream_params, mut value) in pl_results {
                     if stream_params.stream_type != StreamType::Logs {
                         continue;
                     }
 
-                    if !is_flattened {
-                        // JSON Flattening
-                        value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
-                    }
+                    // JSON Flattening
+                    value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
 
                     if value.is_null() || !value.is_object() {
                         stream_status.status.failed += 1;

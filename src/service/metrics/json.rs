@@ -172,7 +172,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     stream_status.status.failed += 1;
                 }
                 Ok(pl_results) => {
-                    for (stream_params, (res, _)) in pl_results {
+                    for (stream_params, res) in pl_results {
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }

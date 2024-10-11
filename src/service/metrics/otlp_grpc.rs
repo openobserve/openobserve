@@ -316,7 +316,7 @@ pub async fn handle_grpc_request(
                                 );
                             }
                             Ok(pl_results) => {
-                                for (stream_params, (res, _)) in pl_results {
+                                for (stream_params, res) in pl_results {
                                     if stream_params.stream_type != StreamType::Metrics {
                                         continue;
                                     }
