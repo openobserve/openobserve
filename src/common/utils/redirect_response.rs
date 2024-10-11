@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use actix_web::{HttpResponse, ResponseError};
 
@@ -21,33 +21,46 @@ const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web";
 
 #[derive(Debug)]
 pub struct RedirectResponse {
-    pub redirect_relative_uri: String,
+    redirect_relative_uri: String,
+    query_params: HashMap<String, String>,
 }
 
 impl RedirectResponse {
-    /// Create a new `RedirectResponse` with the given redirection URL.
-    ///
-    /// If no URL is provided, a default URL (`/web`) will be used.
-    pub fn new(redirect_relative_uri: &str) -> Self {
-        RedirectResponse {
-            redirect_relative_uri: redirect_relative_uri.to_string(),
-        }
-    }
-
-    pub fn redirect(&self) -> HttpResponse {
+    pub fn redirect_http(&self) -> HttpResponse {
         self.build_redirect_response()
     }
 
+    fn build_full_redirect_uri(&self) -> String {
+        let mut redirect_uri = self.redirect_relative_uri.clone();
+
+        // If there are query parameters, append them to the URI.
+        if !self.query_params.is_empty() {
+            let query_string: String = self
+                .query_params
+                .iter()
+                .map(|(key, value)| format!("{}={}", key, value))
+                .collect::<Vec<String>>()
+                .join("&");
+
+            redirect_uri = format!("{}?{}", redirect_uri, query_string);
+        }
+
+        redirect_uri
+    }
+
     fn build_redirect_response(&self) -> HttpResponse {
+        let redirect_uri = self.build_full_redirect_uri();
+
         HttpResponse::Found()
-            .append_header(("Location", self.redirect_relative_uri.clone()))
+            .append_header(("Location", redirect_uri))
             .finish()
     }
 }
 
 impl fmt::Display for RedirectResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Redirecting to {}", self.redirect_relative_uri)
+        let redirect_uri = self.build_full_redirect_uri();
+        write!(f, "Redirecting to {}", redirect_uri)
     }
 }
 
@@ -58,10 +71,104 @@ impl ResponseError for RedirectResponse {
     }
 }
 
-impl Default for RedirectResponse {
-    fn default() -> Self {
-        RedirectResponse {
-            redirect_relative_uri: DEFAULT_REDIRECT_RELATIVE_URI.to_string(),
+pub struct RedirectResponseBuilder {
+    redirect_relative_uri: String,
+    query_params: HashMap<String, String>,
+}
+
+impl RedirectResponseBuilder {
+    /// Create a new `RedirectResponseBuilder` with a given redirection URL.
+    ///
+    /// If no URL is provided, a default URL (`/web`) will be used.
+    pub fn new(redirect_relative_uri: &str) -> Self {
+        RedirectResponseBuilder {
+            redirect_relative_uri: redirect_relative_uri.to_string(),
+            query_params: HashMap::new(),
         }
+    }
+
+    pub fn with_query_param(mut self, key: &str, value: &str) -> Self {
+        self.query_params.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    pub fn build(self) -> RedirectResponse {
+        RedirectResponse {
+            redirect_relative_uri: self.redirect_relative_uri,
+            query_params: self.query_params,
+        }
+    }
+}
+
+impl Default for RedirectResponseBuilder {
+    fn default() -> Self {
+        RedirectResponseBuilder {
+            redirect_relative_uri: DEFAULT_REDIRECT_RELATIVE_URI.to_string(),
+            query_params: HashMap::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use actix_web::{http::header::LOCATION, HttpResponse};
+
+    use super::*;
+
+    #[test]
+    fn test_redirect_with_short_url() {
+        // Build a RedirectResponse with a short_url query parameter
+        let redirect_response = RedirectResponseBuilder::new("/web")
+            .with_query_param(
+                "redirect_url",
+                "http://localhost:5080/api/default/short/1234",
+            )
+            .build();
+
+        // Check if the constructed URI is correct
+        let expected_uri = "/web?redirect_url=http://localhost:5080/api/default/short/1234";
+        assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
+
+        // Check if the HTTP response contains the correct "Location" header
+        let http_response: HttpResponse = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
+        assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
+    }
+
+    #[test]
+    fn test_redirect_without_query_params() {
+        // Build a RedirectResponse without any query parameters
+        let redirect_response = RedirectResponseBuilder::new("/web").build();
+
+        // Check if the constructed URI is correct (no query params)
+        let expected_uri = "/web";
+        assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
+
+        // Check if the HTTP response contains the correct "Location" header
+        let http_response: HttpResponse = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
+        assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
+    }
+
+    #[test]
+    fn test_redirect_with_multiple_query_params() {
+        // Build a RedirectResponse with multiple query parameters
+        let redirect_response = RedirectResponseBuilder::new("/web")
+            .with_query_param(
+                "redirect_url",
+                "http://localhost:5080/api/default/short/1234",
+            )
+            .with_query_param("user_id", "42")
+            .build();
+
+        // Check if the constructed URI is correct with multiple query parameters
+        let expected_uri =
+            "/web?redirect_url=http://localhost:5080/api/default/short/1234&user_id=42";
+        assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
+
+        // Check if the HTTP response contains the correct "Location" header
+        let http_response: HttpResponse = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
+        assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
     }
 }
