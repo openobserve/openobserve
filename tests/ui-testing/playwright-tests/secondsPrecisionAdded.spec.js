@@ -11,6 +11,8 @@ import{ startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } fro
 
 //import {CommomnLocator} from '../pages/CommonLocator'
 
+console.log ('Login Started')
+
 test('Relative Seconds on Logs page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
@@ -19,6 +21,8 @@ test('Relative Seconds on Logs page', async ({ page }) => {
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
+
+  console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
