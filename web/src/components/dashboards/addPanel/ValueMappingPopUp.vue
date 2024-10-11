@@ -66,6 +66,7 @@
               :options="mappingTypes"
               :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
               emit-value
+              map-options
               input-debounce="0"
               behavior="menu"
               filled
@@ -144,10 +145,11 @@
                   </template>
                 </q-input>
                 <q-icon
-                  name="close"
+                  :name="outlinedCancel"
                   style="width: 10%"
                   class="cursor-pointer tw-align-middle"
-                  size="sm"
+                  size="xs"
+                  title="Remove color"
                   @click="removeColorByIndex(index)"
                 />
               </div>
@@ -203,6 +205,7 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
+import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
@@ -285,6 +288,7 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
+      outlinedCancel,
     };
   },
 });
