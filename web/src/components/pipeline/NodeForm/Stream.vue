@@ -277,7 +277,7 @@ const saveStream = () => {
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
-  if(stream_name.value.label === "" && stream_name.value.value === ""){
+  if( typeof stream_name.value === 'object' && stream_name.value !== null && stream_name.value.hasOwnProperty('value') && stream_name.value.value === ""){
     $q.notify({
       message: "Please select Stream from the list",
       color: "negative",
