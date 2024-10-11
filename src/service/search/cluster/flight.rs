@@ -883,28 +883,11 @@ pub async fn get_inverted_index_file_list(
             format!("{}_{}", stream_name, stream_type)
         };
     let sql = format!(
-        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
+        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE (deleted IS TRUE) OR ({})",
         index_stream_name, search_condition,
     );
 
-    // for contains, we need to search all prefixes, for others we can only
-    // search specific prefix
-    let prefix_list = match cfg.common.full_text_search_type.as_str() {
-        "contains" => vec![],
-        _ => terms
-            .iter()
-            .map(|t| {
-                t.to_ascii_lowercase()
-                    .chars()
-                    .next()
-                    .unwrap_or('_')
-                    .to_string()
-            })
-            .collect(),
-    };
-
     req.stream_type = StreamType::Index;
-    req.prefixes = prefix_list;
     query.sql = sql;
     query.from = 0;
     query.size = QUERY_WITH_NO_LIMIT;

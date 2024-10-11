@@ -35,14 +35,13 @@ message FlightSearchRequest {
     int64                     start_time = 11;
     int64                       end_time = 12;
     int64                        timeout = 13;
-    repeated string             prefixes = 14;
     // used for super cluster and enterprise
-    bool                is_super_cluster = 15;
-    bool              use_inverted_index = 16;
-    optional string           work_group = 17;
-    optional string           index_type = 18;
-    optional string              user_id = 19;
-    optional string    search_event_type = 20;
+    bool                is_super_cluster = 14;
+    bool              use_inverted_index = 15;
+    optional string           work_group = 16;
+    optional string           index_type = 17;
+    optional string              user_id = 18;
+    optional string    search_event_type = 19;
 }
 
 message KvItem {

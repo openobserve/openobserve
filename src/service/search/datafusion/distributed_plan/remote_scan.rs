@@ -252,7 +252,6 @@ async fn get_remote_batch(
         search_event_type: req.search_event_type,
         use_inverted_index: req.use_inverted_index,
         index_type: req.inverted_index_type.clone(),
-        prefixes: req.prefixes,
     };
 
     log::info!(

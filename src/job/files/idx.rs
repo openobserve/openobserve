@@ -62,11 +62,23 @@ pub(crate) async fn write_parquet_index_to_disk(
         return Err(anyhow::anyhow!("No record batches found"));
     };
     let partition = StreamPartition::new_prefix("term");
+    let bf_fields = vec!["term".to_string()];
 
+    // partiton the recordbatch with the partition key
+    // TODO: need improve the performance
     let json_rows = record_batches_to_json_rows(&batches.iter().collect::<Vec<_>>())?;
 
     let mut partition_buf: HashMap<String, Vec<Arc<serde_json::Value>>> = HashMap::new();
+    let mut deleted_rows: Vec<_> = Vec::new();
     for row in json_rows {
+        if let Some(v) = row.get("deleted") {
+            if let Some(v) = v.as_bool() {
+                if v {
+                    deleted_rows.push(Arc::new(serde_json::Value::Object(row)));
+                    continue;
+                }
+            }
+        }
         let val = match row.get("term") {
             Some(v) => get_string_value(v),
             None => "null".to_string(),
@@ -78,7 +90,9 @@ pub(crate) async fn write_parquet_index_to_disk(
     }
     let mut ret = Vec::new();
 
-    for (prefix, records) in partition_buf.into_iter() {
+    for (prefix, mut records) in partition_buf.into_iter() {
+        // append deleted rows to the records
+        records.extend(deleted_rows.iter().cloned());
         // write metadata
         let mut file_meta = FileMeta {
             min_ts: 0,
@@ -100,7 +114,7 @@ pub(crate) async fn write_parquet_index_to_disk(
 
         // write parquet file
         let mut buf_parquet = Vec::new();
-        let mut writer = new_parquet_writer(&mut buf_parquet, &schema, &[], &file_meta);
+        let mut writer = new_parquet_writer(&mut buf_parquet, &schema, &bf_fields, &file_meta);
         writer.write(&batch).await?;
         writer.close().await?;
         file_meta.compressed_size = buf_parquet.len() as i64;

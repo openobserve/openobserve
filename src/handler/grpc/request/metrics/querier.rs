@@ -220,7 +220,6 @@ impl Metrics for MetricsQuerier {
                 filters.as_slice(),
                 &file_key,
                 true,
-                false,
             )
             .await
             {

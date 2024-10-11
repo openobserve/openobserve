@@ -774,6 +774,9 @@ pub(crate) async fn generate_index_on_ingester(
         &mut schema_map,
     )
     .await;
+    let mut stream_setting = schema_map
+        .get(&index_stream_name)
+        .and_then(|schema| unwrap_stream_settings(schema.schema()));
 
     if !schema_chk.has_fields {
         // create schema
@@ -828,8 +831,8 @@ pub(crate) async fn generate_index_on_ingester(
             };
         }
 
-        // add prefix partition for index
-        if let Some(mut settings) = unwrap_stream_settings(schema.schema()) {
+        // add prefix partition for index <= v0.12.1
+        if let Some(settings) = stream_setting.as_mut() {
             let term_partition_exists = settings
                 .partition_keys
                 .iter()
@@ -846,8 +849,10 @@ pub(crate) async fn generate_index_on_ingester(
             }
         }
     }
+
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
+    let stream_setting = stream_setting.unwrap_or_default();
 
     let json_rows = record_batches_to_json_rows(&record_batches.iter().collect::<Vec<_>>())?;
     if json_rows.is_empty() {
@@ -864,7 +869,7 @@ pub(crate) async fn generate_index_on_ingester(
 
         let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
-            &vec![StreamPartition::new_prefix("term")],
+            &stream_setting.partition_keys,
             PartitionTimeLevel::Hourly,
             &row,
             Some(schema_key_str),
@@ -1269,17 +1274,6 @@ pub(crate) async fn generate_fst_inverted_index(
             }
         }
     }
-
-    // TODO(taiming): future improvement. write index files into file_list to show total index size
-    // on UI let new_idx_file_name = write_fst_index_to_disk(
-    //         compressed_bytes,
-    //         org_id,
-    //         stream_name,
-    //         StreamType::Index,
-    //         &parquet_file_name,
-    //         "index_creator",
-    //     )
-    //     .await?;
 
     // write fst bytes into disk
     let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {

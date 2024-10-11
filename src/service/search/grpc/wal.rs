@@ -466,7 +466,6 @@ async fn get_file_list_inner(
             &search_partition_keys,
             &file_key,
             false,
-            true,
         )
         .await
         {

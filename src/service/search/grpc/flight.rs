@@ -152,18 +152,6 @@ pub async fn search(
         let stream_settings = infra::schema::get_settings(&org_id, stream_name, stream_type)
             .await
             .unwrap_or_default();
-        // if we are searching from index for the files, equal items are
-        // overridden by the prefixes if present
-        let equal_items = if stream_type == StreamType::Index && !req.prefixes.is_empty() {
-            &Some(
-                req.prefixes
-                    .iter()
-                    .map(|p| ("term".into(), p.to_owned()))
-                    .collect(),
-            )
-        } else {
-            &search_partition_keys
-        };
         let (file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
             &org_id,
@@ -171,7 +159,7 @@ pub async fn search(
             stream_name,
             query_params.time_range,
             &stream_settings.partition_keys,
-            equal_items,
+            &search_partition_keys,
             &req.file_id_list,
             &req.idx_file_list,
         )
@@ -324,7 +312,6 @@ async fn get_file_list_by_ids(
             stream_name,
             time_range,
             &file,
-            false,
             false,
             partition_keys,
             &equal_items,

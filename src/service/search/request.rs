@@ -28,7 +28,6 @@ pub struct Request {
     pub search_event_type: Option<String>, // node rule
     pub inverted_index_type: Option<String>,
     pub use_inverted_index: bool,
-    pub prefixes: Vec<String>,
 }
 
 impl Default for Request {
@@ -44,7 +43,6 @@ impl Default for Request {
             search_event_type: None,
             inverted_index_type: None,
             use_inverted_index: false,
-            prefixes: vec![],
         }
     }
 }
@@ -72,7 +70,6 @@ impl Request {
             search_event_type,
             inverted_index_type,
             use_inverted_index: false,
-            prefixes: vec![],
         }
     }
 
@@ -114,7 +111,6 @@ impl From<FlightSearchRequest> for Request {
             search_event_type: request.search_event_type,
             inverted_index_type: request.index_type,
             use_inverted_index: request.use_inverted_index,
-            prefixes:request.prefixes
         }
     }
 }
