@@ -18,7 +18,7 @@
   <div
     class="scroll"
     data-test="dashboard-value-mapping-popup"
-    style="padding: 0px 10px; min-width: 90%"
+    style="padding: 0px 10px; min-width: min(1200px, 90vw)"
   >
     <div
       class="flex justify-between items-center q-pa-md header"
@@ -59,12 +59,11 @@
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
-          <div class="draggable-content">
+          <div class="draggable-content tw-flex tw-gap-x-6">
             <q-select
               v-model="mapping.type"
               label="Type"
               :options="mappingTypes"
-              style="width: 250px"
               :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
               emit-value
               input-debounce="0"
@@ -72,33 +71,39 @@
               filled
               borderless
               dense
-              class="q-mb-xs"
+              class="q-mb-xs tw-flex-1"
             ></q-select>
-            <div v-if="mapping.type === 'value'" class="input-container">
+            <div
+              v-if="mapping.type === 'value'"
+              class="input-container tw-flex-1"
+            >
               <q-input
                 v-model="mapping.value"
                 label="Value"
-                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
               />
             </div>
-            <div v-if="mapping.type === 'regex'" class="input-container">
+            <div
+              v-if="mapping.type === 'regex'"
+              class="input-container tw-flex-1"
+            >
               <q-input
                 v-model="mapping.pattern"
                 label="Regex"
-                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
               />
             </div>
-            <div v-if="mapping.type === 'range'" class="input-container">
+            <div
+              v-if="mapping.type === 'range'"
+              class="input-container tw-flex-1"
+            >
               <q-input
                 v-model="mapping.from"
                 label="From"
-                style="width: 150px"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
@@ -106,8 +111,7 @@
               <q-input
                 v-model="mapping.to"
                 label="To"
-                style="width: 150px"
-                class="input-spacing"
+                class="input-spacing tw-flex-1"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
               />
@@ -115,19 +119,21 @@
             <q-input
               v-model="mapping.text"
               label="Display Value"
-              style="width: 150px"
-              class="input-spacing"
+              class="input-spacing tw-flex-1"
               dense
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
             />
-            <div class="color-section">
-              <div v-if="mapping.color !== null" class="flex tw-items-center">
+            <div class="color-section tw-flex-1">
+              <div
+                v-if="mapping.color !== null"
+                class="tw-items-center tw-flex"
+              >
                 <q-input
                   v-model="mapping.color"
                   filled
+                  style="width: 90%"
                   class="input-spacing"
                   dense
-                  style="width: 116px"
                 >
                   <template v-slot:append>
                     <q-icon name="colorize" class="cursor-pointer">
@@ -139,19 +145,19 @@
                 </q-input>
                 <q-icon
                   name="close"
+                  style="width: 10%"
                   class="cursor-pointer tw-align-middle"
                   size="sm"
                   @click="removeColorByIndex(index)"
                 />
               </div>
-              <div v-else>
+              <div v-else class="tw-w-full">
                 <q-btn
                   label="Set color"
-                  style="width: 150px"
                   no-caps
                   flat
                   dense
-                  class="tw-text-blue-700 tw-font-semibold"
+                  class="tw-text-blue-700 tw-font-semibold tw-w-full"
                   @click="setColorByIndex(index)"
                 />
               </div>
@@ -195,7 +201,6 @@
 import { ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 
@@ -211,7 +216,6 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
-    const store = useStore();
 
     const editedValueMapping = ref(props.valueMapping);
 
@@ -272,7 +276,6 @@ export default defineComponent({
 
     return {
       t,
-      store,
       addValueMapping,
       removeValueMappingByIndex,
       mappingTypes,
