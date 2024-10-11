@@ -46,6 +46,10 @@ impl super::PipelineTable for SqlitePipelineTable {
     async fn create_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
+        // TODO(taiming): remove after done testing
+        sqlx::query("DROP TABLE IF EXISTS pipeline")
+            .execute(&*client)
+            .await?;
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
@@ -76,9 +80,6 @@ CREATE TABLE IF NOT EXISTS pipeline
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let queries = vec![
-            "DROP INDEX IF EXISTS pipeline_org_idx;",
-            "DROP INDEX IF EXISTS pipeline_id_idx;",
-            "DROP INDEX IF EXISTS pipeline_org_src_type_stream_params_idx;",
             "CREATE INDEX IF NOT EXISTS pipeline_org_idx ON pipeline (org);",
             "CREATE INDEX IF NOT EXISTS pipeline_org_src_type_stream_params_idx ON pipeline (org, source_type, stream_org, stream_name, stream_type);",
         ];

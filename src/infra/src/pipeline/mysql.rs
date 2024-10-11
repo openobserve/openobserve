@@ -45,6 +45,16 @@ impl Default for MySqlPipelineTable {
 impl super::PipelineTable for MySqlPipelineTable {
     async fn create_table(&self) -> Result<()> {
         let pool = CLIENT.clone();
+
+        // Start a transaction
+        let mut tx = pool.begin().await?;
+
+        // TODO(taiming): remove this after done testing
+        // Drop and recreate table within the transaction
+        sqlx::query("DROP TABLE IF EXISTS pipeline")
+            .execute(&mut *tx)
+            .await?;
+
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
@@ -66,8 +76,11 @@ CREATE TABLE IF NOT EXISTS pipeline
 );
             "#,
         )
-        .execute(&pool)
+        .execute(&mut *tx)
         .await?;
+
+        // Commit the transaction
+        tx.commit().await?;
 
         Ok(())
     }
@@ -76,10 +89,6 @@ CREATE TABLE IF NOT EXISTS pipeline
         let pool = CLIENT.clone();
 
         let queries = vec![
-            // TODO(taiming): remove DROP after done testing
-            "DROP INDEX IF EXISTS pipeline_org_idx;",
-            "DROP INDEX IF EXISTS pipeline_id_idx;",
-            "DROP INDEX IF EXISTS pipeline_org_src_type_stream_params_idx;",
             "CREATE INDEX pipeline_org_idx ON pipeline (org);",
             "CREATE INDEX pipeline_org_src_type_stream_params_idx ON pipeline (org, source_type, stream_org, stream_name, stream_type);",
         ];
