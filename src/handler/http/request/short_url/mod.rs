@@ -47,9 +47,9 @@ use crate::{common::utils::redirect_response::RedirectResponse, service::short_u
     tag = "Short Url"
 )]
 #[post("/{org_id}/short")]
-pub async fn shorten(_org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
+pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
     let req: config::meta::short_url::ShortenUrlRequest = serde_json::from_slice(&body)?;
-    match short_url::shorten(&req.original_url).await {
+    match short_url::shorten(&org_id, &req.original_url).await {
         Ok(short_url) => {
             let response = ShortenUrlResponse {
                 short_url: short_url.clone(),
@@ -79,16 +79,16 @@ pub async fn shorten(_org_id: web::Path<String>, body: web::Bytes) -> Result<Htt
     ),
     tag = "Short Url"
 )]
-#[get("/{short_id}")]
+#[get("/{org_id}/short/{short_id}")]
 pub async fn retrieve(
     req: HttpRequest,
-    short_id: web::Path<String>,
+    path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     log::info!(
         "short_url::retrieve handler called for path: {}",
         req.path()
     );
-    let short_id = short_id.into_inner();
+    let (_org_id, short_id) = path.into_inner();
     let original_url = short_url::retrieve(&short_id).await;
 
     if let Some(url) = original_url {
