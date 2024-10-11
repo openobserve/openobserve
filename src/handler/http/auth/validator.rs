@@ -33,7 +33,7 @@ use crate::{
         },
         utils::{
             auth::{get_hash, is_root_user, AuthExtractor},
-            redirect_response::RedirectResponse,
+            redirect_response::RedirectResponseBuilder,
         },
     },
     service::{db, users},
@@ -659,7 +659,7 @@ pub async fn oo_validator(
                 Err(handle_auth_failure_for_redirect(req, &e))
             } else {
                 Err((e, req))
-            }
+            };
         }
     };
 
@@ -672,32 +672,6 @@ pub async fn oo_validator(
                 Err((err, err_req))
             }
         }
-    }
-}
-
-/// Validates the authentication result and redirects on failure for requests with the `/short/`
-/// prefix.
-///
-/// This function is a proxy for the `oo_validator_internal` function, setting the `path_prefix` to
-/// "/short/".
-///
-/// # Errors
-/// If authentication fails, the function logs the failure and returns an error that causes a
-/// redirect to a predefined URL.
-// TODO: Remove this no longer used
-pub async fn validate_short_or_redirect(
-    req: ServiceRequest,
-    auth_result: Result<AuthExtractor, Error>,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    match auth_result {
-        Ok(auth_info) => {
-            let path_prefix = "/short/";
-            match oo_validator_internal(req, auth_info, path_prefix).await {
-                Ok(req) => Ok(req),
-                Err((err, err_req)) => Err(handle_auth_failure_for_redirect(err_req, &err)),
-            }
-        }
-        Err(err) => Err(handle_auth_failure_for_redirect(req, &err)),
     }
 }
 
@@ -849,14 +823,32 @@ fn is_short_url_path(path_columns: &[&str]) -> bool {
 /// response. It takes in the request and the error message, and returns a tuple containing the
 /// redirect response and the service request.
 fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
-    let redirect = RedirectResponse::default();
+    let full_url = extract_full_url(&req);
+    let redirect_http = RedirectResponseBuilder::default()
+        .with_query_param("redirect_url", &full_url)
+        .build();
     log::warn!(
-        "Authentication failed for path: {}, err: {}, redirecting to {}",
+        "Authentication failed for path: {}, err: {}, {}",
         req.path(),
         error,
-        &redirect.redirect_relative_uri,
+        &redirect_http,
     );
-    (redirect.into(), req)
+    (redirect_http.into(), req)
+}
+
+/// Extracts the full URL from the request.
+fn extract_full_url(req: &ServiceRequest) -> String {
+    let connection_info = req.connection_info();
+    let scheme = connection_info.scheme();
+    let host = connection_info.host();
+    let path = req
+        .request()
+        .uri()
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or("");
+
+    format!("{}://{}{}", scheme, host, path)
 }
 
 #[cfg(test)]
