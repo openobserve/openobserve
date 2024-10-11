@@ -18,6 +18,15 @@
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
       <span>Value Mappings</span>
+      <q-tooltip
+        class="bg-grey-8"
+        anchor="bottom middle"
+        self="top middle"
+        max-width="250px"
+      >
+        Enhance table readability by mapping values to custom text and
+        backgorund colors for clearer data visualization.
+      </q-tooltip>
     </div>
     <q-btn
       @click="openValueMappingPopUp"
