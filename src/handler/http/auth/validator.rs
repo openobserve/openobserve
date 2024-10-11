@@ -52,7 +52,6 @@ pub async fn validator(
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
-    // /short/
     let path = match req
         .request()
         .path()
