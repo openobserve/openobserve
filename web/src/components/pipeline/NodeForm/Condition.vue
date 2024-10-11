@@ -292,12 +292,13 @@ const getFields = async () => {
       (node: any) => node.io_type === "input" && node.data.node_type === "stream",
     );
 
+
     const inputQueryNode :any = pipelineObj.currentSelectedPipeline.nodes.find(
       (node: any) => node.io_type === "input" && node.data.node_type === "query",
     );
-    if (inputStreamNode) {
+    if (inputStreamNode ) {
       updateStreamFields(
-        inputStreamNode.data?.stream_name.value,
+        inputStreamNode.data?.stream_name.value || inputStreamNode.data?.stream_name,
         inputStreamNode.data?.stream_type,
       );
     } else {
