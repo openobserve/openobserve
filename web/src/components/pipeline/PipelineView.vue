@@ -72,8 +72,8 @@ const queryImage = getImageURL("images/pipeline/query.svg");
         return props.pipeline.edges || [];
       });
 
-      onMounted(() => {
-        vueFlowRef.value.fitView({ padding: 0.1});
+      onMounted(async () => {
+        
         pipelineObj.nodeTypes = [
   {
     label: "Source",
@@ -132,6 +132,10 @@ const queryImage = getImageURL("images/pipeline/query.svg");
   },
 ];
         pipelineObj.currentSelectedPipeline = props.pipeline;
+
+        setTimeout(() => {
+          vueFlowRef.value.fitView({ padding: 0.1});
+        }, 100);
 
       })
   

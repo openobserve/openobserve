@@ -391,6 +391,10 @@ onBeforeMount(() => {
   getFunctions();
 });
 
+onMounted(()=>{
+
+})
+
 
 
 

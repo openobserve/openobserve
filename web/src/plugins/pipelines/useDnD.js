@@ -177,7 +177,10 @@ export default function useDragAndDrop() {
   }
 
   function onEdgesChange(changes) {
-    pipelineObj.dirtyFlag = true;
+    if(pipelineObj.isEditPipeline == true ){
+      pipelineObj.dirtyFlag = true;
+
+    }
     if(changes.length > 0){
       pipelineObj.edgesChange = true;
     }
@@ -303,10 +306,10 @@ export default function useDragAndDrop() {
       pipelineObj.pipelineWithoutChange
     );
     console.log(pipelineObj.edgesChange,"edges")
-    if(arePipelinesEqualById == true && pipelineObj.edgesChange == false ){
+    if(arePipelinesEqualById == true && pipelineObj.edgesChange == false && pipelineObj.isEditPipeline == true){
       pipelineObj.dirtyFlag = false;
     }
-    if(arePipelinesEqualById == false){
+    if(arePipelinesEqualById == false && pipelineObj.isEditPipeline == true){
       pipelineObj.dirtyFlag = true;
     }
     
