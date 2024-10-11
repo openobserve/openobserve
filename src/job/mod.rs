@@ -35,6 +35,7 @@ mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
 mod prom;
+mod prom_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
@@ -224,6 +225,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { flatten_compactor::run().await });
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
+    tokio::task::spawn(async move { prom_self_consume::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
 
     #[cfg(feature = "enterprise")]

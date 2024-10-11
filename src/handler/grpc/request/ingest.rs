@@ -15,7 +15,9 @@
 
 use actix_web::http::StatusCode;
 use config::utils::json;
-use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
+use proto::cluster_rpc::{
+    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType, StreamType,
+};
 use tonic::{Request, Response, Status};
 
 use crate::service::ingestion::create_log_ingestion_req;
@@ -50,6 +52,27 @@ impl Ingest for Ingester {
                     )
                     .await
                     .map_or_else(Err, |_| Ok(())),
+                }
+            }
+            Ok(StreamType::Metrics) => {
+                let log_ingestion_type: IngestionType = req
+                    .ingestion_type
+                    .unwrap_or_default()
+                    .try_into()
+                    .unwrap_or(IngestionType::Multi); // multi is just place holder
+                if log_ingestion_type != IngestionType::Json {
+                    Err(anyhow::anyhow!(
+                        "Internal gPRC metric ingestion only supports json type data, got {:?}",
+                        log_ingestion_type
+                    ))
+                } else {
+                    let data = bytes::Bytes::from(in_data.data);
+                    // we can be fairly certain here that data will actually be json
+                    let values = json::from_slice(&data).unwrap();
+                    crate::service::metrics::json::ingest(&org_id, values)
+                        .await
+                        .map(|_| ()) // we don't care about success response
+                        .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
                 }
             }
             Ok(StreamType::EnrichmentTables) => {
