@@ -910,7 +910,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].includes(dashboardPanelData.data.type)
         "
         outlined
-        v-model="dashboardPanelData.data.config.label.position"
+        v-model="dashboardPanelData.data.config.label_option.position"
         :options="labelPositionOptions"
         dense
         :label="t('dashboard.labelPosition')"
@@ -918,10 +918,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stack-label
         emit-value
         :display-value="`${
-          dashboardPanelData.data.config.label.position
+          dashboardPanelData.data.config.label_option.position
             ? labelPositionOptions.find(
                 (it) =>
-                  it.value == dashboardPanelData.data.config.label.position,
+                  it.value == dashboardPanelData.data.config.label_option.position,
               )?.label
             : 'None'
         }`"
