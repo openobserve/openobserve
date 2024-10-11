@@ -288,7 +288,7 @@ onActivated(() => {
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
 });
 
-const streamTypes = ["logs", "enrichment_tables"];
+const streamTypes = ["logs"];
 
 const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
