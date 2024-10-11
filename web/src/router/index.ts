@@ -80,9 +80,10 @@ export default function (store: any) {
           // else store the current URL in session storage
           // this conditions added specifically for short URL feature where user will be redirected to backend API endpoint
           // if user is not logged in, then user will be redirected to login page and after successful login, user will be redirected to the short URL
-          if (Object.hasOwn(to.query, "redirect_url")) {
-            window.sessionStorage.setItem("redirectURI", to.query.redirect_url);
-          } else {
+          if (Object.hasOwn(to.query, "short_url")) {
+            window.sessionStorage.setItem("redirectURI", to.query.short_url);
+          }
+          else {
             window.sessionStorage.setItem("redirectURI", window.location.href);
           }
         }
