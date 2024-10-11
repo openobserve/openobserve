@@ -96,7 +96,7 @@ pub async fn retrieve(
         Ok(redirect_http)
     } else {
         let redirect = RedirectResponseBuilder::default().build();
-        log::warn!("Short URL not found, {}", &redirect);
+        log::error!("Short URL not found, {}", &redirect);
         Ok(redirect.redirect_http())
     }
 }
