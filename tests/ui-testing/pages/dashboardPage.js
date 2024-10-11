@@ -1,9 +1,9 @@
 import { expect } from '@playwright/test';
-import{CommomnLocator} from '../pages/CommonLocator';
-import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
+import { CommomnLocator } from '../pages/CommonLocator';
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
 
 
-export  class DashboardPage {
+export class DashboardPage {
   constructor(page) {
     this.page = page;
 
@@ -13,10 +13,10 @@ export  class DashboardPage {
     this.dashboardSubmitButton = '[data-test="dashboard-add-submit"]';
 
     this.dateTimeButton = dateTimeButtonLocator;
-      this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-      this.absoluteTab = absoluteTabLocator;
+    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
+    this.absoluteTab = absoluteTabLocator;
 
-   
+
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
     this.signOutButton = page.getByText('Sign Out');
 
@@ -37,7 +37,7 @@ export  class DashboardPage {
     await this.page.locator(this.dashboardSubmitButton).click();
     await this.page.waitForTimeout(5000);
   }
-  
+
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
     await this.page.locator(this.dateTimeButton).click();
@@ -48,7 +48,7 @@ export  class DashboardPage {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
- 
+
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
@@ -62,7 +62,7 @@ export  class DashboardPage {
     await this.page.getByLabel('access_time').first().fill(startTime);
     await this.page.getByRole('button', { name: '1', exact: true }).click();
     await this.page.getByLabel('access_time').nth(1).fill(endTime);
-    
+
   }
 
   async verifyDateTime(startTime, endTime) {
