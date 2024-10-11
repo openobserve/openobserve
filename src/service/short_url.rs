@@ -29,6 +29,17 @@ pub fn get_base_url() -> String {
     format!("{}{}", config.common.web_url, config.common.base_uri)
 }
 
+fn construct_short_url(org_id: &str, short_id: &str) -> String {
+    format!(
+        "{}/{}/{}{}{}",
+        get_base_url(),
+        "api",
+        org_id,
+        SHORT_URL_WEB_PATH,
+        short_id
+    )
+}
+
 async fn store_short_url(
     org_id: &str,
     short_id: &str,
@@ -36,14 +47,7 @@ async fn store_short_url(
 ) -> Result<String, anyhow::Error> {
     let entry = ShortUrlRecord::new(short_id, original_url);
     db::short_url::set(short_id, entry).await?;
-    Ok(format!(
-        "{}/{}/{}{}{}",
-        get_base_url(),
-        "api",
-        org_id,
-        SHORT_URL_WEB_PATH,
-        short_id
-    ))
+    Ok(construct_short_url(org_id, short_id))
 }
 
 fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
@@ -62,14 +66,7 @@ pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow:
 
     if let Ok(existing_url) = db::short_url::get(&short_id).await {
         if existing_url == original_url {
-            return Ok(format!(
-                "{}/{}/{}{}{}",
-                get_base_url(),
-                "api",
-                org_id,
-                SHORT_URL_WEB_PATH,
-                short_id
-            ));
+            return Ok(construct_short_url(org_id, &short_id));
         }
     }
 
@@ -98,15 +95,15 @@ pub async fn retrieve(short_id: &str) -> Option<String> {
     db::short_url::get(short_id).await.ok()
 }
 
-/// Extracts the short ID from the shortened URL
-pub fn get_short_id_from_url(org_id: &str, short_url: &str) -> Option<String> {
-    let prefix = format!("{}api/{}{}", get_base_url(), org_id, SHORT_URL_WEB_PATH);
-    short_url.strip_prefix(&prefix).map(|s| s.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Extracts the short ID from the shortened URL
+    fn get_short_id_from_url(org_id: &str, short_url: &str) -> Option<String> {
+        let prefix = format!("{}api/{}{}", get_base_url(), org_id, SHORT_URL_WEB_PATH);
+        short_url.strip_prefix(&prefix).map(|s| s.to_string())
+    }
 
     #[tokio::test]
     #[ignore]
