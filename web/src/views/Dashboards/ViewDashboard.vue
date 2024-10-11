@@ -137,7 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               no-caps
               icon="share"
-              @click="shareLink"
+              @click="shareLink.execute()"
+              :loading="shareLink.isLoading.value"
               data-test="dashboard-share-btn"
               ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
             >
@@ -301,6 +302,8 @@ import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
+import { useLoading } from "@/composables/useLoading";
+import shortURLService from "@/services/short_url";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -816,7 +819,7 @@ export default defineComponent({
       }
     };
 
-    const shareLink = () => {
+    const shareLink = useLoading(async () => {
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
@@ -830,14 +833,23 @@ export default defineComponent({
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
 
-      copyToClipboard(urlObj?.href)
-        .then(() => {
-          showPositiveNotification("Link copied successfully");
-        })
-        .catch(() => {
-          showErrorNotification("Error while copying link");
-        });
-    };
+      try {
+        const res = await shortURLService.create(
+          store.state.selectedOrganization.identifier,
+          urlObj?.href,
+        );
+        const shortURL = res?.data?.short_url;
+        copyToClipboard(shortURL)
+          .then(() => {
+            showPositiveNotification("Link copied successfully");
+          })
+          .catch(() => {
+            showErrorNotification("Error while copying link");
+          });
+      } catch (error) {
+        showErrorNotification("Error while sharing link");
+      }
+    });
 
     // Fullscreen
     const fullscreenDiv = ref(null);

@@ -306,7 +306,7 @@ pub async fn search(
         req_stats,
         org_id,
         &stream_name,
-        StreamType::Logs,
+        stream_type,
         UsageType::Search,
         num_fn,
         started_at,

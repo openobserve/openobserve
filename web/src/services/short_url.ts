@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2023 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,11 +12,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-pub mod auth;
-pub mod functions;
-pub mod http;
-pub mod jwt;
-pub mod redirect_response;
-pub mod stream;
-pub mod zo_logger;
+import http from "./http";
+const shortURL = {
+  create: (org_identifier: string, url: string) => {
+    return http().post(`/api/${org_identifier}/short`, {
+      original_url: url,
+    });
+  },
+};
+export default shortURL;

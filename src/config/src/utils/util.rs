@@ -13,10 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod auth;
-pub mod functions;
-pub mod http;
-pub mod jwt;
-pub mod redirect_response;
-pub mod stream;
-pub mod zo_logger;
+pub fn zero_or<T>(v: T, def: T) -> T
+where
+    T: PartialEq + Default,
+{
+    if v == Default::default() { def } else { v }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zero_or() {
+        assert_eq!(zero_or(0, 1), 1);
+        assert_eq!(zero_or(2, 1), 2);
+        assert_eq!(zero_or(0, 0), 0);
+        assert_eq!(zero_or(0.0, 1.1), 1.1);
+        assert_eq!(zero_or(2.1, 1.1), 2.1);
+        assert_eq!(zero_or("", "v"), "v");
+        assert_eq!(zero_or("vv", "v"), "vv");
+    }
+}

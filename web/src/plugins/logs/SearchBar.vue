@@ -396,7 +396,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
-          @click="shareLink"
+          @click="shareLink.execute()"
+          :loading="shareLink.isLoading.value"
         ></q-btn>
         <q-btn
           data-test="logs-search-bar-share-link-btn"
@@ -938,6 +939,7 @@ import useLogs from "@/composables/useLogs";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
+import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -961,6 +963,7 @@ import { inject } from "vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 const defaultValue: any = () => {
   return {
@@ -2337,7 +2340,7 @@ export default defineComponent({
       }
     };
 
-    const shareLink = () => {
+    const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true);
       const queryString = Object.entries(queryObj)
         .map(
@@ -2352,22 +2355,36 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
-      copyToClipboard(shareURL)
-        .then(() => {
-          $q.notify({
-            type: "positive",
-            message: "Link Copied Successfully!",
-            timeout: 5000,
-          });
+      await shortURLService
+        .create(store.state.selectedOrganization.identifier, shareURL)
+        .then((res: any) => {
+          if (res.status == 200) {
+            shareURL = res.data.short_url;
+            copyToClipboard(shareURL)
+              .then(() => {
+                $q.notify({
+                  type: "positive",
+                  message: "Link Copied Successfully!",
+                  timeout: 5000,
+                });
+              })
+              .catch(() => {
+                $q.notify({
+                  type: "negative",
+                  message: "Error while copy link.",
+                  timeout: 5000,
+                });
+              });
+          }
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while copy link.",
+            message: "Error while shortening link.",
             timeout: 5000,
           });
         });
-    };
+    });
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
