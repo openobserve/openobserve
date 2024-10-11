@@ -46,15 +46,6 @@ impl super::PipelineTable for MySqlPipelineTable {
     async fn create_table(&self) -> Result<()> {
         let pool = CLIENT.clone();
 
-        // Start a transaction
-        let mut tx = pool.begin().await?;
-
-        // TODO(taiming): remove this after done testing
-        // Drop and recreate table within the transaction
-        sqlx::query("DROP TABLE IF EXISTS pipeline")
-            .execute(&mut *tx)
-            .await?;
-
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
@@ -76,11 +67,8 @@ CREATE TABLE IF NOT EXISTS pipeline
 );
             "#,
         )
-        .execute(&mut *tx)
+        .execute(&pool)
         .await?;
-
-        // Commit the transaction
-        tx.commit().await?;
 
         Ok(())
     }
