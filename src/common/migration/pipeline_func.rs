@@ -38,7 +38,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn migrate_pipelines() -> Result<(), anyhow::Error> {
-    let mut new_pipelines = vec![];
+    let mut new_pipeline_by_source: HashMap<StreamParams, Pipeline> = HashMap::new();
     let mut func_to_update = vec![];
 
     // load all functions from meta table
@@ -140,28 +140,49 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     nodes,
                     edges,
                 };
-                new_pipelines.push(pipeline);
+                new_pipeline_by_source.insert(
+                    StreamParams::new(
+                        &old_derived_stream.source.org_id,
+                        &old_derived_stream.name,
+                        old_derived_stream.source.stream_type,
+                    ),
+                    pipeline,
+                );
             }
         }
 
         // scenario 2: with functions or routing -> realtime
         let source_params = StreamParams::new(key_col[1], key_col[3], StreamType::from(key_col[2]));
         if stream_funcs.contains_key(&source_params) || old_pipe.routing.is_some() {
-            // construct a new pipeline
             let (mut pos_x, mut pos_y): (f32, f32) = (50.0, 50.0);
             let pos_offset: f32 = 200.0;
-            let pipeline_source = PipelineSource::Realtime(source_params.clone());
-            let source_node = Node::new(
-                ider::uuid(),
-                NodeData::Stream(source_params.clone()),
-                pos_x,
-                pos_y,
-                "input".to_string(),
-            );
 
-            let source_node_id = source_node.id.clone();
-            let mut nodes = vec![source_node];
-            let mut edges = vec![];
+            let new_pipeline = new_pipeline_by_source.entry(source_params.clone()).or_insert_with(|| {
+                let pipeline_source = PipelineSource::Realtime(source_params.clone());
+                let source_node = Node::new(
+                    ider::uuid(),
+                    NodeData::Stream(source_params.clone()),
+                    pos_x,
+                    pos_y,
+                    "input".to_string(),
+                );
+                let pl_id = ider::uuid();
+                let name = format!("Migrated-{pl_id}");
+                let description = "This pipeline was generated from previous found prior to OpenObserve v0.12.2. Please check and confirm before enabling it manually".to_string();
+                Pipeline {
+                    id: pl_id,
+                    version: 0,
+                    enabled: false,
+                    org: key_col[1].to_string(),
+                    name,
+                    description,
+                    source: pipeline_source,
+                    nodes: vec![source_node],
+                    edges: vec![],
+                }
+            });
+
+            let source_node_id = new_pipeline.nodes[0].id.clone();
 
             if let Some(mut func_params) = stream_funcs.remove(&source_params) {
                 let dest_node = Node::new(
@@ -182,15 +203,19 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                         pos_y,
                         "default".to_string(),
                     );
-                    nodes.push(func_node);
+                    let new_edge = Edge::new(
+                        new_pipeline.nodes.last().unwrap().id.clone(),
+                        func_node.id.clone(),
+                    );
+                    new_pipeline.edges.push(new_edge);
+                    new_pipeline.nodes.push(func_node);
                 }
-                nodes.push(dest_node);
-
-                let func_edges = nodes
-                    .windows(2)
-                    .map(|pair| Edge::new(pair[0].id.clone(), pair[1].id.clone()))
-                    .collect::<Vec<_>>();
-                edges.extend(func_edges);
+                let new_edge = Edge::new(
+                    new_pipeline.nodes.last().unwrap().id.clone(),
+                    dest_node.id.clone(),
+                );
+                new_pipeline.edges.push(new_edge);
+                new_pipeline.nodes.push(dest_node);
             }
 
             if let Some(routings) = old_pipe.routing {
@@ -218,29 +243,18 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                         pos_y,
                         "output".to_string(),
                     );
-                    edges.push(Edge::new(source_node_id.clone(), condition_node.id.clone()));
-                    edges.push(Edge::new(condition_node.id.clone(), dest_node.id.clone()));
-                    nodes.push(condition_node);
-                    nodes.push(dest_node);
+
+                    new_pipeline
+                        .edges
+                        .push(Edge::new(source_node_id.clone(), condition_node.id.clone()));
+                    new_pipeline
+                        .edges
+                        .push(Edge::new(condition_node.id.clone(), dest_node.id.clone()));
+                    new_pipeline.nodes.push(condition_node);
+                    new_pipeline.nodes.push(dest_node);
                     pos_y += pos_offset;
                 }
             }
-
-            let pl_id = ider::uuid();
-            let name = format!("Migrated-{pl_id}");
-            let description = "This pipeline was generated from previous found prior to OpenObserve v0.12.2. Please check and confirm before enabling it manually".to_string();
-            let pipeline = Pipeline {
-                id: pl_id,
-                version: 0,
-                enabled: false,
-                org: key_col[1].to_string(),
-                name,
-                description,
-                source: pipeline_source,
-                nodes,
-                edges,
-            };
-            new_pipelines.push(pipeline);
         }
     }
 
@@ -248,30 +262,40 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
     for (stream_params, mut func_params) in stream_funcs {
         func_params.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let pipeline_source = PipelineSource::Realtime(stream_params.clone());
-
-        // construct the nodes and edges lists
-        let source_node_data = NodeData::Stream(stream_params.clone());
-        let dest_node_data = NodeData::Stream(stream_params.clone());
         let (pos_x, pos_y): (f32, f32) = (50.0, 50.0);
         let pos_offset: f32 = 200.0;
-        let source_node = Node::new(
-            ider::uuid(),
-            source_node_data,
-            pos_x,
-            pos_y,
-            "input".to_string(),
-        );
+        let new_pipeline = new_pipeline_by_source.entry(stream_params.clone()).or_insert_with(|| {
+            let pipeline_source = PipelineSource::Realtime(stream_params.clone());
+            let source_node = Node::new(
+                ider::uuid(),
+                NodeData::Stream(stream_params.clone()),
+                pos_x,
+                pos_y,
+                "input".to_string(),
+            );
+                let pl_id = ider::uuid();
+            let name = format!("Migrated-{pl_id}");
+            let description = "This pipeline was generated based on Function x Stream Associations found prior to OpenObserve v0.12.2. Please check the correctness of the pipeline and enabling manually".to_string();
+            Pipeline {
+                id: pl_id,
+                version: 0,
+                enabled: false,
+                org: stream_params.org_id.to_string(),
+                name,
+                description,
+                source: pipeline_source,
+                nodes: vec![source_node],
+                edges: vec![],
+            }
+        });
 
         let dest_node = Node::new(
             ider::uuid(),
-            dest_node_data,
+            NodeData::Stream(stream_params.clone()),
             pos_x + (pos_offset * (func_params.len() + 1) as f32),
             pos_y,
             "output".to_string(),
         );
-
-        let mut nodes: Vec<Node> = vec![source_node];
         for (idx, (_, func_param)) in func_params.into_iter().enumerate() {
             let func_node_data = NodeData::Function(func_param);
             let func_node = Node::new(
@@ -281,45 +305,36 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 pos_y,
                 "default".to_string(),
             );
-            nodes.push(func_node);
+            let new_edge = Edge::new(
+                new_pipeline.nodes.last().unwrap().id.clone(),
+                func_node.id.clone(),
+            );
+            new_pipeline.edges.push(new_edge);
+            new_pipeline.nodes.push(func_node);
         }
-        nodes.push(dest_node);
-
-        let edges = nodes
-            .windows(2)
-            .map(|pair| Edge::new(pair[0].id.clone(), pair[1].id.clone()))
-            .collect::<Vec<_>>();
-
-        let pl_id = ider::uuid();
-        let name = format!("Migrated-{pl_id}");
-        let description = "This pipeline was generated based on Function x Stream Associations found prior to OpenObserve v0.12.2. Please check the correctness of the pipeline and enabling manually".to_string();
-        let pipeline = Pipeline {
-            id: pl_id,
-            version: 0,
-            enabled: false,
-            org: stream_params.org_id.to_string(),
-            name,
-            description,
-            source: pipeline_source,
-            nodes,
-            edges,
-        };
-        new_pipelines.push(pipeline);
+        let new_edge = Edge::new(
+            new_pipeline.nodes.last().unwrap().id.clone(),
+            dest_node.id.clone(),
+        );
+        new_pipeline.edges.push(new_edge);
+        new_pipeline.nodes.push(dest_node);
     }
 
-    for pipeline in new_pipelines {
-        if !crate::service::pipeline::save_pipeline(pipeline)
-            .await
-            .is_ok_and(|res| res.status().as_u16() == 200)
-        {
+    // save generated pipeline
+    let mut ok_to_remove = true;
+    for (_, pipeline) in new_pipeline_by_source {
+        if infra::pipeline::put(&pipeline).await.is_err() {
             log::error!(
                 "[Migration]: Error migrating pipelines to the new pipeline format introduced in v0.12.2. Original data kept."
             );
-            return Ok(());
+            ok_to_remove = false;
+            continue;
         }
     }
 
-    // TODO(taiming): remove old pipeline and save updated functions after done testing
+    if ok_to_remove {
+        // TODO(taiming): remove old pipeline and save updated functions after done testing
+    }
 
     Ok(())
 }

@@ -75,6 +75,9 @@ CREATE TABLE IF NOT EXISTS pipeline
         let pool = CLIENT.clone();
 
         let queries = vec![
+            "DROP INDEX IF EXISTS pipeline_org_idx;",
+            "DROP INDEX IF EXISTS pipeline_id_idx;",
+            "DROP INDEX IF EXISTS pipeline_org_src_type_stream_params_idx;",
             "CREATE INDEX IF NOT EXISTS pipeline_org_idx ON pipeline (org);",
             "CREATE INDEX IF NOT EXISTS pipeline_org_src_type_stream_params_idx ON pipeline (org, source_type, stream_org, stream_name, stream_type);",
         ];
