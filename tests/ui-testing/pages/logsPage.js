@@ -61,6 +61,7 @@ export class LogsPage {
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
+    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
     await this.relative30SecondsButton.click();
   }

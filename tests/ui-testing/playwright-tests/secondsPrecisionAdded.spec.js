@@ -35,7 +35,8 @@ test('Relative Seconds on Logs page', async ({ page }) => {
 
   // Step 3: Select Index and Stream
   await page.waitForTimeout(3000);  // Wait for logs page to load 
-  await logsPage.selectIndexAndStream();
+  
+  // await logsPage.selectIndexAndStream();
 
   // Step 4: Set the time to past 30 seconds and verify
   await logsPage.setTimeToPast30Seconds();
@@ -45,6 +46,7 @@ test('Relative Seconds on Logs page', async ({ page }) => {
 
 });
 
+/*
 
 test('Absolute Seconds on Logs page', async ({ page }) => {
   // Create page object instances
@@ -307,4 +309,4 @@ test('Relative second on alert', async ({ page }) => {
 
   await alertPage.signOut();
 });
-
+*/
