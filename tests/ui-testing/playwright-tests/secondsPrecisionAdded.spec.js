@@ -1,11 +1,11 @@
 // Implementation test.spec.js
 import { test, expect } from '@playwright/test';
-import { LoginPage } from '../pages/LoginPage';
-import { LogsPage } from '../pages/logsPage';
+import { LoginPage } from '../pages/loginPage.js';
+import { LogsPage } from '../pages/logsPage.js';
 import { TracesPage } from '../pages/tracesPage.js';
-import { ReportsPage } from '../pages/reportsPage';
-import { DashboardPage } from '../pages/dashboardPage';
-import { AlertPage } from '../pages/alertsPage';
+import { ReportsPage } from '../pages/reportsPage.js';
+import { DashboardPage } from '../pages/dashboardPage.js';
+import { AlertPage } from '../pages/alertsPage.js';
 
 import{ startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } from '../pages/CommonLocator.js';
 
