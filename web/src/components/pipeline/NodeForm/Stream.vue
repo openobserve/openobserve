@@ -153,7 +153,12 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+import { useQuasar } from "quasar";
+
 const emit = defineEmits(["cancel:hideform"]);
+
+
+const $q = useQuasar();
 
 const { t } = useI18n();
 
@@ -174,6 +179,7 @@ const isFetchingStreams = ref(false);
 const indexOptions = ref([]);
 const schemaList = ref([]);
 const streams: any = ref({});
+
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const outputStreamTypes = ["logs"];
@@ -271,6 +277,15 @@ const saveStream = () => {
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
+  if(stream_name.value.label === "" && stream_name.value.value === ""){
+    $q.notify({
+      message: "Please select Stream from the list",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+    return;
+  }
   addNode(streamNodeData);
 
   emit("cancel:hideform");

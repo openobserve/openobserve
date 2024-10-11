@@ -159,6 +159,8 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import { useQuasar } from "quasar";
+
 
 interface RouteCondition {
   column: string;
@@ -221,6 +223,7 @@ const afterFlattening = ref((pipelineObj.currentSelectedNodeData?.data as { afte
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
+const $q = useQuasar();
 
 const store = useStore();
 
@@ -281,6 +284,18 @@ const saveFunction = () => {
   functionExists.value = false;
 
   if (createNewFunction.value) {
+    if(addFunctionRef.value.formData.name == "" ){
+      return;
+    }
+    if(addFunctionRef.value.formData.function == ""){
+     $q.notify({
+        message: "Function is required",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000,
+      });
+      return;
+    }
     addFunctionRef.value.onSubmit();
     return;
   }

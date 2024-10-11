@@ -110,6 +110,7 @@ import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
+
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
@@ -269,9 +270,9 @@ const isValidStreamName = computed(() => {
 });
 
 const updateStreamFields = async (streamName : any, streamType : any) => {
+
   let streamCols: any = [];
   const streams: any = await getStream(streamName, streamType, true);
-  console.log(streamName, "updateStreamFields");
 
   if (streams && Array.isArray(streams.schema)) {
     streamCols = streams.schema.map((column: any) => ({
@@ -294,10 +295,9 @@ const getFields = async () => {
     const inputQueryNode :any = pipelineObj.currentSelectedPipeline.nodes.find(
       (node: any) => node.io_type === "input" && node.data.node_type === "query",
     );
-
     if (inputStreamNode) {
       updateStreamFields(
-        inputStreamNode.data?.stream_name,
+        inputStreamNode.data?.stream_name.value,
         inputStreamNode.data?.stream_type,
       );
     } else {
@@ -355,6 +355,14 @@ const openCancelDialog = () => {
 // TODO OK : Add check for duplicate routing name
 const saveCondition = async () => {
   let payload = getConditionPayload();
+  if(payload.conditions.length === 0){
+    q.notify({
+      type: "negative",
+      message: "Please add atleast one condition",
+      timeout: 3000,
+    });
+    return;
+  }
   let conditionData = {
     node_type: "condition",
     conditions: payload.conditions,

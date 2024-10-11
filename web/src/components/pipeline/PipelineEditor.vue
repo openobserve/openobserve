@@ -486,6 +486,11 @@ const savePipeline = async () => {
       (node.data?.node_type === "stream" || node.data?.node_type === "query")
   );
 
+  const outputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
+    (node:any) =>
+      node?.io_type === "output"
+  );
+
   if (inputNodeIndex === -1) {
     q.notify({
       message: "Source node is required",
@@ -494,7 +499,21 @@ const savePipeline = async () => {
       timeout: 3000,
     });
     return;
-  } else {
+  }
+  
+  
+
+  else if(outputNodeIndex === -1){
+    q.notify({
+      message: "Destination node is required",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
+  
+  else {
     pipelineObj.currentSelectedPipeline.nodes.map((node : any) => {
       if (node.data.node_type === "stream" && node.data.stream_name && node.data.stream_name.hasOwnProperty("value")) {
         node.data.stream_name = node.data.stream_name.value;
@@ -546,13 +565,24 @@ const savePipeline = async () => {
       });
     })
     .catch((error) => {
-      q.notify({
+
+      if(error.response?.data?.message === "Invalid Pipeline: empty edges list"){
+        q.notify({
+          message: "Please connect all nodes",
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        });
+      }
+      else{
+        q.notify({
         message:
           error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      }
     })
     .finally(() => {
       pipelineObj.isEditPipeline = false;
