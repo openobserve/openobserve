@@ -647,7 +647,21 @@ pub async fn oo_validator(
     auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/api/";
-    oo_validator_internal(req, auth_info, path_prefix).await
+    let path =
+        match req.request().path().strip_prefix(
+            format!("{}{}", config::get_config().common.base_uri, path_prefix).as_str(),
+        ) {
+            Some(path) => path,
+            None => req.request().path(),
+        };
+
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+
+    if path_columns.get(1).unwrap_or(&"").eq(&"short") {
+        validate_short_or_redirect(req, Ok(auth_info)).await
+    } else {
+        oo_validator_internal(req, auth_info, path_prefix).await
+    }
 }
 
 /// Validates the authentication result and redirects on failure for requests with the `/short/`
