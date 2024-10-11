@@ -331,15 +331,18 @@ export const findFirstValidMappedValue = (
 
     // Check based on type
     if (v?.type == "value") {
-      isMatch = v?.value == value || v.text == value;
+      isMatch = v?.value == value;
     } else if (v?.type == "range") {
-      if (v?.from && v?.to && !Number.isNaN(+v?.from) && !Number.isNaN(+v?.to)) {
-        isMatch = (+v?.from <= +value && +v?.to >= +value) || v?.text == value;
+      if (
+        v?.from &&
+        v?.to &&
+        !Number.isNaN(+v?.from) &&
+        !Number.isNaN(+v?.to)
+      ) {
+        isMatch = +v?.from <= +value && +v?.to >= +value;
       }
     } else if (v?.type == "regex") {
-      isMatch =
-        new RegExp(v?.pattern ?? "").test(value) ||
-        new RegExp(v?.pattern ?? "").test(v?.text);
+      isMatch = new RegExp(v?.pattern ?? "").test(value);
     }
 
     // If a match is found, check if the required field (color or text) is valid

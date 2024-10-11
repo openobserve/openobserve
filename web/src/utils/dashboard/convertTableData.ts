@@ -23,6 +23,18 @@ import {
   isTimeStamp,
 } from "./convertDataIntoUnitValue";
 
+const applyValueMapping = (value: any, mappings: any) => {
+  // Find the first valid mapping with a valid text
+  const foundValue = findFirstValidMappedValue(value, mappings, "text");
+
+  // if foundValue is not null and foundValue.text is not null, then return foundValue.text
+  if (foundValue && foundValue.text) {
+    return foundValue.text;
+  }
+
+  return null;
+};
+
 /**
  * Converts table data based on the panel schema and search query data.
  *
@@ -50,22 +62,6 @@ export const convertTableData = (
   let columnData = [...x, ...y];
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
-
-  // value mapping
-  tableRows?.forEach((row: any) => {
-    Object.entries(row).forEach(([key, value]: any) => {
-      // Find the first valid mapping with a valid text
-      const foundValue = findFirstValidMappedValue(
-        value,
-        panelSchema.config?.mappings,
-        "text",
-      );
-
-      if (foundValue && foundValue.text) {
-        row[key] = foundValue.text;
-      }
-    });
-  });
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -151,10 +147,34 @@ export const convertTableData = (
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
+
+      obj["format"] = (val: any) => {
+        // value mapping
+        const valueMapping = applyValueMapping(
+          val,
+          panelSchema.config?.mappings,
+        );
+
+        if (valueMapping != null) {
+          return valueMapping;
+        }
+        return val;
+      };
+
       // if number then sort by number and use decimal point config option in format
       if (isNumber) {
         obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
         obj["format"] = (val: any) => {
+          // value mapping
+          const valueMapping = applyValueMapping(
+            val,
+            panelSchema.config?.mappings,
+          );
+
+          if (valueMapping != null) {
+            return valueMapping;
+          }
+
           return !Number.isNaN(val)
             ? `${
                 formatUnitValue(
@@ -174,6 +194,16 @@ export const convertTableData = (
       if (histogramFields.includes(it.alias)) {
         // if current field is histogram field then return formatted date
         obj["format"] = (val: any) => {
+          // value mapping
+          const valueMapping = applyValueMapping(
+            val,
+            panelSchema.config?.mappings,
+          );
+
+          if (valueMapping != null) {
+            return valueMapping;
+          }
+
           return formatDate(
             toZonedTime(
               typeof val === "string"
@@ -268,9 +298,33 @@ export const convertTableData = (
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
 
+        obj["format"] = (val: any) => {
+          // value mapping
+          const valueMapping = applyValueMapping(
+            val,
+            panelSchema.config?.mappings,
+          );
+
+          if (valueMapping != null) {
+            return valueMapping;
+          }
+
+          return val;
+        };
+
         if (isNumber) {
           obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
           obj["format"] = (val: any) => {
+            // value mapping
+            const valueMapping = applyValueMapping(
+              val,
+              panelSchema.config?.mappings,
+            );
+
+            if (valueMapping != null) {
+              return valueMapping;
+            }
+
             return !Number.isNaN(val)
               ? `${
                   formatUnitValue(
@@ -289,6 +343,15 @@ export const convertTableData = (
         // Check if it's a histogram field and apply timezone conversion
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
+            // value mapping
+            const valueMapping = applyValueMapping(
+              val,
+              panelSchema.config?.mappings,
+            );
+
+            if (valueMapping != null) {
+              return valueMapping;
+            }
             return formatDate(
               toZonedTime(
                 typeof val === "string"
