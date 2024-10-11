@@ -1302,9 +1302,9 @@ export default defineComponent({
         dashboardPanelData.data.config.table_dynamic_columns = false;
       }
 
-      // by default, use label position as null and rotate as 0
-      if (!dashboardPanelData.data.config.label) {
-        dashboardPanelData.data.config.label = {
+      // by default, use label_option position as null and rotate as 0
+      if (!dashboardPanelData.data.config.label_option) {
+        dashboardPanelData.data.config.label_option = {
           position: null,
           rotate: 0,
         };
