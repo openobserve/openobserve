@@ -497,7 +497,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
             .service(stream::delete_stream_cache)
-            .service(short_url::shorten),
+            .service(short_url::shorten)
+            .service(short_url::retrieve),
     );
 }
 
