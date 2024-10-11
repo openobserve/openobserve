@@ -944,7 +944,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'h-stacked',
           ].includes(dashboardPanelData.data.type)
         "
-        v-model.number="dashboardPanelData.data.config.label.rotate"
+        v-model.number="dashboardPanelData.data.config.label_option.rotate"
         :label="t('dashboard.labelRotate')"
         color="input-border"
         bg-color="input-bg"
@@ -958,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="0"
         @update:model-value="
           (value: any) =>
-            (dashboardPanelData.data.config.label.rotate =
+            (dashboardPanelData.data.config.label_option.rotate =
               value !== '' ? value : 0)
         "
         data-test="dashboard-config-label-rotate"
