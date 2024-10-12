@@ -91,16 +91,23 @@ impl Pipeline {
     pub fn validate(&mut self) -> Result<()> {
         // ck 1 & 2
         match (self.nodes.is_empty(), self.edges.is_empty()) {
-            (true, true) => return Err(anyhow!("empty nodes and edges list")),
-            (true, false) => return Err(anyhow!("empty nodes list")),
-            (false, true) => return Err(anyhow!("empty edges list")),
+            (true, true) | (true, false) => {
+                return Err(anyhow!(
+                    "Empty pipeline. Please add Source/Destination nodes, or any applicable Transform Nodes"
+                ));
+            }
+            (false, true) => {
+                return Err(anyhow!(
+                    "Please connect all Nodes to complete pipeline creation"
+                ));
+            }
             _ => {}
         };
 
         // ck 3
         match self.nodes.first().unwrap().get_node_data() {
             NodeData::Stream(stream_params) => {
-                self.source = PipelineSource::Realtime(stream_params)
+                self.source = PipelineSource::Realtime(stream_params);
             }
             NodeData::Query(derived_stream) => {
                 if derived_stream.trigger_condition.period == 0 {
@@ -108,7 +115,7 @@ impl Pipeline {
                         "DerivedStream source's TriggerCondition period missing or is 0"
                     ));
                 }
-                self.source = PipelineSource::Scheduled(derived_stream)
+                self.source = PipelineSource::Scheduled(derived_stream);
             }
             _ => return Err(anyhow!("source must be either a StreamNode or QueryNode")),
         };
@@ -222,7 +229,7 @@ where
             "realtime" => {
                 let stream_org: String = row.try_get("stream_org")?;
                 let stream_name: String = row.try_get("stream_name")?;
-                let stream_type: String = row.try_get("stream_name")?;
+                let stream_type: String = row.try_get("stream_type")?;
                 let stream_params = StreamParams::new(
                     &stream_org,
                     &stream_name,

@@ -94,14 +94,13 @@ impl PipelinedExt for Pipeline {
         vrl_map: &HashMap<String, VRLResultResolver>,
         runtime: &mut Runtime,
     ) -> Result<HashMap<StreamParams, Value>> {
-        let source_node_id = self.nodes[0].get_node_id();
         let mut results = HashMap::new();
 
         if let Err(e) = dfs(
             &self.org,
             input,
             false,
-            &source_node_id,
+            &self.nodes[0].id,
             node_map,
             graph,
             vrl_map,
