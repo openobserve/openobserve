@@ -41,6 +41,7 @@ pub fn connect() -> Box<dyn PipelineTable> {
 pub trait PipelineTable: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
+    async fn drop_table(&self) -> Result<()>;
     async fn put(&self, pipeline: &Pipeline) -> Result<()>;
     async fn update(&self, pipeline: Pipeline) -> Result<()>;
     async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline>;
@@ -122,4 +123,11 @@ pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
 #[inline]
 pub async fn delete(pipeline_id: &str) -> Result<()> {
     CLIENT.delete(pipeline_id).await
+}
+
+/// DropTable first. Used for testing migration.
+#[inline]
+pub async fn drop_table() -> Result<()> {
+    CLIENT.drop_table().await?;
+    Ok(())
 }

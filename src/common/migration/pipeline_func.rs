@@ -33,6 +33,8 @@ use config::{
 use infra::db as infra_db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    infra::pipeline::drop_table().await?;
+    infra::pipeline::init().await?;
     migrate_pipelines().await?;
     Ok(())
 }

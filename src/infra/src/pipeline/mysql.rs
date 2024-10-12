@@ -94,6 +94,16 @@ CREATE TABLE IF NOT EXISTS pipeline
         Ok(())
     }
 
+    async fn drop_table(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+
+        sqlx::query("DROP TABLE IF EXISTS pipeline;")
+            .execute(&pool)
+            .await?;
+
+        Ok(())
+    }
+
     async fn put(&self, pipeline: &Pipeline) -> Result<()> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
