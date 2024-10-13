@@ -210,7 +210,6 @@ async fn get_file_list(
             filters,
             &file,
             false,
-            false,
         )
         .await
         {

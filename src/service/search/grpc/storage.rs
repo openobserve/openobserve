@@ -451,7 +451,7 @@ async fn filter_file_list_by_inverted_index(
         .iter()
         .map(|v| (v.key.to_string(), v.value.to_string()))
         .collect::<Vec<_>>();
-    // filter euqal_items with index_fields
+    // filter equal_items with index_fields
     let schema = infra::schema::get(&query.org_id, &query.stream_name, query.stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&schema);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
