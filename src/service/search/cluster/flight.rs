@@ -895,8 +895,8 @@ pub async fn get_inverted_index_file_list(
             format!("{}_{}", stream_name, stream_type)
         };
     let sql = format!(
-        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
-        index_stream_name, search_condition,
+        "SELECT file_name, segment_ids FROM \"{}\" WHERE {}",
+        index_stream_name, search_condition
     );
 
     req.stream_type = StreamType::Index;
@@ -906,20 +906,7 @@ pub async fn get_inverted_index_file_list(
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-
     let resp = super::http::search(req, query, vec![], vec![]).await?;
-    // get deleted file
-    let deleted_files = resp
-        .hits
-        .iter()
-        .filter_map(|hit| {
-            if hit.get("deleted").unwrap().as_bool().unwrap() {
-                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-            } else {
-                None
-            }
-        })
-        .collect::<HashSet<_>>();
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
@@ -928,9 +915,6 @@ pub async fn get_inverted_index_file_list(
             None => continue,
             Some(v) => v.as_str().unwrap(),
         };
-        if deleted_files.contains(filename) {
-            continue;
-        }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             &org_id, stream_type, stream_name, filename
