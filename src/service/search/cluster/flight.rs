@@ -40,7 +40,6 @@ use infra::{
     dist_lock,
     errors::{Error, Result},
     file_list::FileId,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings, SchemaCache},
 };
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
@@ -99,7 +98,6 @@ pub async fn search(
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
-        &sql.schemas,
         sql.time_range,
     )
     .await?;
@@ -327,7 +325,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let equal_keys = sql
+    let mut equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -340,6 +338,18 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
+
+    // check inverted index prefix search
+    if sql.stream_type == StreamType::Index
+        && cfg.common.inverted_index_search_format.to_lowercase() != "contains"
+    {
+        for (stream, items) in sql.prefix_items.iter() {
+            equal_keys
+                .entry(stream.to_string())
+                .or_insert_with(Vec::new)
+                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
+        }
+    }
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -726,25 +736,13 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[String],
-    schemas: &HashMap<String, Arc<SchemaCache>>,
     time_range: Option<(i64, i64)>,
 ) -> Result<HashMap<String, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for name in stream_names {
-        // stream settings
-        let stream_settings =
-            unwrap_stream_settings(schemas.get(name).unwrap().schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         // get file list
-        let file_id_list = crate::service::file_list::query_ids(
-            org_id,
-            stream_type,
-            name,
-            partition_time_level,
-            time_range,
-        )
-        .await?;
+        let file_id_list =
+            crate::service::file_list::query_ids(org_id, stream_type, name, time_range).await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
@@ -897,8 +895,8 @@ pub async fn get_inverted_index_file_list(
             format!("{}_{}", stream_name, stream_type)
         };
     let sql = format!(
-        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
-        index_stream_name, search_condition,
+        "SELECT file_name, segment_ids FROM \"{}\" WHERE {}",
+        index_stream_name, search_condition
     );
 
     req.stream_type = StreamType::Index;
@@ -908,20 +906,7 @@ pub async fn get_inverted_index_file_list(
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-
     let resp = super::http::search(req, query, vec![], vec![]).await?;
-    // get deleted file
-    let deleted_files = resp
-        .hits
-        .iter()
-        .filter_map(|hit| {
-            if hit.get("deleted").unwrap().as_bool().unwrap() {
-                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-            } else {
-                None
-            }
-        })
-        .collect::<HashSet<_>>();
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
@@ -930,9 +915,6 @@ pub async fn get_inverted_index_file_list(
             None => continue,
             Some(v) => v.as_str().unwrap(),
         };
-        if deleted_files.contains(filename) {
-            continue;
-        }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             &org_id, stream_type, stream_name, filename
