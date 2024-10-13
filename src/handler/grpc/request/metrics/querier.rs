@@ -109,7 +109,7 @@ impl Metrics for MetricsQuerier {
             StreamType::Metrics.to_string().as_str(),
             stream_name,
             Some((start_time, end_time)),
-            None,
+            &[],
         )
         .await
         .unwrap_or_default();
@@ -121,7 +121,7 @@ impl Metrics for MetricsQuerier {
                 StreamType::Metrics.to_string().as_str(),
                 stream_name,
                 Some((start_time, end_time)),
-                None,
+                &[],
             )
             .await
             .unwrap_or_default(),
@@ -220,7 +220,6 @@ impl Metrics for MetricsQuerier {
                 filters.as_slice(),
                 &file_key,
                 true,
-                false,
             )
             .await
             {
