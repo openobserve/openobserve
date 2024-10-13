@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding-bottom: 30px;">
+  <div style="padding-bottom: 30px">
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}
@@ -53,6 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.wrap_table_cells"
       :label="t('dashboard.wraptext')"
       data-test="dashboard-config-wrap-table-cells"
+    />
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_transpose"
+      :label="t('dashboard.tableTranspose')"
+      data-test="dashboard-config-table_transpose"
+    />
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_dynamic_columns"
+      :label="t('dashboard.tableDynamicColumns')"
+      data-test="dashboard-config-table_dynamic_columns"
     />
 
     <div class="space"></div>
@@ -172,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.unit
             ? unitOptions.find(
-                (it) => it.value == dashboardPanelData.data.config.unit
+                (it) => it.value == dashboardPanelData.data.config.unit,
               )?.label
             : 'Default'
         }`"
@@ -201,8 +219,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         min="0"
         max="100"
         @update:model-value="
-        (value: any) => (dashboardPanelData.data.config.decimals = ( typeof value == 'number' && value >= 0) ? value : 2)
-      "
+          (value: any) =>
+            (dashboardPanelData.data.config.decimals =
+              typeof value == 'number' && value >= 0 ? value : 2)
+        "
         :rules="[
           (val: any) =>
             (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
@@ -328,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 1,
-                'min'
+                'min',
               )
             "
             :label="t('dashboard.minimum')"
@@ -359,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 100,
-                'max'
+                'max',
               )
             "
             :label="t('dashboard.maximum')"
@@ -389,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             handleBlur(
               dashboardPanelData.data.config.map_symbol_style,
               2,
-              'size_fixed'
+              'size_fixed',
             )
           "
           :label="t('dashboard.fixedValue')"
@@ -497,6 +517,116 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
+      <div class="space"></div>
+      <q-input
+        v-if="
+          [
+            'area',
+            'bar',
+            'line',
+            'h-bar',
+            'h-stacked',
+            'scatter',
+            'area-stacked',
+            'stacked',
+          ].includes(dashboardPanelData.data.type) && !promqlMode
+        "
+        v-model.number="dashboardPanelData.data.config.top_results"
+        :min="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.top_results = value ? value : null)
+        "
+        label="Top Results"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="ALL"
+        :type="'number'"
+        :disable="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.breakdown?.length == 0
+        "
+        data-test="dashboard-config-top_results"
+        ><template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            Show Top N values
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-top_results-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+                max-width="250px"
+              >
+                <b>This is only applicable when breakdown field is available</b>
+                <br />
+                <br />
+                Specify the number of Top N values to show when breakdown field
+                is available.
+              </q-tooltip>
+            </div>
+          </div>
+        </template></q-input
+      >
+
+      <div
+        class="row items-center"
+        v-if="
+          [
+            'area',
+            'bar',
+            'line',
+            'h-bar',
+            'h-stacked',
+            'scatter',
+            'area-stacked',
+            'stacked',
+          ].includes(dashboardPanelData.data.type) && !promqlMode
+        "
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.top_results_others"
+          label="Add 'others' series"
+          data-test="dashboard-config-top_results_others"
+          :disable="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.breakdown?.length == 0
+          "
+        />
+
+        <q-icon
+          class="q-ml-xs"
+          size="20px"
+          name="info"
+          data-test="dashboard-config-top_results-others-info"
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            Include an 'others' series for values outside the top results when
+            using breakdown fields.
+          </q-tooltip>
+        </q-icon>
+      </div>
+
+      <div class="space"></div>
+
       <CommonAutoComplete
         v-if="promqlMode"
         :label="t('common.legend')"
@@ -548,7 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="
           ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
@@ -560,8 +690,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-input
         v-if="
-          ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+          ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
@@ -637,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config,
             1,
-            'weight_fixed'
+            'weight_fixed',
           )
         "
         :label="t('common.weight')"
@@ -768,11 +898,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         :variablesData="variablesData"
       />
+
+      <div class="space"></div>
+      <ValueMapping v-if="dashboardPanelData.data.type == 'table'" />
 
       <div class="space"></div>
       <MarkLineConfig
@@ -790,6 +923,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
+
+    <div
+      v-if="
+        [
+          'area',
+          'bar',
+          'line',
+          'h-bar',
+          'h-stacked',
+          'scatter',
+          'area-stacked',
+          'stacked',
+        ].includes(dashboardPanelData.data.type) && !promqlMode
+      "
+    >
+      <div class="flex items-center q-mr-sm">
+        <div
+          data-test="scheduled-dashboard-period-title"
+          class="text-bold q-py-md flex items-center"
+          style="width: 190px"
+        >
+          Comparison Against
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            data-test="dashboard-addpanel-config-time-shift-info"
+          >
+            <q-tooltip
+              anchor="bottom middle"
+              self="top middle"
+              style="font-size: 10px"
+              max-width="250px"
+            >
+              <span>
+                This feature allows you to compare data points from multiple
+                queries over a selected time range. By adjusting the date or
+                time, the system will retrieve corresponding data from different
+                queries, enabling you to observe changes or differences between
+                the selected time periods.
+              </span>
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+      <CustomDateTimePicker
+        modelValue="0m"
+        :isFirstEntry="true"
+        :disable="true"
+        class="q-mb-md"
+      />
+      <div
+        v-for="(picker, index) in dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift"
+        :key="index"
+        class="q-mb-md"
+      >
+        <div class="flex items-center">
+          <CustomDateTimePicker
+            v-model="picker.offSet"
+            :picker="picker"
+            :isFirstEntry="false"
+          />
+          <q-icon
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            @click="removeTimeShift(index)"
+            :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
+          />
+        </div>
+      </div>
+
+      <q-btn
+        @click="addTimeShift"
+        style="cursor: pointer; padding: 0px 5px"
+        label="+ Add"
+        no-caps
+        data-test="dashboard-addpanel-config-time-shift-add-btn"
+      />
+    </div>
   </div>
 </template>
 
@@ -798,11 +1016,19 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete, MarkLineConfig },
+  components: {
+    Drilldown,
+    ValueMapping,
+    CommonAutoComplete,
+    MarkLineConfig,
+    CustomDateTimePicker,
+  },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
@@ -820,7 +1046,6 @@ export default defineComponent({
         value: "osm",
       },
     ];
-
     onBeforeMount(() => {
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
@@ -832,6 +1057,11 @@ export default defineComponent({
 
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
+      }
+
+      // by default, use top_results_others as false
+      if (!dashboardPanelData.data.config.top_results_others) {
+        dashboardPanelData.data.config.top_results_others = false;
       }
 
       // Ensure that the nested structure is initialized
@@ -859,6 +1089,16 @@ export default defineComponent({
       // by default, use wrap_table_cells as false
       if (!dashboardPanelData.data.config.wrap_table_cells) {
         dashboardPanelData.data.config.wrap_table_cells = false;
+      }
+
+      // by default, use table_transpose as false
+      if (!dashboardPanelData.data.config.table_transpose) {
+        dashboardPanelData.data.config.table_transpose = false;
+      }
+
+      // by default, use table_dynamic_columns  as false
+      if (!dashboardPanelData.data.config.table_dynamic_columns) {
+        dashboardPanelData.data.config.table_dynamic_columns = false;
       }
     });
 
@@ -981,6 +1221,27 @@ export default defineComponent({
         value: "percent",
       },
       {
+        label: t("dashboard.currencyDollar"),
+        value: "currency-dollar",
+      },
+      {
+        label: t("dashboard.currencyEuro"),
+        value: "currency-euro",
+      },
+      {
+        label: t("dashboard.currencyPound"),
+        value: "currency-pound",
+      },
+      {
+        label: t("dashboard.currencyYen"),
+        value: "currency-yen",
+      },
+      {
+        label: t("dashboard.currencyRupees"),
+        value: "currency-rupee",
+      },
+
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },
@@ -1028,9 +1289,48 @@ export default defineComponent({
             label: it.name,
             value: it.name,
           };
-        }
-      )
+        },
+      ),
     );
+
+    const timeShifts = [];
+
+    const addTimeShift = () => {
+      const newTimeShift = {
+        offSet: "15m",
+        data: {
+          selectedDate: {
+            relative: {
+              value: 15,
+              period: "m",
+              label: "Minutes",
+            },
+          },
+        },
+      };
+
+      timeShifts.push(newTimeShift);
+      if (
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+      }
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.time_shift.push({
+        offSet: newTimeShift.offSet,
+      });
+    };
+
+    const removeTimeShift = (index: any) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.time_shift.splice(index, 1);
+    };
 
     return {
       t,
@@ -1047,6 +1347,8 @@ export default defineComponent({
       legendWidthValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
+      addTimeShift,
+      removeTimeShift,
     };
   },
 });

@@ -98,7 +98,7 @@ impl Metadata for TraceListIndex {
 
             let mut data = json::to_value(item).unwrap();
             let data = data.as_object_mut().unwrap();
-            let hour_key = ingestion::get_wal_time_key(
+            let hour_key = ingestion::get_write_partition_key(
                 timestamp,
                 PARTITION_KEYS.to_vec().as_ref(),
                 unwrap_partition_time_level(None, StreamType::Metadata),
@@ -124,6 +124,22 @@ impl Metadata for TraceListIndex {
         _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
         if let Err(e) = writer.sync().await {
             log::error!("[TraceListIndex] error while syncing writer: {}", e);
+        }
+
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::{
+                common::infra::config::O2_CONFIG,
+                openfga::authorizer::authz::set_ownership_if_not_exists,
+            };
+
+            if O2_CONFIG.openfga.enabled {
+                set_ownership_if_not_exists(
+                    org_id,
+                    &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
+                )
+                .await;
+            }
         }
 
         Ok(())
@@ -189,6 +205,7 @@ impl TraceListIndex {
                 flatten_level: None,
                 max_query_range: 0,
                 defined_schema_fields: None,
+                store_original_data: false,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
@@ -246,7 +263,7 @@ mod tests {
             config::get_config().common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
-        let hour_key = ingestion::get_wal_time_key(
+        let hour_key = ingestion::get_write_partition_key(
             timestamp,
             &vec![],
             unwrap_partition_time_level(None, StreamType::Metadata),

@@ -13,18 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::Utc;
 use config::{
     get_config,
+    ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    RwAHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    RwAHashMap, RwHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
+use serde::Serialize;
 
 use crate::{
     db as infra_db,
@@ -39,9 +41,12 @@ pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, Vec<(i64, bytes::B
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
-    Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
+/// Used for filtering records when a stream is configured to store original unflattened records
+/// use a RwHashMap instead of RwAHashMap because of high write ratio as
+/// SnowflakeIdGenerator::generate() requires a &mut
+pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
+    Lazy::new(Default::default);
 
 pub async fn init() -> Result<()> {
     history::init().await?;
@@ -58,7 +63,7 @@ pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Re
 
     let r = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.schema.clone());
+        return Ok(schema.schema().as_ref().clone());
     }
     drop(r);
     // if not found in cache, get from db
@@ -634,15 +639,19 @@ pub fn get_merge_schema_changes(
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct SchemaCache {
-    schema: Schema,
+    schema: SchemaRef,
     fields_map: HashMap<String, usize>,
     hash_key: String,
 }
 
 impl SchemaCache {
     pub fn new(schema: Schema) -> Self {
+        Self::new_from_arc(Arc::new(schema))
+    }
+
+    pub fn new_from_arc(schema: Arc<Schema>) -> Self {
         let hash_key = schema.hash_key();
         let fields_map = schema
             .fields()
@@ -661,12 +670,22 @@ impl SchemaCache {
         &self.hash_key
     }
 
-    pub fn schema(&self) -> &Schema {
+    pub fn schema(&self) -> &Arc<Schema> {
         &self.schema
     }
 
     pub fn fields_map(&self) -> &HashMap<String, usize> {
         &self.fields_map
+    }
+
+    pub fn contains_field(&self, field_name: &str) -> bool {
+        self.fields_map.contains_key(field_name)
+    }
+
+    pub fn field_with_name(&self, field_name: &str) -> Option<&FieldRef> {
+        self.fields_map
+            .get(field_name)
+            .and_then(|i| self.schema.fields().get(*i))
     }
 }
 

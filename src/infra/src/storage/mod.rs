@@ -14,14 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{get_config, is_local_disk_storage, metrics};
+use datafusion::parquet::data_type::AsBytes;
 use futures::{StreamExt, TryStreamExt};
-use object_store::ObjectStore;
+use object_store::{path::Path, ObjectStore, WriteMultipart};
 use once_cell::sync::Lazy;
 
 pub mod local;
 pub mod remote;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
+pub const MULTI_PART_UPLOAD_DATA_SIZE: f64 = 100.0;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
 pub static LOCAL_CACHE: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_cache);
@@ -77,7 +79,20 @@ pub async fn get(file: &str) -> Result<bytes::Bytes, anyhow::Error> {
 }
 
 pub async fn put(file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
-    DEFAULT.put(&file.into(), data.into()).await?;
+    if bytes_size_in_mb(&data) >= MULTI_PART_UPLOAD_DATA_SIZE {
+        put_multipart(file, data).await?;
+    } else {
+        DEFAULT.put(&file.into(), data.into()).await?;
+    }
+    Ok(())
+}
+
+pub async fn put_multipart(file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+    let path = Path::from(file);
+    let upload = DEFAULT.put_multipart(&path).await?;
+    let mut write = WriteMultipart::new(upload);
+    write.write(data.as_bytes());
+    write.finish().await?;
     Ok(())
 }
 
@@ -100,7 +115,12 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
                     log::debug!("Deleted object: {}", file);
                 }
                 Err(e) => {
-                    log::error!("Failed to delete object: {:?}", e);
+                    // TODO: need a better solution for identifying the error
+                    if file.ends_with(".puffin") {
+                        // ignore puffin file deletion error
+                    } else {
+                        log::error!("Failed to delete object: {:?}", e);
+                    }
                 }
             }
         })
@@ -127,4 +147,8 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
     } else {
         key.to_string()
     }
+}
+
+fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {
+    b.len() as f64 / (1024.0 * 1024.0)
 }

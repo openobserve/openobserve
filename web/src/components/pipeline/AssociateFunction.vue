@@ -330,7 +330,7 @@ const saveFunction = () => {
 };
 
 const onFunctionCreation = async (_function: any) => {
-  // Assing newly created function to the block
+  // Assign newly created function to the block
   createNewFunction.value = false;
   emit("add:function", _function);
   await nextTick();

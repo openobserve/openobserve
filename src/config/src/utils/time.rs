@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDateTime, TimeZone, Utc};
 use once_cell::sync::Lazy;
 
 use crate::utils::json;
@@ -22,6 +22,8 @@ use crate::utils::json;
 // is in seconds or milliseconds or microseconds or nanoseconds
 pub static BASE_TIME: Lazy<DateTime<Utc>> =
     Lazy::new(|| Utc.with_ymd_and_hms(1971, 1, 1, 0, 0, 0).unwrap());
+
+pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
 
 // check format: 1s, 1m, 1h, 1d, 1w, 1y, 1h10m30s
 static TIME_UNITS: [(char, u64); 7] = [
@@ -213,6 +215,16 @@ pub fn parse_str_to_timestamp_micros_as_option(v: &str) -> Option<i64> {
     }
 }
 
+/// Get the end of the day timestamp_micros
+pub fn end_of_the_day(timestamp: i64) -> i64 {
+    let t = Utc.timestamp_nanos((timestamp + DAY_MICRO_SECS) * 1000);
+    let t_next_day_zero = Utc
+        .with_ymd_and_hms(t.year(), t.month(), t.day(), 0, 0, 0)
+        .unwrap()
+        .timestamp_micros();
+    t_next_day_zero - 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,5 +386,14 @@ mod tests {
         assert_eq!(parse_timezone_to_offset("CST"), 28800);
         assert_eq!(parse_timezone_to_offset("+08:00"), 28800);
         assert_eq!(parse_timezone_to_offset("-08:00"), -28800);
+    }
+
+    #[test]
+    fn test_end_of_the_day() {
+        let t = [1609459200000000, 1727740800000000];
+        let d = [1609545599999999, 1727827199999999];
+        for i in 0..t.len() {
+            assert_eq!(end_of_the_day(t[i]), d[i]);
+        }
     }
 }

@@ -79,7 +79,8 @@
       >
         <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
           <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
-          <pre>Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local 
+          <pre>
+Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local 
 Make changes accordingly to the above URL.
           </pre>
         </q-tab-panel>
@@ -136,9 +137,15 @@ Make changes accordingly to the above URL.
         </li>
       </ol>
       You can refer and install
-      <a href="https://github.com/openobserve/hotcommerce">HOT commerce</a> app
-      as an example to understand how this works in practice. Refer to
-      <a href="https://github.com/open-telemetry/opentelemetry-operator"
+      <a
+        href="https://github.com/openobserve/hotcommerce"
+        class="hover:tw-underline text-primary"
+        >HOT commerce</a
+      >
+      app as an example to understand how this works in practice. Refer to
+      <a
+        href="https://github.com/open-telemetry/opentelemetry-operator"
+        class="hover:tw-underline text-primary"
         >OpenTelemetry operator</a
       >
       for further documentation.
@@ -188,7 +195,7 @@ endpoint.value = {
 
 const accessKey = computed(() => {
   return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
+    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`,
   );
 });
 

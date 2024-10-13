@@ -16,13 +16,13 @@
 use async_trait::async_trait;
 use chrono::Duration;
 use config::utils::json;
-use sqlx::Row;
+use sqlx::{Pool, Row, Sqlite};
 
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
     db::{
         self,
-        sqlite::{CLIENT_RO, CLIENT_RW},
+        sqlite::{create_index, CLIENT_RO, CLIENT_RW},
     },
     errors::{DbError, Error, Result},
 };
@@ -62,27 +62,42 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP
+    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
+    data         TEXT not null
 );
             "#,
         )
         .execute(&*client)
         .await?;
+
+        // Add data column for old version <= 0.10.9
+        add_data_column(&client).await?;
         Ok(())
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        let queries = vec![
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
-        ];
+        create_index(
+            "scheduled_jobs_key_idx",
+            "scheduled_jobs",
+            false,
+            &["module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_key_idx",
+            "scheduled_jobs",
+            false,
+            &["org", "module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_module_key_idx",
+            "scheduled_jobs",
+            true,
+            &["org", "module", "module_key"],
+        )
+        .await?;
 
-        for query in queries {
-            sqlx::query(query).execute(&*client).await?;
-        }
         Ok(())
     }
 
@@ -117,8 +132,8 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time, data)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT DO NOTHING;
         "#,
         )
@@ -132,6 +147,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(trigger.next_run_at)
         .bind(0)
         .bind(0)
+        .bind(&trigger.data)
         .execute(&mut *tx)
         .await
         {
@@ -229,14 +245,15 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         let client = client.lock().await;
         sqlx::query(
             r#"UPDATE scheduled_jobs
-SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5
-WHERE org = $6 AND module_key = $7 AND module = $8;"#,
+SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
+WHERE org = $7 AND module_key = $8 AND module = $9;"#,
         )
         .bind(&trigger.status)
         .bind(trigger.retries)
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
+        .bind(&trigger.data)
         .bind(&trigger.org)
         .bind(&trigger.module_key)
         .bind(&trigger.module)
@@ -435,4 +452,21 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
         Ok(())
     }
+}
+
+async fn add_data_column(client: &Pool<Sqlite>) -> Result<()> {
+    // Attempt to add the column, ignoring the error if the column already exists
+    if let Err(e) =
+        sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data TEXT NOT NULL DEFAULT '';"#)
+            .execute(client)
+            .await
+    {
+        // Check if the error is about the duplicate column
+        if !e.to_string().contains("duplicate column name") {
+            // If the error is not about the duplicate column, return it
+            return Err(e.into());
+        }
+    }
+
+    Ok(())
 }

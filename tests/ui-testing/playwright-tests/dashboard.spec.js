@@ -9,7 +9,8 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
-  //  await page.getByText('Login as internal user').click();
+  // await page.getByText('Login as internal user').click();
+  await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -30,6 +31,34 @@ async function login(page) {
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
     waitUntil: "networkidle",
   });
+  await page
+  .locator('[data-test="navbar-organizations-select"]')
+  .getByText("arrow_drop_down")
+  .click();
+await page.getByRole("option", { name: "default", exact: true }).click();
+}
+
+async function ingestion(page) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
+
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+  const fetchResponse = await fetch(
+    `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+    {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(logsdata),
+    }
+  );
+  const response = await fetchResponse.json();
+  console.log(response);
 }
 
 async function waitForDashboardPage(page) {
@@ -76,74 +105,19 @@ test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
 
     // just to make sure org is set
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
-    // ("ingests logs via API", () => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    // const logsdata = {}; // Fill this with your actual data
-
-    const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-      {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(logsdata),
-      }
-    );
-    const response = await fetchResponse.json();
-
     await orgNavigation;
-
-    // Making a POST request using fetch API
-    // const response = await page.evaluate(
-    //     async ({ url, headers, orgId, streamName, logsdata }) => {
-    //         const fetchResponse = await fetch(
-    //             `${url}/api/${orgId}/${streamName}/_json`,
-    //             {
-    //                 method: "POST",
-    //                 headers: headers,
-    //                 body: JSON.stringify(logsdata),
-    //             }
-    //         );
-    //         return await fetchResponse.json();
-    //     },
-    //     {
-    //         url: process.env.INGESTION_URL,
-    //         headers: headers,
-    //         orgId: orgId,
-    //         streamName: streamName,
-    //         logsdata: logsdata,
-    //     }
-    // );
-
-    console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
-    //   await page.goto(
-    //   `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    //  );
-    //  const allsearch = page.waitForResponse("**/api/default/_search**");
-    //  await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    //  await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
-  test("should create a new dashboar", async ({ page }) => {
+  test("should create a new dashboard", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -1086,29 +1060,25 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_host"] [data-test="dashboard-add-filter-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="dashboard-filter-item-kubernetes_host"]')
-      .click();
-    await page.getByText("Condition").click();
-    await page
-      .locator('[data-test="dashboard-filter-condition-panel"]')
-      .getByText("arrow_drop_down")
-      .click();
+ 
+      await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+      await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+
+
+      await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+
     await page.getByRole("option", { name: "Is Null" }).click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(200);
 
-    // Apply "=" filter
-    await page
-      .locator('[data-test="dashboard-filter-item-kubernetes_host"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-filter-condition-panel"]')
-      .getByText("arrow_drop_down")
-      .click();
+    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+    await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+
+
     await page.getByRole("option", { name: "=", exact: true }).click();
     await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("kubernetes_docker_Id");
+    await page.getByLabel("Value").fill("kubernetes_docker_id");
     await page.locator('[data-test="dashboard-apply"]').click();
 
     // Apply "Is Not Null" filter
@@ -1119,13 +1089,10 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
 
-    await page
-      .locator('[data-test="dashboard-filter-item-kubernetes_host"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-filter-condition-panel"]')
-      .getByText("arrow_drop_down")
-      .click();
+    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+    await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+
     await page.getByText("Is Not Null").click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
@@ -1635,7 +1602,7 @@ test.describe("dashboard UI testcases", () => {
 
     page.once("dialog", (dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => {});
+      dialog.dismiss().catch(() => { });
     });
     // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
     //  await page.waitForTimeout(1000);
@@ -1757,7 +1724,7 @@ test.describe("dashboard UI testcases", () => {
 
     page.once("dialog", (dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => {});
+      dialog.dismiss().catch(() => { });
     });
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 

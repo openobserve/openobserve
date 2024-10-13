@@ -28,6 +28,7 @@ pub mod functions;
 pub mod instance;
 pub mod kv;
 pub mod metrics;
+#[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod organization;
 pub mod pipelines;
@@ -35,6 +36,7 @@ pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
 pub mod session;
+pub mod short_url;
 pub mod syslog;
 pub mod user;
 pub mod version;

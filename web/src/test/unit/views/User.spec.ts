@@ -114,7 +114,7 @@ describe("Users", async () => {
   //         .setValue("omk@gmail.com");
   //     });
 
-  //     it("Should select user as Memmber", async () => {
+  //     it("Should select user as Member", async () => {
   //       global.server.use(
   //         rest.post(
   //           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/organizations/members`,

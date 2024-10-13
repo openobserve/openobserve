@@ -35,7 +35,10 @@ use config::{
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
+        ingestion::{
+            BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus, ID_COL_NAME,
+            ORIGINAL_DATA_COL_NAME,
+        },
         stream::StreamParams,
     },
     service::{
@@ -82,6 +85,7 @@ pub async fn ingest(
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
     let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut streams_need_original_set: HashSet<String> = HashSet::new();
 
     let mut json_data_by_stream = HashMap::new();
     let mut next_line_is_data = false;
@@ -145,9 +149,10 @@ pub async fn ingest(
             }
             // End get stream keys
 
-            crate::service::ingestion::get_user_defined_schema(
+            crate::service::ingestion::get_uds_and_original_data_streams(
                 &streams,
                 &mut user_defined_schema_map,
+                &mut streams_need_original_set,
             )
             .await;
 
@@ -165,9 +170,25 @@ pub async fn ingest(
         } else {
             next_line_is_data = false;
 
-            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+            // store a copy of original data before it's being transformed and/or flattened, unless
+            // 1. original data is not an object -> won't be flattened.
+            // 2. no routing and current StreamName not in streams_need_original_set
+            let original_data = if value.is_object() {
+                if stream_routing_map.is_empty()
+                    && !streams_need_original_set.contains(&stream_name)
+                {
+                    None
+                } else {
+                    // otherwise, make a copy in case the routed stream needs original data
+                    Some(value.to_string())
+                }
+            } else {
+                None // `item` won't be flattened, no need to store original
+            };
+
+            let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             // Start row based transform before flattening the value
-            if let Some(transforms) = stream_before_functions_map.get(&key) {
+            if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
                 if !transforms.is_empty() {
                     let mut ret_value = value.clone();
                     ret_value = crate::service::ingestion::apply_stream_functions(
@@ -201,6 +222,7 @@ pub async fn ingest(
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
 
+            let mut routed_stream_name = stream_name.clone();
             // Start re-routing if exists
             if let Some(routing) = stream_routing_map.get(&stream_name) {
                 if !routing.is_empty() {
@@ -214,13 +236,15 @@ pub async fn ingest(
                             }
                         }
                         if is_routed && !val.is_empty() {
-                            stream_name = route.destination.clone();
+                            routed_stream_name = route.destination.clone();
                             break;
                         }
                     }
                 }
             }
             // End re-routing
+
+            let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
 
             // Start row based transform
             if let Some(transforms) = stream_after_functions_map.get(&key) {
@@ -231,14 +255,14 @@ pub async fn ingest(
                         ret_value,
                         &stream_vrl_map,
                         org_id,
-                        &stream_name,
+                        &routed_stream_name,
                         &mut runtime,
                     )?;
 
                     if ret_value.is_null() || !ret_value.is_object() {
                         bulk_res.errors = true;
                         add_record_status(
-                            stream_name.clone(),
+                            routed_stream_name.clone(),
                             &doc_id,
                             action.clone(),
                             Some(value),
@@ -265,8 +289,25 @@ pub async fn ingest(
                 local_val.insert("_id".to_string(), json::Value::String(doc_id.to_owned()));
             }
 
-            if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+            if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
                 local_val = crate::service::logs::refactor_map(local_val, fields);
+            }
+
+            // add `_original` and '_record_id` if required by StreamSettings
+            if streams_need_original_set.contains(&routed_stream_name) && original_data.is_some() {
+                local_val.insert(
+                    ORIGINAL_DATA_COL_NAME.to_string(),
+                    original_data.unwrap().into(),
+                );
+                let record_id = crate::service::ingestion::generate_record_id(
+                    org_id,
+                    &routed_stream_name,
+                    &StreamType::Logs,
+                );
+                local_val.insert(
+                    ID_COL_NAME.to_string(),
+                    json::Value::String(record_id.to_string()),
+                );
             }
 
             // handle timestamp
@@ -276,7 +317,7 @@ pub async fn ingest(
                     Err(_e) => {
                         bulk_res.errors = true;
                         add_record_status(
-                            stream_name.clone(),
+                            routed_stream_name.clone(),
                             &doc_id,
                             action.clone(),
                             Some(value),
@@ -295,7 +336,7 @@ pub async fn ingest(
                 bulk_res.errors = true;
                 let failure_reason = Some(get_upto_discard_error().to_string());
                 add_record_status(
-                    stream_name.clone(),
+                    routed_stream_name.clone(),
                     &doc_id,
                     action.clone(),
                     Some(value),
@@ -311,7 +352,7 @@ pub async fn ingest(
             );
 
             let fns_length = stream_before_functions_map
-                .get(&key)
+                .get(&main_stream_key)
                 .map(|v| v.len())
                 .unwrap_or_default()
                 + stream_after_functions_map
@@ -320,7 +361,7 @@ pub async fn ingest(
                     .unwrap_or_default();
 
             let (ts_data, fn_num) = json_data_by_stream
-                .entry(stream_name.clone())
+                .entry(routed_stream_name.clone())
                 .or_insert((Vec::new(), None));
             ts_data.push((timestamp, local_val));
             *fn_num = Some(fns_length);

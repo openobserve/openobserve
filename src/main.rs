@@ -17,6 +17,7 @@ use std::{cmp::max, collections::HashMap, net::SocketAddr, str::FromStr, time::D
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
+use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
 use log::LevelFilter;
 use openobserve::{
@@ -29,9 +30,9 @@ use openobserve::{
     handler::{
         grpc::{
             auth::check_auth,
+            flight::FlightServiceImpl,
             request::{
                 event::Eventer,
-                file_list::Filelister,
                 ingest::Ingester,
                 logs::LogsServer,
                 metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
@@ -45,18 +46,17 @@ use openobserve::{
     job, router,
     service::{db, metadata, search::SEARCH_SERVER, usage},
 };
-use opentelemetry::KeyValue;
+use opentelemetry::{global, trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
-use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
 use proto::cluster_rpc::{
-    event_server::EventServer, filelist_server::FilelistServer, ingest_server::IngestServer,
-    metrics_server::MetricsServer, query_cache_server::QueryCacheServer,
-    search_server::SearchServer, usage_server::UsageServer,
+    event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
+    query_cache_server::QueryCacheServer, search_server::SearchServer, usage_server::UsageServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -68,6 +68,7 @@ use tonic::{
     metadata::{MetadataKey, MetadataMap, MetadataValue},
 };
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 
 #[cfg(feature = "mimalloc")]
@@ -153,7 +154,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
-        cfg.limit.cpu_num,
+        cfg.limit.real_cpu_num,
         cfg.limit.mem_total / 1024 / 1024,
         cfg.limit.disk_total / 1024 / 1024 / 1024,
         cfg.limit.disk_free / 1024 / 1024 / 1024,
@@ -328,7 +329,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("HTTP server stopped");
 
-    // flush useage report
+    // flush usage report
     usage::flush().await;
 
     // leave the cluster
@@ -382,13 +383,14 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip);
     let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let filelist_svc = FilelistServer::new(Filelister)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_svc = MetricsServer::new(MetricsQuerier)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -398,14 +400,18 @@ async fn init_common_grpc_server(
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let tracer = TraceServer::default();
-    let trace_svc = TraceServiceServer::new(tracer)
+    let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let ingest_svc = IngestServer::new(Ingester)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
@@ -415,7 +421,6 @@ async fn init_common_grpc_server(
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
-        .add_service(filelist_svc)
         .add_service(metrics_svc)
         .add_service(metrics_ingest_svc)
         .add_service(trace_svc)
@@ -423,6 +428,7 @@ async fn init_common_grpc_server(
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
+        .add_service(flight_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
@@ -765,11 +771,13 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         })
     };
     let tracer = tracer
-        .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", cfg.common.node_role.to_string()),
-            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-            KeyValue::new("service.version", VERSION),
-        ])))
+        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
+            Resource::new(vec![
+                KeyValue::new("service.name", cfg.common.node_role.to_string()),
+                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+                KeyValue::new("service.version", VERSION),
+            ]),
+        ))
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     let layer = if cfg.log.json_format {
@@ -781,10 +789,13 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         tracing_subscriber::fmt::layer().with_ansi(false).boxed()
     };
 
+    global::set_tracer_provider(tracer.clone());
     Registry::default()
         .with(tracing_subscriber::EnvFilter::new(&cfg.log.level))
         .with(layer)
-        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .with(OpenTelemetryLayer::new(
+            tracer.tracer("tracing-otel-subscriber"),
+        ))
         .init();
     Ok(())
 }

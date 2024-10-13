@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Range;
+use std::{ops::Range, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -93,16 +93,23 @@ impl ObjectStore for Remote {
         }
     }
 
-    async fn put_multipart(&self, _location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
-    }
-
     async fn put_multipart_opts(
         &self,
-        _location: &Path,
-        _opts: PutMultipartOpts,
+        location: &Path,
+        opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
+        let file = location.to_string();
+        match self
+            .client
+            .put_multipart_opts(&(format_key(&file, true).into()), opts)
+            .await
+        {
+            Ok(r) => Ok(r),
+            Err(err) => {
+                log::error!("s3 multipart File upload error: {:?}", err);
+                Err(err)
+            }
+        }
     }
 
     async fn get(&self, location: &Path) -> Result<GetResult> {
@@ -240,10 +247,21 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
     if cfg.s3.feature_http2_only {
         opts = opts.with_http2_only();
     }
+    if cfg.s3.max_idle_per_host > 0 {
+        opts = opts.with_pool_max_idle_per_host(cfg.s3.max_idle_per_host)
+    }
     let force_hosted_style = cfg.s3.feature_force_hosted_style || cfg.s3.feature_force_path_style;
+    let retry_config = object_store::RetryConfig {
+        max_retries: cfg.s3.max_retries,
+        // this value is from the default arrow-rs object
+        // https://github.com/apache/arrow-rs/blob/678517018ddfd21b202a94df13b06dfa1ab8a378/object_store/src/client/retry.rs#L171-L179
+        retry_timeout: Duration::from_secs(3 * 60),
+        backoff: object_store::BackoffConfig::default(),
+    };
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
         .with_client_options(opts)
         .with_bucket_name(&cfg.s3.bucket_name)
+        .with_retry(retry_config)
         .with_virtual_hosted_style_request(force_hosted_style);
     if !cfg.s3.server_url.is_empty() {
         builder = builder.with_endpoint(&cfg.s3.server_url);

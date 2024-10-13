@@ -122,7 +122,7 @@ def test_e2e_validhistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
     }
 
@@ -152,7 +152,7 @@ def test_e2e_histogramwithlimit(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
     }
 
@@ -210,7 +210,7 @@ def test_e2e_matchallindexhistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
 } 
 
@@ -240,7 +240,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
 } 
 
@@ -264,7 +264,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
 } 
 
@@ -357,7 +357,7 @@ def test_e2e_matchallcount(create_session, base_url):
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "size": -1,
-                        "track_total_hits": True,
+                        "track_total_hits": False
                 },
             }
     json_data2 = {
@@ -366,7 +366,7 @@ def test_e2e_matchallcount(create_session, base_url):
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "size": -1,
-                        "track_total_hits": True,
+                        "track_total_hits": False
                 },
             }
 
@@ -604,7 +604,7 @@ def test_e2e_inquery(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
   "query": {
-    "sql": "SELECT * FROM \"e2e_automate\" WHERE kubernetes_container_name IN ('controller', 'ziox') ORDER BY _timestamp DESC",
+    "sql": "SELECT * FROM \"stream_pytest_data\" WHERE kubernetes_container_name IN ('controller', 'ziox') ORDER BY _timestamp DESC",
     "start_time": one_min_ago,
     "end_time": end_time,
     "from": 0,
@@ -618,33 +618,6 @@ def test_e2e_inquery(create_session, base_url):
         resp_get_inquery.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
     response_data = resp_get_inquery.json()
-
-
-def test_e2e_distinctquery(create_session, base_url):
-    """Running an E2E test for valid sql query."""
-
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": "SELECT DISTINCT kubernetes_container_name, _timestamp FROM \"e2e_automate\" ORDER BY _timestamp",
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 250,
-            "quick_mode": False,
-            "sql_mode": "full"
-        }
-}
-    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_distinctquery.status_code == 200
-    ), f"histogram mode added 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
-    response_data = resp_get_distinctquery.json()
 
 
 
@@ -910,7 +883,7 @@ def test_e2e_eventtimestamp(create_session, base_url):
 
     json_data = {
         "query": {
-            "sql": "SELECT histogram(_timestamp, '1 minutes') as eventtime1, COUNT(_timestamp) as totallogcount FROM \"e2e_automate\" GROUP BY eventtime1 Having totallogcount > 100 ORDER BY eventtime1 DESC",
+            "sql": "SELECT histogram(_timestamp, '1 minutes') as eventtime1, COUNT(_timestamp) as totallogcount FROM \"stream_pytest_data\" GROUP BY eventtime1 Having totallogcount > 100 ORDER BY eventtime1 DESC",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -933,4 +906,165 @@ def test_e2e_eventtimestamp(create_session, base_url):
     assert len(eventtimes) == len(set(eventtimes)), "eventtime1 values are not unique"
 
 
+def test_e2e_distinctqueries(create_session, base_url):
+    """Running an E2E test for valid sql query."""
 
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT DISTINCT kubernetes_container_name \nFROM \"stream_pytest_data\"\n",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+    }
+        
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()
+
+
+def test_e2e_countcase(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT histogram(_timestamp, '1 minutes') as eventtime1, COUNT(_timestamp) as totallogcount, COUNT(CASE WHEN log = 'error' THEN 1 END) as errorlogcount, (COUNT(CASE WHEN log = 'error' THEN 1 END) / COUNT(*) * 100.0) as errorrate FROM 'stream_pytest_data' GROUP BY eventtime1 ORDER BY eventtime1 DESC",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()
+
+
+def test_e2e_coalesce(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT COALESCE(log, 'first value is null') as \"x_axis_1\", count(kubernetes_namespace_name) as \"y_axis_1\"  FROM \"stream_pytest_data\"  GROUP BY x_axis_1",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()
+
+
+def test_e2e_percentile(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT _timestamp as \"x_axis_1\", approx_percentile_cont(arrow_cast(took,'Int64'), 0.99) as \"y_axis_1\"  FROM \"stream_pytest_data\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()
+
+
+def test_e2e_float(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT _timestamp AS \"x_axis_1\", approx_percentile_cont(arrow_cast(took,'Float64'), 0.99) AS \"y_axis_1\"  FROM \"stream_pytest_data\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()
+
+
+    
+def test_e2e_matchallsinglechar(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('m')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()

@@ -39,6 +39,8 @@ pub enum TriggerDataStatus {
 pub enum TriggerDataType {
     #[serde(rename = "report")]
     Report,
+    #[serde(rename = "cached_report")]
+    CachedReport,
     #[serde(rename = "alert")]
     Alert,
     #[serde(rename = "derived_stream")]
@@ -59,6 +61,8 @@ pub struct TriggerData {
     pub end_time: i64,
     pub retries: i32,
     pub error: Option<String>,
+    pub success_response: Option<String>,
+    pub is_partial: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -95,6 +99,8 @@ pub struct UsageData {
     pub took_wait_in_queue: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result_cache_ratio: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -151,7 +157,8 @@ impl From<UsageType> for UsageEvent {
             UsageType::Search
             | UsageType::SearchAround
             | UsageType::SearchTopNValues
-            | UsageType::MetricSearch => UsageEvent::Search,
+            | UsageType::MetricSearch
+            | UsageType::SearchHistory => UsageEvent::Search,
             UsageType::Functions => UsageEvent::Functions,
             UsageType::Retention => UsageEvent::Other,
         }
@@ -190,6 +197,8 @@ pub enum UsageType {
     SearchAround,
     #[serde(rename = "/_values")]
     SearchTopNValues,
+    #[serde(rename = "/_search_history")]
+    SearchHistory,
     #[serde(rename = "functions")]
     Functions,
     #[serde(rename = "data_retention")]
@@ -218,6 +227,7 @@ impl std::fmt::Display for UsageType {
             UsageType::MetricSearch => write!(f, "/metrics/_search"),
             UsageType::SearchAround => write!(f, "/_around"),
             UsageType::SearchTopNValues => write!(f, "/_values"),
+            UsageType::SearchHistory => write!(f, "/_search_history"),
             UsageType::Functions => write!(f, "functions"),
             UsageType::Retention => write!(f, "data_retention"),
             UsageType::Syslog => write!(f, "syslog"),
@@ -233,6 +243,8 @@ pub struct RequestStats {
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -259,6 +271,7 @@ impl Default for RequestStats {
             records: 0,
             response_time: 0.0,
             request_body: None,
+            function: None,
             cached_ratio: None,
             compressed_size: None,
             min_ts: None,
@@ -278,6 +291,7 @@ impl From<FileMeta> for RequestStats {
             size: meta.original_size as f64 / SIZE_IN_MB,
             records: meta.records,
             response_time: 0.0,
+            function: None,
             request_body: None,
             cached_ratio: None,
             compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),

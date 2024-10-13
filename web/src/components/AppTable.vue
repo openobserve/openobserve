@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="qTableRef"
       :title="title"
       :rows="rows"
-      :columns="(columns as [])"
+      :columns="columns as []"
       :table-colspan="9"
       row-key="index"
       :virtual-scroll="virtualScroll"

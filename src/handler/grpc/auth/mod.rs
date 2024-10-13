@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
 use tonic::{metadata::MetadataValue, Request, Status};
 
 use crate::common::{
-    infra::{
-        cluster::get_internal_grpc_token,
-        config::{ROOT_USER, USERS},
-    },
+    infra::config::{ROOT_USER, USERS},
     utils::auth::{get_hash, is_root_user},
 };
 
@@ -90,7 +88,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use config::cache_instance_id;
+    use config::{cache_instance_id, get_config};
 
     use super::*;
     use crate::common::meta::user::User;
@@ -116,6 +114,9 @@ mod tests {
         );
 
         let mut request = tonic::Request::new(());
+        request.set_timeout(std::time::Duration::from_secs(
+            get_config().limit.query_timeout,
+        ));
 
         let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbg==".parse().unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
@@ -146,6 +147,9 @@ mod tests {
         );
 
         let mut request = tonic::Request::new(());
+        request.set_timeout(std::time::Duration::from_secs(
+            get_config().limit.query_timeout,
+        ));
         let token: MetadataValue<_> = "instance".parse().unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
@@ -173,6 +177,9 @@ mod tests {
             },
         );
         let mut request = tonic::Request::new(());
+        request.set_timeout(std::time::Duration::from_secs(
+            get_config().limit.query_timeout,
+        ));
 
         let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbjg4OA=="
             .parse()

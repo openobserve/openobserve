@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap as stdHashMap;
+
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
@@ -26,9 +28,10 @@ pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
-static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
+static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
+pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
-pub fn connect() -> Box<dyn FileList> {
+pub fn connect_default() -> Box<dyn FileList> {
     match config::get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
@@ -36,6 +39,10 @@ pub fn connect() -> Box<dyn FileList> {
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
+}
+
+pub fn connect_local_cache() -> Box<dyn FileList> {
+    Box::<sqlite::SqliteFileList>::default()
 }
 
 #[async_trait]
@@ -46,6 +53,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
+    async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
     async fn batch_add_deleted(
@@ -69,6 +77,14 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
+    async fn query_ids(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileId>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -83,6 +99,8 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
     ) -> Result<i64>;
     async fn get_max_pk_value(&self) -> Result<i64>;
+    async fn get_min_pk_value(&self) -> Result<i64>;
+    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()>;
     async fn stats(
         &self,
         org_id: &str,
@@ -123,6 +141,7 @@ pub trait FileList: Sync + Send + 'static {
         offset: i64,
     ) -> Result<()>;
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
     async fn set_job_done(&self, id: i64) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
@@ -237,6 +256,34 @@ pub async fn query(
 }
 
 #[inline]
+#[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+    CLIENT.query_by_ids(ids).await
+}
+
+#[inline]
+#[tracing::instrument(
+    name = "infra:file_list:db:query_ids",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_ids(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<FileId>> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    CLIENT
+        .query_ids(org_id, stream_type, stream_name, time_range)
+        .await
+}
+
+#[inline]
 pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<(String, bool)>> {
     CLIENT.query_deleted(org_id, time_max, limit).await
 }
@@ -249,6 +296,11 @@ pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str
 #[inline]
 pub async fn get_max_pk_value() -> Result<i64> {
     CLIENT.get_max_pk_value().await
+}
+
+#[inline]
+pub async fn get_min_pk_value() -> Result<i64> {
+    CLIENT.get_min_pk_value().await
 }
 
 #[inline]
@@ -333,6 +385,11 @@ pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobReco
 }
 
 #[inline]
+pub async fn get_pending_jobs_count() -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
+    CLIENT.get_pending_jobs_count().await
+}
+
+#[inline]
 pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
     CLIENT.set_job_pending(ids).await
 }
@@ -357,17 +414,48 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
     CLIENT.clean_done_jobs(before_date).await
 }
 
+pub async fn local_cache_gc() -> Result<()> {
+    tokio::task::spawn(async move {
+        let cfg = config::get_config();
+        if cfg.common.local_mode || !cfg.common.meta_store_external {
+            return;
+        }
+
+        // gc every hour
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+        interval.tick().await; // the first tick is immediate
+        loop {
+            if let Ok(min_id) = get_min_pk_value().await {
+                if min_id > 0 {
+                    match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                        Ok(_) => log::info!("[file_list] local cache gc done"),
+                        Err(e) => log::error!("[file_list] local cache gc failed: {}", e),
+                    }
+                }
+            }
+            interval.tick().await;
+        }
+    });
+
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
+    #[sqlx(default)]
+    pub id: i64,
+    #[sqlx(default)]
     pub stream: String,
     pub date: String,
     pub file: String,
+    #[sqlx(default)]
     pub deleted: bool,
     pub min_ts: i64,
     pub max_ts: i64,
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    #[sqlx(default)]
     pub flattened: bool,
 }
 
@@ -438,4 +526,11 @@ pub enum FileListJobStatus {
     Pending,
     Running,
     Done,
+}
+
+#[derive(Clone, Debug, Default, sqlx::FromRow)]
+pub struct FileId {
+    pub id: i64,
+    pub records: i64,
+    pub original_size: i64,
 }

@@ -45,7 +45,7 @@ pub async fn create_dashboard(
     match dashboards::folders::get(org_id, folder_id).await {
         Ok(_) => {
             let dashboard_id = ider::generate();
-            match save_dashboard(org_id, &dashboard_id, folder_id, body).await {
+            match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
                 Ok(res) => {
                     set_ownership(
                         org_id,
@@ -71,7 +71,7 @@ pub async fn create_dashboard(
                 };
                 folders::save_folder(org_id, folder, true).await?;
                 let dashboard_id = ider::generate();
-                match save_dashboard(org_id, &dashboard_id, folder_id, body).await {
+                match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
                     Ok(res) => {
                         set_ownership(
                             org_id,
@@ -108,9 +108,10 @@ pub async fn update_dashboard(
     dashboard_id: &str,
     folder_id: &str,
     body: web::Bytes,
+    hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
     // Store new dashboard in the database
-    save_dashboard(org_id, dashboard_id, folder_id, body).await
+    save_dashboard(org_id, dashboard_id, folder_id, body, hash).await
 }
 
 #[tracing::instrument]
@@ -180,15 +181,20 @@ async fn save_dashboard(
     dashboard_id: &str,
     folder_id: &str,
     body: web::Bytes,
+    hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
-    match dashboards::put(org_id, dashboard_id, folder_id, body).await {
+    match dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))
         }
         Err(error) => {
             tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
-            Ok(Response::InternalServerError(error).into())
+            if error.to_string().contains("Conflict") {
+                Ok(Response::Conflict(error).into())
+            } else {
+                Ok(Response::InternalServerError(error).into())
+            }
         }
     }
 }
@@ -211,12 +217,16 @@ pub async fn move_dashboard(
             json::to_vec(&dashboard.v2.unwrap()).unwrap()
         } else if dashboard.version == 3 {
             json::to_vec(&dashboard.v3.unwrap()).unwrap()
-        } else {
+        } else if dashboard.version == 4 {
             json::to_vec(&dashboard.v4.unwrap()).unwrap()
+        } else {
+            json::to_vec(&dashboard.v5.unwrap()).unwrap()
         };
 
         // add the dashboard to the destination folder
-        if let Err(error) = dashboards::put(org_id, dashboard_id, to_folder, dash.into()).await {
+        if let Err(error) =
+            dashboards::put(org_id, dashboard_id, to_folder, dash.into(), None).await
+        {
             return Ok(Response::InternalServerError(error).into());
         }
 
@@ -232,6 +242,7 @@ pub async fn move_dashboard(
 enum Response {
     OkMessage(String),
     NotFound(String),
+    Conflict(anyhow::Error),
     InternalServerError(anyhow::Error),
 }
 
@@ -245,6 +256,10 @@ impl From<Response> for HttpResponse {
             Response::NotFound(entity) => Self::NotFound().json(MetaHttpResponse::error(
                 http::StatusCode::NOT_FOUND.into(),
                 format!("{entity} not found"),
+            )),
+            Response::Conflict(err) => Self::Conflict().json(MetaHttpResponse::error(
+                http::StatusCode::CONFLICT.into(),
+                err.to_string(),
             )),
             Response::InternalServerError(err) => {
                 Self::InternalServerError().json(MetaHttpResponse::error(

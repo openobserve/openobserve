@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
+use config::meta::cluster::get_internal_grpc_token;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_client::LogsServiceClient, logs_service_server::LogsService,
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -21,12 +21,12 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster, service::search::MetadataMap};
+use crate::service::{grpc::get_ingester_channel, search::MetadataMap};
 
 #[derive(Default)]
 pub struct LogsServer;
 
-#[async_trait]
+#[tonic::async_trait]
 impl LogsService for LogsServer {
     async fn export(
         &self,
@@ -53,10 +53,10 @@ impl LogsService for LogsServer {
             )
         });
 
-        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let channel = super::get_ingester_channel().await?;
+        let (addr, channel) = get_ingester_channel().await?;
         let client = LogsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)
@@ -72,15 +72,15 @@ impl LogsService for LogsServer {
             Ok(res) => {
                 if res.get_ref().partial_success.is_some() {
                     log::error!(
-                        "[Router:LOGS] export partial_success response: {:?}",
-                        res.get_ref()
+                        "[Router:LOGS] export partial_success node: {addr}, response: {:?}",
+                        res.get_ref(),
                     );
                 }
                 Ok(res)
             }
             Err(e) => {
                 let time = start.elapsed().as_millis() as usize;
-                log::error!("[Router:LOGS] export status: {e}, took: {time} ms");
+                log::error!("[Router:LOGS] export node: {addr}, status: {e}, took: {time} ms");
                 Err(e)
             }
         }

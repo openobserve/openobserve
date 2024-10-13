@@ -51,7 +51,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
         let cluster_name = config::get_cluster_name();
-        // regester to super cluster
+        // register to super cluster
         o2_enterprise::enterprise::super_cluster::kv::alert_manager::register_job_cluster(
             &cluster_name,
         )
@@ -66,7 +66,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(30));
+    let interval = get_config().limit.alert_schedule_interval;
+    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

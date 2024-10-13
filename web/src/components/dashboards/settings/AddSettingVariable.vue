@@ -53,9 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   stack-label
                   :rules="[
-                    (val: any) => !!(val.trim()) || 'Field is required!',
-                    (val: any) => /^[a-zA-Z0-9_-]*$/.test(val) || 'Only letters, numbers, hyphens (-), and underscores (_) are allowed.'
-                ]"
+                    (val: any) => !!val.trim() || 'Field is required!',
+                    (val: any) =>
+                      /^[a-zA-Z0-9_-]*$/.test(val) ||
+                      'Only letters, numbers, hyphens (-), and underscores (_) are allowed.',
+                  ]"
                 ></q-input>
               </div>
               <div class="textbox col">
@@ -71,10 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="text-body1 text-bold q-mt-lg"
+              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-lg"
               v-if="variableData.type !== 'dynamic_filters'"
             >
-              {{ t("dashboard.extraOptions") }}
+              <span>{{ t("dashboard.extraOptions") }}</span>
+              <div
+                v-if="variableData.type == 'custom' && variableData.multiSelect"
+              ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
               <div class="row">
@@ -158,13 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <div>
-                <q-toggle
-                  v-model="variableData.multiSelect"
-                  :label="t('dashboard.multiSelect')"
-                  data-test="dashboard-query_values-show_multiple_values"
-                />
-              </div>
-              <div>
                 <div class="flex flex-row">
                   <div
                     data-test="dashboard-query-values-filter"
@@ -214,7 +212,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="fieldsFilterFn"
                       :placeholder="filter.name ? '' : 'Select Field'"
                       class="textbox col no-case q-ml-sm"
-                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
                       style="max-width: 41%; width: 41%"
                       ><q-tooltip v-if="filter.name">
                         {{ filter.name }}
@@ -235,7 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: 18%"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
-                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                      :rules="[
+                        (val: any) => !!val.trim() || 'Field is required!',
+                      ]"
                       :options="[
                         '=',
                         '!=',
@@ -299,11 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop"
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
+              data-test="dashboard-variable-constant-value"
               dense
               filled
               outlined
               stack-label
-              :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             ></q-input>
           </div>
           <div class="textbox" v-if="['textbox'].includes(variableData.type)">
@@ -311,54 +314,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop"
               v-model="variableData.value"
               :label="t('dashboard.DefaultValue')"
+              data-test="dashboard-variable-textbox-default-value"
               dense
               filled
               outlined
               stack-label
             ></q-input>
           </div>
-          <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
-            <div>
-              <q-toggle
-                v-model="variableData.multiSelect"
-                :label="t('dashboard.multiSelect')"
-                data-test="dashboard-custom-show_multiple_values"
-              />
+            <div class="tw-flex">
+              <div class="tw-w-6"></div>
+              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+                Label
+              </div>
+              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+                Value
+              </div>
+              <div class="tw-w-12 tw-flex tw-flex-col tw-items-center">
+                <span v-if="!variableData.multiSelect"> Default </span>
+                <q-checkbox
+                  v-if="variableData.multiSelect"
+                  dense
+                  v-model="customSelectAllModel"
+                  data-test="dashboard-custom-variable-select-all-checkbox"
+                  @click="onCustomSelectAllClick"
+                  class="tw-ml-[0.4rem]"
+                >
+                  <q-tooltip anchor="top middle" self="bottom middle">
+                    Default - Select All
+                  </q-tooltip>
+                </q-checkbox>
+              </div>
+              <div class="tw-w-[2.62rem]"></div>
             </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
               class="row"
             >
+              <span class="tw-pt-3.5 tw-w-6">{{ index + 1 }}</span>
               <q-input
                 dense
                 filled
                 outlined
-                stack-label
-                :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                class="col textbox showLabelOnTop q-mr-sm"
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                class="col textbox q-mr-sm"
                 v-model="variableData.options[index].label"
-                :label="'Label ' + (index + 1) + ' *'"
+                :data-test="`dashboard-custom-variable-${index}-label`"
+                :placeholder="'Label ' + (index + 1)"
                 name="label"
               />
               <q-input
                 dense
                 filled
                 outlined
-                stack-label
-                :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                class="col textbox showLabelOnTop q-mr-sm"
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                class="col textbox q-mr-sm"
                 v-model="variableData.options[index].value"
-                :label="'Value ' + (index + 1) + ' *'"
+                :data-test="`dashboard-custom-variable-${index}-value`"
+                :placeholder="'Value ' + (index + 1)"
                 name="value"
               />
+              <div class="tw-flex tw-w-12 tw-item-center tw-justify-center">
+                <q-checkbox
+                  dense
+                  v-model="variableData.options[index].selected"
+                  :data-test="`dashboard-custom-variable-${index}-checkbox`"
+                  @click="onCheckboxClick(index)"
+                  class="q-mb-lg"
+                />
+              </div>
               <div>
                 <q-btn
                   flat
-                  style="margin-top: 33px"
                   round
                   @click="removeField(index)"
+                  :data-test="`dashboard-custom-variable-${index}-remove`"
                   icon="cancel"
                 />
               </div>
@@ -373,6 +404,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >Add Option</q-btn
               >
             </div>
+          </div>
+          <!-- multiselect toggle for query values and custom variables-->
+          <div
+            v-if="['query_values', 'custom'].includes(variableData.type)"
+            class="q-mt-md"
+          >
+            <q-toggle
+              v-model="variableData.multiSelect"
+              :label="t('dashboard.multiSelect')"
+              data-test="dashboard-query_values-show_multiple_values"
+            />
+          </div>
+          <!-- default value for multi select variables -->
+          <!-- it can be first value or all values -->
+          <div v-if="['query_values'].includes(variableData.type)">
+            <div
+              class="button-group multi-select-default-value-toggle q-mt-md"
+              style="margin-bottom: 12px"
+            >
+              <div class="multi-select-default-value">By Default Select:</div>
+              <div class="row">
+                <div>
+                  <button
+                    data-test="dashboard-multi-select-default-value-toggle-first-value"
+                    :class="
+                      variableData.selectAllValueForMultiSelect === 'first'
+                        ? 'selected'
+                        : ''
+                    "
+                    class="button button-left"
+                    type="button"
+                    style="padding: 8px"
+                    @click="variableData.selectAllValueForMultiSelect = 'first'"
+                  >
+                    First value
+                  </button>
+                </div>
+
+                <div v-if="variableData.multiSelect">
+                  <button
+                    data-test="dashboard-multi-select-default-value-toggle-all-values"
+                    :class="
+                      variableData.selectAllValueForMultiSelect === 'all'
+                        ? 'selected'
+                        : ''
+                    "
+                    type="button"
+                    class="button button-middle"
+                    style="padding: 8px"
+                    @click="variableData.selectAllValueForMultiSelect = 'all'"
+                  >
+                    All values
+                  </button>
+                </div>
+
+                <div>
+                  <button
+                    data-test="dashboard-multi-select-default-value-toggle-custom"
+                    :class="
+                      variableData.selectAllValueForMultiSelect === 'custom'
+                        ? 'selected'
+                        : ''
+                    "
+                    type="button"
+                    class="button button-right"
+                    style="padding: 8px"
+                    @click="
+                      variableData.selectAllValueForMultiSelect = 'custom'
+                    "
+                  >
+                    Custom
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- if selectAllValueForMultiSelect is custom then show this input -->
+            <div
+              v-if="
+                variableData.selectAllValueForMultiSelect === 'custom' &&
+                variableData.type === 'query_values'
+              "
+            >
+              <div
+                v-for="(value, index) in variableData.multiSelect
+                  ? variableData.customMultiSelectValue
+                  : [variableData.customMultiSelectValue[0]]"
+                :key="index"
+                class="q-mb-sm q-mt-md"
+                style="flex-wrap: wrap"
+              >
+                <div class="flex q-mr-sm" style="width: 50%">
+                  <q-input
+                    dense
+                    filled
+                    outlined
+                    stack-label
+                    class="col textbox showLabelOnTop"
+                    v-model="variableData.customMultiSelectValue[index]"
+                    name="value"
+                    placeholder="Enter value"
+                  />
+                  <q-btn
+                    v-if="variableData.multiSelect"
+                    size="sm"
+                    padding="12px 5px"
+                    flat
+                    dense
+                    @click="removeCustomValue(index)"
+                    icon="close"
+                    :data-test="`dashboard-variable-custom-close-${index}`"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="variableData.multiSelect"
+                class="flex"
+                style="width: 50%"
+              >
+                <q-btn
+                  no-caps
+                  icon="add"
+                  no-outline
+                  class="q-mt-md"
+                  @click="addCustomValue"
+                  data-test="dashboard-add-custom-value-btn"
+                >
+                </q-btn>
+              </div>
+            </div>
+          </div>
+
+          <!-- hide on dashboard toggle -->
+          <div>
+            <q-toggle
+              v-model="variableData.hideOnDashboard"
+              :label="t('dashboard.hideOnDashboard')"
+              data-test="dashboard-variable-hide_on_dashboard"
+            />
           </div>
           <div class="flex justify-center q-mt-lg">
             <q-btn
@@ -444,7 +614,7 @@ export default defineComponent({
     const addVariableForm: Ref<any> = ref(null);
     const data: any = reactive({
       schemaResponse: [],
-      streamType: ["logs", "metrics", "traces"],
+      streamType: ["logs", "metrics", "traces", "enrichment_tables"],
       streams: [],
       currentFieldsList: [],
 
@@ -454,7 +624,10 @@ export default defineComponent({
     const route = useRoute();
     const title = ref("Add Variable");
     const { getStreams, getStream } = useStreams();
-    const { showErrorNotification } = useNotifications();
+    const {
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -490,9 +663,24 @@ export default defineComponent({
       value: "",
       options: [],
       multiSelect: false,
+      hideOnDashboard: false,
+      selectAllValueForMultiSelect: "first",
+      customMultiSelectValue: [],
     });
 
     const filterCycleError: any = ref("");
+
+    // select all values as default value for custom typed variable
+    const customSelectAllModel: any = ref(false);
+
+    const handleCustomSelectAll = () => {
+      // if all values are selected, then check customSelectAllModel = true
+      if (variableData.options.every((option: any) => option.selected)) {
+        customSelectAllModel.value = true;
+      } else {
+        customSelectAllModel.value = false;
+      }
+    };
 
     const addFilter = () => {
       if (!variableData.query_data.filter) {
@@ -507,6 +695,16 @@ export default defineComponent({
     // by default, use multiSelect as false
     if (!variableData.multiSelect) {
       variableData.multiSelect = false;
+    }
+
+    // by default, use hideOnDashboard as false
+    if (!variableData.hideOnDashboard) {
+      variableData.hideOnDashboard = false;
+    }
+
+    // by default, use selectAllValueForMultiSelect as 'first'
+    if (!variableData.selectAllValueForMultiSelect) {
+      variableData.selectAllValueForMultiSelect = "first";
     }
 
     const filterUpdated = (index: number, filter: any) => {
@@ -525,12 +723,12 @@ export default defineComponent({
         if (newVal === "") {
           variableData.query_data.max_record_size = null;
         }
-      }
+      },
     );
 
     // watch for filter changes and set default value for Is Null and Is Not Null operators
     watch(
-      () => variableData.query_data.filter,
+      () => variableData?.query_data?.filter,
       (newValue) => {
         if (newValue && newValue.length > 0) {
           newValue.forEach((filter: any) => {
@@ -540,7 +738,7 @@ export default defineComponent({
           });
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     onMounted(async () => {
@@ -550,14 +748,38 @@ export default defineComponent({
         // Fetch dashboard data
         const data = JSON.parse(
           JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder,
+            ),
+          ),
         )?.variables?.list;
 
         // Find the variable to edit
         const edit = (data || []).find(
-          (it: any) => it.name === props.variableName
+          (it: any) => it.name === props.variableName,
         );
+
+        // for already created variable, need to add selected fields
+        // check if variable type is custom
+        if (edit?.type === "custom") {
+          //  loop on on options, and assign selected = false if selected key is not found
+          edit.options.forEach((option: any) => {
+            if (option.selected === undefined || option.selected === null) {
+              option.selected = false;
+            }
+          });
+
+          // for custom, check if all are selected
+          const allSelected = edit.options.every(
+            (option: any) => option.selected === true,
+          );
+          if (allSelected) {
+            customSelectAllModel.value = true;
+          }
+        }
+
         // Assign edit data to variableData
         Object.assign(variableData, edit);
       } else {
@@ -591,7 +813,7 @@ export default defineComponent({
               // get all streams from current stream type
               const streamList: any = await getStreams(
                 variableData?.query_data?.stream_type,
-                false
+                false,
               );
               data.streams = streamList.list ?? [];
 
@@ -601,7 +823,7 @@ export default defineComponent({
                 const fieldWithSchema: any = await getStream(
                   variableData?.query_data?.stream,
                   variableData.query_data.stream_type,
-                  true
+                  true,
                 );
 
                 // assign the schema
@@ -621,15 +843,26 @@ export default defineComponent({
             });
           }
         }
-      }
+      },
     );
 
     const addField = () => {
-      variableData.options.push({ label: "", value: "" });
+      // add new field for options
+      variableData.options.push({
+        label: "",
+        value: "",
+        selected: false,
+      });
+
+      // if all values are selected, then check customSelectAllModel = true
+      handleCustomSelectAll();
     };
 
     const removeField = (index: any) => {
       variableData.options.splice(index, 1);
+
+      // if all values are selected, then check customSelectAllModel = true
+      handleCustomSelectAll();
     };
 
     const saveVariableApiCall = useLoading(async () => await saveData());
@@ -642,6 +875,16 @@ export default defineComponent({
         delete variableData["query_data"];
       }
 
+      // reset multi select config if type is not query_values or custom
+      if (
+        variableData.type !== "query_values" &&
+        variableData.type !== "custom"
+      ) {
+        variableData.multiSelect = false;
+        variableData.selectAllValueForMultiSelect = "";
+        variableData.customMultiSelectValue = [];
+      }
+
       if (editMode.value) {
         try {
           await updateVariable(
@@ -649,13 +892,21 @@ export default defineComponent({
             dashId,
             props.variableName,
             toRaw(variableData),
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable update failed", {
-            timeout: 2000,
-          });
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                "Variable update failed",
+            );
+          } else {
+            showErrorNotification(error.message ?? "Variable update failed", {
+              timeout: 2000,
+            });
+          }
         }
       } else {
         try {
@@ -663,13 +914,21 @@ export default defineComponent({
             store,
             dashId,
             variableData,
-            route.query.folder ?? "default"
+            route.query.folder ?? "default",
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable creation failed", {
-            timeout: 2000,
-          });
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                "Variable creation failed",
+            );
+          } else {
+            showErrorNotification(error.message ?? "Variable creation failed", {
+              timeout: 2000,
+            });
+          }
         }
       }
     };
@@ -681,8 +940,12 @@ export default defineComponent({
         // get all variables data.
         let variablesData: any = JSON.parse(
           JSON.stringify(
-            await getDashboard(store, route.query.dashboard, route.query.folder)
-          )
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder,
+            ),
+          ),
         )?.variables?.list;
 
         // current updated variable data need to merge/update in above variablesData.
@@ -691,7 +954,7 @@ export default defineComponent({
         if (editMode.value) {
           //if name already exists
           const variableIndex = variablesData.findIndex(
-            (variable: any) => variable.name == props.variableName
+            (variable: any) => variable.name == props.variableName,
           );
 
           // Update the variable data in the list
@@ -714,7 +977,7 @@ export default defineComponent({
         if (hasCycle) {
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->"
+            "->",
           )} -> ${hasCycle[0]}`;
           return true;
         }
@@ -727,7 +990,7 @@ export default defineComponent({
           err?.message ??
             (editMode.value
               ? "Variable update failed"
-              : "Variable creation failed")
+              : "Variable creation failed"),
         );
         return true;
       }
@@ -755,7 +1018,7 @@ export default defineComponent({
             err?.message ??
               (editMode.value
                 ? "Variable update failed"
-                : "Variable creation failed")
+                : "Variable creation failed"),
           );
         });
       });
@@ -779,7 +1042,7 @@ export default defineComponent({
         // get all streams from current stream type
         const streamList: any = await getStreams(
           variableData?.query_data?.stream_type,
-          false
+          false,
         );
 
         // assign the stream list
@@ -804,7 +1067,7 @@ export default defineComponent({
           const fieldWithSchema: any = await getStream(
             variableData?.query_data?.stream,
             variableData.query_data.stream_type,
-            true
+            true,
           );
 
           // assign the schema
@@ -830,8 +1093,72 @@ export default defineComponent({
           label: it.name,
           value: "$" + it.name,
         }))
-        .filter((it: any) => it.label !== variableData.name)
+        .filter((it: any) => it.label !== variableData.name),
     );
+
+    // Add new custom value to the array
+    const addCustomValue = () => {
+      variableData.customMultiSelectValue.push("");
+    };
+
+    // Remove a custom value from the array by index
+    const removeCustomValue = (index: number) => {
+      variableData.customMultiSelectValue.splice(index, 1);
+    };
+
+    // watch on multi select value change
+    watch(
+      () => variableData?.multiSelect,
+      (newVal) => {
+        if (!newVal) {
+          variableData.selectAllValueForMultiSelect = "first";
+          if (Array.isArray(variableData?.options)) {
+            variableData.options.forEach((option: any, index: any) => {
+              if (variableData.options[index]) {
+                variableData.options[index].selected = false;
+              }
+            });
+
+            if (variableData.options.length > 0 && variableData.options[0]) {
+              variableData.options[0].selected = true;
+            }
+          }
+        }
+      },
+    );
+
+    watch(
+      () => variableData.selectAllValueForMultiSelect,
+      (newVal, oldVal) => {
+        if (newVal != "custom") {
+          variableData.customMultiSelectValue = [];
+        }
+      },
+    );
+
+    const onCheckboxClick = (index: any) => {
+      if (!variableData.multiSelect) {
+        variableData.options.forEach((option: any, i: any) => {
+          variableData.options[i].selected = i === index;
+        });
+      }
+
+      // if all values are selected, then check customSelectAllModel = true
+      handleCustomSelectAll();
+    };
+
+    const onCustomSelectAllClick = () => {
+      if (customSelectAllModel.value) {
+        variableData.options.forEach((option: any) => {
+          option.selected = true;
+        });
+      } else {
+        variableData.options.forEach((option: any) => {
+          option.selected = false;
+        });
+      }
+    };
+
     return {
       variableData,
       store,
@@ -858,6 +1185,11 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
+      addCustomValue,
+      removeCustomValue,
+      onCheckboxClick,
+      customSelectAllModel,
+      onCustomSelectAllClick,
     };
   },
 });
@@ -879,5 +1211,44 @@ export default defineComponent({
 
 .theme-light .bg-highlight {
   background-color: #e7e6e6;
+}
+
+.multi-select-default-value-toggle {
+  .button-group {
+    border: 1px solid gray !important;
+    border-radius: 9px;
+  }
+
+  .button {
+    display: block;
+    cursor: pointer;
+    background-color: #f0eaea;
+    border: none;
+    font-size: 12px;
+    padding: 6px 4px;
+  }
+
+  .button-left {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    color: black;
+  }
+
+  .button-right {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    color: black;
+  }
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
+  }
+}
+.multi-select-default-value {
+  margin-top: 5px;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666666;
 }
 </style>

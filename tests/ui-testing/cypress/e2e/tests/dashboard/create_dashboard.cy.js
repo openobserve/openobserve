@@ -514,7 +514,7 @@ describe("Create a new dashboard", () => {
       "have.value",
       ""
     );
-    // Asserion for the clear value in the x and y layout
+    // Assertion for the clear value in the x and y layout
     cy.get(
       `[data-test='dashboard-x-item-${dashboardData.customQueryValue.field1}']`
     ).should("not.exist");

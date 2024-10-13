@@ -14,12 +14,35 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::ider;
+use opentelemetry::propagation::Extractor;
 use proto::cluster_rpc;
 
 use crate::service::promql;
 
 pub mod auth;
+pub mod flight;
 pub mod request;
+
+pub struct MetadataMap<'a>(&'a tonic::metadata::MetadataMap);
+
+impl<'a> Extractor for MetadataMap<'a> {
+    /// Get a value for a key from the MetadataMap.  If the value can't be
+    /// converted to &str, returns None
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).and_then(|metadata| metadata.to_str().ok())
+    }
+
+    /// Collect all the keys from the MetadataMap.
+    fn keys(&self) -> Vec<&str> {
+        self.0
+            .keys()
+            .map(|key| match key {
+                tonic::metadata::KeyRef::Ascii(v) => v.as_str(),
+                tonic::metadata::KeyRef::Binary(v) => v.as_str(),
+            })
+            .collect::<Vec<_>>()
+    }
+}
 
 impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
     fn from(req: promql::MetricsQueryRequest) -> Self {
@@ -40,7 +63,6 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
         cluster_rpc::MetricsQueryRequest {
             job: Some(job),
             org_id: "".to_string(),
-            stype: cluster_rpc::SearchType::User.into(),
             need_wal: false,
             query: Some(req_query),
             timeout: 0,

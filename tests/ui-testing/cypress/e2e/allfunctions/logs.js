@@ -176,20 +176,20 @@ export function valueAddedInSqlMode() {
   });
 }
 
-//**  Verify if add value feild is clicked*/
+//**  Verify if add value field is clicked*/
 export function addFeildandSubValue() {
   cy.get(
     `[data-test="log-search-expand-${logData.addFieldAndSubFieldValueWithEqual.field}-field-btn"]`
   ).click({ force: true });
 }
 
-export function addsubFeildValue() {
+export function addsubFieldValue() {
   cy.get(
     `[data-test="logs-search-subfield-add-${logData.addFieldAndSubFieldValueWithEqual.field}-${logData.addFieldAndSubFieldValueWithEqual.subFieldValue}"] `
   ).trigger("mouseover", { force: true });
 }
 
-export function clickFeildSubvalue() {
+export function clickFieldSubvalue() {
   cy.get(
     `[data-test="logs-search-subfield-add-${logData.addFieldAndSubFieldValueWithEqual.field}-${logData.addFieldAndSubFieldValueWithEqual.subFieldValue}"] [data-test="log-search-subfield-list-equal-${logData.addFieldAndSubFieldValueWithEqual.field}-field-btn"]`
   ).click({ force: true });

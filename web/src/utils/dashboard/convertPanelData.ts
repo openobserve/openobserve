@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
-import { convertSQLData } from "@/utils/dashboard/convertSQLData";
+import {
+  convertMultiSQLData,
+  convertSQLData,
+} from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertMapData } from "@/utils/dashboard/convertMapData";
 import { convertSankeyData } from "./convertSankeyData";
@@ -32,7 +35,7 @@ export const convertPanelData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   resultMetaData: any,
-  metadata: any
+  metadata: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -63,21 +66,22 @@ export const convertPanelData = async (
             data,
             store,
             chartPanelRef,
-            hoveredSeriesState
+            hoveredSeriesState,
           )),
         };
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
+
         return {
           chartType: panelSchema.type,
-          ...(await convertSQLData(
+          ...(await convertMultiSQLData(
             panelSchema,
             data,
             store,
             chartPanelRef,
             hoveredSeriesState,
             resultMetaData,
-            metadata
+            metadata,
           )),
         };
       }
@@ -101,7 +105,6 @@ export const convertPanelData = async (
       };
     }
     default: {
-      console.log("No Chart Type found, skipping");
       return {};
     }
   }

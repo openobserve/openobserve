@@ -325,7 +325,7 @@ pub async fn update_user(
                             }
 
                             #[cfg(not(feature = "enterprise"))]
-                            log::debug!("Role chnaged from {:?} to {:?}", old_role, new_role);
+                            log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
                             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                                 http::StatusCode::OK.into(),
                                 "User updated successfully".to_string(),
@@ -397,9 +397,9 @@ pub async fn add_user_to_org(
                     for org in orgs.iter() {
                         if org.name.eq(org_id) {
                             // External user is already part of this org
-                            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                                http::StatusCode::FORBIDDEN.into(),
-                                "Not Allowed".to_string(),
+                            return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
+                                http::StatusCode::CONFLICT.into(),
+                                "User is already part of the org".to_string(),
                             )));
                         }
                     }

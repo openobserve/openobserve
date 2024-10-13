@@ -426,24 +426,27 @@ export default defineComponent({
 
     const showTraceDetails = ref(false);
 
-    onActivated(() => {
-      const params = router.currentRoute.value.query;
+    // Disabled for now
+    // onActivated(() => {
+    //   const params = router.currentRoute.value.query;
 
-      // If selected trace is different from the one in the URL, reset the trace details
-      // If there is no selected trace, then also reset the trace details
+    //   // If selected trace is different from the one in the URL, reset the trace details
+    //   // If there is no selected trace, then also reset the trace details
 
-      if (
-        (searchObj.data.traceDetails.selectedTrace &&
-          params.trace_id !==
-            searchObj.data.traceDetails.selectedTrace?.trace_id) ||
-        !searchObj.data.traceDetails.selectedTrace
-      ) {
-        resetTraceDetails();
-        setupTraceDetails();
-      }
-    });
+    //   if (
+    //     (searchObj.data.traceDetails.selectedTrace &&
+    //       params.trace_id !==
+    //         searchObj.data.traceDetails.selectedTrace?.trace_id) ||
+    //     !searchObj.data.traceDetails.selectedTrace
+    //   ) {
+    //     resetTraceDetails();
+    //     console.log("resetTraceDetails >>>>>>>>>>>>>");
+    //     setupTraceDetails();
+    //   }
+    // });
 
     onBeforeMount(async () => {
+      resetTraceDetails();
       setupTraceDetails();
     });
 
@@ -458,24 +461,26 @@ export default defineComponent({
       },
     );
 
-    watch(
-      () => router.currentRoute.value.query.trace_id,
-      (_new, _old) => {
-        // If trace_id changes, reset the trace details
-        if (
-          _new &&
-          _new !== _old &&
-          _new !== searchObj.data.traceDetails.selectedTrace?.trace_id
-        ) {
-          resetTraceDetails();
-          setupTraceDetails();
-          const params = router.currentRoute.value.query;
-          if (params.span_id) {
-            updateSelectedSpan(params.span_id as string);
-          }
-        }
-      },
-    );
+    // Disabled for now
+    // watch(
+    //   () => router.currentRoute.value.query.trace_id,
+    //   (_new, _old) => {
+    //     // If trace_id changes, reset the trace details
+    //     if (
+    //       _new &&
+    //       _old &&
+    //       _new !== _old &&
+    //       _new !== searchObj.data.traceDetails.selectedTrace?.trace_id
+    //     ) {
+    //       resetTraceDetails();
+    //       // setupTraceDetails();
+    //       const params = router.currentRoute.value.query;
+    //       if (params.span_id) {
+    //         updateSelectedSpan(params.span_id as string);
+    //       }
+    //     }
+    //   },
+    // );
 
     const backgroundStyle = computed(() => {
       return {
@@ -524,15 +529,15 @@ export default defineComponent({
       }
     });
 
-    watch(
-      () => spanList.value.length,
-      () => {
-        if (spanList.value.length) {
-          buildTracesTree();
-        } else traceTree.value = [];
-      },
-      { immediate: true },
-    );
+    // watch(
+    //   () => spanList.value.length,
+    //   () => {
+    //     if (spanList.value.length) {
+    //       buildTracesTree();
+    //     } else traceTree.value = [];
+    //   },
+    //   { immediate: true },
+    // );
 
     const isSidebarOpen = computed(() => {
       return searchObj.data.traceDetails.showSpanDetails;
@@ -763,8 +768,8 @@ export default defineComponent({
       }
 
       traceTree.value[0].lowestStartTime =
-        converTimeFromNsToMs(lowestStartTime);
-      traceTree.value[0].highestEndTime = converTimeFromNsToMs(highestEndTime);
+        convertTimeFromNsToMs(lowestStartTime);
+      traceTree.value[0].highestEndTime = convertTimeFromNsToMs(highestEndTime);
       traceTree.value[0].style.color =
         searchObj.meta.serviceColors[traceTree.value[0].serviceName];
 
@@ -886,8 +891,8 @@ export default defineComponent({
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
-        startTimeMs: converTimeFromNsToMs(span.start_time),
-        endTimeMs: converTimeFromNsToMs(span.end_time),
+        startTimeMs: convertTimeFromNsToMs(span.start_time),
+        endTimeMs: convertTimeFromNsToMs(span.end_time),
         durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
         durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
@@ -911,7 +916,7 @@ export default defineComponent({
       return Number((time / 1000000).toFixed(2));
     };
 
-    const converTimeFromNsToMs = (time: number) => {
+    const convertTimeFromNsToMs = (time: number) => {
       const nanoseconds = time;
       const milliseconds = Math.floor(nanoseconds / 1000000);
       const date = new Date(milliseconds);
@@ -1132,7 +1137,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 $sidebarWidth: 60%;
-$seperatorWidth: 2px;
+$separatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
@@ -1150,7 +1155,7 @@ $traceChartCollapseHeight: 42px;
   width: 100%;
 }
 .histogram-container {
-  width: calc(100% - $sidebarWidth - $seperatorWidth);
+  width: calc(100% - $sidebarWidth - $separatorWidth);
 }
 
 .histogram-sidebar {

@@ -55,7 +55,11 @@
     "date": "Date",
     "description": "Description",
     "cancelChanges": "Cancel Changes",
-    "logs": "Logs"
+    "logs": "Logs",
+    "addGroup":"Add Group",
+    "addCondition":"Add Condition",
+    "required": "Value is required",
+    "valueMustBeGreaterThanZero": "Value must be greater than zero"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -119,7 +123,10 @@
     "regionFilterMsg": "Search Region/Cluster",
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
-    "viewTrace": "View Trace"
+    "viewTrace": "View Trace",
+    "flattened": "Flattened",
+    "unflattened": "Unflattened",
+    "resetFilters": "Reset Filters"
   },
   "menu": {
     "home": "Home",
@@ -349,7 +356,7 @@
     "header": "Streams",
     "search": "Search Stream",
     "name": "Name",
-    "docNum": "Doc Num",
+    "docNum": "Records",
     "storageSize": "Ingested Data",
     "compressedSize": "Compressed Size",
     "time": "Time",
@@ -392,7 +399,8 @@
     "indexType": "Index Type",
     "addField": "Add Field",
     "addSchemaField": "Add to Defined Schema Fields",
-    "removeSchemaField": "Remove Defined Schema Fields"
+    "removeSchemaField": "Remove Defined Schema Fields",
+    "storeOriginalData" : "Store Original Data"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -536,6 +544,7 @@
     "typeOfVariable": "Type of variable",
     "DefaultSize": "Default max record size(optional)",
     "multiSelect": "Allow multiple selection",
+    "hideOnDashboard": "Hide On Dashboard",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",
     "newFolderBtnLabel": "New Folder",
     "folderLabel": "Folders",
@@ -565,11 +574,18 @@
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
     "wraptext": "Wrap Table Cells",
+    "tableTranspose": "Transpose",
+    "tableDynamicColumns": "Allow Dynamic Columns",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
     "basemapLabel": "Base Map",
     "customunitLabel": "Custom Unit",
+    "currencyDollar": "Currency - Dollar ($)",
+    "currencyEuro": "Currency - Euro (€)",
+    "currencyPound": "Currency - Pound (£)",
+    "currencyYen": "Currency - Yen (¥)",
+    "currencyRupees": "Currency - Indian Rupees (₹)",
     "latitudeLabel": "Latitude",
     "longitudeLabel": "Longitude",
     "zoomLabel": "Zoom",
@@ -617,6 +633,7 @@
     "percent1": "Percent (0.0-1.0)",
     "percent": "Percent (0-100)",
     "custom": "Custom",
+    "currency":"Currency",
     "count": "Count",
     "countDistinct": "Count (Distinct)",
     "sum": "Sum",
@@ -633,7 +650,11 @@
     "textbox": "Textbox",
     "ad-hoc-variable": "Dynamic variables",
     "newFolder": "New Folder",
-    "updateFolder": "Update Folder"
+    "updateFolder": "Update Folder",
+    "scheduledReports": "Scheduled Reports",
+    "newReport": "New Report",
+    "scheduledDashboards": "Scheduled Dashboards",
+    "panelHeight": "Panel Height"
   },
   "panel": {
     "header": "Panel",
@@ -685,7 +706,7 @@
     "scheduledAlert": "Scheduled alerts",
     "rtAlert": "Real time alerts",
     "noData": "No Data Ingested",
-    "findIngestion": "Find how to ingest logs >>",
+    "findIngestion": "Find how to ingest data >>",
     "ingestionMsg": "Looks like you have not ingested any data to selected organization, there are various ways in which data can be ingested, like fluentbit.",
     "inestedInSearch": "Try Log Search",
     "searchInDemoOrg": "You can explore search capbilities by switching to demo organization, to switch to demo organization, select 'Demo Organization' using organization dropdown on top.We keep ingesting dummy data to Demo Organization."
@@ -742,6 +763,7 @@
     "header": "Alerts",
     "add": "Add alert",
     "edit": "Edit",
+    "clone": "Clone alert",
     "search": "Search alert",
     "name": "Name",
     "save": "Save",
@@ -778,12 +800,17 @@
     "prom_am": "Alert manager",
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
+    "cloneTitle": "Clone Alert",
     "start": "start",
     "pause": "Pause",
     "groupBy": "Group by",
     "row": "Row Template",
     "preview": "Preview",
-    "crontitle": "Enable Cron"
+    "crontitle": "Enable Cron",
+    "lastTriggered":"Last Triggered At",
+    "lastSatisfied":"Last Satisfied At",
+    "owner": "Owner",
+    "title": "Title"
   },
   "alert_templates": {
     "header": "Templates",
@@ -878,7 +905,16 @@
     "title": "Title",
     "description": "Description",
     "cron": "Cron Job",
-    "cronExpression": "Cron expression"
+    "cronExpression": "Cron expression",
+    "timeRange": "Time Range",
+    "frequency": "Frequency",
+    "lastTriggeredAt": "Last Triggered At",
+    "createdAt": "Created At",
+    "tab": "Tab",
+    "cached": "Cached",
+    "cachedReport": "Cached Report",
+    "destination": "Destination",
+    "scheduled": "Scheduled"
   },
   "queries": {
     "runningQueries": "Running Queries",

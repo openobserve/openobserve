@@ -17,7 +17,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
+    cluster::LOCAL_NODE_ID,
     get_config,
+    ider::SnowflakeIdGenerator,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -25,7 +27,8 @@ use config::{
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    get_settings, unwrap_stream_settings, SchemaCache, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+    get_settings, unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR,
+    STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
 };
 use serde_json::{Map, Value};
 
@@ -48,7 +51,7 @@ pub(crate) fn get_request_columns_limit_error(
     num_fields: usize,
 ) -> anyhow::Error {
     anyhow::anyhow!(
-        "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_cloumns>",
+        "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_columns>",
         get_config().limit.req_cols_per_record_limit
     )
 }
@@ -348,6 +351,11 @@ async fn handle_diff_schema(
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
+    if stream_setting.store_original_data {
+        if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
+            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+        }
+    }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
     drop(w);
@@ -456,8 +464,11 @@ pub async fn stream_schema_exists(
             let schema = infra::schema::get(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-
-            stream_schema_map.insert(stream_name.to_string(), SchemaCache::new(schema.clone()));
+            let schema = Arc::new(schema);
+            stream_schema_map.insert(
+                stream_name.to_string(),
+                SchemaCache::new_from_arc(schema.clone()),
+            );
             schema
         }
     };

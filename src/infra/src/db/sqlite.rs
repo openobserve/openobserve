@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, FxIndexMap};
+use config::{cluster, utils::util::zero_or, FxIndexMap};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -27,8 +27,9 @@ use sqlx::{
     },
     Pool, Sqlite,
 };
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{mpsc, Mutex, OnceCell, RwLock};
 
+use super::DBIndex;
 use crate::{
     db::{Event, EventData},
     errors::*,
@@ -37,6 +38,8 @@ use crate::{
 pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
 pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
     Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
+static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
+
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
@@ -52,19 +55,26 @@ fn connect_rw() -> Pool<Sqlite> {
         _ = std::fs::remove_file(format!("{url}-shm"));
         _ = std::fs::remove_file(format!("{url}-wal"));
     }
+
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
+    let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
+
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
         .locking_mode(SqliteLockingMode::Normal)
-        .busy_timeout(Duration::from_secs(30))
+        .busy_timeout(Duration::from_secs(acquire_timeout))
         // .disable_statement_logging()
         .create_if_missing(true);
 
     SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(1)
-        .acquire_timeout(Duration::from_secs(30))
+        .acquire_timeout(Duration::from_secs(acquire_timeout))
+        .idle_timeout(Some(Duration::from_secs(idle_timeout)))
+        .max_lifetime(Some(Duration::from_secs(max_lifetime)))
         .connect_lazy_with(db_opts)
 }
 
@@ -80,11 +90,35 @@ fn connect_ro() -> Pool<Sqlite> {
         .busy_timeout(Duration::from_secs(30))
         // .disable_statement_logging()
         .read_only(true);
+
+    let max_lifetime = if cfg.limit.sql_db_connections_max_lifetime > 0 {
+        Some(std::time::Duration::from_secs(
+            cfg.limit.sql_db_connections_max_lifetime,
+        ))
+    } else {
+        None
+    };
     SqlitePoolOptions::new()
-        .min_connections(cfg.limit.sql_min_db_connections)
-        .max_connections(cfg.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_db_connections_min)
+        .max_connections(cfg.limit.sql_db_connections_max)
+        .max_lifetime(max_lifetime)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
+}
+
+async fn cache_indices() -> HashSet<DBIndex> {
+    let client = CLIENT_RO.clone();
+    let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
+    let res = sqlx::query_as::<_, (String, String)>(sql)
+        .fetch_all(&client)
+        .await;
+    match res {
+        Ok(r) => r
+            .into_iter()
+            .map(|(name, table)| DBIndex { name, table })
+            .collect(),
+        Err(_) => HashSet::new(),
+    }
 }
 
 pub struct SqliteDbChannel {
@@ -191,15 +225,11 @@ impl super::Db for SqliteDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
-        let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;"#,
-        )
-        .bind(module)
-        .bind(key1)
-        .bind(key2)
-        .fetch_one(&pool)
-        .await
-        {
+        let query = format!(
+            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
+            module, key1, key2
+        );
+        let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
@@ -665,10 +695,8 @@ impl super::Db for SqliteDb {
     }
 
     async fn add_start_dt_column(&self) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        create_meta_backup(&client).await?;
-        add_start_dt_column(&client).await?;
+        create_meta_backup().await?;
+        add_start_dt_column().await?;
         Ok(())
     }
 }
@@ -692,44 +720,32 @@ CREATE TABLE IF NOT EXISTS meta
     )
     .execute(&*client)
     .await?;
+    drop(client);
 
     // create start_dt column for old version <= 0.9.2
-    add_start_dt_column(&client).await?;
+    add_start_dt_column().await?;
 
     // create table index
-    sqlx::query(
-        r#"
-CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
-CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
-        "#,
+    create_index("meta_module_idx", "meta", false, &["module"]).await?;
+    create_index("meta_module_key1_idx", "meta", false, &["module", "key1"]).await?;
+    create_index(
+        "meta_module_start_dt_idx",
+        "meta",
+        true,
+        &["module", "key1", "key2", "start_dt"],
     )
-    .execute(&*client)
     .await?;
 
-    match sqlx::query(
-        r#"
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);
-        "#,
-    )
-    .execute(&*client)
-    .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!(
-                "[SQLITE] create meta_module_start_dt_idx index error: {}",
-                e
-            );
-        }
-    }
     Ok(())
 }
 
-async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
+async fn add_start_dt_column() -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
     // Attempt to add the column, ignoring the error if the column already exists
     if let Err(e) =
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
-            .execute(client)
+            .execute(&*client)
             .await
     {
         // Check if the error is about the duplicate column
@@ -738,21 +754,23 @@ async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
             return Err(e.into());
         }
     }
+    drop(client);
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
-    sqlx::query(
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);"#
-        )
-        .execute(client)
-        .await?;
-    sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
-        .execute(client)
-        .await?;
-
+    create_index(
+        "meta_module_start_dt_idx",
+        "meta",
+        true,
+        &["module", "key1", "key2", "start_dt"],
+    )
+    .await?;
+    delete_index("meta_module_key2_idx", "meta").await?;
     Ok(())
 }
 
-async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
+async fn create_meta_backup() -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
     let mut tx = client.begin().await?;
     if let Err(e) =
         sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
@@ -774,5 +792,51 @@ async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
         );
         return Err(e.into());
     }
+    Ok(())
+}
+
+pub async fn create_index(
+    idx_name: &str,
+    table: &str,
+    unique: bool,
+    fields: &[&str],
+) -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    let unique_str = if unique { "UNIQUE" } else { "" };
+    log::info!("[SQLITE] creating index {} on table {}", idx_name, table);
+    let sql = format!(
+        "CREATE {} INDEX IF NOT EXISTS {} ON {} ({});",
+        unique_str,
+        idx_name,
+        table,
+        fields.join(",")
+    );
+    sqlx::query(&sql).execute(&*client).await?;
+    log::info!("[SQLITE] index {} created successfully", idx_name);
+    Ok(())
+}
+
+pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let indices = INDICES.get_or_init(cache_indices).await;
+    if !indices.contains(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    }) {
+        return Ok(());
+    }
+    log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
+    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
+    sqlx::query(&sql).execute(&*client).await?;
+    log::info!("[SQLITE] index {} deleted successfully", idx_name);
     Ok(())
 }
