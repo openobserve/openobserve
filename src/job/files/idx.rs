@@ -15,13 +15,15 @@
 
 use std::sync::Arc;
 
+use arrow::array::{
+    make_builder, Array, ArrayBuilder, BinaryArray, BinaryBuilder, BooleanArray, BooleanBuilder,
+    Int64Array, Int64Builder, RecordBatch, StringArray, StringBuilder,
+};
+use arrow_schema::{DataType, Schema};
 use config::{
     ider,
     meta::stream::{FileMeta, StreamPartition, StreamType},
-    utils::{
-        arrow::record_batches_to_json_rows, json::get_string_value, parquet::new_parquet_writer,
-        record_batch_ext::convert_json_to_record_batch,
-    },
+    utils::parquet::new_parquet_writer,
     FILE_EXT_PARQUET,
 };
 use hashbrown::HashMap;
@@ -61,38 +63,25 @@ pub(crate) async fn write_parquet_index_to_disk(
     } else {
         return Err(anyhow::anyhow!("No record batches found"));
     };
-    let partition = StreamPartition::new_prefix("term");
-    let bf_fields = vec!["term".to_string()];
 
-    // partiton the recordbatch with the partition key
-    // TODO: need improve the performance
-    let json_rows = record_batches_to_json_rows(&batches.iter().collect::<Vec<_>>())?;
+    println!(
+        "write_parquet_index_to_disk: batches row counts: {:?}",
+        batches.iter().map(|b| b.num_rows()).sum::<usize>()
+    );
 
-    let mut partition_buf: HashMap<String, Vec<Arc<serde_json::Value>>> = HashMap::new();
-    let mut deleted_rows: Vec<_> = Vec::new();
-    for row in json_rows {
-        if let Some(v) = row.get("deleted") {
-            if let Some(v) = v.as_bool() {
-                if v {
-                    deleted_rows.push(Arc::new(serde_json::Value::Object(row)));
-                    continue;
-                }
-            }
-        }
-        let val = match row.get("term") {
-            Some(v) => get_string_value(v),
-            None => "null".to_string(),
-        };
-        let prefix = partition.get_partition_key(&val);
-        let batch = partition_buf.entry(prefix).or_default();
-        let entry = serde_json::Value::Object(row);
-        batch.push(Arc::new(entry));
+    // partition the record batches
+    let partitioned_batches = generate_prefixed_batches(schema.clone(), batches)?;
+
+    for (prefix, batch) in partitioned_batches.iter() {
+        println!(
+            "write_parquet_index_to_disk: prefix: {}, row count: {}",
+            prefix,
+            batch.num_rows()
+        );
     }
     let mut ret = Vec::new();
 
-    for (prefix, mut records) in partition_buf.into_iter() {
-        // append deleted rows to the records
-        records.extend(deleted_rows.iter().cloned());
+    for (prefix, batch) in partitioned_batches.into_iter() {
         // write metadata
         let mut file_meta = FileMeta {
             min_ts: 0,
@@ -102,7 +91,6 @@ pub(crate) async fn write_parquet_index_to_disk(
             compressed_size: 0,
             flattened: false,
         };
-        let batch = convert_json_to_record_batch(&schema, &records)?;
         populate_file_meta(
             schema.clone(),
             vec![vec![batch.clone()]],
@@ -114,6 +102,7 @@ pub(crate) async fn write_parquet_index_to_disk(
 
         // write parquet file
         let mut buf_parquet = Vec::new();
+        let bf_fields = vec!["term".to_string()];
         let mut writer = new_parquet_writer(&mut buf_parquet, &schema, &bf_fields, &file_meta);
         writer.write(&batch).await?;
         writer.close().await?;
@@ -149,4 +138,238 @@ pub(crate) async fn write_parquet_index_to_disk(
         }
     }
     Ok(ret)
+}
+
+/// Generate prefix batches from   record batches
+fn generate_prefixed_batches(
+    schema: Arc<Schema>,
+    batches: Vec<RecordBatch>,
+) -> Result<HashMap<String, RecordBatch>, anyhow::Error> {
+    // partiton the recordbatch with the partition key
+    let partition = StreamPartition::new_prefix("term");
+    let mut partition_buf: HashMap<String, HashMap<usize, Box<dyn ArrayBuilder>>> = HashMap::new();
+    let term_idx = schema.index_of("term")?;
+    for batch in batches {
+        let row_count = batch.num_rows();
+        let col_term = batch
+            .column(term_idx)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        for (idx, field) in schema.fields().iter().enumerate() {
+            match field.data_type() {
+                DataType::Utf8 => {
+                    let col = if idx == term_idx {
+                        col_term
+                    } else {
+                        batch
+                            .column(idx)
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                    };
+                    for i in 0..row_count {
+                        let term = col_term.value(i);
+                        let prefix = if term.is_empty() {
+                            String::new()
+                        } else {
+                            partition.get_partition_key(term)
+                        };
+                        let entry = partition_buf.entry(prefix).or_default();
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap();
+                        b.append_value(col.value(i));
+                    }
+                }
+                DataType::Int64 => {
+                    let col = batch
+                        .column(idx)
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap();
+                    for i in 0..row_count {
+                        let term = col_term.value(i);
+                        let prefix = if term.is_empty() {
+                            String::new()
+                        } else {
+                            partition.get_partition_key(term)
+                        };
+                        let entry = partition_buf.entry(prefix).or_default();
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                        let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        b.append_value(col.value(i));
+                    }
+                }
+                DataType::Boolean => {
+                    let col = batch
+                        .column(idx)
+                        .as_any()
+                        .downcast_ref::<BooleanArray>()
+                        .unwrap();
+                    for i in 0..row_count {
+                        let term = col_term.value(i);
+                        let prefix = if term.is_empty() {
+                            String::new()
+                        } else {
+                            partition.get_partition_key(term)
+                        };
+                        let entry = partition_buf.entry(prefix).or_default();
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap();
+                        b.append_value(col.value(i));
+                    }
+                }
+                DataType::Binary => {
+                    let col = batch
+                        .column(idx)
+                        .as_any()
+                        .downcast_ref::<BinaryArray>()
+                        .unwrap();
+                    for i in 0..row_count {
+                        let term = col_term.value(i);
+                        let prefix = if term.is_empty() {
+                            String::new()
+                        } else {
+                            partition.get_partition_key(term)
+                        };
+                        let entry = partition_buf.entry(prefix).or_default();
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
+                            .unwrap();
+                        b.append_value(col.value(i));
+                    }
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+        }
+    }
+
+    // append deleted rows to each prefix
+    if let Some(deleted_buf) = partition_buf.remove("") {
+        for (idx, mut builder) in deleted_buf {
+            let field_type = schema.field(idx).data_type();
+            match field_type {
+                DataType::Utf8 => {
+                    let del_b = builder
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .unwrap()
+                        .finish();
+                    for (prefix, entry) in partition_buf.iter_mut() {
+                        if prefix.is_empty() {
+                            continue;
+                        }
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field_type, del_b.len()));
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap();
+                        for i in 0..del_b.len() {
+                            b.append_value(del_b.value(i));
+                        }
+                    }
+                }
+                DataType::Int64 => {
+                    let del_b = builder
+                        .as_any_mut()
+                        .downcast_mut::<Int64Builder>()
+                        .unwrap()
+                        .finish();
+                    for (prefix, entry) in partition_buf.iter_mut() {
+                        if prefix.is_empty() {
+                            continue;
+                        }
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field_type, del_b.len()));
+                        let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        for i in 0..del_b.len() {
+                            b.append_value(del_b.value(i));
+                        }
+                    }
+                }
+                DataType::Boolean => {
+                    let del_b = builder
+                        .as_any_mut()
+                        .downcast_mut::<BooleanBuilder>()
+                        .unwrap()
+                        .finish();
+                    for (prefix, entry) in partition_buf.iter_mut() {
+                        if prefix.is_empty() {
+                            continue;
+                        }
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field_type, del_b.len()));
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap();
+                        for i in 0..del_b.len() {
+                            b.append_value(del_b.value(i));
+                        }
+                    }
+                }
+                DataType::Binary => {
+                    let del_b = builder
+                        .as_any_mut()
+                        .downcast_mut::<BinaryBuilder>()
+                        .unwrap()
+                        .finish();
+                    for (prefix, entry) in partition_buf.iter_mut() {
+                        if prefix.is_empty() {
+                            continue;
+                        }
+                        let builder = entry
+                            .entry(idx)
+                            .or_insert_with(|| make_builder(field_type, del_b.len()));
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
+                            .unwrap();
+                        for i in 0..del_b.len() {
+                            b.append_value(del_b.value(i));
+                        }
+                    }
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+        }
+    }
+
+    // finish the builders
+    let mut partitioned_batches = HashMap::with_capacity(partition_buf.len());
+    for (prefix, entry) in partition_buf.into_iter() {
+        let mut cols = entry
+            .into_iter()
+            .map(|(idx, mut builder)| (idx, builder.finish()))
+            .collect::<Vec<_>>();
+        cols.sort_by(|a, b| a.0.cmp(&b.0));
+        let cols = cols.into_iter().map(|(_, col)| col).collect::<Vec<_>>();
+        let batch = RecordBatch::try_new(schema.clone(), cols)?;
+        partitioned_batches.insert(prefix, batch);
+    }
+    Ok(partitioned_batches)
 }
