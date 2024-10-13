@@ -17,7 +17,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use config::{
     get_config,
-    meta::search::Response,
+    meta::{search::Response, sql::OrderBy, stream::StreamType},
     utils::{file::scan_files, json},
 };
 use infra::cache::{
@@ -32,7 +32,7 @@ use crate::{
             result_utils::{get_ts_value, round_down_to_nearest_minute},
             MultiCachedQueryResponse,
         },
-        sql::{generate_histogram_interval, RE_HISTOGRAM, RE_SELECT_FROM},
+        sql::{generate_histogram_interval, Sql, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
 
@@ -54,7 +54,10 @@ pub async fn check_cache(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
+    let query = rpc_req.clone().query.unwrap();
+    let org_id = rpc_req.org_id.clone();
+    let stream_type = StreamType::from(rpc_req.stream_type.as_str());
+    let sql = match Sql::new(&query, &org_id, stream_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
@@ -63,13 +66,13 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let mut result_ts_col = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
-    if result_ts_col.is_none() && (is_aggregate || !meta.meta.group_by.is_empty()) {
+    let mut result_ts_col = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
+    if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
         return MultiCachedQueryResponse::default();
     }
 
     // skip the count queries & queries first order by is not _timestamp field
-    let order_by = meta.meta.order_by;
+    let order_by = sql.order_by;
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
@@ -81,10 +84,7 @@ pub async fn check_cache(
     }
 
     // Hack select for _timestamp
-    if !is_aggregate
-        && meta.meta.group_by.is_empty()
-        && order_by.is_empty()
-        && !origin_sql.contains('*')
+    if !is_aggregate && sql.group_by.is_empty() && order_by.is_empty() && !origin_sql.contains('*')
     {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
@@ -104,7 +104,7 @@ pub async fn check_cache(
 
     let result_ts_col = result_ts_col.unwrap();
     let mut discard_interval = -1;
-    if let Some(interval) = meta.histogram_interval {
+    if let Some(interval) = sql.histogram_interval {
         *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
@@ -112,18 +112,17 @@ pub async fn check_cache(
             req_time_range.1 = chrono::Utc::now().timestamp_micros();
         }
 
-        let meta_time_range_is_empty =
-            meta.meta.time_range.is_none() || meta.meta.time_range == Some((0, 0));
+        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
                 Some(req_time_range)
             } else {
-                meta.meta.time_range
+                sql.time_range
             };
-        handle_historgram(origin_sql, q_time_range);
+        handle_histogram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; //in microseconds
-    };
+    }
     if req.query.size >= 0 {
         *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
     }
@@ -134,38 +133,63 @@ pub async fn check_cache(
     if !order_by.is_empty() {
         for (field, order) in &order_by {
             if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
-                is_descending = *order;
+                is_descending = order == &OrderBy::Desc;
                 break;
             }
         }
     }
+    if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
+        return MultiCachedQueryResponse::default();
+    }
     let mut multi_resp = MultiCachedQueryResponse::default();
+    if discard_interval > -1 {
+        multi_resp.histogram_interval = discard_interval / 1000 / 1000;
+    }
     if get_config().common.use_multi_result_cache {
-        let mut multi_res = crate::service::search::cluster::cache_multi::get_cached_results(
-            query_key.to_owned(),
-            file_path.to_string(),
-            trace_id.to_owned(),
-            CacheQueryRequest {
-                q_start_time: req.query.start_time,
-                q_end_time: req.query.end_time,
-                is_aggregate,
-                ts_column: result_ts_col.clone(),
+        let mut cached_responses =
+            crate::service::search::cluster::cache_multi::get_cached_results(
+                query_key.to_owned(),
+                file_path.to_string(),
+                trace_id.to_owned(),
+                CacheQueryRequest {
+                    q_start_time: req.query.start_time,
+                    q_end_time: req.query.end_time,
+                    is_aggregate,
+                    ts_column: result_ts_col.clone(),
+                    discard_interval,
+                    is_descending,
+                },
+            )
+            .await;
+        if is_descending {
+            cached_responses.sort_by_key(|meta| meta.response_end_time);
+        } else {
+            cached_responses.sort_by_key(|meta| meta.response_start_time);
+        }
+
+        let total_hits = cached_responses
+            .iter()
+            .map(|v| v.cached_response.total)
+            .sum::<usize>();
+
+        let deltas = if total_hits == (sql.limit as usize) {
+            *should_exec_query = false;
+            vec![]
+        } else {
+            let (deltas, updated_start_time, cache_duration) = calculate_deltas_multi(
+                &cached_responses,
+                req.query.start_time,
+                req.query.end_time,
                 discard_interval,
-                is_descending,
-            },
-        )
-        .await;
+            );
+            multi_resp.total_cache_duration = cache_duration as usize;
+            if let Some(start_time) = updated_start_time {
+                req.query.start_time = start_time;
+            }
+            deltas
+        };
 
-        multi_res.sort_by_key(|meta| meta.response_start_time);
-
-        let deltas = calculate_deltas_multi(
-            &multi_res,
-            req.query.start_time,
-            req.query.end_time,
-            discard_interval,
-        );
-
-        for res in multi_res {
+        for res in cached_responses {
             if res.has_cached_data {
                 multi_resp.has_cached_data = true;
                 multi_resp.cached_response.push(res.cached_response);
@@ -187,9 +211,10 @@ pub async fn check_cache(
         }
         multi_resp.cache_query_response = true;
         multi_resp.is_descending = is_descending;
-        multi_resp.limit = meta.meta.limit as i64;
+        multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
+
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -210,12 +235,12 @@ pub async fn check_cache(
             Some(mut cached_resp) => {
                 let mut deltas = vec![];
                 calculate_deltas_v1(
-                    &ResultCacheMeta {
+                    &(ResultCacheMeta {
                         start_time: cached_resp.response_start_time,
                         end_time: cached_resp.response_end_time,
                         is_aggregate,
                         is_descending,
-                    },
+                    }),
                     req.query.start_time,
                     req.query.end_time,
                     &mut deltas,
@@ -229,9 +254,9 @@ pub async fn check_cache(
                 if search_delta.is_empty() {
                     log::debug!("cached response found");
                     *should_exec_query = false;
-                };
+                }
 
-                if cached_resp.cached_response.total == (meta.meta.limit as usize)
+                if cached_resp.cached_response.total == (sql.limit as usize)
                     && cached_resp.response_end_time == req.query.end_time
                 {
                     *should_exec_query = false;
@@ -258,7 +283,7 @@ pub async fn check_cache(
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.deltas = c_resp.deltas;
         multi_resp.cache_query_response = true;
-        multi_resp.limit = meta.meta.limit as i64;
+        multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp
     }
@@ -275,27 +300,36 @@ pub async fn get_cached_results(
     drop(r);
 
     if let Some(cache_metas) = is_cached {
-        match cache_metas
-            .iter()
-            .filter(|cache_meta| {
-                // to make sure there is overlap between cache time range and query time range
-                log::info!(
-                "[CACHE CANDIDATES {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
-                cache_meta.start_time ,
-                cache_meta.end_time);
-                cache_meta.start_time <= cache_req.q_end_time
-                    && cache_meta.end_time >= cache_req.q_start_time
-            })
-            .max_by_key(|result| {
-                result.end_time -result.start_time
-            }) {
+        match
+            cache_metas
+                .iter()
+                .filter(|cache_meta| {
+                    // to make sure there is overlap between cache time range and query time range
+                    log::info!(
+                        "[CACHE CANDIDATES {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                        cache_meta.start_time,
+                        cache_meta.end_time
+                    );
+                    cache_meta.start_time <= cache_req.q_end_time &&
+                        cache_meta.end_time >= cache_req.q_start_time
+                })
+                .max_by_key(|result| { result.end_time - result.start_time })
+        {
             Some(matching_meta) => {
                 let file_name = format!(
                     "{}_{}_{}_{}.json",
                     matching_meta.start_time,
                     matching_meta.end_time,
-                    if cache_req.is_aggregate { 1 } else { 0 },
-                    if cache_req.is_descending { 1 } else { 0 }
+                    if cache_req.is_aggregate {
+                        1
+                    } else {
+                        0
+                    },
+                    if cache_req.is_descending {
+                        1
+                    } else {
+                        0
+                    }
                 );
                 let mut matching_cache_meta = matching_meta.clone();
                 // calculate delta time range to fetch the delta data using search query
@@ -304,13 +338,17 @@ pub async fn get_cached_results(
 
                 let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
                 // return None if cache duration is less than 2 * discard_duration
-                if cache_duration <= discard_duration && matching_cache_meta.start_time > Utc::now().timestamp_micros() - discard_duration  {
+                if
+                    cache_duration <= discard_duration &&
+                    matching_cache_meta.start_time >
+                        Utc::now().timestamp_micros() - discard_duration
+                {
                     return None;
                 }
 
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
-                        let mut cached_response: Response = match json::from_str::<Response>(&v){
+                        let mut cached_response: Response = match json::from_str::<Response>(&v) {
                             Ok(v) => v,
                             Err(e) => {
                                 log::error!(
@@ -322,19 +360,26 @@ pub async fn get_cached_results(
                         };
                         let first_ts = get_ts_value(
                             &cache_req.ts_column,
-                            cached_response.hits.first().unwrap(),
+                            cached_response.hits.first().unwrap()
                         );
 
                         let last_ts = get_ts_value(
                             &cache_req.ts_column,
-                            cached_response.hits.last().unwrap(),
+                            cached_response.hits.last().unwrap()
                         );
 
-                        let (hits_allowed_start_time,hits_allowed_end_time) =if cache_req.discard_interval > 0{
+                        let (hits_allowed_start_time, hits_allowed_end_time) = if
+                            cache_req.discard_interval > 0
+                        {
                             // calculation in line with date bin of datafusion
-                            (cache_req.q_start_time - (cache_req.q_start_time%cache_req.discard_interval) , cache_req.q_end_time - (cache_req.q_end_time%cache_req.discard_interval))
-                        }else{
-                            (cache_req.q_start_time,cache_req.q_end_time)
+                            (
+                                cache_req.q_start_time -
+                                    (cache_req.q_start_time % cache_req.discard_interval),
+                                cache_req.q_end_time -
+                                    (cache_req.q_end_time % cache_req.discard_interval),
+                            )
+                        } else {
+                            (cache_req.q_start_time, cache_req.q_end_time)
                         };
                         let discard_ts = if cache_req.is_descending {
                             if cache_req.discard_interval > 0 {
@@ -362,15 +407,15 @@ pub async fn get_cached_results(
 
                         cached_response.hits.retain(|hit| {
                             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                            hit_ts <=  hits_allowed_end_time
-                                && hit_ts >= hits_allowed_start_time
-                                && hit_ts < discard_ts
+                            hit_ts <= hits_allowed_end_time &&
+                                hit_ts >= hits_allowed_start_time &&
+                                hit_ts < discard_ts
                         });
 
                         cached_response.total = cached_response.hits.len();
                         if cache_req.discard_interval < 0 {
                             matching_cache_meta.end_time = discard_ts;
-                        };
+                        }
 
                         log::info!(
                             "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
@@ -391,10 +436,7 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!(
-                            "[trace_id {trace_id}] Get results from disk failed : {:?}",
-                            e
-                        );
+                        log::error!("[trace_id {trace_id}] Get results from disk failed : {:?}", e);
                         None
                     }
                 }
@@ -457,7 +499,7 @@ pub fn calculate_deltas_v1(
             });
             has_pre_cache_delta = true;
         }
-    };
+    }
     has_pre_cache_delta
 }
 
@@ -492,18 +534,17 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-pub fn get_ts_col(
-    parsed_sql: &config::meta::sql::Sql,
-    ts_col: &str,
-    is_aggregate: bool,
-) -> Option<String> {
-    for (original, alias) in &parsed_sql.field_alias {
-        if original.contains("histogram") {
+pub fn get_ts_col(parsed_sql: &Sql, ts_col: &str, is_aggregate: bool) -> Option<String> {
+    for (original, alias) in &parsed_sql.aliases {
+        if original == ts_col || original.contains("histogram") {
             return Some(alias.clone());
         }
     }
     if !is_aggregate
-        && (parsed_sql.fields.contains(&ts_col.to_owned())
+        && (parsed_sql
+            .columns
+            .iter()
+            .any(|(_, v)| v.contains(&ts_col.to_owned()))
             || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
     {
         return Some(ts_col.to_string());
@@ -548,14 +589,14 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_historgram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
+fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
     let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
     let attrs = caps
         .get(1)
         .unwrap()
         .as_str()
         .split(',')
-        .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+        .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
         .collect::<Vec<&str>>();
 
     let interval = match attrs.get(1) {
@@ -577,10 +618,10 @@ fn calculate_deltas_multi(
     start_time: i64,
     end_time: i64,
     histogram_interval: i64,
-) -> Vec<QueryDelta> {
+) -> (Vec<QueryDelta>, Option<i64>, i64) {
     let mut deltas = Vec::new();
+    let mut cache_duration = 0_i64;
 
-    // Track the current end of coverage
     let mut current_end_time = start_time;
 
     for meta in results {
@@ -590,10 +631,9 @@ fn calculate_deltas_multi(
             meta.response_end_time,
             meta.cached_response.hits.len()
         );
-
-        let delta_end_time = if current_end_time != start_time && histogram_interval > 0 {
-            // If there is a histogram interval, we need to adjust the end time to the nearest
-            // interval
+        cache_duration += meta.response_end_time - meta.response_start_time;
+        let delta_end_time = if histogram_interval > 0 && !meta.cached_response.hits.is_empty() {
+            // If histogram interval > 0, we need to adjust the end time to the nearest interval
             let mut end_time = meta.response_start_time;
             if end_time % histogram_interval != 0 {
                 end_time = end_time - (end_time % histogram_interval);
@@ -615,7 +655,11 @@ fn calculate_deltas_multi(
     }
 
     // Check if there is a gap at the end
-    if current_end_time < end_time {
+    if current_end_time < end_time
+        && results.last().map_or(false, |last_meta| {
+            !last_meta.cached_response.hits.is_empty()
+        })
+    {
         deltas.push(QueryDelta {
             delta_start_time: current_end_time,
             delta_end_time: end_time,
@@ -623,5 +667,11 @@ fn calculate_deltas_multi(
         });
     }
 
-    deltas
+    // remove all deltas that are within the cache duration
+    // deltas.retain(|d| d.delta_start_time >= new_start_time);
+
+    deltas.sort(); // Sort the deltas to bring duplicates together
+    deltas.dedup(); // Remove consecutive duplicates
+
+    (deltas, None, cache_duration)
 }

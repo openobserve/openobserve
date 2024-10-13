@@ -20,6 +20,7 @@ use std::{
     time::UNIX_EPOCH,
 };
 
+use anyhow::Context;
 use arrow::{
     array::{
         new_null_array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
@@ -35,19 +36,22 @@ use config::{
     cluster, get_config,
     meta::{
         bitvec::BitVec,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+        inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
+        puffin::writer::PuffinBytesWriter,
+        stream::{
+            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
+        },
     },
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files_with_channel,
-        inverted_index::split_token,
+        inverted_index::{convert_parquet_idx_file_name, split_token},
         json,
         parquet::{
             read_metadata_from_file, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH,
@@ -57,7 +61,7 @@ use infra::{
     cache::tmpfs,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, SchemaCache,
+        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
     },
     storage,
 };
@@ -73,7 +77,7 @@ use crate::{
         infra::wal,
         meta::{authz::Authz, stream::SchemaRecords},
     },
-    job::files::idx::write_to_disk,
+    job::files::idx::write_parquet_index_to_disk,
     service::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
@@ -127,8 +131,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn scan_wal_files(
     worker_tx: tokio::sync::mpsc::Sender<(String, Vec<FileKey>)>,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
     let pattern = wal_dir.join("files/");
 
@@ -445,7 +450,7 @@ async fn move_files(
         // check if allowed to delete the file
         for file in new_file_list.iter() {
             loop {
-                if wal::lock_files_exists(&file.key).await {
+                if wal::lock_files_exists(&file.key) {
                     log::warn!(
                         "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
                         file.key
@@ -588,10 +593,10 @@ async fn merge_files(
         .defined_schema_fields
         .unwrap_or_default();
     let schema = if !defined_schema_fields.is_empty() {
-        let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
+        let latest_schema = SchemaCache::new_from_arc(latest_schema.clone());
         let latest_schema =
             generate_schema_for_defined_schema_fields(&latest_schema, &defined_schema_fields);
-        Arc::new(latest_schema.schema().clone())
+        latest_schema.schema().clone()
     } else {
         latest_schema.clone()
     };
@@ -654,7 +659,6 @@ async fn merge_files(
             new_schema.clone(),
             &new_batches,
             &bloom_filter_fields,
-            &full_text_search_fields,
             &new_file_meta,
         )
         .await?;
@@ -676,31 +680,54 @@ async fn merge_files(
         start.elapsed().as_millis(),
     );
 
-    // generate inverted index RecordBatch
-    let inverted_idx_batches = generate_inverted_idx_recordbatch(
-        new_schema.clone(),
-        &new_batches,
-        stream_type,
-        &full_text_search_fields,
-        &index_fields,
-    );
-
     // upload file
     let buf = Bytes::from(buf);
     match storage::put(&new_file_key, buf).await {
         Ok(_) => {
             if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
-                generate_index_on_ingester(
-                    inverted_idx_batches,
-                    new_file_key.clone(),
-                    &org_id,
-                    &stream_name,
+                // generate inverted index RecordBatch
+                if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
+                    new_schema.clone(),
+                    &new_batches,
                     stream_type,
                     &full_text_search_fields,
                     &index_fields,
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
+                )? {
+                    let index_format =
+                        InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+                    ) {
+                        generate_index_on_ingester(
+                            inverted_idx_batch.clone(),
+                            new_file_key.clone(),
+                            &org_id,
+                            &stream_name,
+                            stream_type,
+                            &full_text_search_fields,
+                            &index_fields,
+                        )
+                        .await
+                        .map_err(|e| {
+                            anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e)
+                        })?;
+                    }
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+                    ) {
+                        // generate fst inverted index and write to storage
+                        generate_fst_inverted_index(
+                            inverted_idx_batch,
+                            &new_file_key,
+                            &full_text_search_fields,
+                            &index_fields,
+                            None,
+                        )
+                        .await?;
+                    }
+                }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -711,7 +738,7 @@ async fn merge_files(
 /// Create an inverted index file for the given file
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_ingester(
-    batches: Vec<RecordBatch>,
+    inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
@@ -726,14 +753,13 @@ pub(crate) async fn generate_index_on_ingester(
             format!("{}_{}", stream_name, stream_type)
         };
     let record_batches = prepare_index_record_batches(
-        batches,
+        inverted_idx_batch,
         org_id,
         stream_name,
         &new_file_key,
         full_text_search_fields,
         index_fields,
     )
-    .await
     .map_err(|e| anyhow::anyhow!("prepare_index_record_batches error: {}", e))?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(());
@@ -748,6 +774,9 @@ pub(crate) async fn generate_index_on_ingester(
         &mut schema_map,
     )
     .await;
+    let mut stream_setting = schema_map
+        .get(&index_stream_name)
+        .and_then(|schema| unwrap_stream_settings(schema.schema()));
 
     if !schema_chk.has_fields {
         // create schema
@@ -766,16 +795,15 @@ pub(crate) async fn generate_index_on_ingester(
         };
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
-            bloom_filter_fields: vec![
-                "field".to_string(),
-                "term".to_string(),
-                "file_name".to_string(),
-            ],
+            bloom_filter_fields: vec!["term".to_string()],
+            partition_keys: vec![StreamPartition::new_prefix("term")],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
+        // update stream setting
+        stream_setting = Some(settings);
 
         crate::common::utils::auth::set_ownership(
             org_id,
@@ -804,29 +832,48 @@ pub(crate) async fn generate_index_on_ingester(
                 ));
             };
         }
+
+        // add prefix partition for index <= v0.12.1
+        if let Some(settings) = stream_setting.as_mut() {
+            let term_partition_exists = settings
+                .partition_keys
+                .iter()
+                .any(|partition| partition.field == "term");
+            if !term_partition_exists {
+                settings
+                    .partition_keys
+                    .push(StreamPartition::new_prefix("term"));
+
+                let mut metadata = schema.schema().metadata().clone();
+                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
+                    .await?;
+            }
+        }
     }
+
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
+    let stream_setting = stream_setting.unwrap_or_default();
 
     let json_rows = record_batches_to_json_rows(&record_batches.iter().collect::<Vec<_>>())?;
     if json_rows.is_empty() {
         return Ok(());
     }
-    let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    for record_val in recs {
-        let timestamp: i64 = record_val
+    for row in json_rows {
+        let timestamp: i64 = row
             .get(&get_config().common.column_timestamp)
             .unwrap()
             .as_i64()
             .unwrap();
 
-        let hour_key = crate::service::ingestion::get_wal_time_key(
+        let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
-            &Vec::new(),
+            &stream_setting.partition_keys,
             PartitionTimeLevel::Hourly,
-            &json::Map::new(),
+            &row,
             Some(schema_key_str),
         );
 
@@ -836,7 +883,7 @@ pub(crate) async fn generate_index_on_ingester(
             records: vec![],
             records_size: 0,
         });
-
+        let record_val: json::Value = json::Value::Object(row);
         let record_size = json::estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
@@ -855,14 +902,14 @@ pub(crate) async fn generate_index_on_ingester(
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    batches: Vec<RecordBatch>,
+    inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Result<(String, FileMeta), anyhow::Error> {
+) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -870,16 +917,15 @@ pub(crate) async fn generate_index_on_compactor(
             format!("{}_{}", stream_name, stream_type)
         };
     let mut record_batches = prepare_index_record_batches(
-        batches,
+        inverted_idx_batch,
         org_id,
         stream_name,
         &new_file_key,
         full_text_search_fields,
         index_fields,
-    )
-    .await?;
+    )?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
-        return Ok((String::new(), FileMeta::default()));
+        return Ok(vec![(String::new(), FileMeta::default())]);
     }
     let schema = record_batches.first().unwrap().schema();
 
@@ -940,7 +986,7 @@ pub(crate) async fn generate_index_on_compactor(
     record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
-    let (filename, filemeta, _stream_type) = write_to_disk(
+    let files = write_parquet_index_to_disk(
         record_batches,
         original_file_size,
         org_id,
@@ -951,46 +997,20 @@ pub(crate) async fn generate_index_on_compactor(
     )
     .await?;
 
-    log::debug!("[COMPACTOR:JOB] Written index file successfully");
-    Ok((filename, filemeta))
+    log::debug!("[COMPACTOR:JOB] Written index files successfully");
+    Ok(files)
 }
 
-async fn prepare_index_record_batches(
-    mut batches: Vec<RecordBatch>,
+fn prepare_index_record_batches(
+    inverted_idx_batch: RecordBatch,
     org_id: &str,
     stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<Vec<RecordBatch>, anyhow::Error> {
-    if batches.is_empty() {
-        return Ok(vec![]);
-    }
-
     let cfg = get_config();
-    // filter null columns
-    let mut new_batch = if batches.len() == 1 {
-        batches.remove(0)
-    } else {
-        let schema = batches.first().unwrap().schema();
-        concat_batches(schema, batches)
-            .map_err(|e| anyhow::anyhow!("concat_batches error: {}", e))?
-    };
-
-    let mut null_columns = 0;
-    for i in 0..new_batch.num_columns() {
-        let ni = i - null_columns;
-        if new_batch.column(ni).null_count() == new_batch.num_rows() {
-            new_batch.remove_column(ni);
-            null_columns += 1;
-        }
-    }
-    let schema = new_batch.schema();
-    if schema.fields().is_empty()
-        || (schema.fields().len() == 1 && schema.field(0).name() == &cfg.common.column_timestamp)
-    {
-        return Ok(vec![]);
-    }
+    let schema = inverted_idx_batch.schema();
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
@@ -1009,7 +1029,7 @@ async fn prepare_index_record_batches(
     let mut indexed_record_batches_to_merge = Vec::new();
 
     // get _timestamp column
-    let Some(time_data) = new_batch
+    let Some(time_data) = inverted_idx_batch
         .column_by_name(&cfg.common.column_timestamp)
         .unwrap()
         .as_any()
@@ -1018,7 +1038,7 @@ async fn prepare_index_record_batches(
         return Ok(vec![]);
     };
 
-    let num_rows = new_batch.num_rows();
+    let num_rows = inverted_idx_batch.num_rows();
     // process full text search fields
     for column in schema.fields().iter() {
         let column_name = column.name();
@@ -1027,7 +1047,7 @@ async fn prepare_index_record_batches(
         }
 
         // get full text search column
-        let Some(column_data) = new_batch
+        let Some(column_data) = inverted_idx_batch
             .column_by_name(column_name)
             .unwrap()
             .as_any()
@@ -1130,7 +1150,7 @@ async fn prepare_index_record_batches(
         }
 
         // get index column
-        let Some(column_data) = new_batch
+        let Some(column_data) = inverted_idx_batch
             .column_by_name(column_name)
             .unwrap()
             .as_any()
@@ -1221,6 +1241,195 @@ async fn prepare_index_record_batches(
     }
 
     Ok(indexed_record_batches_to_merge)
+}
+
+/// Creates fst inverted index bytes and writes to storage.
+/// Called by both ingester and compactor. Compactor needs to provide `file_list_to_invalidate`
+/// to delete previously created small index files
+pub(crate) async fn generate_fst_inverted_index(
+    inverted_idx_batch: RecordBatch,
+    parquet_file_name: &str,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
+    file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
+                                                  * .idx files */
+) -> Result<(), anyhow::Error> {
+    let Some((compressed_bytes, file_meta)) =
+        prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
+    else {
+        log::info!("generate_fst_index_on_compactor creates empty index. skip");
+        return Ok(());
+    };
+
+    // delete corresponding small .puffin files
+    if let Some(file_list) = file_list_to_invalidate {
+        for old_parquet_file in file_list {
+            let Some(old_idx_file) = convert_parquet_idx_file_name(&old_parquet_file.key) else {
+                continue;
+            };
+            if let Err(e) = storage::del(&[&old_idx_file]).await {
+                log::info!(
+                    "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
+                    old_idx_file,
+                    e
+                );
+            }
+        }
+    }
+
+    // write fst bytes into disk
+    let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
+        return Ok(());
+    };
+    let caller = if file_list_to_invalidate.is_some() {
+        "[COMPACTOR:JOB]"
+    } else {
+        "[INGESTER:JOB]"
+    };
+    match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
+        Ok(_) => {
+            log::info!(
+                "{} Written fst index file successfully compressed size {}, original size {}",
+                caller,
+                file_meta.compressed_size,
+                file_meta.original_size,
+            );
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("{} Written fst index file error: {}", caller, e.to_string());
+            Err(e)
+        }
+    }
+}
+
+/// Create and compressed inverted index bytes using FST solution for the given RecordBatch
+pub(crate) fn prepare_fst_index_bytes(
+    inverted_idx_batch: RecordBatch,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
+) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
+    let schema = inverted_idx_batch.schema();
+
+    let mut writer = Vec::new();
+    let mut index_file_metas = IndexFileMetas::new();
+
+    let num_rows = inverted_idx_batch.num_rows();
+    // Process full text search fields
+    let mut ft_indexer = ColumnIndexer::new();
+    for column in schema.fields() {
+        let column_name = column.name();
+        if !full_text_search_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
+            continue;
+        }
+
+        let Some(column_data) = inverted_idx_batch
+            .column_by_name(column_name)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+        else {
+            continue;
+        };
+
+        // split the column into terms
+        let terms = (0..num_rows)
+            .flat_map(|i| {
+                split_token(
+                    column_data.value(i),
+                    &config::get_config().common.inverted_index_split_chars,
+                )
+                .into_iter()
+                .map(|s| (s, i))
+                .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        if terms.is_empty() {
+            continue;
+        }
+
+        for (term, row_id) in terms {
+            let segment_id = row_id / INDEX_SEGMENT_LENGTH;
+            ft_indexer.push(term.as_bytes(), segment_id, term.len());
+        }
+    }
+    // finish ft_indexer
+    if !ft_indexer.is_empty() {
+        let ft_index_meta = ft_indexer
+            .write(&mut writer)
+            .context("Error constructing FST ColumnIndex for full text search fields")?;
+        // add ft_indexer_meta to IndexFileMetas
+        index_file_metas
+            .metas
+            .insert(INDEX_FIELD_NAME_FOR_ALL.to_string(), ft_index_meta);
+    }
+
+    // Process secondary index fields
+    for column in schema.fields() {
+        let column_name = column.name();
+        if !index_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
+            continue;
+        }
+
+        let Some(column_data) = inverted_idx_batch
+            .column_by_name(column_name)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+        else {
+            continue;
+        };
+
+        let terms = (0..num_rows)
+            .map(|i| (column_data.value(i), i))
+            .collect::<Vec<_>>();
+        if terms.is_empty() {
+            continue;
+        }
+
+        let mut col_indexer = ColumnIndexer::new();
+        for (term, row_id) in terms {
+            let segment_id = row_id / INDEX_SEGMENT_LENGTH;
+            col_indexer.push(term.as_bytes(), segment_id, term.len());
+        }
+
+        // finish col_indexer
+        if !col_indexer.is_empty() {
+            let col_index_meta = col_indexer.write(&mut writer).context(format!(
+                "Error constructing FST ColumnIndex for field {}",
+                column_name
+            ))?;
+            // add ft_indexer_meta to IndexFileMetas
+            index_file_metas
+                .metas
+                .insert(column_name.to_string(), col_index_meta);
+        }
+    }
+
+    // TODO(taiming): left for future improvement - write index files into file_list to show total
+    // index size
+    let mut file_meta = FileMeta {
+        min_ts: 0,
+        max_ts: 0,
+        records: 0,
+        original_size: 0,
+        compressed_size: 0,
+        flattened: false,
+    };
+
+    let _ = index_file_metas.finish(&mut writer)?;
+    let original_size = writer.len();
+
+    let mut puffin_buf: Vec<u8> = Vec::new();
+    let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
+    puffin_writer.add_blob(writer)?;
+    puffin_writer.finish()?;
+
+    file_meta.original_size = original_size as _;
+    file_meta.compressed_size = puffin_buf.len() as _;
+
+    Ok(Some((puffin_buf, file_meta)))
 }
 
 #[allow(clippy::too_many_arguments)]

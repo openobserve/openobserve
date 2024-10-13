@@ -369,12 +369,13 @@ pub async fn remote_write(
                 .get(&metric_name)
                 .unwrap()
                 .schema()
+                .as_ref()
                 .clone()
                 .with_metadata(HashMap::new());
             let schema_key = schema.hash_key();
 
             // get hour key
-            let hour_key = crate::service::ingestion::get_wal_time_key(
+            let hour_key = crate::service::ingestion::get_write_partition_key(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
@@ -405,7 +406,7 @@ pub async fn remote_write(
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
+                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }
@@ -459,7 +460,9 @@ pub async fn remote_write(
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in stream_trigger_map {
-        evaluate_trigger(entry).await;
+        if let Some(entry) = entry {
+            evaluate_trigger(entry).await;
+        }
     }
 
     metrics::HTTP_RESPONSE_TIME
@@ -644,6 +647,7 @@ pub(crate) async fn get_series(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -788,6 +792,7 @@ pub(crate) async fn get_label_values(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

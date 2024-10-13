@@ -14,11 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::{meta::stream::StreamType, utils::json};
+use config::{meta::stream::StreamType, metrics::DB_QUERY_NUMS, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::mysql::CLIENT,
+    db::mysql::{create_index, CLIENT},
     errors::{Error, Result},
 };
 
@@ -56,6 +56,9 @@ impl super::SchemaHistory for MysqlSchemaHistory {
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "schema_history"])
+            .inc();
         match sqlx::query(
             r#"
 INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, value)
@@ -85,6 +88,9 @@ INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, valu
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "schema_history"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
@@ -105,31 +111,21 @@ CREATE TABLE IF NOT EXISTS schema_history
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let pool = CLIENT.clone();
-    let sqls = vec![
-        (
-            "schema_history",
-            "CREATE INDEX schema_history_org_idx on schema_history (org);",
-        ),
-        (
-            "schema_history",
-            "CREATE INDEX schema_history_stream_idx on schema_history (org, stream_type, stream_name);",
-        ),
-        (
-            "schema_history",
-            "CREATE UNIQUE INDEX schema_history_stream_version_idx on schema_history (org, stream_type, stream_name, start_dt);",
-        ),
-    ];
-    for (table, sql) in sqls {
-        if let Err(e) = sqlx::query(sql).execute(&pool).await {
-            if e.to_string().contains("Duplicate key") {
-                // index already exists
-                continue;
-            }
-            log::error!("[MYSQL] create table {} index error: {}", table, e);
-            return Err(e.into());
-        }
-    }
+    create_index("schema_history_org_idx", "schema_history", false, &["org"]).await?;
+    create_index(
+        "schema_history_stream_idx",
+        "schema_history",
+        false,
+        &["org", "stream_type", "stream_name"],
+    )
+    .await?;
+    create_index(
+        "schema_history_stream_version_idx",
+        "schema_history",
+        true,
+        &["org", "stream_type", "stream_name", "start_dt"],
+    )
+    .await?;
 
     Ok(())
 }

@@ -16,11 +16,15 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Duration;
+use config::metrics::DB_QUERY_NUMS;
 use sqlx::Row;
 
 use super::{Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
-    db::{self, mysql::CLIENT},
+    db::{
+        self,
+        mysql::{create_index, CLIENT},
+    },
     errors::{DbError, Error, Result},
 };
 
@@ -43,6 +47,9 @@ impl super::Scheduler for MySqlScheduler {
     /// Creates the Scheduled Jobs table
     async fn create_table(&self) -> Result<()> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["create", "scheduled_jobs"])
+            .inc();
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS scheduled_jobs
@@ -67,6 +74,9 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .await?;
 
         // create data column for old version <= 0.10.9
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "information_schema.columns"])
+            .inc();
         let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
             .fetch_one(&pool)
             .await?;
@@ -77,30 +87,37 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        create_index(
+            "scheduled_jobs_key_idx",
+            "scheduled_jobs",
+            false,
+            &["module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_key_idx",
+            "scheduled_jobs",
+            false,
+            &["org", "module_key"],
+        )
+        .await?;
+        create_index(
+            "scheduled_jobs_org_module_key_idx",
+            "scheduled_jobs",
+            true,
+            &["org", "module", "module_key"],
+        )
+        .await?;
 
-        let queries = vec![
-            "CREATE INDEX scheduled_jobs_key_idx on scheduled_jobs (module_key);",
-            "CREATE INDEX scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
-            "CREATE UNIQUE INDEX scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
-        ];
-
-        for query in queries {
-            if let Err(e) = sqlx::query(query).execute(&pool).await {
-                if e.to_string().contains("Duplicate key") {
-                    // index already exists
-                    return Ok(());
-                }
-                log::error!("[MYSQL] create table scheduled_jobs index error: {}", e);
-                return Err(e.into());
-            }
-        }
         Ok(())
     }
 
     /// The count of jobs for the given module (Report/Alert etc.)
     async fn len_module(&self, module: TriggerModule) -> usize {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "scheduled_jobs"])
+            .inc();
         let ret = match sqlx::query(
             r#"
 SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
@@ -126,6 +143,9 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
 
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "scheduled_jobs"])
+            .inc();
         if let Err(e) = sqlx::query(
             r#"
 INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time, data)
@@ -174,6 +194,9 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "scheduled_jobs"])
+            .inc();
         sqlx::query(
             r#"DELETE FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#,
         )
@@ -187,7 +210,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         if module == TriggerModule::Alert {
             // It will send event even if the alert is not realtime alert.
             // But that is okay, for non-realtime alerts, since the triggers are not
-            // present in the cache at all, it will just do nothin.
+            // present in the cache at all, it will just do nothing.
             let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
@@ -205,6 +228,9 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         retries: i32,
     ) -> Result<()> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
         sqlx::query(
             r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#
         )
@@ -223,6 +249,9 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
 
     async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
@@ -283,6 +312,9 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
                 .num_microseconds()
                 .unwrap();
         let mut tx = pool.begin().await?;
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "scheduled_jobs"])
+            .inc();
         let job_ids: Vec<TriggerId> = match sqlx::query_as::<_, TriggerId>(
             r#"SELECT id
 FROM scheduled_jobs
@@ -323,6 +355,9 @@ FOR UPDATE;
         }
 
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
         let query = format!(
             "UPDATE scheduled_jobs
 SET status = ?, start_time = ?,
@@ -359,6 +394,9 @@ WHERE id IN ({});",
             job_ids.join(",")
         );
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "scheduled_jobs"])
+            .inc();
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query.as_str())
             .fetch_all(&pool)
             .await?;
@@ -368,6 +406,9 @@ WHERE id IN ({});",
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "scheduled_jobs"])
+            .inc();
         let query =
             r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#;
         let job = match sqlx::query_as::<_, Trigger>(query)
@@ -390,6 +431,9 @@ WHERE id IN ({});",
 
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "scheduled_jobs"])
+            .inc();
         let jobs: Vec<Trigger> = if let Some(module) = module {
             let query = r#"SELECT * FROM scheduled_jobs WHERE module = ? ORDER BY id;"#;
             sqlx::query_as::<_, Trigger>(query)
@@ -407,6 +451,9 @@ WHERE id IN ({});",
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "scheduled_jobs"])
+            .inc();
         sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
             .bind(TriggerStatus::Completed)
             .bind(config::get_config().limit.scheduler_max_retries)
@@ -424,6 +471,9 @@ WHERE id IN ({});",
     async fn watch_timeout(&self) -> Result<()> {
         let pool = CLIENT.clone();
         let now = chrono::Utc::now().timestamp_micros();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = retries + 1
@@ -440,6 +490,9 @@ WHERE status = ? AND end_time <= ?
 
     async fn len(&self) -> usize {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "scheduled_jobs"])
+            .inc();
         let ret = match sqlx::query(
             r#"
 SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
@@ -465,6 +518,9 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 
     async fn clear(&self) -> Result<()> {
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "scheduled_jobs"])
+            .inc();
         match sqlx::query(r#"DELETE FROM scheduled_jobs;"#)
             .execute(&pool)
             .await
@@ -480,6 +536,9 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 async fn add_data_column() -> Result<()> {
     log::info!("[MYSQL] Adding data column to scheduled_jobs table");
     let pool = CLIENT.clone();
+    DB_QUERY_NUMS
+        .with_label_values(&["alter", "scheduled_jobs"])
+        .inc();
     if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
         .execute(&pool)
         .await

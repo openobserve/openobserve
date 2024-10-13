@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { date } from "quasar";
+import { DateTime as _DateTime } from "luxon";
 
 // Parses the duration string and returns the number is seconds
 export const parseDuration = (durationString: string) => {
@@ -193,7 +194,7 @@ export const getDurationObjectFromParams = (params: any) => {
 };
 
 export const getConsumableRelativeTime = (period: string) => {
-  const periodString = period?.match(/(\d+)([mhdwM])/);
+  const periodString = period?.match(/(\d+)([smhdwM])/);
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];
@@ -215,7 +216,7 @@ export const getConsumableRelativeTime = (period: string) => {
 
     const startTimeStamp = date.subtractFromDate(
       endTimeStamp,
-      JSON.parse(subtractObject)
+      JSON.parse(subtractObject),
     );
 
     return {
@@ -227,6 +228,7 @@ export const getConsumableRelativeTime = (period: string) => {
 
 export const getRelativePeriod = (period: string) => {
   const mapping: { [key: string]: string } = {
+    s: "Seconds",
     m: "Minutes",
     h: "Hours",
     d: "Days",
@@ -238,4 +240,59 @@ export const getRelativePeriod = (period: string) => {
 
 export const isInvalidDate = (date: any) => {
   return !(date && date instanceof Date && !isNaN(date.getTime()));
+};
+
+export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
+  try {
+    if (!unixMicroseconds) return "";
+    const unixSeconds = unixMicroseconds / 1e6;
+    const dateToFormat = new Date(unixSeconds * 1000);
+    const formattedDate = dateToFormat.toISOString();
+    return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  } catch (error) {
+    console.log("Error converting unix to quasar format");
+    return "";
+  }
+};
+
+/**
+ * @param {string} date - date in DD-MM-YYYY format
+ * @param {string} time - time in HH:MM 24hr format
+ * @param {string} timezone - timezone
+ */
+export const convertDateToTimestamp = (
+  date: string,
+  time: string,
+  timezone: string,
+) => {
+  try {
+    const browserTime =
+      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+    const [day, month, year] = date.split("-");
+    const [hour, minute] = time.split(":");
+
+    const _date = {
+      year: Number(year),
+      month: Number(month),
+      day: Number(day),
+      hour: Number(hour),
+      minute: Number(minute),
+    };
+
+    if (timezone.toLowerCase() == browserTime.toLowerCase()) {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+
+    // Create a DateTime instance from date and time, then set the timezone
+    const dateTime = _DateTime.fromObject(_date, { zone: timezone });
+
+    // Convert the DateTime to a Unix timestamp in milliseconds
+    const unixTimestampMillis = dateTime.toMillis();
+
+    return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
+  } catch (error) {
+    console.log("Error converting date to timestamp");
+    return { timestamp: 0, offset: 0 };
+  }
 };

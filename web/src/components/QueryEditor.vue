@@ -34,6 +34,7 @@ import {
   onUnmounted,
   onActivated,
   watch,
+  computed,
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
@@ -124,7 +125,7 @@ export default defineComponent({
       });
     };
 
-    const setupEditor = () => {
+    const setupEditor = async () => {
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -141,20 +142,32 @@ export default defineComponent({
 
       registerAutoCompleteProvider();
 
-      const editorElement = document.getElementById(props.editorId);
+      let editorElement = document.getElementById(props.editorId);
+      let retryCount = 0;
+      const maxRetries = 5;
+
+      // Retry mechanism to ensure the editor element is found
+      while (!editorElement && retryCount < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for 100ms
+        editorElement = document.getElementById(props.editorId);
+        retryCount++;
+      }
 
       if (!editorElement) {
-        console.error("Query Editor element not found");
+        console.error("Query Editor element not found after retries");
         return;
       }
+
       if (editorElement && editorElement?.hasChildNodes()) return;
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query,
         language: props.language,
         theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-        showFoldingControls: "never",
+        showFoldingControls: enableCodeFolding.value ? "always" : "never",
+        folding: enableCodeFolding.value,
         wordWrap: "on",
+        automaticLayout: true,
         lineNumbers: "on",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
@@ -164,7 +177,6 @@ export default defineComponent({
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
-        folding: false,
         scrollBeyondLastColumn: 0,
         scrollBeyondLastLine: false,
         smoothScrolling: true,
@@ -184,7 +196,7 @@ export default defineComponent({
         debounce((e: any) => {
           emit("update-query", e, editorObj.getValue());
           emit("update:query", editorObj.getValue());
-        }, props.debounceTime)
+        }, props.debounceTime),
       );
 
       editorObj.createContextKey("ctrlenter", true);
@@ -195,7 +207,7 @@ export default defineComponent({
             emit("run-query");
           }, 300);
         },
-        "ctrlenter"
+        "ctrlenter",
       );
 
       editorObj.onDidFocusEditorWidget(() => {
@@ -207,12 +219,12 @@ export default defineComponent({
       });
 
       window.addEventListener("click", () => {
-        editorObj.layout();
+        editorObj?.layout();
       });
 
       window.addEventListener("resize", async () => {
         await nextTick();
-        editorObj.layout();
+        editorObj?.layout();
         // queryEditorRef.value.resetEditorLayout();
       });
     };
@@ -226,7 +238,7 @@ export default defineComponent({
         // Register a tokens provider for the language
         monaco.languages.setMonarchTokensProvider(
           "vrl",
-          vrlLanguageDefinition as any
+          vrlLanguageDefinition as any,
         );
       }
 
@@ -260,7 +272,11 @@ export default defineComponent({
     onActivated(async () => {
       provider.value?.dispose();
       registerAutoCompleteProvider();
-      editorObj?.layout();
+
+      if (!editorObj) {
+        setupEditor();
+        editorObj?.layout();
+      }
     });
 
     onDeactivated(() => {
@@ -271,37 +287,41 @@ export default defineComponent({
       provider.value?.dispose();
     });
 
+    const enableCodeFolding = computed(() => {
+      return ["json", "html"].includes(props.language);
+    });
+
     // update readonly when prop value changes
     watch(
       () => props.readOnly,
       () => {
         editorObj.updateOptions({ readOnly: props.readOnly });
-      }
+      },
     );
 
     watch(
       () => store.state.theme,
       () => {
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
-      }
+      },
     );
 
     // update readonly when prop value changes
     watch(
       () => props.query,
       () => {
-        if (props.readOnly || !editorObj.hasWidgetFocus()) {
-          editorObj.getModel().setValue(props.query);
+        if (props.readOnly || !editorObj?.hasWidgetFocus()) {
+          editorObj?.getModel().setValue(props.query);
         }
-      }
+      },
     );
 
     const setValue = (value: string) => {
       if (editorObj?.setValue) {
         editorObj.setValue(value);
-        editorObj.layout();
+        editorObj?.layout();
       }
     };
 
@@ -350,12 +370,12 @@ export default defineComponent({
               suggestions: filteredSuggestions,
             };
           },
-        }
+        },
       );
     };
 
     const resetEditorLayout = () => {
-      editorObj.layout();
+      editorObj?.layout();
     };
 
     const triggerAutoComplete = async (value: string) => {
@@ -375,12 +395,13 @@ export default defineComponent({
     };
 
     const formatDocument = () => {
-      editorObj.getAction("editor.action.formatDocument").run();
+      editorObj?.getAction("editor.action.formatDocument")?.run();
     };
 
     const getCursorIndex = () => {
       const currentPosition = editorObj.getPosition();
-      const cursorIndex = editorObj.getModel().getOffsetAt(currentPosition) - 1;
+      const cursorIndex =
+        editorObj?.getModel().getOffsetAt(currentPosition) - 1;
       return cursorIndex || null;
     };
 

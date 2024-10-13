@@ -37,6 +37,14 @@ pub struct TriggerCondition {
     pub frequency_type: FrequencyType,
     #[serde(default)]
     pub silence: i64, // silence for 10 minutes after fire an alert
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CompareHistoricData {
+    #[serde(rename = "offSet")]
+    pub offset: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -62,6 +70,8 @@ pub struct QueryCondition {
     pub vrl_function: Option<String>,
     #[serde(default)]
     pub search_event_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

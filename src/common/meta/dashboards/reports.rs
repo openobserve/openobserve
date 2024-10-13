@@ -198,8 +198,10 @@ impl Default for Report {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ReportEmailDetails {
-    pub recepients: Vec<String>,
+    #[serde(alias = "recepients")]
+    pub recipients: Vec<String>,
     pub title: String,
     pub name: String,
     pub message: String,
@@ -210,4 +212,33 @@ pub struct ReportEmailDetails {
 pub struct HttpReportPayload {
     pub dashboards: Vec<ReportDashboard>,
     pub email_details: ReportEmailDetails,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReportListFilters {
+    pub dashboard: Option<String>,
+    pub folder: Option<String>,
+    pub destination_less: Option<bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_recipients_backwards_compatibility() {
+        // The serde alias allows loading data created before the typo was fixed.
+        let email_details = ReportEmailDetails {
+            recipients: vec!["foo@example.com".to_string()],
+            title: "title".to_string(),
+            name: "name".to_string(),
+            message: "message".to_string(),
+            dashb_url: "https://example.com/dashb_url".to_string(),
+        };
+        let json = serde_json::to_string(&email_details).unwrap();
+        let json_using_alias = json.replace("recipients", "recepients");
+        let email_details_from_alias: ReportEmailDetails =
+            serde_json::from_str(&json_using_alias).unwrap();
+        assert_eq!(email_details, email_details_from_alias);
+    }
 }

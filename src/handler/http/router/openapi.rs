@@ -39,6 +39,7 @@ use crate::{common::meta, handler::http::request};
         request::stream::list,
         request::stream::schema,
         request::stream::settings,
+        request::stream::update_settings,
         request::stream::delete_fields,
         request::stream::delete,
         request::logs::ingest::bulk,
@@ -63,6 +64,7 @@ use crate::{common::meta, handler::http::request};
         request::search::search_partition,
         request::search::around,
         request::search::values,
+        request::search::search_history,
         request::search::saved_view::create_view,
         request::search::saved_view::delete_view,
         request::search::saved_view::get_view,
@@ -113,6 +115,8 @@ use crate::{common::meta, handler::http::request};
         request::syslog::list_routes,
         request::syslog::delete_route,
         request::clusters::list_clusters,
+        request::short_url::shorten,
+        request::short_url::retrieve,
     ),
     components(
         schemas(
@@ -234,6 +238,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Traces", description = "Traces data ingestion operations"),
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
+        (name = "Short Url", description = "Short Url Service"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",

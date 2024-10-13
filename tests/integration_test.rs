@@ -16,18 +16,24 @@
 #[cfg(test)]
 mod tests {
     use core::time;
-    use std::{env, fs, str, sync::Once, thread};
+    use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
 
     use actix_web::{http::header::ContentType, test, web, App};
+    use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
     use config::{get_config, utils::json};
     use openobserve::{
         common::meta::dashboards::{v1, Dashboard, Dashboards},
-        handler::http::router::*,
+        handler::{
+            grpc::{auth::check_auth, flight::FlightServiceImpl},
+            http::router::*,
+        },
+        service::search::SEARCH_SERVER,
     };
     use prost::Message;
-    use proto::prometheus_rpc;
+    use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
+    use tonic::codec::CompressionEncoding;
 
     static START: Once = Once::new();
 
@@ -40,7 +46,8 @@ mod tests {
             env::set_var("ZO_FILE_PUSH_INTERVAL", "1");
             env::set_var("ZO_PAYLOAD_LIMIT", "209715200");
             env::set_var("ZO_JSON_LIMIT", "209715200");
-            env::set_var("ZO_TIME_STAMP_COL", "_timestamp");
+            env::set_var("ZO_RESULT_CACHE_ENABLED", "false");
+            env::set_var("ZO_PRINT_KEY_SQL", "true");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -54,6 +61,32 @@ mod tests {
         )
     }
 
+    async fn init_grpc_server() -> Result<(), anyhow::Error> {
+        let cfg = get_config();
+        let ip = if !cfg.grpc.addr.is_empty() {
+            cfg.grpc.addr.clone()
+        } else {
+            "0.0.0.0".to_string()
+        };
+        let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
+        let search_svc = SearchServer::new(SEARCH_SERVER.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+        let flight_svc = FlightServiceServer::new(FlightServiceImpl)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+
+        log::info!("starting gRPC server at {}", gaddr);
+        tonic::transport::Server::builder()
+            .layer(tonic::service::interceptor(check_auth))
+            .add_service(search_svc)
+            .add_service(flight_svc)
+            .serve(gaddr)
+            .await
+            .expect("gRPC server init failed");
+        Ok(())
+    }
+
     async fn e2e_100_tear_down() {
         log::info!("Tear Down Invoked");
         fs::remove_dir_all("./data").expect("Delete local dir failed");
@@ -61,11 +94,18 @@ mod tests {
 
     #[test]
     async fn e2e_test() {
-        // make sure data dir is deleted before we run integ tests
+        // make sure data dir is deleted before we run integration tests
         fs::remove_dir_all("./data")
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
         setup();
+
+        // start gRPC server
+        tokio::task::spawn(async move {
+            init_grpc_server()
+                .await
+                .expect("router gRPC server init failed");
+        });
 
         // register node
         openobserve::common::infra::cluster::register_and_keepalive()
@@ -107,12 +147,9 @@ mod tests {
         e2e_remove_stream_function().await;
         e2e_delete_function().await;
 
-        // FIXME: Revise and restore the e2e tests for search API calls.
-        // They have been broken by https://github.com/openobserve/openobserve/pull/570
-        //
-        // // search
-        // e2e_search().await;
-        // e2e_search_around().await;
+        // search
+        e2e_search().await;
+        e2e_search_around().await;
 
         // users
         e2e_post_user().await;
@@ -274,7 +311,7 @@ mod tests {
 
     async fn e2e_get_stream_schema() {
         let auth = setup();
-        let one_sec = time::Duration::from_millis(15000);
+        let one_sec = time::Duration::from_secs(2);
         thread::sleep(one_sec);
         let app = test::init_service(
             App::new()
@@ -300,8 +337,7 @@ mod tests {
 
     async fn e2e_post_stream_settings() {
         let auth = setup();
-        let body_str =
-            r#"{"partition_keys": [{"field":"test_key"}], "full_text_search_keys": ["log"]}"#;
+        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["log"],"remove":[]}}"#;
         // app
         let thread_id: usize = 0;
         let app = test::init_service(
@@ -515,14 +551,17 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[allow(dead_code)] // TODO: enable this test
     async fn e2e_search() {
         let auth = setup();
-        let body_str = r#"{"query":{"sql":"select * from olympics_schema",
-                                "from": 0,
-                                "size": 100
-                                        }
-                            }"#;
+        let body_str = r#"{
+            "query": {
+                "sql": "select * from olympics_schema",
+                "from": 0,
+                "size": 100,
+                "start_time": 1714857600000,
+                "end_time": 1714944000000
+            }
+        }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -543,7 +582,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[allow(dead_code)] // TODO: enable this test
     async fn e2e_search_around() {
         let auth = setup();
 
@@ -976,7 +1014,7 @@ mod tests {
     async fn e2e_post_metrics() {
         let auth = setup();
 
-        let loc_lable: Vec<prometheus_rpc::Label> = vec![
+        let loc_label: Vec<prometheus_rpc::Label> = vec![
             prometheus_rpc::Label {
                 name: "__name__".to_string(),
                 value: "grafana_api_dashboard_save_milliseconds_count".to_string(),
@@ -1016,7 +1054,7 @@ mod tests {
         let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
         let ts = prometheus_rpc::TimeSeries {
-            labels: loc_lable,
+            labels: loc_label,
             samples: loc_samples,
             exemplars: loc_exemp,
             histograms: loc_hist,
@@ -1309,6 +1347,8 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        println!("{:?}", resp.status());
+        println!("{:?}", resp.response().body());
         assert!(resp.status().is_success());
     }
 

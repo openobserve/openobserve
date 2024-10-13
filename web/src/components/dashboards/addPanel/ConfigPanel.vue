@@ -57,6 +57,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_transpose"
+      :label="t('dashboard.tableTranspose')"
+      data-test="dashboard-config-table_transpose"
+    />
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.table_dynamic_columns"
+      :label="t('dashboard.tableDynamicColumns')"
+      data-test="dashboard-config-table_dynamic_columns"
+    />
+
+    <div class="space"></div>
+
     <div class="o2-input">
       <q-select
         v-if="
@@ -533,12 +551,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.breakdown.length == 0
+          ]?.fields?.breakdown?.length == 0
         "
         data-test="dashboard-config-top_results"
         ><template v-slot:label>
           <div class="row items-center all-pointer-events">
-            Show top n values
+            Show Top N values
             <div>
               <q-icon
                 class="q-ml-xs"
@@ -552,12 +570,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b
-                  >This is only applicable when breakdown field is available</b
-                >
+                <b>This is only applicable when breakdown field is available</b>
                 <br />
                 <br />
-                Specify the number of top N values to show when breakdown field
+                Specify the number of Top N values to show when breakdown field
                 is available.
               </q-tooltip>
             </div>
@@ -587,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.breakdown.length == 0
+            ].fields?.breakdown?.length == 0
           "
         />
 
@@ -674,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-input
         v-if="
-          ['area', 'line', 'area-stacked'].includes(
+          ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
             dashboardPanelData.data.type,
           )
         "
@@ -889,6 +905,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+      <ValueMapping v-if="dashboardPanelData.data.type == 'table'" />
+
+      <div class="space"></div>
       <MarkLineConfig
         v-if="
           [
@@ -904,6 +923,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
+
+    <div
+      v-if="
+        [
+          'area',
+          'bar',
+          'line',
+          'h-bar',
+          'h-stacked',
+          'scatter',
+          'area-stacked',
+          'stacked',
+        ].includes(dashboardPanelData.data.type) && !promqlMode
+      "
+    >
+      <div class="flex items-center q-mr-sm">
+        <div
+          data-test="scheduled-dashboard-period-title"
+          class="text-bold q-py-md flex items-center"
+          style="width: 190px"
+        >
+          Comparison Against
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            data-test="dashboard-addpanel-config-time-shift-info"
+          >
+            <q-tooltip
+              anchor="bottom middle"
+              self="top middle"
+              style="font-size: 10px"
+              max-width="250px"
+            >
+              <span>
+                This feature allows you to compare data points from multiple
+                queries over a selected time range. By adjusting the date or
+                time, the system will retrieve corresponding data from different
+                queries, enabling you to observe changes or differences between
+                the selected time periods.
+              </span>
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+      <CustomDateTimePicker
+        modelValue="0m"
+        :isFirstEntry="true"
+        :disable="true"
+        class="q-mb-md"
+      />
+      <div
+        v-for="(picker, index) in dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift"
+        :key="index"
+        class="q-mb-md"
+      >
+        <div class="flex items-center">
+          <CustomDateTimePicker
+            v-model="picker.offSet"
+            :picker="picker"
+            :isFirstEntry="false"
+          />
+          <q-icon
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            @click="removeTimeShift(index)"
+            :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
+          />
+        </div>
+      </div>
+
+      <q-btn
+        @click="addTimeShift"
+        style="cursor: pointer; padding: 0px 5px"
+        label="+ Add"
+        no-caps
+        data-test="dashboard-addpanel-config-time-shift-add-btn"
+      />
+    </div>
   </div>
 </template>
 
@@ -912,11 +1016,19 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete, MarkLineConfig },
+  components: {
+    Drilldown,
+    ValueMapping,
+    CommonAutoComplete,
+    MarkLineConfig,
+    CustomDateTimePicker,
+  },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
@@ -934,7 +1046,6 @@ export default defineComponent({
         value: "osm",
       },
     ];
-
     onBeforeMount(() => {
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
@@ -978,6 +1089,16 @@ export default defineComponent({
       // by default, use wrap_table_cells as false
       if (!dashboardPanelData.data.config.wrap_table_cells) {
         dashboardPanelData.data.config.wrap_table_cells = false;
+      }
+
+      // by default, use table_transpose as false
+      if (!dashboardPanelData.data.config.table_transpose) {
+        dashboardPanelData.data.config.table_transpose = false;
+      }
+
+      // by default, use table_dynamic_columns  as false
+      if (!dashboardPanelData.data.config.table_dynamic_columns) {
+        dashboardPanelData.data.config.table_dynamic_columns = false;
       }
     });
 
@@ -1172,6 +1293,45 @@ export default defineComponent({
       ),
     );
 
+    const timeShifts = [];
+
+    const addTimeShift = () => {
+      const newTimeShift = {
+        offSet: "15m",
+        data: {
+          selectedDate: {
+            relative: {
+              value: 15,
+              period: "m",
+              label: "Minutes",
+            },
+          },
+        },
+      };
+
+      timeShifts.push(newTimeShift);
+      if (
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+      }
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.time_shift.push({
+        offSet: newTimeShift.offSet,
+      });
+    };
+
+    const removeTimeShift = (index: any) => {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.time_shift.splice(index, 1);
+    };
+
     return {
       t,
       dashboardPanelData,
@@ -1187,6 +1347,8 @@ export default defineComponent({
       legendWidthValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
+      addTimeShift,
+      removeTimeShift,
     };
   },
 });

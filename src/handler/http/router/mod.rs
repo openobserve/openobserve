@@ -143,8 +143,9 @@ async fn check_keepalive(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let req_conn_type = req.head().connection_type();
     let mut resp = next.call(req).await?;
-    if resp.status() >= StatusCode::BAD_REQUEST {
+    if resp.status() >= StatusCode::BAD_REQUEST || req_conn_type == ConnectionType::Close {
         resp.response_mut()
             .head_mut()
             .set_connection_type(ConnectionType::Close);
@@ -219,11 +220,19 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))
-            .wrap(cors)
+            .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node)
-            .service(status::stream_fields),
+            .service(status::flush_node),
+    );
+
+    cfg.service(
+        web::scope("/short")
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validate_short_or_redirect,
+            ))
+            .wrap(cors.clone())
+            .service(short_url::retrieve),
     );
 
     if get_config().common.swagger_enabled {
@@ -357,6 +366,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::es::org_data_stream_create)
             .service(stream::schema)
             .service(stream::settings)
+            .service(stream::update_settings)
             .service(stream::delete_fields)
             .service(stream::delete)
             .service(stream::list)
@@ -390,6 +400,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::search_partition)
             .service(search::around)
             .service(search::values)
+            .service(search::search_history)
             .service(search::saved_view::create_view)
             .service(search::saved_view::update_view)
             .service(search::saved_view::get_view)
@@ -485,7 +496,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::multi_streams::search_multi)
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
-            .service(stream::delete_stream_cache),
+            .service(stream::delete_stream_cache)
+            .service(short_url::shorten),
     );
 }
 

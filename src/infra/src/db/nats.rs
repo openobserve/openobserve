@@ -689,7 +689,7 @@ static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub(crate) struct Locker {
-    key: String,
+    pub key: String,
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
 }
@@ -747,7 +747,7 @@ impl Locker {
             let expiration = expiration.parse::<i64>().unwrap();
             if (expiration < chrono::Utc::now().timestamp_micros())
                 || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
-                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[2])))
+                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[1])))
             {
                 if let Err(err) = bucket.purge(&key).await {
                     log::error!("nats purge lock for key: {}, error: {}", self.key, err);
@@ -774,7 +774,7 @@ impl Locker {
         if let Some(err) = last_err {
             if err.contains("key already exists") {
                 Err(Error::Message(format!(
-                    "nats lock for key: {}, accquire timeout in {timeout}s",
+                    "nats lock for key: {}, acquire timeout in {timeout}s",
                     self.key
                 )))
             } else {

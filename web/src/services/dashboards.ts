@@ -23,24 +23,24 @@ const dashboards = {
     desc: boolean,
     name: string,
     organization: string,
-    folderId: string
+    folderId: string,
   ) => {
     return http().get(
-      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folderId}`
+      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folderId}`,
     );
   },
   create: (organization: string, data: any, folderId?: string) => {
     return http().post(
       `/api/${organization}/dashboards?folder=${folderId ?? "default"}`,
       data,
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+      { headers: { "Content-Type": "application/json; charset=UTF-8" } },
     );
   },
   delete: (organization: string, dashboardID: string, folderId?: string) => {
     return http().delete(
       `/api/${organization}/dashboards/${dashboardID}?folder=${
         folderId ?? "default"
-      }`
+      }`,
     );
   },
   get_Dashboard: (org_identifier: string) => {
@@ -50,14 +50,15 @@ const dashboards = {
     organization: string,
     dashboardID: string,
     data: any,
-    folderId?: string
+    folderId?: string,
+    hash?: any,
   ) => {
     return http().put(
       `/api/${organization}/dashboards/${dashboardID}?folder=${
         folderId ?? "default"
-      }`,
+      }&hash=${hash}`,
       data,
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+      { headers: { "Content-Type": "application/json; charset=UTF-8" } },
     );
   },
   list_Folders: (organization: string) => {
@@ -80,7 +81,7 @@ const dashboards = {
     return http().put(
       `/api/${organization}/folders/dashboards/${dashboardId}`,
       data,
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+      { headers: { "Content-Type": "application/json; charset=UTF-8" } },
     );
   },
 };

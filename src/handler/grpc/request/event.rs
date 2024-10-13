@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{Duration, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -22,16 +21,14 @@ use config::{
         stream::FileKey,
     },
     metrics,
-    utils::parquet::read_recordbatch_from_bytes,
 };
-use hashbrown::HashSet;
-use infra::{file_list as infra_file_list, schema::STREAM_SCHEMAS_FIELDS};
+use infra::file_list as infra_file_list;
 use opentelemetry::global;
 use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::cluster::get_node_from_consistent_hash;
+use crate::{common::infra::cluster::get_node_from_consistent_hash, handler::grpc::MetadataMap};
 
 pub struct Eventer;
 
@@ -42,9 +39,8 @@ impl Event for Eventer {
         req: Request<FileList>,
     ) -> Result<Response<EmptyResponse>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
-        });
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();
@@ -93,9 +89,8 @@ impl Event for Eventer {
 
         // cache latest files for querier
         if cfg.memory_cache.cache_latest_files && LOCAL_NODE.is_querier() {
-            let mut cached_field_stream = HashSet::new();
             for item in put_items.iter() {
-                let Some(node) = get_node_from_consistent_hash(
+                let Some(node_name) = get_node_from_consistent_hash(
                     &item.key,
                     &Role::Querier,
                     Some(RoleGroup::Interactive),
@@ -104,25 +99,11 @@ impl Event for Eventer {
                 else {
                     continue; // no querier node
                 };
-                if LOCAL_NODE.uuid.ne(&node) {
+                if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
-                if infra::cache::file_data::download("download", &item.key)
-                    .await
-                    .is_ok()
-                    && cfg.limit.quick_mode_file_list_enabled
-                {
-                    let columns = item.key.split('/').collect::<Vec<&str>>();
-                    if columns[2] != "logs" {
-                        continue; // only cache fields for logs
-                    }
-                    let stream_key = columns[1..4].join("/");
-                    if cached_field_stream.contains(&stream_key) {
-                        continue;
-                    }
-                    if cache_latest_fields(&stream_key, &item.key).await.is_ok() {
-                        cached_field_stream.insert(stream_key);
-                    }
+                if let Err(e) = infra::cache::file_data::download("download", &item.key).await {
+                    log::error!("Failed to cache file data: {}", e);
                 }
             }
         }
@@ -138,64 +119,4 @@ impl Event for Eventer {
 
         Ok(Response::new(EmptyResponse {}))
     }
-}
-
-async fn cache_latest_fields(stream: &str, file: &str) -> Result<(), anyhow::Error> {
-    let fr = STREAM_SCHEMAS_FIELDS.read().await;
-    let field_cache_time = fr.get(stream).map(|v| v.0).unwrap_or(0);
-    drop(fr);
-
-    if field_cache_time
-        + Duration::try_seconds(get_config().limit.quick_mode_file_list_interval)
-            .unwrap()
-            .num_microseconds()
-            .unwrap()
-        >= Utc::now().timestamp_micros()
-    {
-        return Ok(());
-    }
-
-    let buf = match infra::cache::file_data::memory::get(file, None).await {
-        Some(buf) => Some(buf),
-        _ => infra::cache::file_data::disk::get(file, None).await,
-    };
-    let Some(buf) = buf else {
-        return Ok(());
-    };
-
-    let (schema, batches) = read_recordbatch_from_bytes(&buf).await?;
-    let mut new_batch = arrow::compute::concat_batches(&schema, &batches)?;
-    // delete all null values column
-    let mut null_columns = Vec::new();
-    for i in 0..new_batch.num_columns() {
-        let fi = i - null_columns.len();
-        if new_batch.column(fi).null_count() == new_batch.num_rows() {
-            null_columns.push(i);
-            new_batch.remove_column(fi);
-        }
-    }
-    let new_chema = if null_columns.is_empty() {
-        schema
-    } else {
-        new_batch.schema()
-    };
-    let mut fields = new_chema
-        .fields()
-        .iter()
-        .map(|f| f.name().to_string())
-        .collect::<Vec<_>>();
-    fields.sort();
-    if fields.is_empty() {
-        return Ok(());
-    }
-
-    log::debug!("cached latest stream: {}, fields: {}", stream, fields.len());
-
-    let mut fw = STREAM_SCHEMAS_FIELDS.write().await;
-    let entry = fw.entry(stream.to_string()).or_insert((0, Vec::new()));
-    entry.0 = Utc::now().timestamp_micros();
-    entry.1 = fields;
-    drop(fw);
-
-    Ok(())
 }

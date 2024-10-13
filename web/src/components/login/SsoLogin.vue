@@ -22,7 +22,7 @@
         style="width: 400px"
       >
         <div
-          class="flex items-center justify-center full-width text-center realtive"
+          class="flex items-center justify-center full-width text-center relative"
         >
           <img
             class="absolute"

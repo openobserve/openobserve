@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
     <template v-else>
-      <div class="flex tw-justify-between items-center">
+      <div class="tw-flex tw-justify-start tw-items-center">
         <div class="text-bold q-mr-sm q-my-sm">
           {{ tab === "promql" ? "Promql" : "SQL" }}
         </div>
@@ -198,6 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
+
+
     <div class="q-mt-sm">
       <div
         v-if="
@@ -300,7 +302,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   placeholder="Select column"
                   fill-input
                   :input-debounce="400"
-                  @filter="filterColumns"
+                  @filter="
+                    (val: string, update: any) => filterFields(val, update)
+                  "
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   style="width: 200px"
                   @update:model-value="updateTrigger"
@@ -611,6 +615,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      <div v-if="tab == 'sql'">
+  <div  class="flex items-center q-mr-sm">
+        <div 
+          data-test="multi-time-range-alerts-title"
+          class="text-bold q-py-md flex items-center"
+          style="width: 190px"
+        >
+        Multi Window Selection
+          <q-btn
+          no-caps
+          padding="xs"
+          class=""
+          size="sm"
+          flat
+          icon="info_outline"
+          data-test="multi-time-range-alerts-info-btn">
+           <q-tooltip
+            anchor="bottom middle" self="top middle" 
+              style="font-size: 14px"
+              max-width="300px" >
+             <span>Additional timeframe for query execution: <br />
+                For example, selecting "past 10 hours" means that each time the query runs, it will retrieve data from 10 hours prior, using the last 10 minutes of that period. <br /> If the query is scheduled from 4:00 PM to 4:10 PM, additionally it will pull data from 6:00 AM to 6:10 AM.
+                </span> 
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+    <div
+        v-for="(picker, index) in  dateTimePicker"
+        :key="index"
+        class="q-mb-md"
+      >
+        <div class="flex">
+          <CustomDateTimePicker
+            v-model="picker.offSet"
+            :picker="picker"
+            :isFirstEntry="false"
+            @update:model-value="updateDateTimePicker"
+          />
+          <q-btn
+                data-test="multi-time-range-alerts-delete-btn"
+                :icon="outlinedDelete"
+                class="iconHoverBtn q-ml-xs q-mr-sm"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                padding="xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('alert_templates.delete')"
+                @click="removeTimeShift(index)"
+                style="min-width: auto"
+              />
+        </div>
+      </div>
+<div>
+  <q-btn
+        data-test="multi-time-range-alerts-add-btn"
+        label="Add Time Shift"
+        size="sm"
+        class="text-bold add-variable"
+        icon="add"
+        style="
+          border-radius: 4px;
+          text-transform: capitalize;
+          background: #f2f2f2 !important;
+          color: #000 !important;
+        "
+        @click="addTimeShift"
+      />
+</div>
+</div>
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-cron-toggle-title"
@@ -638,10 +714,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
         <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
-          >
+          <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-cron-input"
               style="width: 87px; margin-left: 0 !important"
@@ -700,18 +773,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </q-tooltip>
           </q-icon>
-        </div>
-        <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+          <template
+            v-if="triggerData.frequency_type == 'cron' && showTimezoneWarning"
           >
+            <q-icon
+              :name="outlinedWarning"
+              size="18px"
+              class="cursor-pointer tw-ml-[8px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-orange-500'
+                  : 'tw-text-orange-500'
+              "
+            >
+              <q-tooltip
+                anchor="center right"
+                self="center left"
+                max-width="auto"
+                class="tw-text-[14px]"
+              >
+                Warning: The displayed timezone is approximate. Verify and
+                select the correct timezone manually.
+              </q-tooltip>
+            </q-icon>
+          </template>
+        </div>
+        <div style="min-height: 78px">
+          <div class="flex items-center" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"
               :style="
                 triggerData.frequency_type == 'minutes'
                   ? 'width: 87px; margin-left: 0 !important'
-                  : 'width: 180px !important'
+                  : 'width: fit-content !important'
               "
               class="silence-notification-input"
             >
@@ -726,15 +820,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="background: none"
                 @update:model-value="updateTrigger"
               />
-              <q-input
-                data-test="scheduled-alert-cron-input-field"
-                v-else
-                v-model="triggerData.cron"
-                dense
-                filled
-                style="background: none"
-                @update:model-value="updateTrigger"
-              />
+              <div v-else class="tw-flex tw-items-center o2-input">
+                <q-input
+                  data-test="scheduled-alert-cron-input-field"
+                  v-model="triggerData.cron"
+                  dense
+                  filled
+                  :label="t('reports.cron') + ' *'"
+                  style="background: none; width: 180px"
+                  class="showLabelOnTop"
+                  stack-label
+                  outlined
+                  @update:model-value="updateTrigger"
+                />
+                <q-select
+                  data-test="add-report-schedule-start-timezone-select"
+                  v-model="triggerData.timezone"
+                  :options="filteredTimezone"
+                  @blur="
+                    browserTimezone =
+                      browserTimezone == ''
+                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                        : browserTimezone
+                  "
+                  use-input
+                  @filter="timezoneFilterFn"
+                  input-debounce="0"
+                  dense
+                  filled
+                  emit-value
+                  fill-input
+                  hide-selected
+                  :title="triggerData.timezone"
+                  :label="t('logStream.timezone') + ' *'"
+                  :display-value="`Timezone: ${browserTimezone}`"
+                  class="timezone-select showLabelOnTop q-ml-sm"
+                  stack-label
+                  outlined
+                  style="width: 210px"
+                />
+              </div>
             </div>
             <div
               v-if="triggerData.frequency_type == 'minutes'"
@@ -753,10 +878,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="scheduled-alert-frequency-error-text"
-            v-if="
+            v-show="
               (!Number(triggerData.frequency) &&
                 triggerData.frequency_type == 'minutes') ||
-              (triggerData.frequency_type == 'cron' && triggerData.cron == '')
+              (triggerData.frequency_type == 'cron' &&
+                (triggerData.cron == '' || !triggerData.timezone))
             "
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
@@ -776,10 +902,13 @@ import { useI18n } from "vue-i18n";
 import {
   outlinedDelete,
   outlinedInfo,
+  outlinedWarning,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -803,6 +932,8 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "vrlFunctionError",
+  "showTimezoneWarning",
+  "multi_time_range"
 ]);
 
 const emits = defineEmits([
@@ -819,6 +950,7 @@ const emits = defineEmits([
   "update:vrl_function",
   "update:showVrlFunction",
   "validate-sql",
+  "update:multi_time_range"
 ]);
 
 const { t } = useI18n();
@@ -862,6 +994,8 @@ const filteredFields = ref(props.columns);
 
 const fnEditorRef = ref<any>(null);
 
+const filteredTimezone: any = ref([]);
+
 const getNumericColumns = computed(() => {
   if (
     _isAggregationEnabled.value &&
@@ -881,9 +1015,41 @@ const addField = () => {
   emits("field:add");
 };
 
+const updateDateTimePicker = (data : any) =>{
+  emits("update:multi_time_range", dateTimePicker.value);
+  console.log("data",dateTimePicker.value);
+}
+
+const removeTimeShift = (index: any) => {
+  dateTimePicker.value.splice(index, 1);
+    };
+
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
 const selectedFunction = ref("");
+
+const currentTimezone =
+  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const browserTimezone = ref(currentTimezone);
+
+// @ts-ignore
+let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
+  return tz;
+});
+
+filteredTimezone.value = [...timezoneOptions];
+
+const browserTime =
+  "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+// Add the UTC option
+timezoneOptions.unshift("UTC");
+timezoneOptions.unshift(browserTime);
+
+const timezoneFilterFn = (val: string, update: Function) => {
+  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
+};
 
 const removeField = (field: any) => {
   emits("field:remove", field);
@@ -924,6 +1090,7 @@ const onFunctionSelect = (_function: any) => {
 };
 
 const functionsList = computed(() => store.state.organizationData.functions);
+const dateTimePicker = ref(props.multi_time_range || []);
 
 const functionOptions = ref<any[]>([]);
 
@@ -972,6 +1139,23 @@ const updateQuery = () => {
 
   if (tab.value === "sql") query.value = props.sql;
 };
+const addTimeShift = () => {
+      const newTimeShift = {
+        offSet: "15m",
+        data: {
+          selectedDate: {
+            relative: {
+              value: 15,
+              period: "m",
+              label: "Minutes",
+            },
+          },
+        },
+      };
+
+      dateTimePicker.value.push({offSet:newTimeShift.offSet});
+      
+    };
 
 const updatePromqlCondition = () => {
   emits("update:promql_condition", promqlCondition.value);
@@ -1009,18 +1193,36 @@ const updateAggregation = () => {
   emits("input:update", "aggregation", aggregationData.value);
 };
 
-const filterColumns = (val: string, update: Function) => {
+const filterFields = (val: string, update: Function) => {
+  filteredFields.value = filterColumns(props.columns, val, update);
+};
+
+const filterColumns = (options: string[], val: string, update: Function) => {
+  let filteredOptions: any[] = [];
+
   if (val === "") {
     update(() => {
-      filteredFields.value = [...props.columns];
+      filteredOptions = [...options];
     });
   }
+
+  console.log("options", options);
+
   update(() => {
     const value = val.toLowerCase();
-    filteredFields.value = props.columns.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
-    );
+    filteredOptions = options.filter((column: any) => {
+      // Check if type of column is object or string and then filter
+      if (typeof column === "object") {
+        return column.value.toLowerCase().indexOf(value) > -1;
+      }
+
+      if (typeof column === "string") {
+        return column.toLowerCase().indexOf(value) > -1;
+      }
+    });
   });
+
+  return filteredOptions;
 };
 
 const filterNumericColumns = (val: string, update: Function) => {

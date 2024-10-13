@@ -27,7 +27,7 @@ use crate::{
         utils::http::get_or_create_trace_id,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{search as SearchService, traces::otlp_http},
+    service::{search as SearchService, traces},
 };
 
 /// TracesIngest
@@ -74,9 +74,9 @@ async fn handle_req(
         .get(&get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        otlp_http::traces_proto(&org_id, body, in_stream_name).await
+        traces::traces_proto(&org_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        otlp_http::traces_json(&org_id, body, in_stream_name).await
+        traces::traces_json(&org_id, body, in_stream_name).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -129,8 +129,9 @@ pub async fn get_latest_traces(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
@@ -149,6 +150,8 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         use crate::common::{
             infra::config::USERS,
             utils::auth::{is_root_user, AuthExtractor},
@@ -159,6 +162,7 @@ pub async fn get_latest_traces(
                 .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
                 .unwrap()
                 .clone();
+            let stream_type_str = StreamType::Traces.to_string();
 
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
@@ -166,7 +170,13 @@ pub async fn get_latest_traces(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("{}:{}", StreamType::Traces, stream_name),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str.as_str())
+                                .map_or(stream_type_str.as_str(), |model| model.key),
+                            stream_name
+                        ),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),
@@ -262,6 +272,7 @@ pub async fn get_latest_traces(
         clusters: vec![],
         timeout,
         search_type: None,
+        index_type: "".to_string(),
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req
@@ -323,11 +334,12 @@ pub async fn get_latest_traces(
         let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
         let trace_start_time = item.get("trace_start_time").unwrap().as_i64().unwrap();
         let trace_end_time = item.get("trace_end_time").unwrap().as_i64().unwrap();
-        if trace_start_time < start_time {
-            start_time = trace_start_time;
+        // trace time is nanosecond, need to compare with microsecond
+        if trace_start_time / 1000 < start_time {
+            start_time = trace_start_time / 1000;
         }
-        if trace_end_time > end_time {
-            end_time = trace_end_time;
+        if trace_end_time / 1000 > end_time {
+            end_time = trace_end_time / 1000;
         }
         traces_data.insert(
             trace_id.clone(),

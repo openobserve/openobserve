@@ -150,16 +150,12 @@ impl Partition {
                 batch_num: data.data.len(),
             };
             // write into parquet buf
-            let (bloom_filter_fields, full_text_search_fields) =
+            let bloom_filter_fields =
                 if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
                     let settings = infra::schema::unwrap_stream_settings(self.schema.as_ref());
-                    let bloom_filter_fields =
-                        infra::schema::get_stream_setting_bloom_filter_fields(&settings);
-                    let full_text_search_fields =
-                        infra::schema::get_stream_setting_fts_fields(&settings);
-                    (bloom_filter_fields, full_text_search_fields)
+                    infra::schema::get_stream_setting_bloom_filter_fields(&settings)
                 } else {
-                    (vec![], vec![])
+                    vec![]
                 };
 
             let batches = data
@@ -175,13 +171,8 @@ impl Partition {
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();
-            let mut writer = new_parquet_writer(
-                &mut buf_parquet,
-                &schema,
-                &bloom_filter_fields,
-                &full_text_search_fields,
-                &file_meta,
-            );
+            let mut writer =
+                new_parquet_writer(&mut buf_parquet, &schema, &bloom_filter_fields, &file_meta);
 
             writer
                 .write(&batches)
@@ -208,6 +199,7 @@ impl Partition {
             f.write_all(&buf_parquet)
                 .await
                 .context(WriteFileSnafu { path: path.clone() })?;
+            drop(f);
 
             // set parquet metadata cache
             let mut file_key = path.clone();

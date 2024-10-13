@@ -17,7 +17,8 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search,
+        search::{self, ResponseTook},
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -55,22 +56,21 @@ pub async fn search(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<search::Response, Error> {
-    let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let parsed_sql = match config::meta::sql::Sql::new(&origin_sql) {
-        Ok(v) => v,
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // TODO: cache don't not support multiple stream names
+        Ok(v) => v[0].clone(),
         Err(e) => {
             return Err(Error::Message(e.to_string()));
         }
     };
-
-    let stream_name = &parsed_sql.source;
 
     let mut req = in_req.clone();
     let mut query_fn = req
@@ -79,12 +79,19 @@ pub async fn search(
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
 
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
     let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = if let Some(vrl_function) = &query_fn {
-        h.sum64(&format!("{}{}", origin_sql, vrl_function))
-    } else {
-        h.sum64(&origin_sql)
-    };
+    let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
@@ -109,16 +116,31 @@ pub async fn search(
         )
         .await
     } else {
-        MultiCachedQueryResponse::default()
+        let query = rpc_req.clone().query.unwrap();
+        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+            Ok(v) => {
+                let ts_column = cacher::get_ts_col(&v, &cfg.common.column_timestamp, is_aggregate)
+                    .unwrap_or_default();
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {:?}", e);
+                MultiCachedQueryResponse::default()
+            }
+        }
     };
 
     // No cache data present, add delta for full query
-    if !c_resp.has_cached_data {
+    if !c_resp.has_cached_data && c_resp.deltas.is_empty() {
         c_resp.deltas.push(QueryDelta {
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
             delta_removed_hits: false,
-        })
+        });
     } else if use_cache {
         log::info!(
             "[trace_id {trace_id}] Query deltas are: {:?}",
@@ -187,39 +209,39 @@ pub async fn search(
 
         let mut tasks = Vec::new();
 
-        let delta_len = c_resp.deltas.len();
+        log::info!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas);
+        c_resp.deltas.sort();
+        c_resp.deltas.dedup();
+
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
             let org_id = org_id.to_string();
-            let trace_id = if delta_len <= 1 {
-                trace_id.to_string()
-            } else {
-                format!("{}-{}", trace_id, i)
-            };
+            let trace_id = format!("{}-{}", trace_id, i);
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
-            let task = tokio::task::spawn(async move {
-                let trace_id = trace_id.clone();
-                req.query.start_time = delta.delta_start_time;
-                req.query.end_time = delta.delta_end_time;
+            let task = tokio::task::spawn(
+                (async move {
+                    let trace_id = trace_id.clone();
+                    req.query.start_time = delta.delta_start_time;
+                    req.query.end_time = delta.delta_end_time;
 
-                let cfg = get_config();
-                if cfg.common.result_cache_enabled
-                    && cfg.common.print_key_sql
-                    && c_resp.has_cached_data
-                {
-                    log::info!(
-                        "[trace_id {trace_id}] Query new start time: {}, end time : {}",
-                        req.query.start_time,
-                        req.query.end_time
-                    );
-                }
+                    let cfg = get_config();
+                    if cfg.common.result_cache_enabled
+                        && cfg.common.print_key_sql
+                        && c_resp.has_cached_data
+                    {
+                        log::info!(
+                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            req.query.start_time,
+                            req.query.end_time
+                        );
+                    }
 
-                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
-                    .instrument(enter_span)
-                    .await
-            });
+                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
+                })
+                .instrument(enter_span),
+            );
             tasks.push(task);
         }
 
@@ -249,11 +271,21 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
+    if is_aggregate
+        && res.histogram_interval.is_none()
+        && !c_resp.ts_column.is_empty()
+        && c_resp.histogram_interval > -1
+    {
+        res.histogram_interval = Some(c_resp.histogram_interval);
+    }
+
+    let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
         response_time: time,
         size: res.scan_size as f64,
         request_body: Some(req.query.sql),
+        function: req.query.query_fn,
         user_email: user_id,
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
@@ -270,12 +302,11 @@ pub async fn search(
         result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };
-    let num_fn = req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
-        StreamType::Logs,
+        &stream_name,
+        stream_type,
         UsageType::Search,
         num_fn,
         started_at,
@@ -324,6 +355,7 @@ fn merge_response(
     if cache_responses.is_empty() && search_response.is_empty() {
         return config::meta::search::Response::default();
     }
+    let mut fn_error = String::new();
 
     let mut cache_response = if cache_responses.is_empty() {
         config::meta::search::Response::default()
@@ -339,21 +371,34 @@ fn merge_response(
                 continue;
             }
             resp.hits.extend(res.hits.clone());
+            resp.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
         }
         resp.took = cache_took;
         resp
     };
 
     if cache_response.hits.is_empty()
-        && search_response.is_empty()
-        && search_response.first().unwrap().hits.is_empty()
-        && search_response.last().unwrap().hits.is_empty()
+        && !search_response.is_empty()
+        && search_response
+            .first()
+            .map_or(true, |res| res.hits.is_empty())
+        && search_response
+            .last()
+            .map_or(true, |res| res.hits.is_empty())
     {
         for res in search_response {
             cache_response.total += res.total;
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
+            cache_response.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
         }
+        cache_response.function_error = fn_error;
         return cache_response;
     }
     let cache_hits_len = cache_response.hits.len();
@@ -362,6 +407,8 @@ fn merge_response(
 
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
+
+    let mut res_took = ResponseTook::default();
 
     for res in search_response.clone() {
         cache_response.total += res.total;
@@ -375,23 +422,45 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
+        if let Some(mut took_details) = res.took_detail {
+            res_took.cluster_total += took_details.cluster_total;
+            res_took.cluster_wait_queue += took_details.cluster_wait_queue;
+            res_took.idx_took += took_details.idx_took;
+            res_took.wait_queue += took_details.wait_queue;
+            res_took.total += took_details.total;
+            res_took.nodes.append(&mut took_details.nodes);
+        }
+        if !res.function_error.is_empty() {
+            fn_error = res.function_error.clone();
+        }
+
         cache_response.hits.extend(res.hits.clone());
     }
     sort_response(is_descending, &mut cache_response, ts_column);
 
-    if cache_response.hits.len() > limit as usize {
+    if cache_response.hits.len() > (limit as usize) {
         cache_response.hits.truncate(limit as usize);
     }
+    if limit > 0 {
+        cache_response.total = cache_response.hits.len();
+    }
+
     if !search_response.is_empty() {
         cache_response.cached_ratio = files_cache_ratio / search_response.len();
     }
+    cache_response.size = cache_response.hits.len() as i64;
     log::info!(
         "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
         cache_hits_len,
-        result_cache_len,
+        result_cache_len
     );
-    cache_response.result_cache_ratio =
-        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+    cache_response.took_detail = Some(res_took);
+    cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
+        / ((result_cache_len + cache_hits_len) as f64))
+        as usize;
+    if !fn_error.is_empty() {
+        cache_response.function_error = fn_error;
+    }
     cache_response
 }
 
@@ -418,10 +487,31 @@ async fn write_results(
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+    let mut local_resp = res.clone();
+    let remove_hit = if is_descending {
+        local_resp.hits.last()
+    } else {
+        local_resp.hits.first()
+    };
 
-    let smallest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
+    if !local_resp.hits.is_empty() && remove_hit.is_some() {
+        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+
+        if let Some(ts_value) = ts_value_to_remove {
+            local_resp
+                .hits
+                .retain(|hit| hit.get(ts_column) != Some(&ts_value));
+        }
+    }
+
+    if local_resp.hits.is_empty() || local_resp.hits.len() < 2 {
+        return;
+    }
+
+    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
+    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+
+    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
     let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
 
     if (last_rec_ts - first_rec_ts).abs() < discard_duration
@@ -437,15 +527,22 @@ async fn write_results(
     } else {
         req_query_end_time
     };
+
+    let cache_start_time = if smallest_ts > 0 && smallest_ts > req_query_start_time {
+        smallest_ts
+    } else {
+        req_query_start_time
+    };
+
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        req_query_start_time,
+        cache_start_time,
         cache_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
 
-    let res_cache = json::to_string(&res).unwrap();
+    let res_cache = json::to_string(&local_resp).unwrap();
     let query_key = file_path.replace('/', "_");
     let trace_id = trace_id.to_string();
     tokio::spawn(async move {
@@ -464,7 +561,7 @@ async fn write_results(
                 w.entry(query_key)
                     .or_insert_with(Vec::new)
                     .push(ResultCacheMeta {
-                        start_time: req_query_start_time,
+                        start_time: cache_start_time,
                         end_time: cache_end_time,
                         is_aggregate,
                         is_descending,

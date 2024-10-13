@@ -178,9 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h5 class="text-center">
               <SanitizedHtmlRenderer
                 data-test="logs-search-error-message"
-                :htmlContent="searchObj.data.errorMsg"
-              />
-
+                :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
               <br />
               <q-item-label>{{
                 searchObj.data.additionalErrorMsg
@@ -354,7 +352,7 @@ export default defineComponent({
     const chartData = ref({});
     const { showErrorNotification } = useNotifications();
 
-    searchObj.organizationIdetifier =
+    searchObj.organizationIdentifier =
       store.state.selectedOrganization.identifier;
 
     const importSqlParser = async () => {
@@ -418,7 +416,7 @@ export default defineComponent({
       if (isMounted.value) updateStreams();
 
       if (
-        searchObj.organizationIdetifier !=
+        searchObj.organizationIdentifier !=
         store.state.selectedOrganization.identifier
       ) {
         loadPageData();
@@ -647,7 +645,7 @@ export default defineComponent({
 
     function loadPageData(isFirstLoad = false) {
       resetSearchObj();
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
 
       //get stream list

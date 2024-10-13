@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Error, sync::Arc};
 
-use actix_web::{http, HttpResponse};
+use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -29,6 +29,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     DISTINCT_FIELDS,
 };
+use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -58,19 +59,60 @@ use crate::{
     },
 };
 
-pub mod otlp_http;
-
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
+// ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
+const SPAN_ID_BYTES_COUNT: usize = 8;
+const TRACE_ID_BYTES_COUNT: usize = 16;
+
+pub enum RequestType {
+    Grpc,
+    HttpJson,
+    HttpProtobuf,
+}
+
+pub async fn traces_proto(
+    org_id: &str,
+    body: web::Bytes,
+    in_stream_name: Option<&str>,
+) -> Result<HttpResponse, Error> {
+    let request = match ExportTraceServiceRequest::decode(body) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid proto: {}", e),
+            )));
+        }
+    };
+    handle_trace_request(org_id, request, RequestType::HttpProtobuf, in_stream_name).await
+}
+
+pub async fn traces_json(
+    org_id: &str,
+    body: web::Bytes,
+    in_stream_name: Option<&str>,
+) -> Result<HttpResponse, Error> {
+    let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
+        Ok(req) => req,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid json: {}", e),
+            )));
+        }
+    };
+    handle_trace_request(org_id, request, RequestType::HttpJson, in_stream_name).await
+}
 
 pub async fn handle_trace_request(
     org_id: &str,
     request: ExportTraceServiceRequest,
-    is_grpc: bool,
+    req_type: RequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -109,8 +151,10 @@ pub async fn handle_trace_request(
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
-    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-        .timestamp_micros();
+    let min_ts = (Utc::now()
+        - Duration::try_hours(cfg.limit.ingest_allowed_upto)
+            .expect("configuration error: too large ingest_allowed_upto"))
+    .timestamp_micros();
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -128,49 +172,48 @@ pub async fn handle_trace_request(
     let mut partial_success = ExportTracePartialSuccess::default();
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
-        let resource = res_span.resource.unwrap();
-
-        for res_attr in resource.attributes {
-            if res_attr.key.eq(SERVICE_NAME) {
-                let loc_service_name = get_val(&res_attr.value.as_ref());
-                if let Some(name) = loc_service_name.as_str() {
-                    service_name = name.to_string();
-                    service_att_map.insert(res_attr.key, loc_service_name);
+        if let Some(resource) = res_span.resource {
+            for res_attr in resource.attributes {
+                if res_attr.key.eq(SERVICE_NAME) {
+                    let loc_service_name = get_val(&res_attr.value.as_ref());
+                    if let Some(name) = loc_service_name.as_str() {
+                        service_name = name.to_string();
+                        service_att_map.insert(res_attr.key, loc_service_name);
+                    }
+                } else {
+                    service_att_map.insert(
+                        format!("{}.{}", SERVICE, res_attr.key),
+                        get_val(&res_attr.value.as_ref()),
+                    );
                 }
-            } else {
-                service_att_map.insert(
-                    format!("{}.{}", SERVICE, res_attr.key),
-                    get_val(&res_attr.value.as_ref()),
-                );
             }
         }
         let inst_resources = res_span.scope_spans;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
-                let span_id: String = SpanId::from_bytes(
-                    span.span_id
-                        .try_into()
-                        .expect("slice with incorrect length"),
-                )
-                .to_string();
-                let trace_id: String = TraceId::from_bytes(
-                    span.trace_id
-                        .try_into()
-                        .expect("slice with incorrect length"),
-                )
-                .to_string();
+                if span.span_id.len() != SPAN_ID_BYTES_COUNT {
+                    log::info!("skipping span with invalid span id");
+                    partial_success.rejected_spans += 1;
+                    continue;
+                }
+                let span_id: String =
+                    SpanId::from_bytes(span.span_id.try_into().unwrap()).to_string();
+                if span.trace_id.len() != TRACE_ID_BYTES_COUNT {
+                    log::info!("skipping span with invalid trace id");
+                    partial_success.rejected_spans += 1;
+                    continue;
+                }
+                let trace_id: String =
+                    TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
                 let mut span_ref = HashMap::new();
-                if !span.parent_span_id.is_empty() {
+                if !span.parent_span_id.is_empty()
+                    && span.parent_span_id.len() == SPAN_ID_BYTES_COUNT
+                {
                     span_ref.insert(PARENT_TRACE_ID.to_string(), trace_id.clone());
                     span_ref.insert(
                         PARENT_SPAN_ID.to_string(),
-                        SpanId::from_bytes(
-                            span.parent_span_id
-                                .try_into()
-                                .expect("slice with incorrect length"),
-                        )
-                        .to_string(),
+                        SpanId::from_bytes(span.parent_span_id.try_into().unwrap()).to_string(),
                     );
                     span_ref.insert(REF_TYPE.to_string(), format!("{:?}", SpanRefType::ChildOf));
                 }
@@ -204,18 +247,18 @@ pub async fn handle_trace_request(
                     for link_att in link.attributes {
                         link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
                     }
-                    let span_id: String = SpanId::from_bytes(
-                        link.span_id
-                            .try_into()
-                            .expect("slice with incorrect length"),
-                    )
-                    .to_string();
-                    let trace_id: String = TraceId::from_bytes(
-                        link.trace_id
-                            .try_into()
-                            .expect("slice with incorrect length"),
-                    )
-                    .to_string();
+                    if link.span_id.len() != SPAN_ID_BYTES_COUNT {
+                        log::info!("skipping link with invalid span id");
+                        continue;
+                    }
+                    let span_id: String =
+                        SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
+                    if link.trace_id.len() != TRACE_ID_BYTES_COUNT {
+                        log::info!("skipping link with invalid trace id");
+                        continue;
+                    }
+                    let trace_id: String =
+                        TraceId::from_bytes(link.trace_id.try_into().unwrap()).to_string();
                     links.push(SpanLink {
                         context: SpanLinkContext {
                             span_id,
@@ -224,7 +267,7 @@ pub async fn handle_trace_request(
                             trace_state: Some(link.trace_state),
                         },
                         attributes: link_att_map.clone(),
-                        dropped_attributes_count: link.dropped_attributes_count, // TODO: add appropriate value
+                        dropped_attributes_count: link.dropped_attributes_count,
                     })
                 }
 
@@ -248,7 +291,6 @@ pub async fn handle_trace_request(
                     attributes: span_att_map,
                     service: service_att_map.clone(),
                     flags: 1, // TODO add appropriate value
-                    //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
                     links: json::to_string(&links).unwrap(),
                 };
@@ -298,7 +340,14 @@ pub async fn handle_trace_request(
                         span_metrics.push(sm);
                         v
                     }
-                    _ => unreachable!(""),
+                    _ => {
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                "stream functions did not return valid json object".into(),
+                            ),
+                        ));
+                    }
                 };
 
                 // add timestamp
@@ -313,23 +362,27 @@ pub async fn handle_trace_request(
 
     // if no data, fast return
     if json_data.is_empty() {
-        return format_response(partial_success);
+        return format_response(partial_success, req_type);
     }
 
     let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error while writing traces: {}", e);
-            return format_response(partial_success);
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    format!("error while writing trace data: {e}",),
+                )),
+            );
         }
     };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
-    let ep = if is_grpc {
-        "/grpc/otlp/traces"
-    } else {
-        "/api/otlp/v1/traces"
+    let ep = match req_type {
+        RequestType::Grpc => "/grpc/otlp/traces",
+        _ => "/api/otlp/v1/traces",
     };
 
     // record span metrics
@@ -384,7 +437,7 @@ pub async fn handle_trace_request(
     )
     .await;
 
-    format_response(partial_success)
+    format_response(partial_success, req_type)
 }
 
 fn get_span_status(status: Option<Status>) -> String {
@@ -394,27 +447,42 @@ fn get_span_status(status: Option<Status>) -> String {
             StatusCode::Error => "ERROR".to_string(),
             StatusCode::Unset => "UNSET".to_string(),
         },
-        None => "".to_string(),
+        // unset is the default status for span - https://opentelemetry.io/docs/languages/go/instrumentation/#set-span-status
+        None => "UNSET".to_string(),
     }
 }
 
-fn format_response(mut partial_success: ExportTracePartialSuccess) -> Result<HttpResponse, Error> {
-    let res = ExportTraceServiceResponse {
-        partial_success: if partial_success.rejected_spans > 0 {
-            partial_success.error_message =
-                "Some spans were rejected due to exceeding the allowed retention period"
-                    .to_string();
-            Some(partial_success)
-        } else {
-            None
-        },
+fn format_response(
+    mut partial_success: ExportTracePartialSuccess,
+    req_type: RequestType,
+) -> Result<HttpResponse, Error> {
+    let partial = partial_success.rejected_spans > 0;
+
+    let res = if partial {
+        partial_success.error_message =
+            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        ExportTraceServiceResponse {
+            partial_success: Some(partial_success),
+        }
+    } else {
+        ExportTraceServiceResponse::default()
     };
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
-    Ok(HttpResponse::Ok()
-        .status(http::StatusCode::OK)
-        .content_type("application/x-protobuf")
-        .body(out))
+
+    match req_type {
+        RequestType::HttpJson => Ok(if partial {
+            HttpResponse::PartialContent().json(res)
+        } else {
+            HttpResponse::Ok().json(res)
+        }),
+        _ => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            Ok(HttpResponse::Ok()
+                .status(http::StatusCode::OK)
+                .content_type("application/x-protobuf")
+                .body(out))
+        }
+    }
 }
 
 async fn write_traces(
@@ -453,7 +521,6 @@ async fn write_traces(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut trigger: Option<TriggerAlertData> = None;
     crate::service::ingestion::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
@@ -463,6 +530,15 @@ async fn write_traces(
         &mut stream_alerts_map,
     )
     .await;
+    let cur_stream_alerts = stream_alerts_map.get(&format!(
+        "{}/{}/{}",
+        org_id,
+        StreamType::Traces,
+        stream_name
+    ));
+    let mut triggers: TriggerAlertData =
+        Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+    let mut evaluated_alerts = HashSet::new();
     // End get stream alert
 
     // Start check for schema
@@ -480,6 +556,7 @@ async fn write_traces(
         .get(stream_name)
         .unwrap()
         .schema()
+        .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let record_schema = Arc::new(record_schema);
@@ -529,22 +606,31 @@ async fn write_traces(
         }));
 
         // Start check for alert trigger
-        if trigger.is_none() && !stream_alerts_map.is_empty() {
-            let key = format!("{}/{}/{}", &org_id, StreamType::Traces, stream_name);
-            if let Some(alerts) = stream_alerts_map.get(&key) {
-                let mut trigger_alerts: TriggerAlertData = Vec::new();
+        if let Some(alerts) = cur_stream_alerts {
+            if triggers.len() < alerts.len() {
                 for alert in alerts {
-                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
-                        trigger_alerts.push((alert.clone(), v));
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Traces,
+                        stream_name,
+                        alert.name
+                    );
+                    // check if alert already evaluated
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
+                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val), None).await {
+                        triggers.push((alert.clone(), v));
+                        evaluated_alerts.insert(key);
                     }
                 }
-                trigger = Some(trigger_alerts);
             }
         }
         // End check for alert trigger
 
         // get hour key
-        let hour_key = super::ingestion::get_wal_time_key(
+        let hour_key = super::ingestion::get_write_partition_key(
             timestamp,
             &partition_keys,
             partition_time_level,
@@ -586,7 +672,22 @@ async fn write_traces(
     }
 
     // only one trigger per request
-    evaluate_trigger(trigger).await;
+    evaluate_trigger(triggers).await;
 
     Ok(req_stats)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::json::json;
+
+    use crate::service::ingestion::grpc::get_val_for_attr;
+
+    #[test]
+    fn test_get_val_for_attr() {
+        let in_val = 10.00;
+        let input = json!({ "key": in_val });
+        let resp = get_val_for_attr(input);
+        assert_eq!(resp.as_str().unwrap(), in_val.to_string());
+    }
 }

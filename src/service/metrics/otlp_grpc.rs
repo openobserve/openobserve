@@ -205,7 +205,7 @@ pub async fn handle_grpc_request(
                     None => vec![],
                 };
 
-                // udpate schema metadata
+                // update schema metadata
                 if !schema_exists.has_metadata {
                     if let Err(e) =
                         update_setting(org_id, metric_name, StreamType::Metrics, prom_meta).await
@@ -338,11 +338,12 @@ pub async fn handle_grpc_request(
                         .get(local_metric_name)
                         .unwrap()
                         .schema()
+                        .as_ref()
                         .clone()
                         .with_metadata(HashMap::new());
                     let schema_key = schema.hash_key();
                     // get hour key
-                    let hour_key = crate::service::ingestion::get_wal_time_key(
+                    let hour_key = crate::service::ingestion::get_write_partition_key(
                         timestamp,
                         &partition_keys,
                         partition_time_level,
@@ -373,7 +374,8 @@ pub async fn handle_grpc_request(
                         if let Some(alerts) = stream_alerts_map.get(&key) {
                             let mut trigger_alerts: TriggerAlertData = Vec::new();
                             for alert in alerts {
-                                if let Ok((Some(v), _)) = alert.evaluate(Some(val_map)).await {
+                                if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await
+                                {
                                     trigger_alerts.push((alert.clone(), v));
                                 }
                             }
@@ -455,7 +457,9 @@ pub async fn handle_grpc_request(
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in stream_trigger_map {
-        evaluate_trigger(entry).await;
+        if let Some(entry) = entry {
+            evaluate_trigger(entry).await;
+        }
     }
 
     let res = ExportMetricsServiceResponse {

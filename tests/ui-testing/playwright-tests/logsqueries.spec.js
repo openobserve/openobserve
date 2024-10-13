@@ -97,8 +97,8 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should add timestamp to editor save this view and switch", async ({ page }) => {
-    await page.waitForTimeout(
-      1000); await page.locator('[data-test="log-table-column-0-source"] > .flex > .ellipsis').click();
+    await page.waitForTimeout(3000); 
+    await page.locator('[data-test="log-table-column-0-source"]').click();
 
     await page.locator(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click(); await page.locator(
       '[data-test="log-details-include-field-btn"]').click(); await page.locator(
@@ -161,7 +161,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(2000);
     // Type the value of a variable into an input field
     await page.locator(
-      '[data-cy="date-time-button"]').click({ force: true }); await page.locator(
+      '[data-test="date-time-btn"]').click({ force: true }); await page.locator(
 
         '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
 
@@ -180,7 +180,7 @@ test.describe("Logs Queries testcases", () => {
 
                 force: true
               });
-    await page.getByText(/Reset Filters/).first().click({
+    await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({
       force: true
     });
     await page.waitForTimeout(5000);
@@ -200,7 +200,7 @@ test.describe("Logs Queries testcases", () => {
 
     await page.waitForTimeout(2000);
     await page.locator(
-      '[data-cy="date-time-button"]').click({ force: true }); await page.locator(
+      '[data-test="date-time-btn"]').click({ force: true }); await page.locator(
 
         '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
@@ -213,7 +213,7 @@ test.describe("Logs Queries testcases", () => {
   test("should not display error if match all case added in log query search", async ({ page }) => {
     // Type the value of a variable into an input field
     await page.waitForTimeout(2000);
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code')");

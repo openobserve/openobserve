@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
+          :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -163,6 +164,8 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
+import { onUnmounted } from "vue";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -215,12 +218,24 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
+    dashboardId: {
+      default: "",
+      required: false,
+      type: String,
+    },
+    folderId: {
+      default: "",
+      required: false,
+      type: String,
+    },
   },
   emits: [
     "updated:data-zoom",
     "error",
     "metadata-update",
     "result-metadata-update",
+    "last-triggered-at-update",
+    "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
   ],
@@ -242,17 +257,29 @@ export default defineComponent({
       variablesData,
       forceLoad,
       searchType,
+      dashboardId,
+      folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } =
-      usePanelDataLoader(
-        panelSchema,
-        selectedTimeObj,
-        variablesData,
-        chartPanelRef,
-        forceLoad,
-        searchType,
-      );
+    let {
+      data,
+      loading,
+      errorDetail,
+      metadata,
+      resultMetaData,
+      lastTriggeredAt,
+      isCachedDataDifferWithCurrentTimeRange,
+      searchRequestTraceIds,
+    } = usePanelDataLoader(
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      chartPanelRef,
+      forceLoad,
+      searchType,
+      dashboardId,
+      folderId,
+    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -267,7 +294,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {} },
+      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -280,14 +307,36 @@ export default defineComponent({
         };
       }
     });
-
+    //watch trace id and add in the searchRequestTraceIds
+    watch(searchRequestTraceIds, (updatedSearchRequestTraceIds) => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: updatedSearchRequestTraceIds,
+        };
+      }
+    });
     // ======= [END] dashboard PrintMode =======
 
+    // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
+    // As some panels were getting true cancel button and datetime picker were not getting updated
+    onUnmounted(() => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: [],
+        };
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: false,
+        };
+      }
+    });
     watch(
       [data, store?.state],
       async () => {
         // emit vrl function field list
-        if (data.value.length && data.value[0] && data.value[0].length) {
+        if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
           const maxAttributesIndex = data.value[0].reduce(
             (
@@ -347,12 +396,31 @@ export default defineComponent({
     );
 
     // when we get the new metadata from the apis, emit the metadata update
-    watch(metadata, () => {
-      emit("metadata-update", metadata.value);
+    watch(
+      metadata,
+      () => {
+        emit("metadata-update", metadata.value);
+      },
+      { deep: true },
+    );
+
+    watch(
+      resultMetaData,
+      () => {
+        emit("result-metadata-update", resultMetaData.value);
+      },
+      { deep: true },
+    );
+
+    watch(lastTriggeredAt, () => {
+      emit("last-triggered-at-update", lastTriggeredAt.value);
     });
 
-    watch(resultMetaData, () => {
-      emit("result-metadata-update", resultMetaData.value);
+    watch(isCachedDataDifferWithCurrentTimeRange, () => {
+      emit(
+        "is-cached-data-differ-with-current-time-range-update",
+        isCachedDataDifferWithCurrentTimeRange.value,
+      );
     });
 
     const handleNoData = (panelType: any) => {
@@ -431,7 +499,7 @@ export default defineComponent({
       // Check if the queryType is 'promql'
       else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
-        return data.value.length &&
+        return data.value?.length &&
           data.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
@@ -584,6 +652,37 @@ export default defineComponent({
         // if pie, donut or heatmap then series name will come in name field
         // also, if value is an array, then last value will be taken
         const drilldownVariables: any = {};
+
+        // selected start time and end time
+        if (
+          selectedTimeObj?.value?.start_time &&
+          selectedTimeObj?.value?.start_time != "Invalid Date"
+        ) {
+          drilldownVariables.start_time = new Date(
+            selectedTimeObj?.value?.start_time?.toISOString(),
+          ).getTime();
+        }
+
+        if (
+          selectedTimeObj?.value?.end_time &&
+          selectedTimeObj?.value?.end_time != "Invalid Date"
+        ) {
+          drilldownVariables.end_time = new Date(
+            selectedTimeObj?.value?.end_time?.toISOString(),
+          ).getTime();
+        }
+
+        // param to pass current query
+        // use metadata query[replaced variables values] or panelSchema query
+        drilldownVariables.query =
+          metadata?.value?.queries[0]?.query ??
+          panelSchema?.value?.queries[0]?.query ??
+          "";
+        drilldownVariables.query_encoded = b64EncodeUnicode(
+          metadata?.value?.queries[0]?.query ??
+            panelSchema?.value?.queries[0]?.query ??
+            "",
+        );
 
         // if chart type is 'table' then we need to pass the table name
         if (panelSchema.value.type == "table") {
@@ -780,6 +879,7 @@ export default defineComponent({
       chartPanelRef,
       data,
       loading,
+      searchRequestTraceIds,
       errorDetail,
       panelData,
       noData,

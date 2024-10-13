@@ -13,45 +13,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashSet, sync::Arc};
+use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
-use cache::cacher::get_ts_col;
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
-        stream::{FileKey, StreamType},
+        sql::{OrderBy, SqlOperator},
+        stream::{FileKey, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, sql::is_aggregate_query, str::find},
-    FxIndexSet,
+    utils::{
+        base64, json,
+        sql::is_aggregate_query,
+        str::{find, StringExt},
+    },
 };
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, SearchQuery};
 use regex::Regex;
+use sql::Sql;
+use tokio::runtime::Runtime;
 #[cfg(not(feature = "enterprise"))]
 use tokio::sync::Mutex;
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
-    tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
-    tracing::{info_span, Instrument},
+    crate::service::grpc::get_cached_channel,
+    config::meta::cluster::get_internal_grpc_token,
+    o2_enterprise::enterprise::search::TaskStatus,
+    std::collections::HashSet,
+    tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
+    tracing::info_span,
 };
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
+    common::{
+        infra::cluster as infra_cluster,
+        meta::{self, stream::StreamParams},
+        utils::functions,
+    },
     handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
@@ -60,7 +73,11 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod request;
 pub(crate) mod sql;
+#[cfg(feature = "enterprise")]
+pub(crate) mod super_cluster;
+pub(crate) mod utlis;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
@@ -73,6 +90,274 @@ pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
+pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .thread_name("datafusion_runtime")
+        .worker_threads(config::get_config().limit.cpu_num)
+        .enable_all()
+        .build()
+        .unwrap()
+});
+
+/// Returns Error if the first query is failed, otherwise returns the partial results.
+/// In case one query fails, the remaining queries are not executed.
+#[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
+pub async fn search_multi(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    multi_req: &search::MultiStreamRequest,
+) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
+    let trace_id = if trace_id.is_empty() {
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            let ctx = tracing::Span::current().context();
+            ctx.span().span_context().trace_id().to_string()
+        } else {
+            ider::uuid()
+        }
+    } else {
+        trace_id.to_string()
+    };
+
+    let mut per_query_resp = multi_req.per_query_response;
+
+    let mut query_fn = multi_req
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
+    if let Some(vrl_function) = &query_fn {
+        if RESULT_ARRAY.is_match(vrl_function) {
+            // The query function expects results array as input
+            // Hence, per_query_resp should be true
+            per_query_resp = true;
+        }
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
+
+    let mut queries = multi_req.to_query_req();
+    log::info!(
+        "search_multi: trace_id: {}, queries.len(): {}",
+        trace_id,
+        queries.len()
+    );
+    let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+    // Before making any rpc requests, first check the sql expressions can be decoded correctly
+    for req in queries.iter_mut() {
+        if let Err(e) = req.decode() {
+            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+        }
+    }
+    let queries_len = queries.len();
+    let mut stream_name = "".to_string();
+    let mut sqls = vec![];
+    let mut index = 0;
+
+    for mut req in queries {
+        stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
+            Ok(v) => v.source.to_string(),
+            Err(e) => {
+                log::error!("report_usage: parse sql error: {:?}", e);
+                "".to_string()
+            }
+        };
+        sqls.push(req.query.sql.clone());
+        if !per_query_resp {
+            req.query.query_fn = query_fn.clone();
+        }
+
+        for fn_name in functions::get_all_transform_keys(org_id).await {
+            if req.query.sql.contains(&format!("{}(", fn_name)) {
+                req.query.uses_zo_fn = true;
+                break;
+            }
+        }
+
+        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
+
+        match res {
+            Ok(res) => {
+                index += 1;
+                multi_res.took += res.took;
+
+                if res.total > multi_res.total {
+                    multi_res.total = res.total;
+                }
+                multi_res.from = res.from;
+                multi_res.size += res.size;
+                multi_res.file_count += res.file_count;
+                multi_res.scan_size += res.scan_size;
+                multi_res.scan_records += res.scan_records;
+                multi_res.columns.extend(res.columns);
+
+                multi_res.response_type = res.response_type;
+                multi_res.trace_id = res.trace_id;
+                multi_res.cached_ratio = res.cached_ratio;
+                log::debug!(
+                    "search_multi: res.hits.len() for query timerange to {} from {} : {}",
+                    req.query.end_time,
+                    req.query.start_time,
+                    res.hits.len()
+                );
+
+                if per_query_resp {
+                    multi_res.hits.push(serde_json::Value::Array(res.hits));
+                } else {
+                    multi_res.hits.extend(res.hits);
+                }
+            }
+            Err(e) => {
+                log::error!("search_multi: search error: {:?}", e);
+                if index == 0 {
+                    // Error in the first query, return the error
+                    return Err(e); // TODO: return partial results
+                } else {
+                    // Error in subsequent queries, add the error to the response and break
+                    // No need to run the remaining queries
+                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.is_partial = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut report_function_usage = false;
+    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.unwrap().trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                report_function_usage = true;
+                if apply_over_hits {
+                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &meta::functions::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        &json::Value::Array(multi_res.hits),
+                        org_id,
+                        &[stream_name.clone()],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            if per_query_resp {
+                                let flattened_array = v
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .map(|item| {
+                                        config::utils::flatten::flatten(item.clone()).unwrap()
+                                    })
+                                    .collect::<Vec<_>>();
+                                Some(serde_json::Value::Array(flattened_array))
+                            } else {
+                                (!v.is_null())
+                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                            }
+                        })
+                        .collect()
+                } else {
+                    multi_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &meta::functions::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                &hit,
+                                org_id,
+                                &[stream_name.clone()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => multi_res.hits,
+        }
+    } else {
+        multi_res.hits
+    };
+    log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
+    let column_timestamp = get_config().common.column_timestamp.to_string();
+    multi_res.cached_ratio /= queries_len;
+    multi_res.hits.sort_by(|a, b| {
+        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
+            return std::cmp::Ordering::Equal;
+        }
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
+        b_ts.cmp(&a_ts)
+    });
+    let time = start.elapsed().as_secs_f64();
+
+    if report_function_usage {
+        let req_stats = RequestStats {
+            // For functions, records = records * num_function, in this case num_function = 1
+            records: multi_res.total as i64,
+            response_time: time,
+            size: multi_res.scan_size as f64,
+            request_body: Some(json::to_string(&sqls).unwrap()),
+            user_email: None,
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            trace_id: None,
+            // took_wait_in_queue: multi_res.t,
+            search_type: multi_req.search_type,
+            ..Default::default()
+        };
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            stream_type,
+            UsageType::Functions,
+            0, // The request stats already contains function event
+            started_at,
+        )
+        .await;
+    }
+    Ok(multi_res)
+}
+
+#[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -83,6 +368,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
     let cfg = get_config();
+
     let trace_id = if trace_id.is_empty() {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
@@ -103,7 +389,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 trace_id.clone(),
-                TaskStatus::new(
+                TaskStatus::new_leader(
                     vec![],
                     true,
                     user_id.clone(),
@@ -117,36 +403,33 @@ pub async fn search(
             .await;
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    let req_regions = vec![];
+    #[cfg(not(feature = "enterprise"))]
+    let req_clusters = vec![];
     #[cfg(feature = "enterprise")]
     let req_regions = in_req.regions.clone();
     #[cfg(feature = "enterprise")]
     let req_clusters = in_req.clusters.clone();
-    #[cfg(feature = "enterprise")]
-    let local_cluster_search = req_regions == vec!["local"]
-        && !req_clusters.is_empty()
-        && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
-    let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
-    req.job.as_mut().unwrap().trace_id = trace_id.clone();
-    req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::Cluster as _;
-    req.stream_type = stream_type.to_string();
-    req.user_id = user_id.clone();
+    let query: SearchQuery = in_req.query.clone().into();
+    let req_query = query.clone();
+    let request = crate::service::search::request::Request::new(
+        trace_id.clone(),
+        org_id.to_string(),
+        stream_type,
+        in_req.timeout,
+        user_id.clone(),
+        Some((query.start_time, query.end_time)),
+        in_req.search_type.map(|v| v.to_string()),
+        in_req.index_type.optional(),
+    );
 
-    let req_query = req.clone().query.unwrap();
-
-    let handle = tokio::task::spawn(async move {
-        #[cfg(feature = "enterprise")]
-        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req, req_regions, req_clusters).await
-        } else {
-            cluster::http::search(req).await
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            cluster::http::search(req).await
-        }
-    });
+    let span = tracing::span::Span::current();
+    let handle = tokio::task::spawn(
+        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+            .instrument(span),
+    );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => Err(e),
@@ -193,6 +476,11 @@ pub async fn search(
                     response_time: time,
                     size: res.scan_size as f64,
                     request_body: Some(req_query.sql.clone()),
+                    function: if req_query.query_fn.is_empty() {
+                        None
+                    } else {
+                        Some(req_query.query_fn.clone())
+                    },
                     user_email: user_id,
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),
@@ -208,13 +496,14 @@ pub async fn search(
                     },
                     ..Default::default()
                 };
+                let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
                 report_request_usage_stats(
                     req_stats,
                     org_id,
                     &stream_name,
                     StreamType::Logs,
                     UsageType::Search,
-                    0,
+                    num_fn,
                     started_at,
                 )
                 .await;
@@ -232,61 +521,16 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let search_req = cluster_rpc::SearchRequest {
-        org_id: org_id.to_string(),
-        stream_type: stream_type.to_string(),
-        query: Some(query),
-        ..Default::default()
-    };
-    let meta = sql::Sql::new(&search_req).await?;
-
-    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let files = cluster::get_file_list(
-        trace_id,
-        &meta,
-        stream_type,
-        partition_time_level,
-        &stream_settings.partition_keys,
-    )
-    .await;
-
-    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-        .await
-        .unwrap_or_default();
-    if nodes.is_empty() {
-        log::error!("no querier node online");
-        return Err(Error::Message("no querier node online".to_string()));
-    }
-    let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
-
-    let (records, original_size, compressed_size) =
-        files
-            .iter()
-            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
-                (
-                    records + f.meta.records,
-                    original_size + f.meta.original_size,
-                    compressed_size + f.meta.compressed_size,
-                )
-            });
-    let mut resp = search::SearchPartitionResponse {
-        trace_id: trace_id.to_string(),
-        file_num: files.len(),
-        records: records as usize,
-        original_size: original_size as usize,
-        compressed_size: compressed_size as usize,
-        histogram_interval: meta.histogram_interval,
-        partitions: vec![],
-    };
+    let sql = Sql::new(&query, org_id, stream_type).await?;
 
     // check for vrl
     let apply_over_hits = match req.query_fn.as_ref() {
@@ -303,10 +547,67 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
-    if ts_column.is_none() || apply_over_hits {
-        resp.partitions.push([req.start_time, req.end_time]);
-        return Ok(resp);
+    let ts_column = cache::cacher::get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let skip_get_file_list = ts_column.is_none() || apply_over_hits;
+
+    let mut files = Vec::new();
+    let mut max_query_range = 0;
+    for (stream, schema) in sql.schemas.iter() {
+        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
+        if !skip_get_file_list {
+            let stream_files = crate::service::file_list::query_ids(
+                &sql.org_id,
+                stream_type,
+                stream,
+                sql.time_range,
+            )
+            .await?;
+            max_query_range = max(
+                max_query_range,
+                stream_settings.max_query_range * 3600 * 1_000_000,
+            );
+            files.extend(stream_files);
+        }
+    }
+
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        (req.start_time, req.end_time),
+        files.len(),
+        file_list_took,
+    );
+
+    if skip_get_file_list {
+        let mut response = search::SearchPartitionResponse::default();
+        response.partitions.push([req.start_time, req.end_time]);
+        response.max_query_range = max_query_range;
+        response.histogram_interval = sql.histogram_interval;
+        return Ok(response);
+    };
+
+    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+        .await
+        .unwrap_or_default();
+    if nodes.is_empty() {
+        log::error!("no querier node online");
+        return Err(Error::Message("no querier node online".to_string()));
+    }
+    let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
+
+    let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
+        (records + f.records, original_size + f.original_size)
+    });
+    let mut resp = search::SearchPartitionResponse {
+        trace_id: trace_id.to_string(),
+        file_num: files.len(),
+        records: records as usize,
+        original_size: original_size as usize,
+        compressed_size: 0, // there is no compressed size in file list
+        histogram_interval: sql.histogram_interval,
+        max_query_range,
+        partitions: vec![],
+        order_by: OrderBy::Desc,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -314,7 +615,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        min_step *= meta.histogram_interval.unwrap_or(1);
+        min_step *= sql.histogram_interval.unwrap_or(1);
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
@@ -325,16 +626,41 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    // if the partition number is too large, we limit it to 1000
+    if part_num > 1000 {
+        part_num = 1000;
+    }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
-    step = step - step % min_step;
+    if step < min_step {
+        step = min_step;
+    }
+    if step % min_step > 0 {
+        step = step - step % min_step;
+    }
+    // this is to ensure we create partitions less than max_query_range
+    if max_query_range > 0 && step > max_query_range {
+        step = if min_step < max_query_range {
+            max_query_range - max_query_range % min_step
+        } else {
+            max_query_range
+        };
+    }
 
-    // generate partitions
+    // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
+    let duration = req.end_time - req.start_time;
     while end > req.start_time {
-        let start = max(end - step - last_partition_step, req.start_time);
+        let mut start = max(end - step, req.start_time);
+        if last_partition_step > 0 && duration > min_step && part_num > 1 {
+            partitions.push([end - last_partition_step, end]);
+            start -= last_partition_step;
+            end -= last_partition_step;
+        } else {
+            start = max(start - last_partition_step, req.start_time);
+        }
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
@@ -342,11 +668,15 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
-    if let Some((field, sort)) = meta.meta.order_by.first() {
-        if field == &ts_column.unwrap() && !sort {
+
+    // We need to reverse partitions if query is ASC order
+    if let Some((field, order_by)) = sql.order_by.first() {
+        if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+            resp.order_by = OrderBy::Asc;
             partitions.reverse();
         }
     }
+
     resp.partitions = partitions;
     Ok(resp)
 }
@@ -379,6 +709,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             async move {
                 let cfg = get_config();
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -387,22 +718,17 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     )
                 });
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -479,6 +805,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 querier_memory_cached_files: scan_stats.querier_memory_cached_files,
                 querier_disk_cached_files: scan_stats.querier_disk_cached_files,
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
+                idx_took: scan_stats.idx_took,
             });
         let query_status = if result.is_queue {
             "waiting"
@@ -542,6 +869,7 @@ pub async fn cancel_query(
                 let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
                         &tracing::Span::current().context(),
@@ -549,22 +877,17 @@ pub async fn cancel_query(
                     )
                 });
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "grpc_cancel_query: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "grpc_cancel_query: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -632,26 +955,66 @@ pub async fn cancel_query(
 }
 
 /// match a source is a valid file or not
-pub async fn match_source(
-    stream: StreamParams,
+#[allow(clippy::too_many_arguments)]
+pub async fn match_file(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
     time_range: Option<(i64, i64)>,
-    filters: &[(&str, Vec<String>)],
     source: &FileKey,
     is_wal: bool,
-    match_min_ts_only: bool,
+    partition_keys: &[StreamPartition],
+    equal_items: &[(String, String)],
 ) -> bool {
-    if stream.stream_type.eq(&StreamType::Metrics)
-        && source.key.starts_with(
-            format!(
-                "files/{}/{}/{}/",
-                stream.org_id, stream.stream_type, stream.org_id
-            )
-            .as_str(),
-        )
-    {
+    // fast path
+    if partition_keys.is_empty() || !source.key.contains('=') {
         return true;
     }
 
+    // slow path
+    let mut filters = generate_filter_from_equal_items(equal_items);
+    let partition_keys: HashMap<&String, &StreamPartition> =
+        partition_keys.iter().map(|v| (&v.field, v)).collect();
+    for (key, value) in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(key) {
+            for val in value.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
+    match_source(
+        StreamParams::new(org_id, stream_name, stream_type),
+        time_range,
+        filters.as_slice(),
+        source,
+        is_wal,
+    )
+    .await
+}
+
+/// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
+/// after [("a", ["3", "4"]), ("b", ["5", "6"])]
+pub fn generate_filter_from_equal_items(
+    equal_items: &[(String, String)],
+) -> Vec<(String, Vec<String>)> {
+    let mut filters: HashMap<String, Vec<String>> = HashMap::new();
+    for (field, value) in equal_items {
+        filters
+            .entry(field.to_string())
+            .or_default()
+            .push(value.to_string());
+    }
+    filters.into_iter().collect()
+}
+
+/// match a source is a valid file or not
+pub async fn match_source(
+    stream: StreamParams,
+    time_range: Option<(i64, i64)>,
+    filters: &[(String, Vec<String>)],
+    source: &FileKey,
+    is_wal: bool,
+) -> bool {
     // match org_id & table
     if !source.key.starts_with(
         format!(
@@ -686,9 +1049,6 @@ pub async fn match_source(
 
     // match partition clause
     if let Some((time_min, time_max)) = time_range {
-        if match_min_ts_only && time_min > 0 {
-            return source.meta.min_ts >= time_min && source.meta.min_ts < time_max;
-        }
         if time_min > 0 && time_min > source.meta.max_ts {
             return false;
         }
@@ -700,7 +1060,7 @@ pub async fn match_source(
 }
 
 /// match a source is a needed file or not, return true if needed
-fn filter_source_by_partition_key(source: &str, filters: &[(&str, Vec<String>)]) -> bool {
+fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
     !filters.iter().any(|(k, v)| {
         let field = format_partition_key(&format!("{k}="));
         find(source, &format!("/{field}"))
@@ -771,132 +1131,80 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 }
 
 // generate parquet file search schema
-fn generate_search_schema(
-    sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
+fn generate_search_schema_diff(
+    schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    // cacluate the diff between latest schema and group schema
+) -> Result<HashMap<String, DataType>, Error> {
+    // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
-    let mut new_fields = Vec::new();
 
-    for field in generate_used_fields_in_query(sql).iter() {
-        let group_field = schema.field_with_name(field).ok();
-        let latest_field = schema_latest_map.get(field).map(|f| f.as_ref());
-
-        match (group_field, latest_field) {
-            // When group_field is None and latest_field is Some, clone latest_field
-            (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
-
-            // When both group_field and latest_field are Some, compare their data types
-            (Some(group_field), Some(latest_field)) => {
-                if group_field.data_type() != latest_field.data_type() {
-                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
-                }
-                new_fields.push(Arc::new(group_field.clone()));
-            }
-
-            // should we return error
-            _ => {}
-        }
-    }
-
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-
-    let mut schema = Schema::new(new_fields);
-    let timestamp = &get_config().common.column_timestamp;
-    if schema.field_with_name(timestamp).is_err() {
-        // self add timestamp column if no exist
-        let field = Arc::new(Field::new(timestamp, DataType::Int64, false));
-        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
-    }
-
-    Ok((Arc::new(schema), diff_fields))
-}
-
-// generate parquet file search schema
-fn generate_select_start_search_schema(
-    sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-    defined_schema_fields: &[String],
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    let schema_fields_map = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
     for field in schema.fields().iter() {
-        if let Some(f) = schema_latest_map.get(field.name()) {
-            if f.data_type() != field.data_type() {
-                diff_fields.insert(field.name().clone(), f.data_type().clone());
+        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+            if field.data_type() != latest_field.data_type() {
+                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }
         }
     }
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-    // add not exists field in group schema but used in sql
-    let mut new_fields = Vec::new();
-    for field in generate_used_fields_in_query(sql).iter() {
-        if schema_fields_map.get(field).is_none() {
-            if let Some(field) = schema_latest_map.get(field) {
-                new_fields.push(Arc::new(field.as_ref().clone()));
-            }
-        }
-    }
-    let cfg = get_config();
-    let schema = if !defined_schema_fields.is_empty() {
-        let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-        if !fields.contains(&cfg.common.column_timestamp) {
-            fields.insert(cfg.common.column_timestamp.to_string());
-        }
-        if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
-            fields.insert(cfg.common.column_all.to_string());
-        }
-        let new_fields = fields
-            .iter()
-            .filter_map(|f| match schema_fields_map.get(f) {
-                Some(f) => Some((*f).clone()),
-                None => schema_latest_map.get(f).map(|f| (*f).clone()),
-            })
-            .collect::<Vec<_>>();
-        Arc::new(Schema::new(new_fields))
-    } else if !new_fields.is_empty() {
-        let new_schema = Schema::new(new_fields);
-        Arc::new(Schema::try_merge(vec![
-            schema.as_ref().to_owned(),
-            new_schema,
-        ])?)
-    } else {
-        schema.clone()
-    };
-    Ok((schema, diff_fields))
+
+    Ok(diff_fields)
 }
 
-fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {
-    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
+pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
+    // parquet format inverted index only support single table
+    if sql.stream_names.len() != 1 {
+        return (false, vec![]);
+    }
 
-    // note field name maybe equal to alias name
-    let used_fields: FxIndexSet<_> = sql
-        .meta
-        .group_by
-        .iter()
-        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
-        .filter(|f| !alias_map.contains(*f))
-        .chain(&sql.meta.fields)
-        .cloned()
-        .collect();
+    let cfg = get_config();
+    let index_terms = if sql.equal_items.len() == 1 {
+        let schema = sql.schemas.values().next().unwrap().schema();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema);
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
+    } else {
+        vec![]
+    };
 
-    used_fields.into_iter().collect()
+    let use_inverted_index = sql.stream_type != StreamType::Index
+        && sql.use_inverted_index
+        && cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && (sql.match_items.is_some() || !index_terms.is_empty());
+
+    (use_inverted_index, index_terms)
+}
+
+pub fn filter_index_fields(
+    items: &[(String, String)],
+    index_fields: &[String],
+) -> Vec<(String, String)> {
+    let mut result = Vec::new();
+    for item in items {
+        if index_fields.contains(&item.0) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+pub fn generate_filter_from_quick_text(
+    data: &[(String, String, SqlOperator)],
+) -> Vec<(&str, Vec<String>)> {
+    let quick_text_len = data.len();
+    let mut filters = HashMap::with_capacity(quick_text_len);
+    for i in 0..quick_text_len {
+        let (k, v, op) = &data[i];
+        if op == &SqlOperator::And
+            || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+        {
+            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+            entry.push(v.to_string());
+        } else {
+            filters.clear();
+            break;
+        }
+    }
+    filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
 #[cfg(test)]
@@ -908,77 +1216,98 @@ mod tests {
         let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
         let filters = vec![
             (vec![], true),
-            (vec![("kuberneteshost", vec!["gke-dev1".to_string()])], true),
             (
-                vec![("kuberneteshost", vec!["gke-dev2".to_string()])],
+                vec![("kuberneteshost".to_string(), vec!["gke-dev1".to_string()])],
+                true,
+            ),
+            (
+                vec![("kuberneteshost".to_string(), vec!["gke-dev2".to_string()])],
                 false,
             ),
             (
                 vec![(
-                    "kuberneteshost",
+                    "kuberneteshost".to_string(),
                     vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                 )],
                 true,
             ),
             (
-                vec![("some_other_key", vec!["no-matter".to_string()])],
+                vec![("some_other_key".to_string(), vec!["no-matter".to_string()])],
                 true,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev1".to_string()]),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 true,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev1".to_string()]),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev2".to_string()]),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
-                    ("kuberneteshost", vec!["gke-dev2".to_string()]),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("kubernetesnamespacename", vec!["ziox-dev".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
                 ],
                 true,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("kubernetesnamespacename", vec!["abcdefg".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
                 ],
                 false,
             ),
             (
                 vec![
                     (
-                        "kuberneteshost",
+                        "kuberneteshost".to_string(),
                         vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
                     ),
-                    ("some_other_key", vec!["no-matter".to_string()]),
+                    ("some_other_key".to_string(), vec!["no-matter".to_string()]),
                 ],
                 true,
             ),
@@ -1066,10 +1395,20 @@ mod tests {
                 true,
             ),
         ];
+
         for (tsql, expected) in sqls {
             let meta = sql::Sql::new(tsql).unwrap();
-            let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+            let filter = generate_filter_from_quick_text(&meta.quick_text);
+            assert_eq!(
+                filter_source_by_partition_key(
+                    path,
+                    &filter
+                        .into_iter()
+                        .map(|(f1, f2)| (f1.to_owned(), f2))
+                        .collect::<Vec<(String, Vec<String>)>>()
+                ),
+                expected
+            );
         }
     }
 }

@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : ''
               "
             >
-              <!-- TODO OK : Repeated code make seperate component to display field  -->
+              <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="
                   props.row.ftsKey ||
@@ -597,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               round
-              data-test="logs-page-fields-list-pagination-messsage-button"
+              data-test="logs-page-fields-list-pagination-message-button"
               dense
               flat
               class="text text-caption text-regular"
@@ -699,6 +699,7 @@ export default defineComponent({
       filterHitsColumns,
       extractFields,
       validateFilterForMultiStream,
+      reorderSelectedFields,
     } = useLogs();
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -784,15 +785,17 @@ export default defineComponent({
     };
 
     function clickFieldFn(row: { name: never }, pageIndex: number) {
-      if (searchObj.data.stream.selectedFields.includes(row.name)) {
-        searchObj.data.stream.selectedFields =
-          searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== row.name,
-          );
+      let selectedFields = reorderSelectedFields();
+
+      if (selectedFields.includes(row.name)) {
+        selectedFields = selectedFields.filter((v: any) => v !== row.name);
       } else {
-        searchObj.data.stream.selectedFields.push(row.name);
+        selectedFields.push(row.name);
       }
-      searchObj.organizationIdetifier =
+
+      searchObj.data.stream.selectedFields = selectedFields;
+
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
       filterHitsColumns();
@@ -1060,11 +1063,11 @@ export default defineComponent({
             let localFieldIndex = -1;
             for (const selectedStream of field.streams) {
               localFieldIndex = localStreamFields[
-                searchObj.organizationIdetifier + "_" + selectedStream
+                searchObj.organizationIdentifier + "_" + selectedStream
               ].indexOf(field.name);
               if (localFieldIndex > -1) {
                 localStreamFields[
-                  searchObj.organizationIdetifier + "_" + selectedStream
+                  searchObj.organizationIdentifier + "_" + selectedStream
                 ].splice(localFieldIndex, 1);
               }
             }
@@ -1096,21 +1099,21 @@ export default defineComponent({
               if (selectedStream != undefined) {
                 if (
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ] == undefined
                 ) {
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ] = [];
                 }
 
                 if (
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ].indexOf(field.name) == -1
                 ) {
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ].push(field.name);
                 }
               }
@@ -1483,9 +1486,7 @@ $streamSelectorHeight: 44px;
 
       .field_list {
         &.selected {
-          .q-expansion-item {
-            background-color: rgba(89, 96, 178, 0.3);
-          }
+          background-color: rgba(89, 96, 178, 0.3);
 
           .field_overlay {
             // background-color: #ffffff;

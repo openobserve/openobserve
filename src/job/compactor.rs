@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey};
+use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics};
 use tokio::{
     sync::{mpsc, Mutex},
     time,
@@ -94,8 +94,37 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_sync_to_db().await });
     tokio::task::spawn(async move { run_check_running_jobs().await });
     tokio::task::spawn(async move { run_clean_done_jobs().await });
+    tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
 
     Ok(())
+}
+
+/// Report compactor pending jobs as prometheus metric
+async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
+    let interval = get_config().compact.pending_jobs_metric_interval;
+
+    log::info!("[COMPACTOR] start run_compactor_pending_jobs_metric job");
+
+    loop {
+        time::sleep(time::Duration::from_secs(interval)).await;
+
+        log::debug!("[COMPACTOR] Running compactor pending jobs to report metric");
+        let job_status = match infra::file_list::get_pending_jobs_count().await {
+            Ok(status) => status,
+            Err(e) => {
+                log::error!("[COMPACTOR] run compactor pending jobs metric error: {e}");
+                continue;
+            }
+        };
+
+        for (org, inner_map) in job_status {
+            for (stream_type, counter) in inner_map {
+                metrics::COMPACT_PENDING_JOBS
+                    .with_label_values(&[org.as_str(), stream_type.as_str()])
+                    .set(counter);
+            }
+        }
+    }
 }
 
 /// Generate merging jobs
@@ -161,7 +190,7 @@ async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
         log::debug!("[COMPACTOR] Running check running jobs");
         let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
         if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
-            log::error!("[COMPACTOR] run check running jobs error: {e}",);
+            log::error!("[COMPACTOR] run check running jobs error: {e}");
         }
         time::sleep(time::Duration::from_secs(time as u64)).await;
     }

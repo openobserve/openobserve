@@ -33,14 +33,6 @@ enum StreamType {
 
 }
 
-// Search request type
-enum SearchType {
-    USER          = 0; // user input search request
-    CLUSTER       = 1; // cluster dispatch search request
-    WAL_ONLY      = 2; // ingester node just search local wal
-    SUPER_CLUSTER = 3; // super cluster
-}
-
 // Job information for a request
 message Job {
     string trace_id = 1;
@@ -58,6 +50,7 @@ message ScanStats {
     int64 querier_memory_cached_files = 6;
     int64 querier_disk_cached_files   = 7;
     int64 idx_scan_size               = 8; // unit: MB
+    int64 idx_took                    = 9; // unit: ms
 }
 
 message FileList {
@@ -69,4 +62,9 @@ message FileKey {
     FileMeta       meta        = 2;
     bool           deleted     = 3;
     optional bytes segment_ids = 4;
+}
+
+message IdxFileName {
+    string         key         = 1;
+    optional bytes segment_ids = 2;
 }

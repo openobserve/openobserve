@@ -562,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               round
-              data-test="dashboard-page-fields-list-pagination-messsage-button"
+              data-test="dashboard-page-fields-list-pagination-message-button"
               dense
               flat
               class="text text-caption text-regular"
@@ -620,7 +620,6 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "FieldList",
   props: ["editMode"],
-  emits: ["update:streamList"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -973,7 +972,7 @@ export default defineComponent({
       });
     };
 
-    async function loadStreamFileds(streamName: string) {
+    async function loadStreamFields(streamName: string) {
       try {
         if (streamName != "") {
           return await getStream(
@@ -1009,7 +1008,7 @@ export default defineComponent({
               // check for schema exist in the object or not
               // if not pull the schema from server.
               if (!stream.hasOwnProperty("schema")) {
-                const streamData: any = await loadStreamFileds(stream.name);
+                const streamData: any = await loadStreamFields(stream.name);
                 const streamSchema: any = streamData.schema;
                 if (streamSchema == undefined) {
                   return;
@@ -1018,7 +1017,7 @@ export default defineComponent({
                 stream.schema = streamSchema;
               }
 
-              // create a schema field mapping based on field name to avoind iteration over object.
+              // create a schema field mapping based on field name to avoid iteration over object.
               // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
               for (const field of stream.schema) {
                 if (
@@ -1068,7 +1067,6 @@ export default defineComponent({
             }
           }
         }
-        emit("update:streamList");
       } catch (e: any) {
         console.log("Error while extracting fields");
       }

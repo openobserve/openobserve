@@ -78,8 +78,11 @@ export const getDefaultOrganization = async (
 export const redirectUser = (redirectURI: string | null) => {
   const path = getPath();
   if (redirectURI != null && redirectURI != "") {
-    // $router.push({ path: redirectURI });
-    window.location.replace(path);
+    if (redirectURI.includes("http")) {
+      window.location.href = redirectURI;
+    } else {
+      window.location.replace(redirectURI);
+    }
   } else {
     // $router.push({ path: "/" });
     window.location.replace(path);

@@ -17,6 +17,7 @@ import { reactive, computed, watch, onBeforeMount } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
+import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 
 const colors = [
   "#5960b2",
@@ -36,7 +37,7 @@ let parser: any;
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
-    version: 4,
+    version: 5,
     id: "",
     type: "bar",
     title: "",
@@ -76,6 +77,8 @@ const getDefaultDashboardPanelData: any = () => ({
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
+      table_transpose: false,
+      table_dynamic_columns: false,
     },
     htmlContent: "",
     markdownContent: "",
@@ -92,7 +95,11 @@ const getDefaultDashboardPanelData: any = () => ({
           y: [],
           z: [],
           breakdown: [],
-          filter: [],
+          filter: {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [],
+          },
           latitude: null,
           longitude: null,
           weight: null,
@@ -108,6 +115,7 @@ const getDefaultDashboardPanelData: any = () => ({
           // gauge min and max values
           min: 0,
           max: 100,
+          time_shift: [],
         },
       },
     ],
@@ -201,7 +209,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         y: [],
         z: [],
         breakdown: [],
-        filter: [],
+        filter: {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [],
+        },
         latitude: null,
         longitude: null,
         weight: null,
@@ -744,6 +756,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
 
       case "area":
@@ -817,6 +832,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "geomap":
         dashboardPanelData.data.queries[
@@ -841,16 +859,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit = 0;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
         break;
       case "sankey":
         dashboardPanelData.data.queries[
@@ -867,7 +894,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.breakdown = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter = [];
+        ].fields.filter = {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [],
+        };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -878,6 +909,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit = 0;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
       default:
         break;
     }
@@ -980,11 +1014,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const removeFilterItem = (name: string) => {
     const index = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.filter.findIndex((it: any) => it.column == name);
+    ].fields.filter.conditions.findIndex((it: any) => it.column == name);
     if (index >= 0) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter.splice(index, 1);
+      ].fields.filter.conditions.splice(index, 1);
     }
   };
 
@@ -1032,16 +1066,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     // Ensure the filter array is initialized
     if (!currentQuery.fields.filter) {
-      currentQuery.fields.filter = [];
+      currentQuery.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      };
     }
 
     // Add the new filter item
-    currentQuery.fields.filter.push({
+    currentQuery.fields.filter.conditions.push({
       type: "list",
       values: [],
       column: name,
       operator: null,
       value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
     });
 
     // Ensure the filterValue array is initialized
@@ -1093,10 +1133,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
       start_time: new Date(
-        dashboardPanelData.meta.dateTime["start_time"].toISOString(),
+        dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
       ).getTime(),
       end_time: new Date(
-        dashboardPanelData.meta.dateTime["end_time"].toISOString(),
+        dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
       ).getTime(),
       fields: [name],
       size: 100,
@@ -1175,11 +1215,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter.splice(
+      ].fields.filter.conditions.splice(
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.length,
+        ].fields.filter.conditions.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1644,6 +1684,167 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     updateQueryValue();
   };
 
+  /**
+   * Format a value to be used in a SQL query.
+   * @param value - the value to format
+   * @returns the formatted value
+   */
+  const formatValue = (value: any): string | null => {
+    if (value == null) {
+      // if value is null or undefined, return it as is
+      return value;
+    }
+
+    // if value is a string, remove any single quotes and add double quotes
+    let tempValue = value;
+    if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
+      tempValue = value.substring(1, value.length - 1);
+    }
+    // escape any single quotes in the value
+    tempValue = escapeSingleQuotes(tempValue);
+    // add double quotes around the value
+    tempValue = `'${tempValue}'`;
+    return tempValue;
+  };
+
+  /**
+   * Format a value for an IN clause in a SQL query.
+   * If the value contains a variable, e.g. $variable, it will be returned as is.
+   * Otherwise, if the value is a string, it will be split into individual values
+   * using the `splitQuotedString` util function. Each value will be escaped and
+   * enclosed in single quotes, and the resulting array of strings will be joined
+   * with commas.
+   * @param value - the value to format
+   * @returns the formatted value
+   */
+  const formatINValue = (value: any) => {
+    // if variable is present, don't want to use splitQuotedString
+    if (value?.includes("$")) {
+      if (value.startsWith("(") && value.endsWith(")")) {
+        return value.substring(1, value.length - 1);
+      }
+      return value;
+    } else {
+      return splitQuotedString(value)
+        ?.map((it: any) => {
+          return `'${escapeSingleQuotes(it)}'`;
+        })
+        .join(", ");
+    }
+  };
+
+  /**
+   * Build a WHERE clause from the given filter data.
+   * @param {array} filterData - an array of filter objects, each with properties
+   *   for column, operator, value, and logicalOperator.
+   * @returns {string} - the WHERE clause as a string.
+   */
+  const buildWhereClause = (filterData: any) => {
+    /**
+     * Build a single condition from the given condition object.
+     * @param {object} condition - a filter object with properties for column,
+     *   operator, value, and logicalOperator.
+     * @returns {string} - the condition as a string.
+     */
+    const buildCondition = (condition: any) => {
+      if (condition.filterType === "group") {
+        const groupConditions = condition.conditions
+          .map(buildCondition)
+          .filter(Boolean);
+        const logicalOperators = condition.conditions
+          .map((c: any) => c.logicalOperator)
+          .filter(Boolean);
+
+        let groupQuery = "";
+        groupConditions.forEach((cond: any, index: any) => {
+          if (index > 0) {
+            groupQuery += ` ${logicalOperators[index]} `;
+          }
+          groupQuery += cond;
+        });
+
+        return groupConditions.length ? `(${groupQuery})` : "";
+      } else if (condition.type === "list" && condition.values?.length > 0) {
+        return `${condition.column} IN (${condition.values
+          .map((value: any) => formatValue(value))
+          .join(", ")})`;
+      } else if (condition.type === "condition" && condition.operator != null) {
+        let selectFilter = "";
+        if (["Is Null", "Is Not Null"].includes(condition.operator)) {
+          selectFilter += `${condition.column} `;
+          switch (condition.operator) {
+            case "Is Null":
+              selectFilter += `IS NULL`;
+              break;
+            case "Is Not Null":
+              selectFilter += `IS NOT NULL`;
+              break;
+          }
+        } else if (condition.operator === "IN") {
+          selectFilter += `${condition.column} IN (${formatINValue(condition.value)})`;
+        } else if (condition.operator === "match_all") {
+          selectFilter += `match_all(${formatValue(condition.value)})`;
+        } else if (condition.operator === "match_all_raw") {
+          selectFilter += `match_all_raw(${formatValue(condition.value)})`;
+        } else if (condition.operator === "match_all_raw_ignore_case") {
+          selectFilter += `match_all_raw_ignore_case(${formatValue(condition.value)})`;
+        } else if (condition.operator === "str_match") {
+          selectFilter += `str_match(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.operator === "str_match_ignore_case") {
+          selectFilter += `str_match_ignore_case(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.operator === "re_match") {
+          selectFilter += `re_match(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.operator === "re_not_match") {
+          selectFilter += `re_not_match(${condition.column}, ${formatValue(condition.value)})`;
+        } else if (condition.value != null && condition.value !== "") {
+          selectFilter += `${condition.column} `;
+          switch (condition.operator) {
+            case "=":
+            case "<>":
+            case "<":
+            case ">":
+            case "<=":
+            case ">=":
+              selectFilter += `${condition.operator} ${formatValue(condition.value)}`;
+              break;
+            case "Contains":
+              selectFilter += `LIKE '%${condition.value}%'`;
+              break;
+            case "Not Contains":
+              selectFilter += `NOT LIKE '%${condition.value}%'`;
+              break;
+            default:
+              selectFilter += `${condition.operator} ${formatValue(condition.value)}`;
+              break;
+          }
+        }
+        return selectFilter;
+      }
+      return "";
+    };
+
+    const whereConditions = filterData.map(buildCondition).filter(Boolean);
+
+    const logicalOperators = filterData.map((it: any) => it.logicalOperator);
+
+    if (whereConditions.length > 0) {
+      return ` WHERE ${whereConditions
+        .map((cond: any, index: any) => {
+          const logicalOperator =
+            index < logicalOperators.length && logicalOperators[index + 1]
+              ? logicalOperators[index + 1]
+              : "";
+
+          return index < logicalOperators.length
+            ? `${cond} ${logicalOperator}`
+            : cond;
+        })
+        .join(" ")}`;
+    }
+
+    return "";
+  };
+
   const sqlchart = () => {
     // STEP 1: first check if there is at least 1 field selected
     if (
@@ -1698,7 +1899,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const filter = [
       ...dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields?.filter,
+      ].fields?.filter.conditions,
     ];
     const array = fields.map((field, i) => {
       let selector = "";
@@ -1722,7 +1923,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             selector += `approx_percentile_cont(${field?.column}, 0.99)`;
             break;
           case "histogram": {
-            // if inteval is not null, then use it
+            // if interval is not null, then use it
             if (field?.args && field?.args?.length && field?.args[0].value) {
               selector += `${field?.aggregationFunction}(${field?.column}, '${field?.args[0]?.value}')`;
             } else {
@@ -1749,51 +1950,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].fields?.stream
     }" `;
 
-    const filterData = filter?.map((field, i) => {
-      let selectFilter = "";
-      if (field.type == "list" && field.values?.length > 0) {
-        selectFilter += `${field.column} IN (${field.values
-          .map((it: any) => `'${it}'`)
-          .join(", ")})`;
-      } else if (field.type == "condition" && field.operator != null) {
-        selectFilter += `${field?.column} `;
-        if (["Is Null", "Is Not Null"].includes(field.operator)) {
-          switch (field?.operator) {
-            case "Is Null":
-              selectFilter += `IS NULL`;
-              break;
-            case "Is Not Null":
-              selectFilter += `IS NOT NULL`;
-              break;
-          }
-        } else if (field.value != null && field.value != "") {
-          switch (field.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${field?.operator} ${field?.value}`;
-              break;
-            case "Contains":
-              selectFilter += `LIKE '%${field.value}%'`;
-              break;
-            case "Not Contains":
-              selectFilter += `NOT LIKE '%${field.value}%'`;
-              break;
-            default:
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-          }
-        }
-      }
-      return selectFilter;
-    });
-    const filterItems = filterData.filter((it: any) => it);
-    if (filterItems.length > 0) {
-      query += "WHERE " + filterItems.join(" AND ");
-    }
+    // Add the AND/OR condition logic
+    const filterData =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.filter.conditions;
+
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
     // add group by statement
     const xAxisAlias = dashboardPanelData.data.queries[
@@ -1902,55 +2066,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const filterData =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter;
+      ].fields.filter.conditions;
 
-    const filterItems = filterData.map((field: any) => {
-      let selectFilter = "";
-      // Handle different filter types and operators
-      if (field.type == "list" && field.values?.length > 0) {
-        selectFilter += `${field.column} IN (${field.values
-          .map((it: any) => `'${it}'`)
-          .join(", ")})`;
-      } else if (field.type == "condition" && field.operator != null) {
-        selectFilter += `${field?.column} `;
-        if (["Is Null", "Is Not Null"].includes(field.operator)) {
-          switch (field?.operator) {
-            case "Is Null":
-              selectFilter += `IS NULL`;
-              break;
-            case "Is Not Null":
-              selectFilter += `IS NOT NULL`;
-              break;
-          }
-        } else if (field.value != null && field.value != "") {
-          switch (field.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${field?.operator} ${field?.value}`;
-              break;
-            case "Contains":
-              selectFilter += `LIKE '%${field.value}%'`;
-              break;
-            case "Not Contains":
-              selectFilter += `NOT LIKE '%${field.value}%'`;
-              break;
-            default:
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-          }
-        }
-      }
-      return selectFilter;
-    });
-
-    const whereClause = filterItems.filter((it: any) => it).join(" AND ");
-    if (whereClause) {
-      query += ` WHERE ${whereClause} `;
-    }
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
     // Group By clause
     let aliases: any = [];
@@ -2051,47 +2170,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     query += ` FROM "${stream}"`;
 
     // Adding filter conditions
-    const filterData = queryData.fields.filter || [];
-    const filterConditions = filterData.map((field: any) => {
-      let selectFilter = "";
-      if (field.type === "list" && field.values?.length > 0) {
-        selectFilter += `${field.column} IN (${field.values
-          .map((it: string) => `'${it}'`)
-          .join(", ")})`;
-      } else if (field.type === "condition" && field.operator != null) {
-        selectFilter += `${field.column} `;
-        if (["Is Null", "Is Not Null"].includes(field.operator)) {
-          selectFilter +=
-            field.operator === "Is Null" ? "IS NULL" : "IS NOT NULL";
-        } else if (field.value != null && field.value !== "") {
-          switch (field.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-            case "Contains":
-              selectFilter += `LIKE '%${field.value}%'`;
-              break;
-            case "Not Contains":
-              selectFilter += `NOT LIKE '%${field.value}%'`;
-              break;
-            default:
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-          }
-        }
-      }
-      return selectFilter;
-    });
+    const filterData = queryData.fields.filter.conditions;
 
-    // Adding filter conditions to the query
-    if (filterConditions.length > 0) {
-      query += " WHERE " + filterConditions.join(" AND ");
-    }
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
     // Group By clause
     let aliases: any = [];
@@ -2288,7 +2370,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       if (
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.length > 0
+        ].fields.filter.conditions.length > 0
       ) {
         errors.push(
           "Filters are not supported for PromQL. Remove anything added to the Filters.",
@@ -2556,59 +2638,57 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         );
       }
 
-      // if there are filters
+      /**
+       * Validate the filters in the panel
+       * @param conditions the conditions array
+       * @param errors the array to push the errors to
+       */
+      function validateConditions(conditions: any, errors: any) {
+        conditions.forEach((it: any) => {
+          if (it.filterType === "condition") {
+            // If the condition is a list, check if at least 1 item is selected
+            if (it.type == "list" && !it.values?.length) {
+              errors.push(
+                `Filter: ${it.column}: Select at least 1 item from the list`,
+              );
+            }
+
+            if (it.type == "condition") {
+              // Check if condition operator is selected
+              if (it.operator == null) {
+                errors.push(
+                  `Filter: ${it.column}: Operator selection required`,
+                );
+              }
+
+              // Check if condition value is required based on the operator
+              if (
+                !["Is Null", "Is Not Null"].includes(it.operator) &&
+                (it.value == null || it.value == "")
+              ) {
+                errors.push(`Filter: ${it.column}: Condition value required`);
+              }
+            }
+          } else if (it.filterType === "group") {
+            // Recursively validate the conditions in the group
+            validateConditions(it.conditions, errors);
+          }
+        });
+      }
+
       if (
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.length
+        ].fields.filter.conditions.length
       ) {
-        // check if at least 1 item from the list is selected
-        const listFilterError = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.filter(
-          (it: any) => it.type == "list" && !it.values?.length,
+        // Validate the top-level conditions
+        validateConditions(
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.conditions,
+          errors,
         );
-        if (listFilterError.length) {
-          errors.push(
-            ...listFilterError.map(
-              (it: any) =>
-                `Filter: ${it.column}: Select at least 1 item from the list`,
-            ),
-          );
-        }
-
-        // check if condition operator is selected
-        const conditionFilterError = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.filter(
-          (it: any) => it.type == "condition" && it.operator == null,
-        );
-        if (conditionFilterError.length) {
-          errors.push(
-            ...conditionFilterError.map(
-              (it: any) => `Filter: ${it.column}: Operator selection required`,
-            ),
-          );
-        }
-
-        // check if condition value is selected
-        const conditionValueFilterError = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.filter(
-          (it: any) =>
-            it.type == "condition" &&
-            !["Is Null", "Is Not Null"].includes(it.operator) &&
-            (it.value == null || it.value == ""),
-        );
-        if (conditionValueFilterError.length) {
-          errors.push(
-            ...conditionValueFilterError.map(
-              (it: any) => `Filter: ${it.column}: Condition value required`,
-            ),
-          );
-        }
       }
-
       // check if query syntax is valid
       if (
         dashboardPanelData.data.queries[

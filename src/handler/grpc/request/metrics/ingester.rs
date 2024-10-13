@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_server::MetricsService, ExportMetricsServiceRequest,
     ExportMetricsServiceResponse,
@@ -23,7 +22,7 @@ use tonic::{Response, Status};
 #[derive(Default)]
 pub struct MetricsIngester;
 
-#[async_trait]
+#[tonic::async_trait]
 impl MetricsService for MetricsIngester {
     async fn export(
         &self,

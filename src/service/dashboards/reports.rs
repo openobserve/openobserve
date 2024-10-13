@@ -35,13 +35,14 @@ use crate::{
                 datetime_now,
                 reports::{
                     HttpReportPayload, Report, ReportDashboard, ReportDestination,
-                    ReportEmailDetails, ReportFrequencyType, ReportTimerangeType,
+                    ReportEmailDetails, ReportFrequencyType, ReportListFilters,
+                    ReportTimerangeType,
                 },
             },
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db,
+    service::{db, short_url},
 };
 
 pub async fn save(
@@ -114,12 +115,14 @@ pub async fn save(
         Err(_) => {
             if !create {
                 return Err(anyhow::anyhow!("Report not found"));
+            } else {
+                report.last_triggered_at = None;
             }
         }
     }
 
-    // Atleast one `ReportDashboard` and `ReportDestination` needs to be present
-    if report.dashboards.is_empty() || report.destinations.is_empty() {
+    // Atleast one `ReportDashboard` needs to be present
+    if report.dashboards.is_empty() {
         return Err(anyhow::anyhow!(
             "Atleast one dashboard/destination is required"
         ));
@@ -179,11 +182,14 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
 
 pub async fn list(
     org_id: &str,
+    filters: ReportListFilters,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Report>, anyhow::Error> {
     match db::dashboards::reports::list(org_id).await {
         Ok(reports) => {
             let mut result = Vec::new();
+            let dashboard = filters.dashboard;
+            let destination_less = filters.destination_less;
             for report in reports {
                 if permitted.is_none()
                     || permitted
@@ -195,7 +201,29 @@ pub async fn list(
                         .unwrap()
                         .contains(&format!("report:_all_{}", org_id))
                 {
-                    result.push(report);
+                    let mut should_include = true;
+                    if let Some(dashboard_id) = dashboard.as_ref() {
+                        // Check if report contains this dashboard
+                        if report
+                            .dashboards
+                            .iter()
+                            .any(|x| !x.dashboard.eq(dashboard_id))
+                        {
+                            should_include = false;
+                        }
+                    }
+                    if let Some(destination_less) = destination_less.as_ref() {
+                        // destination_less = true -> push only if the report is destination-less
+                        // destination_less = false -> push only if the report has destinations
+                        if (*destination_less && !report.destinations.is_empty())
+                            || (!*destination_less && report.destinations.is_empty())
+                        {
+                            should_include = false;
+                        }
+                    }
+                    if should_include {
+                        result.push(report);
+                    }
                 }
             }
             Ok(result)
@@ -265,19 +293,19 @@ impl Report {
         }
 
         let cfg = get_config();
-        if !cfg.common.report_server_url.is_empty() {
-            let mut recepients = vec![];
-            for recepient in &self.destinations {
-                match recepient {
-                    ReportDestination::Email(email) => recepients.push(email.clone()),
-                }
+        let mut recipients = vec![];
+        for recipient in &self.destinations {
+            match recipient {
+                ReportDestination::Email(email) => recipients.push(email.clone()),
             }
-
+        }
+        let no_of_recipients = recipients.len();
+        if !cfg.common.report_server_url.is_empty() {
             let report_data = HttpReportPayload {
                 dashboards: self.dashboards.clone(),
                 email_details: ReportEmailDetails {
                     title: self.title.clone(),
-                    recepients,
+                    recipients,
                     name: self.name.clone(),
                     message: self.message.clone(),
                     dashb_url: format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri),
@@ -323,32 +351,37 @@ impl Report {
                 &cfg.common.report_user_name,
                 &cfg.common.report_user_password,
                 &self.timezone,
+                no_of_recipients,
             )
             .await?;
             self.send_email(&report.0, report.1).await
         }
     }
 
-    /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
+    /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
     async fn send_email(&self, pdf_data: &[u8], dashb_url: String) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         if !cfg.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
-        let mut recepients = vec![];
-        for recepient in &self.destinations {
-            match recepient {
-                ReportDestination::Email(email) => recepients.push(email),
+        let mut recipients = vec![];
+        for recipient in &self.destinations {
+            match recipient {
+                ReportDestination::Email(email) => recipients.push(email),
             }
+        }
+
+        if recipients.is_empty() {
+            return Ok(());
         }
 
         let mut email = Message::builder()
             .from(cfg.smtp.smtp_from_email.parse()?)
             .subject(format!("Openobserve Report - {}", &self.title));
 
-        for recepient in recepients {
-            email = email.to(recepient.parse()?);
+        for recipient in recipients {
+            email = email.to(recipient.parse()?);
         }
 
         if !cfg.smtp.smtp_reply_to.is_empty() {
@@ -389,6 +422,7 @@ async fn generate_report(
     user_id: &str,
     user_pass: &str,
     timezone: &str,
+    no_of_recipients: usize,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
@@ -454,6 +488,11 @@ async fn generate_report(
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
+    let search_type = if no_of_recipients == 0 {
+        "ui"
+    } else {
+        "reports"
+    };
 
     // dashboard link in the email should contain data of the same period as the report
     let (dashb_url, email_dashb_url) = match timerange.range_type {
@@ -461,7 +500,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -511,7 +550,7 @@ async fn generate_report(
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
@@ -545,6 +584,7 @@ async fn generate_report(
 
     if let Err(e) = page.find_element("main").await {
         browser.close().await?;
+        browser.wait().await?;
         handle.await?;
         return Err(anyhow::anyhow!(
             "[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}"
@@ -552,6 +592,7 @@ async fn generate_report(
     }
     if let Err(e) = page.find_element("div.displayDiv").await {
         browser.close().await?;
+        browser.wait().await?;
         handle.await?;
         return Err(anyhow::anyhow!(
             "[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: {e}"
@@ -560,16 +601,30 @@ async fn generate_report(
 
     // Last two elements loaded means atleast the metric components have loaded.
     // Convert the page into pdf
-    let pdf_data = page
-        .pdf(PrintToPdfParams {
+    let pdf_data = if no_of_recipients != 0 {
+        page.pdf(PrintToPdfParams {
             landscape: Some(true),
             ..Default::default()
         })
-        .await?;
+        .await?
+    } else {
+        // No need to capture pdf
+        vec![]
+    };
 
     browser.close().await?;
+    browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
+
+    // convert to short_url
+    let email_dashb_url = match short_url::shorten(&email_dashb_url).await {
+        Ok(short_url) => short_url,
+        Err(e) => {
+            log::error!("Error shortening email dashboard url: {e}");
+            email_dashb_url
+        }
+    };
     Ok((pdf_data, email_dashb_url))
 }
 

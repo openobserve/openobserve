@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{RwAHashMap, RwHashMap};
 use dashmap::DashMap;
 use hashbrown::HashMap;
+use infra::short_url::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use vector_enrichment::TableRegistry;
@@ -84,3 +85,4 @@ pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static STREAM_PIPELINES: Lazy<RwHashMap<String, PipeLine>> = Lazy::new(DashMap::default);
+pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);

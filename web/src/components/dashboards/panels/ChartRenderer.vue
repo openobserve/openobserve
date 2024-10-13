@@ -233,7 +233,7 @@ export default defineComponent({
       }
 
       // set current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName);
+      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName ?? "");
 
       // Below logic is to scroll legend upto current series index
       // which creates wrong legend highlight issue in tooltip
@@ -292,7 +292,7 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
-      // we need that toolbox datazoom button initally selected
+      // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
         key: "dataZoomSelect",
@@ -316,9 +316,9 @@ export default defineComponent({
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
-      chart?.on("downplay", (params: any) => {
+      chart?.on("highlight", (params: any) => {
         // reset hovered series name on downplay
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
+        // hoveredSeriesState?.value?.setHoveredSeriesName("");
 
         // downplay event will only called by currently hovered panel else it will go into infinite loop
         // and chart must be timeseries chart
@@ -374,7 +374,7 @@ export default defineComponent({
       window.removeEventListener("resize", windowResizeEventCallback);
       window.addEventListener("resize", windowResizeEventCallback);
 
-      // we need that toolbox datazoom button initally selected
+      // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
         key: "dataZoomSelect",
@@ -545,7 +545,7 @@ export default defineComponent({
     onActivated(() => {
       windowResizeEventCallback();
 
-      // we need that toolbox datazoom button initally selected
+      // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
         key: "dataZoomSelect",
@@ -563,7 +563,7 @@ export default defineComponent({
             chart?.setOption(props?.data?.options || {}, true);
           } catch (error) {}
 
-          // we need that toolbox datazoom button initally selected
+          // we need that toolbox datazoom button initially selected
           // for that we required to dispatch an event
           // while dispatching an event we need to pass a datazoomselectactive as true
           // this action is available in the echarts docs in list of brush actions

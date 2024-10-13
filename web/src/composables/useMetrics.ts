@@ -17,7 +17,7 @@ import { cloneDeep } from "lodash-es";
 import { reactive, ref } from "vue";
 
 const defaultObject = {
-  organizationIdetifier: "",
+  organizationIdentifier: "",
   runQuery: false,
   loading: false,
 

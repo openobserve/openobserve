@@ -21,7 +21,7 @@ use std::{
 use config::{
     ider,
     meta::{
-        cluster::RoleGroup,
+        cluster::{get_internal_grpc_token, RoleGroup},
         search::ScanStats,
         stream::StreamType,
         usage::{RequestStats, UsageType},
@@ -34,7 +34,6 @@ use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    transport::Channel,
     Request,
 };
 use tracing::{info_span, Instrument};
@@ -43,6 +42,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster,
     service::{
+        grpc::get_cached_channel,
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
         search::{server_internal_error, MetadataMap},
         usage::report_request_usage_stats,
@@ -60,7 +60,6 @@ pub async fn search(
 ) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::User as _;
     req.timeout = timeout;
     search_in_cluster(req, user_email).await
 }
@@ -133,11 +132,7 @@ async fn search_in_cluster(
             partition: node.id as _,
             ..job.clone()
         });
-        let mut req = cluster_rpc::MetricsQueryRequest {
-            job,
-            stype: cluster_rpc::SearchType::Cluster as _,
-            ..req.clone()
-        };
+        let mut req = cluster_rpc::MetricsQueryRequest { job, ..req.clone() };
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
@@ -165,7 +160,7 @@ async fn search_in_cluster(
                     .parse()
                     .map_err(|_| Error::Message(format!("invalid org_id: {}", req.org_id)))?;
                 let mut request = tonic::Request::new(req);
-                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -175,26 +170,20 @@ async fn search_in_cluster(
                 });
 
                 let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
-                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "promql->search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
-
-                    let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
-                        channel,
-                        move |mut req: Request<()>| {
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
+                let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
                         req.metadata_mut()
                             .insert(org_header_key.clone(), org_id.clone());

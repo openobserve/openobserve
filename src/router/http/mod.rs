@@ -158,10 +158,23 @@ async fn dispatch(
     }
 
     // send query
-    let resp = client
-        .request_from(new_url.value.clone(), req.head())
-        .send_stream(payload)
-        .await;
+    let cfg = get_config();
+    let resp = if cfg.route.connection_pool_disabled {
+        let client = awc::Client::builder()
+            .timeout(std::time::Duration::from_secs(cfg.route.timeout))
+            .disable_redirects()
+            .finish();
+        client
+            .request_from(new_url.value.clone(), req.head())
+            .insert_header((awc::http::header::CONNECTION, "close"))
+            .send_stream(payload)
+            .await
+    } else {
+        client
+            .request_from(new_url.value.clone(), req.head())
+            .send_stream(payload)
+            .await
+    };
     if let Err(e) = resp {
         log::error!(
             "dispatch: {}, error: {}, took: {} ms",

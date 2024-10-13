@@ -31,6 +31,11 @@ async function login(page) {
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
     waitUntil: "networkidle",
   });
+  await page
+  .locator('[data-test="navbar-organizations-select"]')
+  .getByText("arrow_drop_down")
+  .click();
+await page.getByRole("option", { name: "default", exact: true }).click();
 }
 
 async function ingestion(page) {
@@ -112,7 +117,7 @@ test.describe("dashboard UI testcases", () => {
     await orgNavigation;
   });
 
-  test("should create a new dashboar", async ({ page }) => {
+  test("should create a new dashboard", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -1055,29 +1060,25 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_host"] [data-test="dashboard-add-filter-data"]'
       )
       .click();
-    await page
-      .locator('[data-test="dashboard-filter-item-kubernetes_host"]')
-      .click();
-    await page.getByText("Condition").click();
-    await page
-      .locator('[data-test="dashboard-filter-condition-panel"]')
-      .getByText("arrow_drop_down")
-      .click();
+ 
+      await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+      await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+
+
+      await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+
     await page.getByRole("option", { name: "Is Null" }).click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(200);
 
-    // Apply "=" filter
-    await page
-      .locator('[data-test="dashboard-filter-item-kubernetes_host"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-filter-condition-panel"]')
-      .getByText("arrow_drop_down")
-      .click();
+    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+    await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+
+
     await page.getByRole("option", { name: "=", exact: true }).click();
     await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("kubernetes_docker_Id");
+    await page.getByLabel("Value").fill("kubernetes_docker_id");
     await page.locator('[data-test="dashboard-apply"]').click();
 
     // Apply "Is Not Null" filter
@@ -1088,13 +1089,10 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
 
-    await page
-      .locator('[data-test="dashboard-filter-item-kubernetes_host"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-filter-condition-panel"]')
-      .getByText("arrow_drop_down")
-      .click();
+    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
+    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
+    await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+
     await page.getByText("Is Not Null").click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);

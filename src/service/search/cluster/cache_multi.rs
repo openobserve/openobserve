@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use std::str::FromStr;
+
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, QueryCacheRequest};
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::meta::search::{CacheQueryRequest, CachedQueryResponse},
-    service::search::infra_cluster,
+    common::meta::search::{CacheQueryRequest, CachedQueryResponse, ResultCacheSelectionStrategy},
+    service::{
+        grpc::get_cached_channel,
+        search::{infra_cluster, server_internal_error},
+    },
 };
 
 #[tracing::instrument(name = "service:search:cluster:cacher:get_cached_results", skip_all)]
@@ -81,29 +86,24 @@ pub async fn get_cached_results(
                     is_descending:cache_req.is_descending,
                 };
 
-                let request = tonic::Request::new(req);
-
+                let mut request = tonic::Request::new(req);
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
                 log::info!(
                     "[trace_id {trace_id}] get_cached_results->grpc: request node: {}",
                     &node_addr
                 );
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        super::super::server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "[trace_id {trace_id}] get_cached_results->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client =
                     cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
                         channel,
@@ -226,11 +226,11 @@ pub async fn get_cached_results(
         all_results.extend(res);
     }
     let mut results = Vec::new();
-    recursive_process_muliple_metas(&all_results, cache_req.clone(), &mut results);
+    recursive_process_multiple_metas(&all_results, cache_req.clone(), &mut results);
     results
 }
 
-fn recursive_process_muliple_metas(
+fn recursive_process_multiple_metas(
     cache_metas: &[CachedQueryResponse],
     cache_req: CacheQueryRequest,
     results: &mut Vec<CachedQueryResponse>,
@@ -238,6 +238,10 @@ fn recursive_process_muliple_metas(
     if cache_metas.is_empty() {
         return;
     }
+    let selection_strategy: ResultCacheSelectionStrategy = ResultCacheSelectionStrategy::from_str(
+        &get_config().common.result_cache_selection_strategy,
+    )
+    .unwrap_or_default();
 
     // Filter relevant metas that are within the overall query range
     let relevant_metas: Vec<_> = cache_metas
@@ -254,10 +258,11 @@ fn recursive_process_muliple_metas(
     sorted_metas.sort_by_key(|m| m.response_start_time);
 
     // Find the largest overlapping meta within the query time range
-    if let Some(largest_meta) = sorted_metas.clone().iter().max_by_key(|meta| {
-        meta.response_end_time.min(cache_req.q_end_time)
-            - meta.response_start_time.max(cache_req.q_start_time)
-    }) {
+    if let Some(largest_meta) = sorted_metas
+        .clone()
+        .iter()
+        .max_by_key(|meta| select_cache_meta(meta, &cache_req, &selection_strategy))
+    {
         results.push(largest_meta.clone());
 
         // Filter out the largest meta and call recursively with non-overlapping metas
@@ -273,6 +278,32 @@ fn recursive_process_muliple_metas(
         if remaining_metas.is_empty() {
             return;
         }
-        recursive_process_muliple_metas(&remaining_metas, cache_req, results);
+        recursive_process_multiple_metas(&remaining_metas, cache_req, results);
+    }
+}
+
+fn select_cache_meta(
+    meta: &CachedQueryResponse,
+    req: &CacheQueryRequest,
+    strategy: &ResultCacheSelectionStrategy,
+) -> i64 {
+    match strategy {
+        ResultCacheSelectionStrategy::Overlap => {
+            let overlap_start = meta.response_start_time.max(req.q_start_time);
+            let overlap_end = meta.response_end_time.min(req.q_end_time);
+            overlap_end - overlap_start
+        }
+        ResultCacheSelectionStrategy::Duration => meta.response_end_time - meta.response_start_time,
+        ResultCacheSelectionStrategy::Both => {
+            let overlap_start = req.q_start_time.max(meta.response_start_time);
+            let overlap_end = req.q_end_time.min(meta.response_end_time);
+            let overlap_duration = overlap_end - overlap_start;
+            let cache_duration = meta.response_end_time - meta.response_start_time;
+            if cache_duration > 0 {
+                (overlap_duration * 100) / cache_duration
+            } else {
+                0
+            }
+        }
     }
 }

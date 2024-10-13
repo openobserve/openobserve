@@ -34,9 +34,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::{self, file_data::disk::FileType},
     file_list,
-    schema::{
-        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
-    },
+    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -112,6 +110,8 @@ struct ConfigResponse<'a> {
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
     all_fields_name: String,
+    usage_enabled: bool,
+    usage_publish_interval: i64,
 }
 
 #[derive(Serialize)]
@@ -133,7 +133,7 @@ struct Rum {
     path = "/healthz",
     tag = "Meta",
     responses(
-        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
     )
 )]
 #[get("/healthz")]
@@ -148,8 +148,8 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     path = "/schedulez",
     tag = "Meta",
     responses(
-        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
-        (status = 404, description="Staus Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
+        (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
+        (status = 404, description="Status Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
     )
 )]
 #[get("/schedulez")]
@@ -269,6 +269,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         all_fields_name: cfg.common.column_all.to_string(),
+        usage_enabled: cfg.common.usage_enabled,
+        usage_publish_interval: cfg.common.usage_publish_interval,
     }))
 }
 
@@ -328,6 +330,9 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
     );
 
+    let consistent_hashing = cluster::print_consistent_hash().await;
+    stats.insert("CONSISTENT_HASHING", json::json!(consistent_hashing));
+
     Ok(HttpResponse::Ok().json(stats))
 }
 
@@ -338,7 +343,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
     }
-    let status = "succcessfully reloaded config";
+    let status = "successfully reloaded config";
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
@@ -684,6 +689,10 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
         None => false,
     };
     node.scheduled = enable;
+    if !node.scheduled {
+        // release all the searching files
+        crate::common::infra::wal::clean_lock_files();
+    }
     match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
@@ -696,19 +705,11 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
     };
 
+    // release all the searching files
+    crate::common::infra::wal::clean_lock_files();
+
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
-}
-
-#[get("/stream_fields/{org_id}/{stream_type}/{stream_name}")]
-async fn stream_fields(path: web::Path<(String, String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, stream_type, stream_name) = path.into_inner();
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let r = STREAM_SCHEMAS_FIELDS.read().await;
-    Ok(MetaHttpResponse::json(match r.get(&key) {
-        Some((updated, fields)) => json::json!({"updated_at": *updated, "fields": fields}),
-        None => json::json!({"updated_at": 0, "fields": []}),
-    }))
 }

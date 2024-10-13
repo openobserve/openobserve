@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-else>
+
               <scheduled-alert
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
@@ -190,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :alertData="formData"
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
                 :vrlFunctionError="vrlFunctionError"
+                :showTimezoneWarning="showTimezoneWarning"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
@@ -198,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:promql_condition="
                   formData.query_condition.promql_condition
                 "
+                v-model:multi_time_range ="formData.query_condition.multi_time_range"
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
@@ -206,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @input:update="onInputUpdate"
                 @validate-sql="validateSqlQuery"
                 @update:showVrlFunction="updateFunctionVisibility"
+                @update:multi_time_range="updateMultiTimeRange"
                 class="q-mt-sm"
               />
             </div>
@@ -322,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-list dense>
                       <q-item
                         tag="label"
-                        :data-test="`add-alert-detination-${option.opt}-select-item`"
+                        :data-test="`add-alert-destination-${option.opt}-select-item`"
                       >
                         <q-item-section avatar>
                           <q-checkbox
@@ -457,6 +461,7 @@ import {
   b64EncodeUnicode,
   b64DecodeUnicode,
   isValidResourceName,
+  getTimezonesByOffset,
 } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
@@ -465,6 +470,7 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import { convertDateToTimestamp } from "@/utils/date";
 
 const defaultValue: any = () => {
   return {
@@ -496,6 +502,7 @@ const defaultValue: any = () => {
       },
       promql_condition: null,
       vrl_function: null,
+      multi_time_range:[],
     },
     trigger_condition: {
       period: 10,
@@ -505,6 +512,7 @@ const defaultValue: any = () => {
       threshold: 3,
       silence: 10,
       frequency_type: "minutes",
+      timezone: "UTC",
     },
     destinations: [],
     context_attributes: {},
@@ -605,6 +613,8 @@ export default defineComponent({
 
     const vrlFunctionError = ref("");
 
+    const showTimezoneWarning = ref(false);
+
     onBeforeMount(async () => {
       await importSqlParser();
       await getAllFunctions();
@@ -628,7 +638,7 @@ export default defineComponent({
       return formData.value.stream_type && formData.value.stream_name;
     });
 
-    const updateCondtions = (e: any) => {
+    const updateConditions = (e: any) => {
       try {
         const ast = parser.astify(e.target.value);
         if (ast) sqlAST.value = ast;
@@ -821,7 +831,7 @@ export default defineComponent({
       }
     };
 
-    const getFromattedCondition = (
+    const getFormattedCondition = (
       column: string,
       operator: string,
       value: number | string,
@@ -869,7 +879,7 @@ export default defineComponent({
                 ? condition.value
                 : `'${condition.value}'`;
 
-            return getFromattedCondition(
+            return getFormattedCondition(
               condition.column,
               condition.operator,
               value,
@@ -883,7 +893,7 @@ export default defineComponent({
 
       if (!isAggregationEnabled.value) {
         query +=
-          ` COUNT(*) as zo_sql_val FROM ${formData.value.stream_name} ` +
+          ` COUNT(*) as zo_sql_val FROM \"${formData.value.stream_name}\" ` +
           whereClause +
           " GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
       } else {
@@ -919,18 +929,18 @@ export default defineComponent({
         if (isAggValid) {
           if (percentileFunctions[aggFn]) {
             query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
+              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
               whereClause +
               ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
           } else {
             query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
+              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
               whereClause +
               ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
           }
         } else {
           query +=
-            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
+            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
             whereClause +
             ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
         }
@@ -1119,6 +1129,9 @@ export default defineComponent({
 
       delete query.aggs;
 
+      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
+      query.query.start_time = query.query.start_time + 780000000;
+
       query.query.sql = formData.value.query_condition.sql;
 
       if (formData.value.query_condition.vrl_function)
@@ -1174,6 +1187,11 @@ export default defineComponent({
         vrlFunctionError.value = "";
       }
     };
+    const updateMultiTimeRange = (value : any) =>{
+      if(value){
+        formData.value.query_condition.multi_time_range = value;
+      }
+    }
 
     return {
       t,
@@ -1193,7 +1211,7 @@ export default defineComponent({
       selectedRelativePeriod,
       relativePeriods,
       editorUpdate,
-      updateCondtions,
+      updateConditions,
       updateStreamFields,
       updateEditorContent,
       triggerCols,
@@ -1235,6 +1253,10 @@ export default defineComponent({
       sqlQueryErrorMsg,
       vrlFunctionError,
       updateFunctionVisibility,
+      convertDateToTimestamp,
+      getTimezonesByOffset,
+      showTimezoneWarning,
+      updateMultiTimeRange,
     };
   },
 
@@ -1256,6 +1278,19 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+
+      if (!this.formData.trigger_condition?.timezone) {
+        if (this.formData.tz_offset === 0) {
+          this.formData.trigger_condition.timezone = "UTC";
+        } else {
+          this.getTimezonesByOffset(this.formData.tz_offset).then(
+            (res: any) => {
+              if (res.length > 1) this.showTimezoneWarning = true;
+              this.formData.trigger_condition.timezone = res[0];
+            },
+          );
+        }
+      }
 
       if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
@@ -1330,7 +1365,30 @@ export default defineComponent({
         this.formData.is_real_time == "false" &&
         this.formData.trigger_condition.frequency_type == "cron"
       ) {
-        this.formData.tz_offset = this.getTimezoneOffset();
+        const now = new Date();
+
+        // Get the day, month, and year from the date object
+        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+        const year = now.getFullYear();
+
+        // Combine them in the DD-MM-YYYY format
+        const date = `${day}-${month}-${year}`;
+
+        // Get the hours and minutes, ensuring they are formatted with two digits
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+
+        // Combine them in the HH:MM format
+        const time = `${hours}:${minutes}`;
+
+        const convertedDateTime = this.convertDateToTimestamp(
+          date,
+          time,
+          this.formData.trigger_condition.timezone,
+        );
+
+        this.formData.tz_offset = convertedDateTime.offset;
       }
 
       this.addAlertForm.validate().then(async (valid: any) => {
