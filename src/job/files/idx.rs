@@ -157,7 +157,8 @@ fn generate_prefixed_batches(
             .downcast_ref::<StringArray>()
             .unwrap();
         for (idx, field) in schema.fields().iter().enumerate() {
-            match field.data_type() {
+            let field_type = field.data_type();
+            match field_type {
                 DataType::Utf8 => {
                     let col = if idx == term_idx {
                         col_term
@@ -178,7 +179,7 @@ fn generate_prefixed_batches(
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
                             .entry(idx)
-                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                            .or_insert_with(|| make_builder(field_type, row_count));
                         let b = builder
                             .as_any_mut()
                             .downcast_mut::<StringBuilder>()
@@ -202,7 +203,7 @@ fn generate_prefixed_batches(
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
                             .entry(idx)
-                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                            .or_insert_with(|| make_builder(field_type, row_count));
                         let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
                         b.append_value(col.value(i));
                     }
@@ -223,7 +224,7 @@ fn generate_prefixed_batches(
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
                             .entry(idx)
-                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                            .or_insert_with(|| make_builder(field_type, row_count));
                         let b = builder
                             .as_any_mut()
                             .downcast_mut::<BooleanBuilder>()
@@ -247,7 +248,7 @@ fn generate_prefixed_batches(
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
                             .entry(idx)
-                            .or_insert_with(|| make_builder(field.data_type(), row_count));
+                            .or_insert_with(|| make_builder(field_type, row_count));
                         let b = builder
                             .as_any_mut()
                             .downcast_mut::<BinaryBuilder>()
@@ -256,7 +257,7 @@ fn generate_prefixed_batches(
                     }
                 }
                 _ => {
-                    unreachable!()
+                    return Err(anyhow::anyhow!("unsupported data type: {:?}", field_type));
                 }
             }
         }
@@ -353,7 +354,7 @@ fn generate_prefixed_batches(
                     }
                 }
                 _ => {
-                    unreachable!()
+                    return Err(anyhow::anyhow!("unsupported data type: {:?}", field_type));
                 }
             }
         }
