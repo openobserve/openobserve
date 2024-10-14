@@ -563,10 +563,11 @@ export default defineComponent({
     font-size: 22px;
     height: 29px;
 
-    :deep(.block) {
+    ::v-deep .block {
       font-size: 12px;
     }
-    :deep(.q-icon) {
+
+    ::v-deep .q-icon {
       margin-right: 4px;
     }
   }
