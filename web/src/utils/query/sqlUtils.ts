@@ -406,10 +406,10 @@ function parseCondition(condition: any) {
         };
       }
     } else if (condition.type === "function") {
-      let conditionName = condition?.name?.name[0]?.value?.toLowerCase();
+      const conditionName = condition?.name?.name[0]?.value?.toLowerCase();
 
       // function with field name and value
-      let conditionsWithFieldName = [
+      const conditionsWithFieldName = [
         "str_match",
         "str_match_ignore_case",
         "re_match",
@@ -417,7 +417,7 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      let conditionsWithoutFieldName = [
+      const conditionsWithoutFieldName = [
         "match_all",
         "match_all_raw",
         "match_all_raw_ignore_case",

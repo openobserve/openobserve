@@ -665,7 +665,7 @@ export default defineComponent({
         message: "Span ID copied to clipboard",
         timeout: 2000,
       });
-      copyToClipboard(props.span.spanId);
+      copyToClipboard(props.span.span_id);
     };
 
     const toggleLinks = () => {
