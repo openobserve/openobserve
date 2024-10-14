@@ -201,6 +201,18 @@ pub async fn delete_by_date(
     drop(locker);
     ret?;
 
+    // same date, just mark delete done
+    if date_range.0 == date_range.1 {
+        // mark delete done
+        return db::compact::retention::delete_stream_done(
+            org_id,
+            stream_type,
+            stream_name,
+            Some(date_range),
+        )
+        .await;
+    }
+
     let mut date_start =
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc);
     let date_end =
