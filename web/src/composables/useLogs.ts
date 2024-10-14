@@ -3709,6 +3709,7 @@ const useLogs = () => {
       if(router.currentRoute.value.query.hasOwnProperty("type") &&  router.currentRoute.value.query.type == "search_history_re_apply"){
        delete router.currentRoute.value.query.type;
         }   
+
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -4221,6 +4222,7 @@ const useLogs = () => {
     validateFilterForMultiStream,
     cancelQuery,
     reorderSelectedFields,
+    extractTimestamps,
   };
 };
 
