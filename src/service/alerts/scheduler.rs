@@ -838,45 +838,45 @@ async fn handle_derived_stream_triggers(
                 ingestion_error_msg = Some(err_msg);
             }
 
-            // Ingest result into destination stream
-            if ingestion_error_msg.is_none() {
-                for (dest_stream, records) in json_data_by_stream {
-                    let (org_id, stream_name, stream_type): (String, String, i32) = {
-                        (
-                            dest_stream.org_id.into(),
-                            dest_stream.stream_name.into(),
-                            cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
-                        )
-                    };
-                    let req = cluster_rpc::IngestionRequest {
-                        org_id: org_id.clone(),
-                        stream_name: stream_name.clone(),
-                        stream_type,
-                        data: Some(cluster_rpc::IngestionData::from(records)),
-                        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                    };
-                    match ingestion_service::ingest(&org_id, req).await {
-                        Ok(resp) if resp.status_code == 200 => {
-                            log::info!(
-                                "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
-                            );
-                        }
-                        error => {
-                            let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                            log::error!(
-                                "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
-                                err,
-                                new_trigger.org,
-                                new_trigger.module_key
-                            );
-                            ingestion_error_msg = Some(err);
-                            break;
-                        }
-                    };
-                }
-            }
             match ingestion_error_msg {
-                None => db::scheduler::update_trigger(new_trigger).await?,
+                None => {
+                    // Ingest result into destination stream
+                    for (dest_stream, records) in json_data_by_stream {
+                        let (org_id, stream_name, stream_type): (String, String, i32) = {
+                            (
+                                dest_stream.org_id.into(),
+                                dest_stream.stream_name.into(),
+                                cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
+                            )
+                        };
+                        let req = cluster_rpc::IngestionRequest {
+                            org_id: org_id.clone(),
+                            stream_name: stream_name.clone(),
+                            stream_type,
+                            data: Some(cluster_rpc::IngestionData::from(records)),
+                            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                        };
+                        match ingestion_service::ingest(&org_id, req).await {
+                            Ok(resp) if resp.status_code == 200 => {
+                                log::info!(
+                                    "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
+                                );
+                            }
+                            error => {
+                                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                                log::error!(
+                                    "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
+                                    err,
+                                    new_trigger.org,
+                                    new_trigger.module_key
+                                );
+                                ingestion_error_msg = Some(err);
+                                break;
+                            }
+                        };
+                    }
+                    db::scheduler::update_trigger(new_trigger).await?
+                }
                 Some(err) => {
                     if trigger.retries + 1 >= cfg.limit.scheduler_max_retries {
                         // It has been tried the maximum time, just update the
