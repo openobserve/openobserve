@@ -1008,6 +1008,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-addpanel-config-time-shift-add-btn"
       />
     </div>
+
+    <div class="space"></div>
+    <ColorPaletteDropDown v-if="dashboardPanelData.data.type != 'metric'" />
+    <div class="space"></div>
   </div>
 </template>
 
@@ -1020,6 +1024,7 @@ import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 
 export default defineComponent({
   components: {
@@ -1028,6 +1033,7 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    ColorPaletteDropDown,
   },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
