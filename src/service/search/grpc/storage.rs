@@ -633,22 +633,34 @@ async fn filter_file_list_by_inverted_index(
 }
 
 /// Fetches the file from cache if it exists, otherwise fetch from storage
-async fn fetch_file(file_name: &str) -> anyhow::Result<Vec<u8>> {
+async fn fetch_file(trace_id: &str, file_name: &str) -> anyhow::Result<Vec<u8>> {
     // first get from memory cache
     if file_data::memory::exist(file_name).await {
+        log::info!(
+            "[trace_id {}] search->storage: Fetching from memory cache",
+            trace_id,
+        );
         return file_data::memory::get(file_name, None)
             .await
             .map(|bytes| bytes.to_vec())
             .ok_or(anyhow::anyhow!("memory cache get failed"));
     }
+    // check disk next
     if file_data::disk::exist(file_name).await {
-        // check disk next
+        log::info!(
+            "[trace_id {}] search->storage: Fetching from Disk",
+            trace_id,
+        );
         return file_data::disk::get(file_name, None)
             .await
             .map(|bytes| bytes.to_vec())
             .ok_or(anyhow::anyhow!("disk cache get failed"));
     }
     // finally get from storage
+    log::info!(
+        "[trace_id {}] search->storage: Fetching from Object Store",
+        trace_id,
+    );
     storage::get(file_name).await.map(|bytes| bytes.to_vec())
 }
 
@@ -669,12 +681,13 @@ async fn search_tantivy_index(
     };
 
     let puffin_dir = {
-        let index_file_bytes = fetch_file(&tantivy_index_file_name).await?;
+        let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
         PuffinDirectory::from_bytes(Cursor::new(index_file_bytes)).await?
     };
 
-    convert_puffin_dir_to_tantivy_dir(PathBuf::from(tantivy_index_file_name), puffin_dir.clone());
-    // let tantivy_dir_real_path = format!("{}/{}", &cfg.common.data_stream_dir, tantivy_dir);
+    // convert_puffin_dir_to_tantivy_dir(PathBuf::from(tantivy_index_file_name),
+    // puffin_dir.clone()); let tantivy_dir_real_path = format!("{}/{}",
+    // &cfg.common.data_stream_dir, tantivy_dir);
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader().unwrap();
@@ -786,7 +799,7 @@ async fn inverted_index_search_in_file(
             parquet_file_name
         ));
     };
-    let compressed_index_blob = match fetch_file(&index_file_name).await {
+    let compressed_index_blob = match fetch_file(trace_id, &index_file_name).await {
         Err(e) => {
             log::warn!(
                 "[trace_id {trace_id}] search->storage: Unable to load corresponding FST index

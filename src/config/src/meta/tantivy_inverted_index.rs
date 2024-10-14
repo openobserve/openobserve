@@ -7,6 +7,7 @@ use std::{
 use ahash::HashSet;
 use anyhow::{Context, Result};
 use futures::{AsyncRead, AsyncSeek};
+use itertools::Itertools;
 use tantivy::{
     directory::{error::OpenReadError, Directory, RamDirectory, WatchCallback, WatchHandle},
     doc,
@@ -25,6 +26,7 @@ const TANTIVY_INDEX_VERSION: &str = "TIIv0.1.0";
 
 // We do not need all of the tantivy files, only the .term and .idx files
 // for getting doc IDs and also the meta.json file
+// This might change in the future when we add more features to the index
 const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos"];
 const META_JSON: &str = "meta.json";
 
@@ -111,12 +113,12 @@ impl PuffinDirectory {
         }
     }
 
-    pub fn list_files(&self) -> Vec<String> {
+    pub fn list_files(&self) -> Vec<PathBuf> {
         self.file_paths
             .read()
             .expect("poisoned lock")
             .iter()
-            .map(|path| path.to_str().unwrap().to_string())
+            .cloned()
             .collect()
     }
 
@@ -124,26 +126,29 @@ impl PuffinDirectory {
     pub fn to_puffin_bytes(&self) -> Result<Vec<u8>> {
         let mut puffin_buf: Vec<u8> = Vec::new();
         let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
+        let empty_puffin_dir = &EMPTY_PUFFIN_DIRECTORY;
+        let mut segment_id = String::new();
 
         let file_paths = self.file_paths.read().expect("poisoned lock");
-        let filtered_file_paths: Vec<&PathBuf> = file_paths
-            .iter()
-            .filter(|path| {
-                let mut allowed = false;
-                if let Some(path_ext) = path.extension() {
-                    if ALLOWED_FILE_EXT.contains(&path_ext.to_str().unwrap()) {
-                        allowed = true;
-                    }
-                }
-
-                // check if its meta.json file
-                if !allowed && path.to_str().unwrap() == META_JSON {
+        let allowed_file_paths = file_paths.iter().filter(|path| {
+            let mut allowed = false;
+            if let Some(path_ext) = path.extension() {
+                if ALLOWED_FILE_EXT.contains(&path_ext.to_str().unwrap()) {
                     allowed = true;
-                };
-                allowed
-            })
-            .collect();
-        for path in filtered_file_paths.iter() {
+                }
+            }
+
+            // check if its meta.json file
+            if !allowed && path.to_str().unwrap() == META_JSON {
+                allowed = true;
+            };
+            allowed
+        });
+        for path in allowed_file_paths.clone() {
+            if segment_id.is_empty() && path.extension().is_some_and(|ext| ext != "json") {
+                segment_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
+            }
+
             let file_data = self.ram_directory.open_read(path)?;
             log::debug!(
                 "Serializing file to puffin: len: {}, path: {}",
@@ -163,6 +168,47 @@ impl PuffinDirectory {
                 .context("Failed to add blob")?;
         }
 
+        let allowed_file_paths = allowed_file_paths.collect_vec();
+        // find the files which are present in the empty puffin dir instance and write them
+        // to the new puffin directory
+        for file in empty_puffin_dir
+            .list_files()
+            .iter()
+            .filter(|file_name| !file_name.extension().is_some_and(|ext| ext == "json"))
+        {
+            let mut empty_puffin_dir_path = PathBuf::from(&file);
+
+            // convert the empty puffin dir path to match the current dir file names
+            let ext = empty_puffin_dir_path.extension().unwrap().to_str().unwrap();
+            empty_puffin_dir_path.set_file_name(format!("{}.{}", segment_id, ext));
+
+            // we skip the files which are already added
+            if allowed_file_paths.contains(&&empty_puffin_dir_path) {
+                continue;
+            }
+
+            let path = PathBuf::from(&file);
+            let file_data = empty_puffin_dir.open_read(&path)?;
+
+            log::debug!(
+                "Substituting file for puffin dir: len: {}, path: {}",
+                file_data.len(),
+                path.to_str().unwrap()
+            );
+
+            puffin_writer
+                .add_blob(
+                    file_data
+                        .read_bytes()
+                        .expect("failed to read file")
+                        .to_vec(),
+                    TANTIVY_INDEX_VERSION.to_string(),
+                    empty_puffin_dir_path.to_str().unwrap().to_owned(),
+                    false,
+                )
+                .context("Failed to add blob")?;
+        }
+
         puffin_writer.finish().context("Failed to finish writing")?;
         Ok(puffin_buf)
     }
@@ -172,7 +218,6 @@ impl PuffinDirectory {
     where
         R: AsyncRead + AsyncSeek + Unpin + Send,
     {
-        let empty_puffin_dir = &EMPTY_PUFFIN_DIRECTORY;
         let mut puffin_reader = PuffinBytesReader::new(data);
         let puffin_dir = PuffinDirectory::new();
 
@@ -181,16 +226,11 @@ impl PuffinDirectory {
             .await
             .context("Failed to get blobs meta")?;
 
-        let mut segment_id = String::new();
         for blob_meta in puffin_meta.blob_metadata {
             let blob = puffin_reader.read_blob_bytes(&blob_meta).await?;
             // Fetch the files names from the blob_meta itself
             if let Some(file_name) = blob_meta.properties.get("file_name") {
                 let path = PathBuf::from(file_name);
-                // get the segment ID from the current blob, ignore metadata files
-                if segment_id.is_empty() && !file_name.contains("json") {
-                    segment_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
-                }
                 let mut writer = puffin_dir
                     .open_write(&path)
                     .context("Failed to write to RAM directory")?;
@@ -198,37 +238,6 @@ impl PuffinDirectory {
                 writer.flush()?;
                 puffin_dir.add_file_path(path);
             }
-        }
-
-        // find the files which are present in the empty puffin dir instance and write them
-        // to the new puffin directory
-        for file in empty_puffin_dir
-            .list_files()
-            .iter()
-            .filter(|file_name| !file_name.contains("json"))
-        {
-            let mut empty_puffin_dir_path = PathBuf::from(&file);
-
-            // convert the empty puffin dir path to match the current dir file names
-            let ext = empty_puffin_dir_path.extension().unwrap().to_str().unwrap();
-            empty_puffin_dir_path.set_file_name(format!("{}.{}", segment_id, ext));
-
-            if puffin_dir.exists(&empty_puffin_dir_path)? {
-                continue;
-            }
-            let path = PathBuf::from(&file);
-            let data = empty_puffin_dir.open_read(&path)?;
-
-            log::debug!(
-                "Substituting file for puffin dir: len: {}, path: {}",
-                data.len(),
-                path.to_str().unwrap()
-            );
-
-            // open the file with corresponding segment id and extension
-            let mut writer = puffin_dir.open_write(&empty_puffin_dir_path)?;
-            writer.write_all(&data.read_bytes()?)?;
-            writer.flush()?;
         }
         Ok(puffin_dir)
     }

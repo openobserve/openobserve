@@ -172,7 +172,7 @@ impl PuffinFooterWriter {
         buf.extend_from_slice(&(payload_size as i32).to_le_bytes());
 
         // flags
-        buf.extend_from_slice(&PuffinFooterFlags::COMPRESSED_ZSTD.bits().to_le_bytes());
+        buf.extend_from_slice(&PuffinFooterFlags::DEFAULT.bits().to_le_bytes());
 
         // FootMagic
         buf.extend_from_slice(&MAGIC);
