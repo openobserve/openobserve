@@ -411,7 +411,7 @@ import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
-import { formatTimeWithSuffix, converTimeFromNsToMs } from "@/utils/zincutils";
+import { formatTimeWithSuffix, convertTimeFromNsToMs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 
@@ -653,7 +653,7 @@ export default defineComponent({
 
     const getStartTime = computed(() => {
       return (
-        converTimeFromNsToMs(props.span.start_time) -
+        convertTimeFromNsToMs(props.span.start_time) -
         (props.baseTracePosition?.startTimeMs || 0) +
         "ms"
       );
@@ -682,8 +682,8 @@ export default defineComponent({
         stream: router.currentRoute.value.query.stream,
         trace_id: link.context.traceId,
         span_id: link.context.spanId,
-        from: converTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
-        to: converTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
+        from: convertTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
+        to: convertTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
         org_identifier: store.state.selectedOrganization.identifier,
       };
 

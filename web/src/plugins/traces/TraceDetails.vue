@@ -314,7 +314,7 @@ import { useStore } from "vuex";
 import {
   formatTimeWithSuffix,
   getImageURL,
-  converTimeFromNsToMs,
+  convertTimeFromNsToMs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -1094,9 +1094,9 @@ export default defineComponent({
       });
     };
 
-    const openTraceLink = () => {
+    const openTraceLink = async () => {
       resetTraceDetails();
-      setupTraceDetails();
+      await setupTraceDetails();
     };
 
     return {
@@ -1144,7 +1144,7 @@ export default defineComponent({
       backgroundStyle,
       routeToTracesList,
       openTraceLink,
-      converTimeFromNsToMs,
+      convertTimeFromNsToMs,
     };
   },
 });
