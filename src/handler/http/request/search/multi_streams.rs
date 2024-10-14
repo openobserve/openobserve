@@ -41,6 +41,7 @@ use crate::{
             },
         },
     },
+    handler::http::request::search::get_work_group,
     service::{
         search::{self as SearchService, RESULT_ARRAY},
         usage::report_request_usage_stats,
@@ -349,6 +350,7 @@ pub async fn search_multi(
                     } else {
                         None
                     },
+                    work_group: res.work_group,
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
@@ -1108,6 +1110,10 @@ pub async fn around_multi(
                 (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
                 _ => None,
             },
+            work_group: get_work_group(vec![
+                resp_forward.work_group.clone(),
+                resp_backward.work_group.clone(),
+            ]),
             ..Default::default()
         };
         let num_fn = query_fn.is_some() as u16;
