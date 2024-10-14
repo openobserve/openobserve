@@ -880,13 +880,13 @@ export default defineComponent({
       return data.filter((item: any) => {
         if (item.expr) {
           if (
-            item.expr.type == "column_ref" &&
+            item.expr.type === "column_ref" &&
             item.expr.column.expr.value === fieldName
           ) {
             return false;
           }
           if (
-            item.expr.type == "aggr_func" &&
+            item.expr.type === "aggr_func" &&
             item.expr?.args?.expr?.column?.value == fieldName
           ) {
             return false;
