@@ -881,7 +881,7 @@ export default defineComponent({
         if (item.expr) {
           if (
             item.expr.type === "column_ref" &&
-            item.expr.column.expr.value === fieldName
+            item.expr?.column?.expr?.value === fieldName
           ) {
             return false;
           }
