@@ -660,12 +660,21 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      q.notify({
-        type: "positive",
-        message: "Span ID copied to clipboard",
-        timeout: 2000,
-      });
-      copyToClipboard(props.span.span_id);
+      try {
+        copyToClipboard(props.span.span_id);
+        q.notify({
+          type: "positive",
+          message: "Span ID copied to clipboard",
+          timeout: 2000,
+        });
+      } catch (e) {
+        q.notify({
+          type: "negative",
+          message: "Failed to copy Span ID to clipboard",
+          timeout: 2000,
+        });
+        console.error("Error copying to clipboard:", e);
+      }
     };
 
     const toggleLinks = () => {
