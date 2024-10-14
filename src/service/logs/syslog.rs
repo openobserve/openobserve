@@ -26,6 +26,7 @@ use config::{
     meta::stream::{Routing, StreamType},
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use syslog_loose::{Message, ProcId, Protocol};
 
@@ -36,10 +37,7 @@ use crate::{
         meta::{
             functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
-            ingestion::{
-                IngestionResponse, IngestionStatus, StreamStatus, ID_COL_NAME,
-                ORIGINAL_DATA_COL_NAME,
-            },
+            ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             stream::StreamParams,
             syslog::SyslogRoute,
         },
