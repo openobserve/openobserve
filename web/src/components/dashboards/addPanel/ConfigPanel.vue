@@ -1197,6 +1197,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="space"></div>
+    <ColorPaletteDropDown v-if="dashboardPanelData.data.type != 'metric'" />
+    <div class="space"></div>
+
+    <div class="space"></div>
     <OverrideConfig
       v-if="dashboardPanelData.data.type == 'table'"
       :dashboardPanelData="dashboardPanelData"
@@ -1214,6 +1218,7 @@ import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import OverrideConfig from "./OverrideConfig.vue";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
@@ -1230,6 +1235,7 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    ColorPaletteDropDown,
     OverrideConfig,
     LinearIcon,
     NoSymbol,

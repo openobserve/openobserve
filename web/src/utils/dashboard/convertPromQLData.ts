@@ -20,6 +20,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import { getColor, getMetricMinMaxValue } from "./colorPalette";
 
 let moment: any;
 let momentInitialized = false;
@@ -371,6 +372,16 @@ export const convertPromQLData = async (
     panelSchema.type
   );
 
+  // if color type is shades, continuous then required to calculate min and max for chart.
+  let chartMin: any = Infinity;
+  let chartMax: any = -Infinity;
+  if (
+    ["shades"].includes(panelSchema?.config?.color?.mode) ||
+    panelSchema?.config?.color?.mode.startsWith("continuous")
+  ) {
+    [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+  }
+
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -397,6 +408,19 @@ export const convertPromQLData = async (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
+                itemStyle: {
+                  color: getColor(
+                    panelSchema,
+                    getPromqlLegendName(
+                      metric.metric,
+                      panelSchema.queries[index].config.promql_legend,
+                    ),
+                    metric.values,
+                    chartMin,
+                    chartMax,
+                  ),
+                },
+                // colorBy: "data",
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
@@ -474,6 +498,18 @@ export const convertPromQLData = async (
                   ) / 6
                 }`,
               },
+            },
+            itemStyle: {
+              color: getColor(
+                panelSchema,
+                getPromqlLegendName(
+                  metric.metric,
+                  panelSchema.queries[index].config.promql_legend,
+                ),
+                values,
+                chartMin,
+                chartMax,
+              ),
             },
             title: {
               fontSize: 10,
