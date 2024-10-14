@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use arrow_schema::Schema;
@@ -31,7 +34,6 @@ use config::{
     DISTINCT_FIELDS,
 };
 use infra::{cache::stats, errors};
-use itertools::Itertools;
 use tracing::{Instrument, Span};
 
 use crate::{
@@ -1635,15 +1637,10 @@ pub async fn search_history(
 }
 
 pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
-    let work_groups = work_group_set
-        .into_iter()
-        .flatten()
-        .sorted()
-        .dedup()
-        .collect::<Vec<_>>();
-    if work_groups.contains(&"long".to_string()) {
+    let work_groups = work_group_set.into_iter().flatten().collect::<HashSet<_>>();
+    if work_groups.contains("long") {
         return Some("long".to_string());
-    } else if work_groups.contains(&"short".to_string()) {
+    } else if work_groups.contains("short") {
         return Some("short".to_string());
     }
     None
