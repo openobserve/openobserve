@@ -527,16 +527,16 @@ export default defineComponent({
     const linkColumns = ref([
       {
         name: "traceId",
-        field: (row: any) => row.context.traceId,
-        prop: (row: any) => row.context.traceId,
+        field: (row: any) => (row.context ? row.context.traceId : ""),
+        prop: (row: any) => (row.context ? row.context.traceId : ""),
         label: "TraceId",
         align: "left",
         sortable: true,
       },
       {
         name: "spanId",
-        field: (row: any) => row.context.spanId,
-        prop: (row: any) => row.context.spanId,
+        field: (row: any) => (row.context ? row.context.spanId : ""),
+        prop: (row: any) => (row.context ? row.context.spanId : ""),
         label: "spanId",
         align: "left",
         sortable: true,
