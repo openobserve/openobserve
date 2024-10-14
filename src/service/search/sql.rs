@@ -24,6 +24,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
+    ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -50,7 +51,6 @@ use sqlparser::{
 };
 
 use super::request::Request;
-use crate::common::meta::ingestion::ORIGINAL_DATA_COL_NAME;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());

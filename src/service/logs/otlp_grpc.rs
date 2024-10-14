@@ -27,6 +27,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -35,7 +36,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use crate::{
-    common::meta::ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
+    common::meta::ingestion::{IngestionStatus, StreamStatus},
     handler::http::request::CONTENT_TYPE_PROTO,
     service::{
         format_stream_name,

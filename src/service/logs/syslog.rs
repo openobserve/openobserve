@@ -29,6 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use syslog_loose::{Message, ProcId, Protocol};
 
@@ -38,10 +39,7 @@ use crate::{
         infra::config::SYSLOG_ROUTES,
         meta::{
             http::HttpResponse as MetaHttpResponse,
-            ingestion::{
-                IngestionResponse, IngestionStatus, StreamStatus, ID_COL_NAME,
-                ORIGINAL_DATA_COL_NAME,
-            },
+            ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             syslog::SyslogRoute,
         },
     },

@@ -226,15 +226,6 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .service(status::flush_node),
     );
 
-    cfg.service(
-        web::scope("/short")
-            .wrap(HttpAuthentication::with_fn(
-                super::auth::validator::validate_short_or_redirect,
-            ))
-            .wrap(cors.clone())
-            .service(short_url::retrieve),
-    );
-
     if get_config().common.swagger_enabled {
         cfg.service(
             SwaggerUi::new("/swagger/{_:.*}")
@@ -495,7 +486,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
             .service(stream::delete_stream_cache)
-            .service(short_url::shorten),
+            .service(short_url::shorten)
+            .service(short_url::retrieve),
     );
 }
 

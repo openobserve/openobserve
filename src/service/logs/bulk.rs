@@ -30,14 +30,11 @@ use config::{
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS,
+    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
 use crate::{
-    common::meta::ingestion::{
-        BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus, ID_COL_NAME,
-        ORIGINAL_DATA_COL_NAME,
-    },
+    common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, pipeline::execution::PipelinedExt,
         schema::get_upto_discard_error,
