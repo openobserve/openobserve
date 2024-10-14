@@ -36,9 +36,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-    },
+    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
@@ -556,14 +554,11 @@ pub async fn search_partition(
     let mut max_query_range = 0;
     for (stream, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         if !skip_get_file_list {
             let stream_files = crate::service::file_list::query_ids(
                 &sql.org_id,
                 stream_type,
                 stream,
-                partition_time_level,
                 sql.time_range,
             )
             .await?;
@@ -967,7 +962,6 @@ pub async fn match_file(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
     source: &FileKey,
-    match_min_ts_only: bool,
     is_wal: bool,
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
@@ -994,7 +988,6 @@ pub async fn match_file(
         filters.as_slice(),
         source,
         is_wal,
-        match_min_ts_only,
     )
     .await
 }
@@ -1021,20 +1014,7 @@ pub async fn match_source(
     filters: &[(String, Vec<String>)],
     source: &FileKey,
     is_wal: bool,
-    match_min_ts_only: bool,
 ) -> bool {
-    if stream.stream_type.eq(&StreamType::Metrics)
-        && source.key.starts_with(
-            format!(
-                "files/{}/{}/{}/",
-                stream.org_id, stream.stream_type, stream.org_id
-            )
-            .as_str(),
-        )
-    {
-        return true;
-    }
-
     // match org_id & table
     if !source.key.starts_with(
         format!(
@@ -1069,9 +1049,6 @@ pub async fn match_source(
 
     // match partition clause
     if let Some((time_min, time_max)) = time_range {
-        if match_min_ts_only && time_min > 0 {
-            return source.meta.min_ts >= time_min && source.meta.min_ts < time_max;
-        }
         if time_min > 0 && time_min > source.meta.max_ts {
             return false;
         }

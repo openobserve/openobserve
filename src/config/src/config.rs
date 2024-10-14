@@ -69,9 +69,8 @@ pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
-    "log", "message", "msg", "content", "data", "body", "events", "json",
-];
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
+    ["log", "message", "msg", "content", "data", "body", "json"];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS

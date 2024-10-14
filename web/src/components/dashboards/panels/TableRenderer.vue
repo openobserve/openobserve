@@ -30,13 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-panel-table"
     @row-click="(...args: any) => $emit('row-click', ...args)"
   >
+    <template v-slot:body-cell="props">
+      <q-td :props="props" :style="getStyle(props)">
+        {{ props.value }}
+      </q-td>
+    </template>
   </q-table>
 </template>
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile } from "quasar";
-import { defineComponent, ref, onMounted, watch } from "vue";
+import { defineComponent, ref } from "vue";
+import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -50,6 +56,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
       default: false,
+    },
+    valueMapping: {
+      required: false,
+      type: Object,
+      default: () => [],
     },
   },
   emits: ["row-click"],
@@ -110,12 +121,48 @@ export default defineComponent({
         showErrorNotification("Browser denied file download...");
       }
     };
+
+    const getStyle = (rowData: any) => {
+      const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
+
+      // Find the first valid mapping with a valid color
+      const foundValue = findFirstValidMappedValue(
+        value,
+        props?.valueMapping,
+        "color",
+      );
+
+      if (foundValue && foundValue?.color) {
+        const hex = foundValue.color;
+
+        // Check if hex is valid
+        const isValidHex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex);
+        if (!isValidHex) {
+          return "";
+        }
+
+        const isDark = isDarkColor(hex);
+        return `background-color: ${hex}; color: ${isDark ? "#ffffff" : "#000000"}`;
+      }
+      return "";
+    };
+
+    const isDarkColor = (hex: any) => {
+      const result: any = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      const r = parseInt(result[1], 16);
+      const g = parseInt(result[2], 16);
+      const b = parseInt(result[3], 16);
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return luminance < 0.5;
+    };
+
     return {
       pagination: ref({
         rowsPerPage: 0,
       }),
       downloadTableAsCSV,
       tableRef,
+      getStyle,
     };
   },
 });

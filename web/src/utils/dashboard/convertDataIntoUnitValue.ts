@@ -319,3 +319,37 @@ export function convertSecondsToOffset(seconds: number): string {
 
   return "0 Minutes"; // Return "0m" if seconds is 0 or less
 }
+
+// will find first valid mapped value based on given fieldToCheck
+export const findFirstValidMappedValue = (
+  value: any,
+  mappings: any[],
+  fieldToCheck: string,
+) => {
+  return mappings?.find((v: any) => {
+    let isMatch = false;
+
+    // Check based on type
+    if (v?.type == "value") {
+      isMatch = v?.value == value;
+    } else if (v?.type == "range") {
+      if (
+        v?.from &&
+        v?.to &&
+        !Number.isNaN(+v?.from) &&
+        !Number.isNaN(+v?.to)
+      ) {
+        isMatch = +v?.from <= +value && +v?.to >= +value;
+      }
+    } else if (v?.type == "regex") {
+      isMatch = new RegExp(v?.pattern ?? "").test(value);
+    }
+
+    // If a match is found, check if the required field (color or text) is valid
+    if (isMatch && v[fieldToCheck]) {
+      return true;
+    }
+
+    return false;
+  });
+};
