@@ -1047,6 +1047,15 @@ const useLogs = () => {
           title: "",
           unparsed_x_data: [],
           timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
+      };
+
+      const parsedSQL: any = fnParsedSQL();
+
+      if (searchObj.meta.sqlMode && parsedSQL == undefined) {
         searchObj.data.queryResults.error =
           "Error while search partition. Search query is invalid.";
         return;
