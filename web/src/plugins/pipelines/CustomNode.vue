@@ -99,7 +99,7 @@ function getIcon(data, ioType) {
       v-if="io_type == 'output' || io_type === 'default'"
       id="input"
       type="target"
-      :position="pipelineObj.pipelineDirectionTopBottom == true ? 'top' : 'left'"
+      :position="'top'"
       :style="{ filter: 'invert(100%)' }"
     />
     <div
@@ -403,7 +403,7 @@ function getIcon(data, ioType) {
       v-if="io_type === 'input' || io_type === 'default'"
       id="output"
       type="source"
-      :position="pipelineObj.pipelineDirectionTopBottom == true ? 'bottom' : 'right'"
+      :position="'bottom'"
       :style="{ filter: 'invert(100%)' }"
     />
   </div>
