@@ -53,7 +53,7 @@ pub async fn search(
     mut req: Request,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
-) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
     let _start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] super cluster leader: start {}", sql);
@@ -70,7 +70,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, 0));
+        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string()));
     }
 
     let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
@@ -137,7 +137,7 @@ pub async fn search(
         Ok(Err(err)) => Err(err),
         Err(err) => Err(Error::Message(err.to_string())),
     };
-    let (data, mut scan_stats) = match data {
+    let (data, mut scan_stats, partial_err) = match data {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
@@ -147,7 +147,7 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
     scan_stats.format_to_mb();
-    Ok((data, scan_stats, 0, false, 0))
+    Ok((data, scan_stats, 0, !partial_err.is_empty(), 0, partial_err))
 }
 
 async fn run_datafusion(
@@ -155,7 +155,7 @@ async fn run_datafusion(
     req: Request,
     sql: Arc<Sql>,
     nodes: Vec<Arc<dyn NodeInfo>>,
-) -> Result<(Vec<RecordBatch>, ScanStats)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     // construct physical plan
     let mut ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
@@ -265,7 +265,7 @@ async fn run_datafusion(
         Err(e.into())
     } else {
         log::info!("[trace_id {trace_id}] super cluster leader: datafusion collect done");
-        ret.map(|data| (data, visit.scan_stats))
+        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }
