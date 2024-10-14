@@ -29,6 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use flate2::read::GzDecoder;
 use opentelemetry_proto::tonic::{
@@ -46,7 +47,7 @@ use crate::{
         ingestion::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
             IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
-            StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+            StreamStatus,
         },
         stream::StreamParams,
     },
@@ -578,7 +579,7 @@ pub fn decode_and_decompress_to_string(
 }
 
 /// Calculate size of VarInt header from byte array
-/// 
+///
 /// See https://protobuf.dev/programming-guides/encoding/#varints for more info
 pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
     for (i, &b) in bytes.iter().enumerate() {

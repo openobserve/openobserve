@@ -218,11 +218,14 @@ pub fn create_session_config(
     target_partitions: usize,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
-    let target_partitions = if target_partitions == 0 {
+    let mut target_partitions = if target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
-        std::cmp::max(DATAFUSION_MIN_PARTITION, target_partitions)
+        std::cmp::max(cfg.limit.datafusion_min_partition_num, target_partitions)
     };
+    if target_partitions == 0 {
+        target_partitions = DATAFUSION_MIN_PARTITION;
+    }
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
         .with_target_partitions(target_partitions)
@@ -421,11 +424,17 @@ pub async fn create_parquet_table(
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
-    let target_partitions = if session.target_partitions == 0 {
+    let mut target_partitions = if session.target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
-        std::cmp::max(DATAFUSION_MIN_PARTITION, session.target_partitions)
+        std::cmp::max(
+            cfg.limit.datafusion_min_partition_num,
+            session.target_partitions,
+        )
     };
+    if target_partitions == 0 {
+        target_partitions = DATAFUSION_MIN_PARTITION;
+    }
 
     // Configure listing options
     let file_format = ParquetFormat::default();

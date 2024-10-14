@@ -69,6 +69,11 @@ pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
+// Columns added to ingested records for _INTERNAL_ use only.
+// Used for storing and querying unflattened original data
+pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
+pub const ID_COL_NAME: &str = "_o2_id";
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -997,6 +1002,8 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(name = "ZO_DATAFUSION_MIN_PARTITION_NUM", default = 2)]
+    pub datafusion_min_partition_num: usize,
     #[env_config(
         name = "ZO_ENRICHMENT_TABLE_LIMIT",
         default = 256,

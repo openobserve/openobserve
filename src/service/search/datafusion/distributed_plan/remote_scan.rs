@@ -67,6 +67,7 @@ pub struct RemoteScanExec {
     partitions: usize,
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
+    pub partial_err: Arc<Mutex<String>>,
     pub context: opentelemetry::Context,
 }
 
@@ -98,6 +99,7 @@ impl RemoteScanExec {
             partitions: output_partitions,
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
+            partial_err: Arc::new(Mutex::new(String::new())),
             context,
         }
     }
@@ -186,6 +188,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.is_super_cluster,
             req,
             self.scan_stats.clone(),
+            self.partial_err.clone(),
             self.context.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
@@ -212,6 +215,7 @@ async fn get_remote_batch(
     is_super_cluster: bool,
     req: Request,
     scan_stats: Arc<Mutex<ScanStats>>,
+    partial_err: Arc<Mutex<String>>,
     context: opentelemetry::Context,
 ) -> Result<SendableRecordBatchStream> {
     let proto = ComposedPhysicalExtensionCodec {
@@ -345,6 +349,7 @@ async fn get_remote_batch(
         is_querier,
         files,
         scan_size,
+        partial_err,
         start,
     )))
 }
@@ -357,6 +362,7 @@ struct FlightStream {
     is_querier: bool,
     files: i64,
     scan_size: i64,
+    partial_err: Arc<Mutex<String>>,
     start: std::time::Instant,
 }
 
@@ -370,6 +376,7 @@ impl FlightStream {
         is_querier: bool,
         files: i64,
         scan_size: i64,
+        partial_err: Arc<Mutex<String>>,
         start: std::time::Instant,
     ) -> Self {
         Self {
@@ -380,6 +387,7 @@ impl FlightStream {
             is_querier,
             files,
             scan_size,
+            partial_err,
             start,
         }
     }
@@ -406,7 +414,16 @@ impl Stream for FlightStream {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
-                Poll::Ready(Some(Err(DataFusionError::Internal(e.to_string()))))
+                {
+                    let mut guard = self.partial_err.lock();
+                    let partial_err = guard.clone();
+                    if partial_err.is_empty() {
+                        guard.push_str(e.to_string().as_str());
+                    } else {
+                        guard.push_str(format!(" \n {}", e).as_str());
+                    }
+                }
+                Poll::Ready(None)
             }
         }
     }

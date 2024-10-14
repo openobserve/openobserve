@@ -16,6 +16,7 @@
 use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
+use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
@@ -547,7 +548,8 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = cache::cacher::get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let ts_column = res_ts_column.map(|(v, _)| v);
     let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     let mut files = Vec::new();
