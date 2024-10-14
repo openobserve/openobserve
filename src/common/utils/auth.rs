@@ -366,7 +366,7 @@ impl FromRequest for AuthExtractor {
             if path_columns[url_len - 1].eq("delete_fields") {
                 method = "DELETE".to_string();
             }
-            if path_columns[url_len - 1].eq("enable") {
+            if path_columns[url_len - 1].eq("enable") || path_columns[url_len - 1].eq("trigger") {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
