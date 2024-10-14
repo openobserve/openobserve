@@ -111,7 +111,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             match service::metrics::json::ingest(METRIC_INGEST_ORG, bytes).await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("error in ingesting self-metrics : {}", e)
+                    log::error!("error in ingesting self-metrics : {:?}", e)
                 }
             }
         } else {
@@ -119,7 +119,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             match send_metrics(&config, metrics).await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("error in sending self-metrics : {}", e)
+                    log::error!("error in sending self-metrics : {:?}", e)
                 }
             }
         }
