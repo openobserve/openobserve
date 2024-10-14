@@ -1092,13 +1092,25 @@ export const convertSQLData = async (
       options.yAxis = temp;
 
       options.yAxis.forEach((it: any) => {
-        it.nameGap =
+        // xAxisKeys will be 1
+        const xAxisMaxLabel =
           calculateWidthText(
             xAxisKeys.reduce(
-              (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
+              (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
               "",
             ),
-          ) + 8;
+          ) + 16;
+
+        // breakDownKeys will be 0 or 1
+        const breakDownMaxLabel =
+          calculateWidthText(
+            breakDownKeys.reduce(
+              (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
+              "",
+            ),
+          ) + 16;
+
+        it.nameGap = Math.max(xAxisMaxLabel, breakDownMaxLabel);
       });
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
