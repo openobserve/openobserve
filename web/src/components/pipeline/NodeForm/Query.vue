@@ -383,6 +383,7 @@ const saveQueryData = async () => {
   let queryPayload = {
     node_type: "query", // required
     stream_type: formData.stream_type, // required
+    org_id: store.state.selectedOrganization.identifier, // required
     query_condition: {
       // same as before
       type: formData.query_condition.type,
@@ -393,6 +394,7 @@ const saveQueryData = async () => {
       aggregation: formData.query_condition.aggregation,
       vrl_function: null,
       search_event_type: "DerivedStream",
+
     },
     trigger_condition: {
       // same as before
