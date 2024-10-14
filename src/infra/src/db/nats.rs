@@ -633,8 +633,7 @@ impl super::Db for NatsDb {
                                 }
                             };
                             if let Err(e) = ret {
-                                log::error!("[NATS:watch] prefix: {}, send error: {}", prefix, e);
-                                break;
+                                log::warn!("[NATS:watch] prefix: {}, send error: {}", prefix, e);
                             }
                         }
                     }

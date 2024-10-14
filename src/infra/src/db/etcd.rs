@@ -480,8 +480,7 @@ impl super::Db for Etcd {
                                 })),
                             };
                             if let Err(e) = ret {
-                                log::error!("[ETCD:watch] prefix: {}, send error: {}", prefix, e);
-                                break;
+                                log::warn!("[ETCD:watch] prefix: {}, send error: {}", prefix, e);
                             }
                         }
                     }
