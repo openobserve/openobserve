@@ -240,7 +240,7 @@ function extractFields(parsedAst: any, timeField: string) {
       // histogram field
       field.column = column?.expr?.args?.value[0]?.column ?? timeField;
       field.aggregationFunction =
-        column?.expr?.name[0]?.value?.toLowerCase() ?? "histogram";
+        column?.expr?.name?.[0]?.value?.toLowerCase() ?? "histogram";
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -406,7 +406,7 @@ function parseCondition(condition: any) {
         };
       }
     } else if (condition.type === "function") {
-      const conditionName = condition?.name?.name[0]?.value?.toLowerCase();
+      const conditionName = condition?.name?.name?.[0]?.value?.toLowerCase();
 
       // function with field name and value
       const conditionsWithFieldName = [
@@ -597,7 +597,7 @@ export const changeHistogramInterval = async (
     // check if the column is histogram
     if (
       column.expr.type === "function" &&
-      column?.expr?.name?.name[0]?.value === "histogram"
+      column?.expr?.name?.name?.[0]?.value === "histogram"
     ) {
       const histogramExpr = column.expr;
       if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
