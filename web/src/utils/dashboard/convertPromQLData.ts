@@ -21,6 +21,7 @@ import {
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { getColor, getMetricMinMaxValue } from "./colorPalette";
+import { scaleLinear } from "d3-scale";
 
 let moment: any;
 let momentInitialized = false;
@@ -65,7 +66,7 @@ export const convertPromQLData = async (
   searchQueryData: any,
   store: any,
   chartPanelRef: any,
-  hoveredSeriesState: any
+  hoveredSeriesState: any,
 ) => {
   // console.time("convertPromQLData");
 
@@ -86,7 +87,7 @@ export const convertPromQLData = async (
   let isTimeSeriesFlag = true;
 
   const legendPosition = getLegendPosition(
-    panelSchema?.config?.legends_position
+    panelSchema?.config?.legends_position,
   );
 
   // get the x axis key which will be timestamp
@@ -95,8 +96,8 @@ export const convertPromQLData = async (
   // add all series timestamp
   searchQueryData.forEach((queryData: any) =>
     queryData.result.forEach((result: any) =>
-      result.values.forEach((value: any) => xAxisData.add(value[0]))
-    )
+      result.values.forEach((value: any) => xAxisData.add(value[0])),
+    ),
   );
 
   // sort the timestamp and make an array
@@ -173,8 +174,8 @@ export const convertPromQLData = async (
             ? 30
             : 50
           : panelSchema.config?.axis_width == null
-          ? 5
-          : "25",
+            ? 5
+            : "25",
     },
     tooltip: {
       show: true,
@@ -210,7 +211,7 @@ export const convertPromQLData = async (
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
             (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // if hovered series index is not -1 then take it to very first position
@@ -237,9 +238,9 @@ export const convertPromQLData = async (
                     it.data[1],
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )} </strong>`
+                    panelSchema.config?.decimals,
+                  ),
+                )} </strong>`,
               );
             // else normal text
             else
@@ -249,9 +250,9 @@ export const convertPromQLData = async (
                     it.data[1],
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  ) ?? ""
-                )}`
+                    panelSchema.config?.decimals,
+                  ) ?? "",
+                )}`,
               );
           }
         });
@@ -272,8 +273,8 @@ export const convertPromQLData = async (
                   name.value,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
+                  panelSchema.config?.decimals,
+                ),
               );
             const date = new Date(name.value);
             return `${formatDate(date)}`;
@@ -306,8 +307,8 @@ export const convertPromQLData = async (
               name,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         },
       },
@@ -361,7 +362,7 @@ export const convertPromQLData = async (
     gridDataForGauge = calculateGridPositions(
       chartPanelRef.value.offsetWidth,
       chartPanelRef.value.offsetHeight,
-      totalLength
+      totalLength,
     );
 
     //assign grid array to gauge chart options
@@ -369,17 +370,34 @@ export const convertPromQLData = async (
   }
 
   const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
-    panelSchema.type
+    panelSchema.type,
   );
 
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
-  if (
-    ["shades"].includes(panelSchema?.config?.color?.mode) ||
-    panelSchema?.config?.color?.mode.startsWith("continuous")
-  ) {
-    [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+
+  [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+
+  const d3ColorObj = scaleLinear([0, 100], ["red", "yellow", "green"]);
+
+  // need one function which will take some series name and will return hash which will be between 1 to 1000
+  function getSeriesHash(seriesName: string) {
+    // Initialize a hash variable
+    let hash = 0;
+
+    // If the seriesName is empty, return 1 as a default hash value
+    if (seriesName.length === 0) return 1;
+
+    // Loop through each character in the series name
+    for (let i = 0; i < seriesName.length; i++) {
+      const char = seriesName.charCodeAt(i); // Get the Unicode value of the character
+      hash = (hash << 5) - hash + char; // Bitwise hash computation
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    // Ensure the hash is positive and between 1 and 1000
+    return (Math.abs(hash) % 100) + 1;
   }
 
   options.series = searchQueryData.map((it: any, index: number) => {
@@ -403,22 +421,25 @@ export const convertPromQLData = async (
                 seriesDataObj[value[0]] = value[1];
               });
 
+              const seriesName = getPromqlLegendName(
+                metric.metric,
+                panelSchema.queries[index].config.promql_legend,
+              );
+
               return {
-                name: getPromqlLegendName(
-                  metric.metric,
-                  panelSchema.queries[index].config.promql_legend
-                ),
+                name: seriesName,
                 itemStyle: {
-                  color: getColor(
-                    panelSchema,
-                    getPromqlLegendName(
-                      metric.metric,
-                      panelSchema.queries[index].config.promql_legend,
-                    ),
-                    metric.values,
-                    chartMin,
-                    chartMax,
-                  ),
+                  // color: getColor(
+                  //   panelSchema,
+                  //   getPromqlLegendName(
+                  //     metric.metric,
+                  //     panelSchema.queries[index].config.promql_legend,
+                  //   ),
+                  //   metric.values,
+                  //   chartMin,
+                  //   chartMax,
+                  // ),
+                  color: d3ColorObj(getSeriesHash(seriesName)),
                 },
                 // colorBy: "data",
                 // if utc then simply return the values by removing z from string
@@ -448,7 +469,7 @@ export const convertPromQLData = async (
               return {
                 name: JSON.stringify(metric.metric),
                 x: values.map((value: any) =>
-                  moment(value[0] * 1000).toISOString(true)
+                  moment(value[0] * 1000).toISOString(true),
                 ),
                 y: values.map((value: any) => value[1]),
               };
@@ -475,7 +496,7 @@ export const convertPromQLData = async (
             radius: `${
               Math.min(
                 gridDataForGauge.gridWidth,
-                gridDataForGauge.gridHeight
+                gridDataForGauge.gridHeight,
               ) /
                 2 -
               5
@@ -485,7 +506,7 @@ export const convertPromQLData = async (
               width: `${
                 Math.min(
                   gridDataForGauge.gridWidth,
-                  gridDataForGauge.gridHeight
+                  gridDataForGauge.gridHeight,
                 ) / 6
               }`,
             },
@@ -494,7 +515,7 @@ export const convertPromQLData = async (
                 width: `${
                   Math.min(
                     gridDataForGauge.gridWidth,
-                    gridDataForGauge.gridHeight
+                    gridDataForGauge.gridHeight,
                   ) / 6
                 }`,
               },
@@ -536,7 +557,7 @@ export const convertPromQLData = async (
               {
                 name: getPromqlLegendName(
                   metric.metric,
-                  panelSchema.queries[index].config.promql_legend
+                  panelSchema.queries[index].config.promql_legend,
                 ),
                 // taking first value for gauge
                 value: values[0][1],
@@ -546,7 +567,7 @@ export const convertPromQLData = async (
                       value,
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals
+                      panelSchema.config?.decimals,
                     );
                     return unitValue.value + unitValue.unit;
                   },
@@ -575,8 +596,8 @@ export const convertPromQLData = async (
                 value,
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
+                panelSchema.config?.decimals,
+              ),
             );
           },
           enterable: true,
@@ -605,13 +626,13 @@ export const convertPromQLData = async (
           case "matrix": {
             const series = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
-                (a: any, b: any) => a[0] - b[0]
+                (a: any, b: any) => a[0] - b[0],
               );
               const unitValue = getUnitValue(
                 values[values.length - 1][1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
+                panelSchema.config?.decimals,
               );
               return {
                 ...getPropsByChartTypeForSeries(panelSchema.type),
@@ -701,7 +722,7 @@ export const convertPromQLData = async (
       legendWidth =
         Math.min(
           chartPanelRef.value?.offsetWidth / 3,
-          calculateWidthText(maxValue) + 60
+          calculateWidthText(maxValue) + 60,
         ) ?? 20;
     }
 
