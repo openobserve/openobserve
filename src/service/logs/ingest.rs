@@ -578,7 +578,7 @@ pub fn decode_and_decompress_to_string(
 }
 
 /// Calculate size of VarInt header from byte array
-/// 
+///
 /// See https://protobuf.dev/programming-guides/encoding/#varints for more info
 pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
     for (i, &b) in bytes.iter().enumerate() {

@@ -53,12 +53,14 @@ impl Drop for AsyncDefer {
 #[derive(Debug)]
 pub struct ScanStatsVisitor {
     pub scan_stats: ScanStats,
+    pub partial_err: String,
 }
 
 impl ScanStatsVisitor {
     pub fn new() -> Self {
         ScanStatsVisitor {
             scan_stats: ScanStats::default(),
+            partial_err: String::new(),
         }
     }
 }
@@ -69,9 +71,16 @@ impl ExecutionPlanVisitor for ScanStatsVisitor {
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
         let mayby_remote_scan_exec = plan.as_any().downcast_ref::<RemoteScanExec>();
         if let Some(remote_scan_exec) = mayby_remote_scan_exec {
-            let guard = remote_scan_exec.scan_stats.lock();
-            let stats = *guard;
-            self.scan_stats.add(&stats);
+            {
+                let guard = remote_scan_exec.scan_stats.lock();
+                let stats = *guard;
+                self.scan_stats.add(&stats);
+            }
+            {
+                let guard = remote_scan_exec.partial_err.lock();
+                let err = (*guard).clone();
+                self.partial_err.push_str(&err);
+            }
         }
         Ok(true)
     }
