@@ -72,8 +72,11 @@ impl Searcher {
         &self,
         trace_id: &str,
         sender: tokio::sync::oneshot::Sender<()>,
+        query_start: bool,
     ) -> Result<(), infra::errors::Error> {
-        self.query_manager.insert_sender(trace_id, sender).await
+        self.query_manager
+            .insert_sender(trace_id, sender, query_start)
+            .await
     }
 
     // get all task status that is leader
