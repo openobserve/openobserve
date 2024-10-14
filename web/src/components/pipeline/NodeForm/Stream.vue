@@ -182,7 +182,8 @@ const streams: any = ref({});
 
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
-const outputStreamTypes = ["logs"];
+//for testing purpose but remove metrics and traces as discuessedf
+const outputStreamTypes = ["logs", "metrics", "traces"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
