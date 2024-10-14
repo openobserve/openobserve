@@ -43,7 +43,7 @@ pub async fn work_group_checking(
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender, false)
         .await
         .is_err()
     {
