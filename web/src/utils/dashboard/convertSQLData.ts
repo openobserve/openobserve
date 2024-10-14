@@ -721,7 +721,7 @@ export const convertSQLData = async (
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
-        nameGap: 9 * (xAxisKeys.length + breakDownKeys.length - index + 1),
+        nameGap: 25,
         nameTextStyle: {
           fontWeight: "bold",
           fontSize: 14,
@@ -741,9 +741,8 @@ export const convertSQLData = async (
               : "truncate",
           // hide axis label if overlaps
           hideOverlap: true,
-          width: 100,
-          margin:
-            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5,
+          width: 120,
+          margin: 10,
         },
         splitLine: {
           show: true,
@@ -755,7 +754,7 @@ export const convertSQLData = async (
           show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
           align: "left",
           alignWithLabel: false,
-          length: 20 * (xAxisKeys.length + breakDownKeys.length - index),
+          length: 5,
           interval:
             panelSchema.type == "h-stacked"
               ? "auto"
@@ -868,7 +867,7 @@ export const convertSQLData = async (
         };
         options.xAxis[0].axisLabel = {};
         options.xAxis[0].axisTick = {};
-        options.xAxis[0].nameGap = 20;
+        options.xAxis[0].nameGap = 25;
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
@@ -1249,7 +1248,7 @@ export const convertSQLData = async (
       options.xAxis[0].axisLabel.margin = 5;
       options.xAxis[0].axisLabel = {};
       options.xAxis[0].axisTick = {};
-      options.xAxis[0].nameGap = 20;
+      options.xAxis[0].nameGap = 25;
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -1497,9 +1496,9 @@ export const convertSQLData = async (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 20;
+        it.nameGap = calculateWidthText(largestLabel(it.data)) + 10;
       });
-      options.xAxis.nameGap = 20;
+      options.xAxis.nameGap = 25;
       break;
     }
     case "metric": {
