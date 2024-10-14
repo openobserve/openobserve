@@ -104,6 +104,7 @@ jobs:
             "vrl.spec.js",
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
+            "vrl_visualize.spec.js",
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-general-setting.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
