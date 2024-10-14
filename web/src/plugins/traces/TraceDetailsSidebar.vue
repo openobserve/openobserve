@@ -715,7 +715,11 @@ export default defineComponent({
 
     const spanLinks = computed(() => {
       try {
-        return JSON.parse(props.span.links);
+        if (typeof props.span.links === "string") {
+          return JSON.parse(props.span.links);
+        } else {
+          return props.span.links;
+        }
       } catch (e) {
         console.log("Error parsing span links:", e);
         return [];
