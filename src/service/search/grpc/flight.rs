@@ -118,7 +118,7 @@ pub async fn search(
     }
 
     // construct partition filters
-    let search_partition_keys: Option<Vec<(String, String)>> = req
+    let search_partition_keys: Vec<(String, String)> = req
         .equal_keys
         .iter()
         .filter_map(|v| {
@@ -128,8 +128,7 @@ pub async fn search(
                 None
             }
         })
-        .collect::<Vec<_>>()
-        .into();
+        .collect::<Vec<_>>();
 
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
@@ -203,7 +202,7 @@ pub async fn search(
         let (tbls, stats) = match super::wal::search_parquet(
             query_params.clone(),
             schema_latest.clone(),
-            search_partition_keys.clone(),
+            &search_partition_keys,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
         )
@@ -230,7 +229,7 @@ pub async fn search(
         let (tbls, stats) = match super::wal::search_memtable(
             query_params.clone(),
             schema_latest.clone(),
-            search_partition_keys.clone(),
+            &search_partition_keys,
             empty_exec.sorted_by_time(),
         )
         .await
@@ -277,7 +276,7 @@ async fn get_file_list_by_ids(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
     partition_keys: &[StreamPartition],
-    equal_items: &Option<Vec<(String, String)>>,
+    equal_items: &[(String, String)],
     ids: &[i64],
     idx_file_list: &[cluster_rpc::IdxFileName],
 ) -> Result<(Vec<FileKey>, usize), Error> {
@@ -304,7 +303,6 @@ async fn get_file_list_by_ids(
     };
 
     let mut files = Vec::with_capacity(file_list.len());
-    let equal_items = equal_items.clone().unwrap_or_default();
     for file in file_list {
         if match_file(
             org_id,
@@ -313,9 +311,8 @@ async fn get_file_list_by_ids(
             time_range,
             &file,
             false,
-            false,
             partition_keys,
-            &equal_items,
+            equal_items,
         )
         .await
         {

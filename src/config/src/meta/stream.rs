@@ -754,6 +754,14 @@ impl StreamPartition {
         }
     }
 
+    pub fn new_prefix(field: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            types: StreamPartitionType::Prefix,
+            disabled: false,
+        }
+    }
+
     pub fn get_partition_key(&self, value: &str) -> String {
         format!("{}={}", self.field, self.get_partition_value(value))
     }
@@ -766,6 +774,12 @@ impl StreamPartition {
                 let bucket = h % n;
                 bucket.to_string()
             }
+            StreamPartitionType::Prefix => value
+                .to_ascii_lowercase()
+                .chars()
+                .next()
+                .unwrap_or('_')
+                .to_string(),
         }
     }
 }
@@ -776,6 +790,7 @@ pub enum StreamPartitionType {
     #[default]
     Value, // each value is a partition
     Hash(u64), // partition with fixed bucket size by hash
+    Prefix,    // partition by first letter of term
 }
 
 impl Display for StreamPartitionType {
@@ -783,6 +798,7 @@ impl Display for StreamPartitionType {
         match self {
             StreamPartitionType::Value => write!(f, "value"),
             StreamPartitionType::Hash(_) => write!(f, "hash"),
+            StreamPartitionType::Prefix => write!(f, "prefix"),
         }
     }
 }
