@@ -388,7 +388,7 @@ pub async fn search(
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
         if super::SEARCH_SERVER
-            .insert_sender(&trace_id, abort_sender)
+            .insert_sender(&trace_id, abort_sender, true)
             .await
             .is_err()
         {
@@ -626,7 +626,7 @@ async fn work_group_checking(
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender, false)
         .await
         .is_err()
     {
@@ -764,7 +764,7 @@ async fn merge_grpc_result(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender, true)
         .await
         .is_err()
     {
