@@ -6,12 +6,13 @@ import { TracesPage } from '../pages/tracesPage.js';
 import { ReportsPage } from '../pages/reportsPage.js';
 import { DashboardPage } from '../pages/dashboardPage.js';
 import { AlertPage } from '../pages/alertsPage.js';
+import { MetricsPage } from '../pages/metricsPage.js';
 
 import{ startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } from '../pages/CommonLocator.js';
 
 //import {CommomnLocator} from '../pages/CommonLocator'
 
-console.log ('Login Started')
+//console.log ('Login Started')
 
 test('Relative Seconds on Logs page', async ({ page }) => {
   // Create page object instances
@@ -22,7 +23,7 @@ test('Relative Seconds on Logs page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  // console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -309,4 +310,138 @@ test('Relative second on alert', async ({ page }) => {
 
   await alertPage.signOut();
 });
+
+
+test('Relative Seconds on Metrics page', async ({ page }) => {
+  // Create page object instances
+  const loginPage = new LoginPage(page);
+  const metricsPage = new MetricsPage(page);
+
+  // Step 1: Navigate to the application and login
+
+  await page.goto(process.env["ZO_BASE_URL"]);
+
+  console.log ('URL Opened')
+
+  await loginPage.gotoLoginPage();
+
+  await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
+
+  // Step 2: Navigate to Logs Page
+  await page.waitForTimeout(4000);  // Wait for login process 
+
+   // Open metrics page and perform operations
+   await metricsPage.openMetricsPage();
+   await page.waitForTimeout(3000); // wait for the page to load
+   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
+   await page.waitForTimeout(3000); // wait for selection to complete
+
+   // Set time filter and verify
+   await metricsPage.setTimeToPast30Seconds();
+   await page.waitForTimeout(3000); // wait for time selection
+   await metricsPage.verifyTimeSetTo30Seconds();
+
+
+});
+
+test('Absolute conds on Metrics page', async ({ page }) => {
+  // Create page object instances
+  const loginPage = new LoginPage(page);
+  const metricsPage = new MetricsPage(page);
+
+  // Step 1: Navigate to the application and login
+
+  await page.goto(process.env["ZO_BASE_URL"]);
+
+  console.log ('URL Opened')
+
+  await loginPage.gotoLoginPage();
+
+  await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
+
+  // Step 2: Navigate to Logs Page
+  await page.waitForTimeout(4000);  // Wait for login process 
+
+   // Open metrics page and perform operations
+   await metricsPage.openMetricsPage();
+   await page.waitForTimeout(3000); // wait for the page to load
+   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
+   await page.waitForTimeout(3000); // wait for selection to complete
+
+   // Set the Date and Time Range
+  await metricsPage.setDateTime();
+  await metricsPage.fillTimeRange(startTimeValue, endTimeValue);
+
+  // Verify the time range is displayed correctly
+  await metricsPage.verifyDateTime(startDateTimeValue, endDateTimeValue);
+
+
+});
+
+test('Relative Seconds on RUM page', async ({ page }) => {
+  // Create page object instances
+  const loginPage = new LoginPage(page);
+  const metricsPage = new MetricsPage(page);
+
+  // Step 1: Navigate to the application and login
+
+  await page.goto(process.env["ZO_BASE_URL"]);
+
+  console.log ('URL Opened')
+
+  await loginPage.gotoLoginPage();
+
+  await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
+
+  // Step 2: Navigate to Logs Page
+  await page.waitForTimeout(4000);  // Wait for login process 
+
+   // Open metrics page and perform operations
+   await metricsPage.openMetricsPage();
+   await page.waitForTimeout(3000); // wait for the page to load
+   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
+   await page.waitForTimeout(3000); // wait for selection to complete
+
+   // Set time filter and verify
+   await metricsPage.setTimeToPast30Seconds();
+   await page.waitForTimeout(3000); // wait for time selection
+   await metricsPage.verifyTimeSetTo30Seconds();
+
+
+});
+
+test('Absolute conds on RUM page', async ({ page }) => {
+  // Create page object instances
+  const loginPage = new LoginPage(page);
+  const metricsPage = new MetricsPage(page);
+
+  // Step 1: Navigate to the application and login
+
+  await page.goto(process.env["ZO_BASE_URL"]);
+
+  console.log ('URL Opened')
+
+  await loginPage.gotoLoginPage();
+
+  await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
+
+  // Step 2: Navigate to Logs Page
+  await page.waitForTimeout(4000);  // Wait for login process 
+
+   // Open metrics page and perform operations
+   await metricsPage.openMetricsPage();
+   await page.waitForTimeout(3000); // wait for the page to load
+   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
+   await page.waitForTimeout(3000); // wait for selection to complete
+
+   // Set the Date and Time Range
+  await metricsPage.setDateTime();
+  await metricsPage.fillTimeRange(startTimeValue, endTimeValue);
+
+  // Verify the time range is displayed correctly
+  await metricsPage.verifyDateTime(startDateTimeValue, endDateTimeValue);
+
+
+});
+
 */
