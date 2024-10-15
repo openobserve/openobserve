@@ -5,7 +5,7 @@
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span>Field Override</span>
+        <span>Override Config</span>
       </div>
       <q-btn
         icon="close"
@@ -26,7 +26,7 @@
     >
       <q-select
         v-model="unitMapping.selected_column"
-        :label="'Select Column ' + (index + 1)"
+        :label="'Field'"
         :options="columnsOptions"
         style="width: 30%"
         @change="updateUnitOptions(index)"
@@ -38,7 +38,7 @@
       >
         <q-select
           v-model="unitMapping.selected_unit"
-          :label="'Select Unit'"
+          :label="'Unit'"
           :options="filteredUnitOptions(index)"
           :disable="!unitMapping.selected_column"
           style="flex-grow: 1"
