@@ -827,6 +827,7 @@ export const convertSQLData = async (
     },
     series: [],
   };
+
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
 
   // Now set the series values as per the chart data
@@ -1061,6 +1062,16 @@ export const convertSQLData = async (
         };
         return seriesObj;
       });
+
+      // When breakDownKey is present
+      options.xAxis.forEach((it: any, index: number) => {
+        it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 5;
+        it.axisLabel.margin =
+          18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5;
+        it.axisTick.length =
+          20 * (xAxisKeys.length + breakDownKeys.length - index);
+      });
+
       break;
     }
     case "h-bar": {
@@ -1091,27 +1102,33 @@ export const convertSQLData = async (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
+      // xAxisKeys will be 1
+      const xAxisMaxLabel =
+        calculateWidthText(
+          xAxisKeys.reduce(
+            (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
+            "",
+          ),
+        ) + 16;
+
+      // breakDownKeys will be 0 or 1
+      const breakDownMaxLabel =
+        calculateWidthText(
+          breakDownKeys.reduce(
+            (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
+            "",
+          ),
+        ) + 16;
+
       options.yAxis.forEach((it: any) => {
-        // xAxisKeys will be 1
-        const xAxisMaxLabel =
-          calculateWidthText(
-            xAxisKeys.reduce(
-              (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
-              "",
-            ),
-          ) + 16;
-
-        // breakDownKeys will be 0 or 1
-        const breakDownMaxLabel =
-          calculateWidthText(
-            breakDownKeys.reduce(
-              (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
-              "",
-            ),
-          ) + 16;
-
-        it.nameGap = Math.max(xAxisMaxLabel, breakDownMaxLabel);
+        it.axisLabel.overflow = "truncate";
+        it.nameGap =
+          Math.min(
+            Math.max(xAxisMaxLabel, breakDownMaxLabel),
+            it.axisLabel.width,
+          ) + 10;
       });
+
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
           ? panelSchema.queries[0]?.fields?.y[0]?.label
@@ -1507,9 +1524,17 @@ export const convertSQLData = async (
       const temp = options.xAxis;
       options.xAxis = options.yAxis;
       options.yAxis = temp;
+
+      const maxYaxisWidth = options.yAxis.reduce((acc, it) => {
+        return Math.max(acc, it.axisLabel.width || 0);
+      }, 0);
+
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 10;
+        it.nameGap =
+          Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
+          10;
       });
+
       options.xAxis.nameGap = 25;
       break;
     }
