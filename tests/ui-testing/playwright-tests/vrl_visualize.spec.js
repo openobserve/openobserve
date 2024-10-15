@@ -8,7 +8,7 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
 
-  //  await page.getByText('Login as internal user').click();
+  // await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -133,18 +133,21 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl12=123");
-    // await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .dblclick();
+    await page.waitForTimeout(3000);
 
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
+    // await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    await page.waitForTimeout(3000);
+    // await page.locator('[data-test="date-time-btn"]').click();
+
+    //await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
+
+    // await page.waitForTimeout(3000);
 
     await page
       .locator(
@@ -156,95 +159,6 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
   });
-  // test("should allow adding a VRL function from the saved function list in the visualization", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click();
-  //   await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.locator('[data-test="logs-visualize-toggle"]').click();
-  //   await page
-  //     .locator(
-  //       "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-  //     )
-  //     .click();
-  //   await page
-  //     .locator("#fnEditor")
-  //     .getByLabel("Editor content;Press Alt+F1")
-  //     .fill(".vrlsanity=100");
-  //   await page.waitForTimeout(2000);
-
-  //   await page
-  //     .locator('[data-test="logs-search-bar-function-dropdown"] button')
-  //     .filter({ hasText: "save" })
-  //     .click();
-  //   await page.locator('[data-test="saved-function-name-input"]').click();
-  //   await page
-  //     .locator('[data-test="saved-function-name-input"]')
-  //     .fill("VRLsanity");
-  //   await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
-  //   await page.waitForTimeout(1000);
-
-  //   // await expect(page.getByText("Function saved successfully")).toBeVisible();
-  //   // await page
-  //   //   .locator('[data-test="logs-search-bar-reset-filters-btn"]')
-  //   //   .click();
-  //   // await page
-  //   //   .locator("div")
-  //   //   .filter({ hasText: /^\.vrlsanity=100$/ })
-  //   //   .nth(3)
-  //   //   .click();
-  //   await page
-  //     .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-  //     .click();
-  //   await page
-  //     .locator('[data-test="logs-search-bar-function-dropdown"]')
-  //     .getByLabel("Expand")
-  //     .click();
-
-  //   // Locate the dropdown after expansion
-  //   const dropdown = page.locator(
-  //     '[data-test="logs-search-bar-function-dropdown"]'
-  //   );
-
-  //   // Scroll the dropdown until the "VRLsanity" option is visible
-  //   await dropdown.evaluate((element) => {
-  //     const option = Array.from(element.querySelectorAll("option")).find(
-  //       (opt) => opt.textContent === "VRLsanity"
-  //     );
-  //     if (option) {
-  //       option.scrollIntoView({ block: "center" }); // Scroll to the option
-  //     }
-  //   });
-
-  //   // Click on the "VRLsanity" option
-  //   await page.getByRole("option", { name: "VRLsanity" }).click();
-
-  //   await expect(page.getByText("VRLsanity function applied")).toBeVisible();
-  //   await page
-  //     .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-  //     .click();
-  //   await page
-  //     .locator(
-  //       '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
-  //     )
-  //     .click();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await expect(
-  //     page.locator('[data-test="chart-renderer"] canvas')
-  //   ).toBeVisible();
-
-  //   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
-  //   await page.getByPlaceholder("Search Function").click();
-  //   await page.getByPlaceholder("Search Function").fill("VRLsanity");
-  //   await page
-  //     .getByRole("button", { name: "Delete Function" })
-  //     .first()
-  //     .click();
-  //   await page.locator('[data-test="confirm-button"]').click();
-  //   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  // });
-
   test('should display an error  masssge when  if  VRL field is not update after closing the "Toggle function editor " ', async ({
     page,
   }) => {
@@ -294,7 +208,7 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
 
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     // await page.waitForTimeout(1000);
@@ -303,6 +217,7 @@ test.describe(" visualize UI testcases", () => {
     await expect(
       page.getByText("There are some errors, please fix them and try again")
     ).toBeVisible();
+
     await page.locator("#q-notify").getByRole("button").click();
     await expect(page.getByText("Please update Y-Axis")).toBeVisible();
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
@@ -448,15 +363,15 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRL=1000");
 
-    // Refresh logs search bar
+    // Refresh visulize search bar
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .dblclick();
 
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    // await page.waitForTimeout(5000);
+    // await page
+    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    //   .click();
+    await page.waitForTimeout(3000);
 
     // Add VRL function field to Breakdown
     await page
