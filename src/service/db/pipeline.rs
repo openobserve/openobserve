@@ -16,35 +16,52 @@
 // use std::sync::Arc;
 
 use anyhow::Result;
-use config::meta::{pipeline::Pipeline, stream::StreamParams};
+use config::meta::{
+    pipeline::{components::PipelineSource, Pipeline, PipelineParams},
+    stream::StreamParams,
+};
 use infra::pipeline::{self as infra_pipeline};
 
-// use crate::common::infra::config::STREAM_PIPELINES;
+use crate::{common::infra::config::STREAM_PIPELINES, service::pipeline::execution::PipelinedExt};
 
 /// Stores a new pipeline to database.
 ///
 /// Pipeline validation should be handled by the caller.
 pub async fn set(pipeline: &Pipeline) -> Result<()> {
-    match infra_pipeline::put(pipeline).await {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Error saving pipeline: {}", e);
-            return Err(anyhow::anyhow!("Error saving pipeline: {}", e));
+    if let Err(e) = infra_pipeline::put(pipeline).await {
+        log::error!("Error saving pipeline: {}", e);
+        return Err(anyhow::anyhow!("Error saving pipeline: {}", e));
+    }
+
+    // save to cache if realtime pipeline
+    if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+        if pipeline.enabled {
+            update_cache(stream_params, pipeline, PipelineTableEvent::Add).await;
         }
     }
+
     Ok(())
 }
+
 /// Updates a pipeline entry with the sane values.
 ///
 /// Pipeline validation should be handled by the caller.
 pub async fn update(pipeline: Pipeline) -> Result<()> {
-    match infra_pipeline::update(pipeline).await {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Error updating pipeline: {}", e);
-            return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
-        }
+    if let Err(e) = infra_pipeline::update(&pipeline).await {
+        log::error!("Error updating pipeline: {}", e);
+        return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
     }
+
+    // save to cache if realtime pipeline
+    if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+        let db_event = if pipeline.enabled {
+            PipelineTableEvent::Add
+        } else {
+            PipelineTableEvent::Remove
+        };
+        update_cache(stream_params, &pipeline, db_event).await;
+    }
+
     Ok(())
 }
 
@@ -56,6 +73,37 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> 
             log::error!("Error getting streams with pipeline for org({org}): {}", e);
             anyhow::anyhow!("Error getting streams with pipeline for org({org}): {}", e)
         })
+}
+
+/// Returns the pipeline_params by stream..
+///
+/// Used for pipeline execution.
+pub async fn get_by_stream(stream_params: &StreamParams) -> Option<PipelineParams> {
+    if let Some(pl_params) = STREAM_PIPELINES.read().await.get(stream_params) {
+        return Some(pl_params.clone());
+    }
+    let pipeline = infra_pipeline::get_by_stream(stream_params).await.ok();
+    match pipeline {
+        Some(pl) if pl.enabled => {
+            let node_map = pl.get_node_map();
+            match (
+                pl.build_adjacency_list(&node_map),
+                pl.register_functions().await,
+            ) {
+                (Ok(graph), Ok(vrl_map)) => Some((pl, node_map, graph, vrl_map)),
+                _ => {
+                    log::error!(
+                        "[Pipeline] {}/{}/{}: Error prep pipeline execution parameters.",
+                        pl.org,
+                        pl.name,
+                        pl.id,
+                    );
+                    None
+                }
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Returns the pipeline by id.
@@ -95,8 +143,85 @@ pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
 
 /// Deletes a pipeline by ID.
 pub async fn delete(pipeline_id: &str) -> Result<()> {
-    infra_pipeline::delete(pipeline_id).await.map_err(|e| {
-        log::error!("Error deleting pipeline with ID({pipeline_id}): {}", e);
-        anyhow::anyhow!("Error deleting pipeline with ID({pipeline_id}): {}", e)
-    })
+    match infra_pipeline::delete(pipeline_id).await {
+        Err(e) => {
+            log::error!("Error deleting pipeline with ID({pipeline_id}): {}", e);
+            return Err(anyhow::anyhow!(
+                "Error deleting pipeline with ID({pipeline_id}): {}",
+                e
+            ));
+        }
+        Ok(pipeline) => {
+            // remove from cache if realtime pipeline
+            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+                update_cache(stream_params, &pipeline, PipelineTableEvent::Remove).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Preload all enabled pipelines into the cache at startup.
+pub async fn cache() -> Result<(), anyhow::Error> {
+    let pipelines = list().await?;
+    let mut writer = STREAM_PIPELINES.write().await;
+    for pipeline in pipelines.into_iter() {
+        if pipeline.enabled {
+            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+                let node_map = pipeline.get_node_map();
+                if let (Ok(graph), Ok(vrl_map)) = (
+                    pipeline.build_adjacency_list(&node_map),
+                    pipeline.register_functions().await,
+                ) {
+                    writer.insert(stream_params.clone(), (pipeline, node_map, graph, vrl_map));
+                }
+            }
+        }
+    }
+    log::info!("[Pipeline] Cached with len: {}", writer.len());
+    Ok(())
+}
+
+/// Update STREAM_PIPELINES cache for realtime pipelines
+async fn update_cache(
+    stream_params: &StreamParams,
+    pipeline: &Pipeline,
+    event: PipelineTableEvent,
+) {
+    match event {
+        PipelineTableEvent::Remove => {
+            log::info!("[Pipeline]: pipeline {} removed from cache.", &pipeline.id);
+            STREAM_PIPELINES.write().await.remove(stream_params);
+        }
+        PipelineTableEvent::Add => {
+            let node_map = pipeline.get_node_map();
+            match (
+                pipeline.build_adjacency_list(&node_map),
+                pipeline.register_functions().await,
+            ) {
+                (Ok(graph), Ok(vrl_map)) => {
+                    let mut cacher = STREAM_PIPELINES.write().await;
+                    cacher.insert(
+                        stream_params.clone(),
+                        (pipeline.clone(), node_map, graph, vrl_map),
+                    );
+                    log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
+                }
+                _ => {
+                    log::error!(
+                        "[Pipeline] {}/{}/{}: Error adding to cache for failing to prepare for its params",
+                        pipeline.org,
+                        pipeline.name,
+                        pipeline.id,
+                    );
+                }
+            }
+        }
+    }
+}
+
+enum PipelineTableEvent {
+    Add,
+    Remove,
 }

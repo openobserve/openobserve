@@ -227,7 +227,7 @@ pub async fn ingest(
                             );
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
-                                stream_params.stream_name.as_str(),
+                                &stream_params.stream_name,
                                 &StreamType::Logs,
                             );
                             local_val.insert(
@@ -249,7 +249,7 @@ pub async fn ingest(
                         let function_no = pipeline.num_of_func();
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(stream_params.stream_name.to_string())
-                            .or_insert((Vec::new(), None));
+                            .or_insert_with(|| (Vec::new(), None));
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
                     }
@@ -297,7 +297,7 @@ pub async fn ingest(
 
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
-                .or_insert((Vec::new(), None));
+                .or_insert_with(|| (Vec::new(), None));
             ts_data.push((timestamp, local_val));
             *fn_num = need_usage_report.then_some(0); // no pl -> no func
         }

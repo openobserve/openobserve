@@ -164,6 +164,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("syslog settings cache failed");
 
+    // cache pipeline
+    db::pipeline::cache().await.expect("Pipeline cache failed");
+
     // cache file list
     if !cfg.common.meta_store_external {
         if LOCAL_NODE.is_ingester() {
