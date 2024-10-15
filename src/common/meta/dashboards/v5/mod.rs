@@ -214,6 +214,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     mark_line: Option<Vec<MarkLine>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    unit_mappings: Option<Vec<UnitMapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     no_value_replacement: Option<String>,
@@ -276,6 +278,15 @@ pub struct MarkLine {
     typee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitMapping {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected_unit: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
