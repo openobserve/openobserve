@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>Units Per Column</span>
+      <span>Overrides</span>
       <q-btn
         no-caps
         padding="xs"
@@ -24,7 +24,7 @@
     <q-btn
       @click="openUnitMappingPopup"
       style="cursor: pointer; padding: 0px 5px"
-      :label="' Add Units Per Column'"
+      :label="' Add field override'"
       no-caps
       data-test="dashboard-addpanel-config-unit-mapping-add-btn"
     />
