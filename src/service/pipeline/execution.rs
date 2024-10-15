@@ -21,11 +21,7 @@ use config::{
     get_config,
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{
-            self,
-            components::{Node, NodeData},
-            Pipeline,
-        },
+        pipeline::{self, components::NodeData, Pipeline},
         stream::StreamParams,
     },
     utils::{flatten, json::Value},
@@ -52,7 +48,7 @@ pub trait PipelinedExt: Sync + Send + 'static {
     fn execute(
         &self,
         input: Value,
-        node_map: &HashMap<String, Node>,
+        node_map: &HashMap<String, NodeData>,
         graph: &HashMap<String, Vec<String>>,
         vrl_map: &HashMap<String, VRLResultResolver>,
         runtime: &mut Runtime,
@@ -89,7 +85,7 @@ impl PipelinedExt for Pipeline {
     fn execute(
         &self,
         input: Value,
-        node_map: &HashMap<String, Node>,
+        node_map: &HashMap<String, NodeData>,
         graph: &HashMap<String, Vec<String>>,
         vrl_map: &HashMap<String, VRLResultResolver>,
         runtime: &mut Runtime,
@@ -127,7 +123,7 @@ fn dfs(
     mut current_value: Value,
     mut flattened: bool,
     current_node_id: &str,
-    node_map: &HashMap<String, Node>,
+    node_map: &HashMap<String, NodeData>,
     graph: &HashMap<String, Vec<String>>,
     vrl_map: &HashMap<String, VRLResultResolver>,
     runtime: &mut Runtime,
@@ -139,7 +135,7 @@ fn dfs(
 
     let current_node = node_map.get(current_node_id).unwrap();
 
-    match &current_node.data {
+    match &current_node {
         NodeData::Stream(stream_params) => {
             if !graph.contains_key(current_node_id) {
                 // leaf node
@@ -160,6 +156,20 @@ fn dfs(
             }
         }
         NodeData::Condition(condition_params) => {
+            // value must be flattened before condition params can take effect
+            if !flattened {
+                current_value = flatten::flatten_with_level(
+                    current_value,
+                    get_config().limit.ingest_flatten_level,
+                )
+                .map_err(|e| {
+                    anyhow!(
+                        "ConditionNode {current_node_id} error with flattening: {}",
+                        e
+                    )
+                })?;
+                flattened = true;
+            }
             for condition in &condition_params.conditions {
                 if !condition.evaluate(current_value.as_object().unwrap()) {
                     // Condition not met. Stop this branch
@@ -242,7 +252,7 @@ fn process_next_nodes(
     current_value: Value,
     flattened: bool,
     next_nodes: &Vec<String>,
-    node_map: &HashMap<String, Node>,
+    node_map: &HashMap<String, NodeData>,
     graph: &HashMap<String, Vec<String>>,
     vrl_map: &HashMap<String, VRLResultResolver>,
     runtime: &mut Runtime,

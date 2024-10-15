@@ -43,14 +43,14 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn create_table_index(&self) -> Result<()>;
     async fn drop_table(&self) -> Result<()>;
     async fn put(&self, pipeline: &Pipeline) -> Result<()>;
-    async fn update(&self, pipeline: Pipeline) -> Result<()>;
-    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline>;
+    async fn update(&self, pipeline: &Pipeline) -> Result<()>;
+    async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Pipeline>;
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline>;
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline>;
     async fn list(&self) -> Result<Vec<Pipeline>>;
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>>;
-    async fn delete(&self, pipeline_id: &str) -> Result<()>;
+    async fn delete(&self, pipeline_id: &str) -> Result<Pipeline>;
 }
 
 /// Initializes the PipelineTable - creates table and index
@@ -68,14 +68,14 @@ pub async fn put(pipeline: &Pipeline) -> Result<()> {
 
 /// Updates a pipeline entry by id
 #[inline]
-pub async fn update(pipeline: Pipeline) -> Result<()> {
+pub async fn update(pipeline: &Pipeline) -> Result<()> {
     CLIENT.update(pipeline).await
 }
 
 /// Finds the pipeline associated with the StreamParams within an organization
 #[inline]
-pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
-    CLIENT.get_by_stream(org, stream_params).await
+pub async fn get_by_stream(stream_params: &StreamParams) -> Result<Pipeline> {
+    CLIENT.get_by_stream(stream_params).await
 }
 
 /// Finds all streams with existing pipelines.
@@ -121,7 +121,7 @@ pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
 
 /// Deletes the pipeline by id
 #[inline]
-pub async fn delete(pipeline_id: &str) -> Result<()> {
+pub async fn delete(pipeline_id: &str) -> Result<Pipeline> {
     CLIENT.delete(pipeline_id).await
 }
 

@@ -34,7 +34,7 @@ pub mod components;
 // (pipeline, node_map, graph, vrl_map)
 pub type PipelineParams = (
     Pipeline,
-    HashMap<String, Node>,
+    HashMap<String, NodeData>,
     HashMap<String, Vec<String>>,
     HashMap<String, VRLResultResolver>,
 );
@@ -83,8 +83,9 @@ impl Pipeline {
     /// 2. non-empty edges list
     /// 3. 1st node in nodes list is either StreamNode or QueryNode
     /// 4. non-empty `conditions` in all ConditionNode nodes in nodes list
-    /// 5. all leaf nodes are of type StreamNode
-    /// 6. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
+    /// 5. every node is reachable
+    /// 6. all leaf nodes are of type StreamNode
+    /// 7. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
     ///    `after_flattened` checked FunctionNode
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
@@ -117,7 +118,7 @@ impl Pipeline {
                 }
                 self.source = PipelineSource::Scheduled(derived_stream);
             }
-            _ => return Err(anyhow!("source must be either a StreamNode or QueryNode")),
+            _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
         };
 
         // ck 4
@@ -127,7 +128,17 @@ impl Pipeline {
             return Err(anyhow!("ConditionNode must have non-empty conditions"));
         }
 
-        // build adjacency list for ck 5 & 6
+        // ck 5
+        if self.edges.len() < self.nodes.len() - 1 {
+            return Err(anyhow!(
+                "Insufficient number of edges to connect all nodes. Need at least {} for {} nodes, but got {}.",
+                self.nodes.len() - 1,
+                self.nodes.len(),
+                self.edges.len()
+            ));
+        }
+
+        // build adjacency list for ck 6 & 7
         let source_node_id = self.nodes[0].id.as_str();
         let node_map = self.get_node_map();
         let adjacency_list = self.build_adjacency_list(&node_map)?;
@@ -144,10 +155,10 @@ impl Pipeline {
     }
 
     /// Converts pipeline's node list to a map for quick lookup
-    pub fn get_node_map(&self) -> HashMap<String, Node> {
+    pub fn get_node_map(&self) -> HashMap<String, NodeData> {
         self.nodes
             .iter()
-            .map(|node| (node.get_node_id(), node.clone()))
+            .map(|node| (node.get_node_id(), node.get_node_data()))
             .collect()
     }
 
@@ -156,7 +167,7 @@ impl Pipeline {
     /// Used for pipeline validation and execution.
     pub fn build_adjacency_list(
         &self,
-        node_map: &HashMap<String, Node>,
+        node_map: &HashMap<String, NodeData>,
     ) -> Result<HashMap<String, Vec<String>>> {
         let mut adjacency_list = HashMap::new();
 
@@ -179,15 +190,15 @@ impl Pipeline {
     /// Finds all the destination streams in the pipeline.
     pub fn get_all_destination_streams(
         &self,
-        node_map: &HashMap<String, Node>,
+        node_map: &HashMap<String, NodeData>,
         graph: &HashMap<String, Vec<String>>,
     ) -> Vec<StreamParams> {
         node_map
             .iter()
-            .filter_map(|(id, node)| {
+            .filter_map(|(id, node_data)| {
                 if !graph.contains_key(id) {
-                    if let NodeData::Stream(stream_params) = node.get_node_data() {
-                        Some(stream_params)
+                    if let NodeData::Stream(stream_params) = node_data {
+                        Some(stream_params.clone())
                     } else {
                         None
                     }
@@ -283,7 +294,7 @@ pub struct PipelineList {
 fn dfs_traversal_check(
     current_id: &str,
     graph: &HashMap<String, Vec<String>>,
-    node_map: &HashMap<String, Node>,
+    node_map: &HashMap<String, NodeData>,
     mut flattened: bool,
     visited: &mut HashSet<String>,
 ) -> Result<()> {
@@ -294,8 +305,8 @@ fn dfs_traversal_check(
     // Check if the current node is a leaf node
     if !graph.contains_key(current_id) {
         // Ensure leaf nodes are Stream nodes
-        if let Some(node) = node_map.get(current_id) {
-            if !matches!(node.get_node_data(), NodeData::Stream(_)) {
+        if let Some(node_data) = node_map.get(current_id) {
+            if !matches!(node_data, NodeData::Stream(_)) {
                 return Err(anyhow!("All leaf nodes must be StreamNode"));
             }
         } else {
@@ -306,7 +317,7 @@ fn dfs_traversal_check(
     }
 
     for next_node_id in graph.get(current_id).unwrap() {
-        if let NodeData::Function(func_params) = &node_map.get(next_node_id).unwrap().data {
+        if let NodeData::Function(func_params) = &node_map.get(next_node_id).unwrap() {
             if flattened && !func_params.after_flatten {
                 return Err(anyhow!(
                     "After Flatten must be checked if a previous FunctionNode already checked it in the same branch."

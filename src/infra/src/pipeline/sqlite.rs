@@ -173,12 +173,12 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
         Ok(())
     }
 
-    async fn update(&self, pipeline: Pipeline) -> Result<()> {
+    async fn update(&self, pipeline: &Pipeline) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
 
-        if let Err(e) = match pipeline.source {
+        if let Err(e) = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
                 let (source_type, stream_org, stream_name, stream_type): (&str, &str, &str, &str) = (
                     "realtime",
@@ -195,16 +195,16 @@ UPDATE pipeline
                 )
                 .bind(pipeline.version)
                 .bind(pipeline.enabled)
-                .bind(pipeline.name)
-                .bind(pipeline.description)
-                .bind(pipeline.org)
+                .bind(&pipeline.name)
+                .bind(&pipeline.description)
+                .bind(&pipeline.org)
                 .bind(source_type)
                 .bind(stream_org)
                 .bind(stream_name)
                 .bind(stream_type)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
-                .bind(pipeline.id)
+                .bind(&pipeline.id)
                 .execute(&mut *tx)
                 .await
             }
@@ -223,14 +223,14 @@ UPDATE pipeline
                 )
                 .bind(pipeline.version)
                 .bind(pipeline.enabled)
-                .bind(pipeline.name)
-                .bind(pipeline.description)
-                .bind(pipeline.org)
+                .bind(&pipeline.name)
+                .bind(&pipeline.description)
+                .bind(&pipeline.org)
                 .bind(source_type)
                 .bind(derived_stream_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
-                .bind(pipeline.id)
+                .bind(&pipeline.id)
                 .execute(&mut *tx)
                 .await
             }
@@ -251,13 +251,13 @@ UPDATE pipeline
         Ok(())
     }
 
-    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
+    async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Pipeline> {
         let pool = CLIENT_RO.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5;
         "#;
         let pipeline = sqlx::query_as::<_, Pipeline>(query)
-            .bind(org)
+            .bind(stream_params.org_id.as_str())
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
@@ -360,15 +360,28 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         }
     }
 
-    async fn delete(&self, pipeline_id: &str) -> Result<()> {
+    async fn delete(&self, pipeline_id: &str) -> Result<Pipeline> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(r#"DELETE FROM pipeline WHERE id = $1;"#)
+        let mut tx = client.begin().await?;
+
+        let pipeline = sqlx::query_as::<_, Pipeline>("SELECT * FROM pipeline WHERE id = $1;")
             .bind(pipeline_id)
-            .execute(&*client)
+            .fetch_one(&mut *tx)
             .await?;
 
+        sqlx::query(r#"DELETE FROM pipeline WHERE id = $1;"#)
+            .bind(pipeline_id)
+            .execute(&mut *tx)
+            .await?;
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit delete pipeline error: {}", e);
+            return Err(e.into());
+        }
+
+        // release lock
         drop(client);
-        Ok(())
+        Ok(pipeline)
     }
 }

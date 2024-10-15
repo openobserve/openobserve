@@ -91,6 +91,7 @@ pub struct VRLRuntimeConfig {
     pub fields: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct VRLResultResolver {
     pub program: Program,
     pub fields: Vec<String>,

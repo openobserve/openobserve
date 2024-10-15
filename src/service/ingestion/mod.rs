@@ -45,7 +45,7 @@ use vrl::{
     prelude::state,
 };
 
-use super::{pipeline::execution::PipelinedExt, usage::publish_triggers_usage};
+use super::{db::pipeline, usage::publish_triggers_usage};
 use crate::{
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
@@ -156,30 +156,7 @@ pub async fn get_stream_pipeline_params(
     stream_type: &StreamType,
 ) -> Option<PipelineParams> {
     let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
-    let pipeline = infra::pipeline::get_by_stream(org_id, &stream_params)
-        .await
-        .ok();
-    match pipeline {
-        Some(pl) if pl.enabled => {
-            let node_map = pl.get_node_map();
-            match (
-                pl.build_adjacency_list(&node_map),
-                pl.register_functions().await,
-            ) {
-                (Ok(graph), Ok(vrl_map)) => Some((pl, node_map, graph, vrl_map)),
-                _ => {
-                    log::error!(
-                        "[Pipeline] {}/{}/{}: Error prep pipeline execution parameters. Skip pipeline execution",
-                        pl.org,
-                        pl.name,
-                        pl.id,
-                    );
-                    None
-                }
-            }
-        }
-        _ => None,
-    }
+    pipeline::get_by_stream(&stream_params).await
 }
 
 pub async fn get_stream_alerts(
