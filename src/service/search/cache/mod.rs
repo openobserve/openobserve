@@ -35,9 +35,8 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::functions,
+        utils::{functions, http::get_work_group},
     },
-    handler::http::request::search::get_work_group,
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
         usage::{http_report_metrics, report_request_usage_stats},

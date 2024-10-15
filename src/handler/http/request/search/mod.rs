@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    io::Error,
-};
+use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use arrow_schema::Schema;
@@ -43,7 +40,7 @@ use crate::{
             functions,
             http::{
                 get_index_type_from_request, get_or_create_trace_id, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
         },
     },
@@ -1634,14 +1631,4 @@ pub async fn search_history(
     .await;
 
     Ok(HttpResponse::Ok().json(search_res))
-}
-
-pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
-    let work_groups = work_group_set.into_iter().flatten().collect::<HashSet<_>>();
-    if work_groups.contains("long") {
-        return Some("long".to_string());
-    } else if work_groups.contains("short") {
-        return Some("short".to_string());
-    }
-    None
 }
