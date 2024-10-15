@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
-      <span class="full-width">
+      <span class="full-width flex justify-center">
         <img
           v-if="
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
