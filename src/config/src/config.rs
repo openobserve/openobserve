@@ -701,7 +701,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "parquet",
-        help = "InvertedIndex store format, parquet(default), fst, or both."
+        help = "InvertedIndex store format, parquet(default), or both."
     )]
     pub inverted_index_store_format: String,
     #[env_config(
@@ -1529,9 +1529,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.inverted_index_store_format.is_empty() {
         cfg.common.inverted_index_search_format = "parquet".to_string();
     }
-    if !["both", "parquet", "fst"].contains(&cfg.common.inverted_index_store_format.as_str()) {
+    if !["both", "parquet"].contains(&cfg.common.inverted_index_store_format.as_str()) {
         return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet, fst."
+            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet."
         ));
     }
     if cfg.common.inverted_index_store_format != "both" {
