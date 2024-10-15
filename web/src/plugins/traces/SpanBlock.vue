@@ -58,21 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start items-center no-wrap"
           ref="spanMarkerRef"
         >
-          <q-icon
-            dense
-            round
-            flat
-            name="expand_more"
-            class="collapse-btn"
-            :style="{
-              rotate: isSpanSelected ? '0deg' : '270deg',
-            }"
-            @click.prevent.stop="toggleSpanDetails()"
-          />
-
           <div
             :style="{
-              width: 'calc(100% - 21px)',
+              width: 'calc(100% - 6px)',
               height: '100%',
               borderRadius: '2px',
               backgroundColor: span.style?.color || '#58508d',
@@ -268,7 +256,7 @@ export default defineComponent({
         style.right = 0;
         style.top = "-5px";
       } else if (leftPosition.value > 50) {
-        style.left = leftPosition.value * onePercent - labelWidth + 10 + "px";
+        style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {
         const left =
           leftPosition.value +

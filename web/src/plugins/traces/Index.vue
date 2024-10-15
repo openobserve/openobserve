@@ -89,7 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                  :htmlContent="
+                    searchObj.data.errorMsg +
+                    '<h6 style=\'font-size: 14px; margin: 0;\'>' +
+                    searchObj.data.errorDetail +
+                    '</h6>'
+                  "
+                />
                 <div
                   data-test="logs-search-error-20003"
                   v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -763,22 +769,7 @@ export default defineComponent({
           });
         }
 
-        const durationFilter = indexListRef.value.duration.input;
-
         let filter = searchObj.data.editorValue.trim();
-
-        if (
-          searchObj.meta.filterType === "basic" &&
-          durationFilter.max !== undefined &&
-          durationFilter.min !== undefined
-        ) {
-          const minDuration = durationFilter.min * 1000;
-          const maxDuration = durationFilter.max * 1000;
-
-          const duration = `duration >= ${minDuration} AND duration <= ${maxDuration}`;
-
-          filter = filter ? `${filter} AND ${duration}` : duration;
-        }
 
         searchService
           .get_traces({
@@ -1194,10 +1185,6 @@ export default defineComponent({
 
       if (queryParams.query) {
         searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-      }
-
-      if (queryParams.filter_type) {
-        searchObj.meta.filterType = queryParams.filter_type;
       }
 
       if (
