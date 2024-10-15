@@ -240,7 +240,7 @@ function extractFields(parsedAst: any, timeField: string) {
       // histogram field
       field.column = column?.expr?.args?.value[0]?.column ?? timeField;
       field.aggregationFunction =
-        column?.expr?.name[0]?.value?.toLowerCase() ?? "histogram";
+        column?.expr?.name?.[0]?.value?.toLowerCase() ?? "histogram";
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -406,10 +406,10 @@ function parseCondition(condition: any) {
         };
       }
     } else if (condition.type === "function") {
-      let conditionName = condition?.name?.name[0]?.value?.toLowerCase();
+      const conditionName = condition?.name?.name?.[0]?.value?.toLowerCase();
 
       // function with field name and value
-      let conditionsWithFieldName = [
+      const conditionsWithFieldName = [
         "str_match",
         "str_match_ignore_case",
         "re_match",
@@ -417,7 +417,7 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      let conditionsWithoutFieldName = [
+      const conditionsWithoutFieldName = [
         "match_all",
         "match_all_raw",
         "match_all_raw_ignore_case",
@@ -597,7 +597,7 @@ export const changeHistogramInterval = async (
     // check if the column is histogram
     if (
       column.expr.type === "function" &&
-      column?.expr?.name?.name[0]?.value === "histogram"
+      column?.expr?.name?.name?.[0]?.value === "histogram"
     ) {
       const histogramExpr = column.expr;
       if (histogramExpr.args && histogramExpr.args.type === "expr_list") {

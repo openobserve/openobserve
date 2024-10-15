@@ -63,7 +63,6 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
-    filterType: "basic",
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -200,8 +199,6 @@ const useTraces = () => {
     }
 
     query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
-
-    query["filter_type"] = searchObj.meta.filterType;
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
