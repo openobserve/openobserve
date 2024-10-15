@@ -147,7 +147,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         }
     }
 
-    match db::pipeline::update(pipeline).await {
+    match db::pipeline::update(&pipeline).await {
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -216,7 +216,7 @@ pub async fn enable_pipeline(
     };
 
     pipeline.enabled = value;
-    match db::pipeline::update(pipeline).await {
+    match db::pipeline::update(&pipeline).await {
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

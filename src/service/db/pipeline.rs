@@ -46,8 +46,8 @@ pub async fn set(pipeline: &Pipeline) -> Result<()> {
 /// Updates a pipeline entry with the sane values.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn update(pipeline: Pipeline) -> Result<()> {
-    if let Err(e) = infra_pipeline::update(&pipeline).await {
+pub async fn update(pipeline: &Pipeline) -> Result<()> {
+    if let Err(e) = infra_pipeline::update(pipeline).await {
         log::error!("Error updating pipeline: {}", e);
         return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
     }
@@ -59,7 +59,7 @@ pub async fn update(pipeline: Pipeline) -> Result<()> {
         } else {
             PipelineTableEvent::Remove
         };
-        update_cache(stream_params, &pipeline, db_event).await;
+        update_cache(stream_params, pipeline, db_event).await;
     }
 
     Ok(())
