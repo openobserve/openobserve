@@ -1525,7 +1525,7 @@ export const convertSQLData = async (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      const maxYaxisWidth = options.yAxis.reduce((acc, it) => {
+      const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
         return Math.max(acc, it.axisLabel.width || 0);
       }, 0);
 
