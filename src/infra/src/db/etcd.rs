@@ -433,7 +433,8 @@ impl super::Db for Etcd {
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        let (tx, rx) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(65535);
+        let prefix = prefix.to_string();
         let key = format!("{}{}", &self.prefix, prefix);
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
@@ -443,6 +444,7 @@ impl super::Db for Etcd {
                 }
                 let mut client = get_etcd_client().await.clone();
                 let opt = etcd_client::WatchOptions::new().with_prefix();
+                log::debug!("[ETCD:watch] prefix: {}", prefix);
                 let (mut _watcher, mut stream) =
                     match client.watch(key.clone(), Some(opt.clone())).await {
                         Ok((watcher, stream)) => (watcher, stream),
@@ -465,23 +467,25 @@ impl super::Db for Etcd {
                             let kv = ev.kv().unwrap();
                             let item_key = kv.key_str().unwrap();
                             let item_key = item_key.strip_prefix(&self_prefix).unwrap();
-                            match ev.event_type() {
-                                EventType::Put => tx
-                                    .send(Event::Put(EventData {
-                                        key: item_key.to_string(),
-                                        value: Some(Bytes::from(kv.value().to_vec())),
-                                        start_dt: None,
-                                    }))
-                                    .await
-                                    .unwrap(),
-                                EventType::Delete => tx
-                                    .send(Event::Delete(EventData {
-                                        key: item_key.to_string(),
-                                        value: None,
-                                        start_dt: None,
-                                    }))
-                                    .await
-                                    .unwrap(),
+                            let ret = match ev.event_type() {
+                                EventType::Put => tx.try_send(Event::Put(EventData {
+                                    key: item_key.to_string(),
+                                    value: Some(Bytes::from(kv.value().to_vec())),
+                                    start_dt: None,
+                                })),
+                                EventType::Delete => tx.try_send(Event::Delete(EventData {
+                                    key: item_key.to_string(),
+                                    value: None,
+                                    start_dt: None,
+                                })),
+                            };
+                            if let Err(e) = ret {
+                                log::warn!(
+                                    "[ETCD:watch] prefix: {}, key: {}, send error: {}",
+                                    prefix,
+                                    item_key,
+                                    e
+                                );
                             }
                         }
                     }

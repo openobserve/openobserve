@@ -105,6 +105,7 @@ struct ConfigResponse<'a> {
     rum: Rum,
     custom_logo_img: Option<String>,
     custom_hide_menus: String,
+    custom_hide_self_logo: bool,
     meta_org: String,
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
@@ -219,6 +220,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_menus = "";
 
     #[cfg(feature = "enterprise")]
+    let custom_hide_self_logo = O2_CONFIG.common.custom_hide_self_logo;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_hide_self_logo = false;
+
+    #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
@@ -252,6 +258,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
         custom_hide_menus: custom_hide_menus.to_string(),
+        custom_hide_self_logo,
         rum: Rum {
             enabled: cfg.rum.enabled,
             client_token: cfg.rum.client_token.to_string(),

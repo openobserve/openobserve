@@ -121,9 +121,30 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+        let stream_schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
-            .unwrap();
+            .unwrap_or(Schema::empty());
+        let schema_metadata = stream_schema.metadata();
+        // check if need to update metadata
+        let mut need_update = false;
+        for (k, v) in extra_metadata.iter() {
+            if schema_metadata.contains_key(k) && schema_metadata.get(k).unwrap() == v {
+                continue;
+            }
+            need_update = true;
+            break;
+        }
+        if need_update {
+            if let Err(e) =
+                update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata).await
+            {
+                log::error!(
+                    "Error updating metadata for stream: {}, err: {}",
+                    metric_name,
+                    e
+                );
+            }
+        }
     }
 
     // maybe empty, we can return immediately
