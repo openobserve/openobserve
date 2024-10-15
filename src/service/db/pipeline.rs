@@ -22,7 +22,7 @@ use config::meta::{
 };
 use infra::pipeline::{self as infra_pipeline};
 
-use crate::{common::infra::config::STREAM_PIPELINES, service::pipeline::execution::PipelinedExt};
+use crate::{common::infra::config::STREAM_PIPELINES, service::pipeline::execution::PipelineExt};
 
 /// Stores a new pipeline to database.
 ///

@@ -48,7 +48,7 @@ use crate::{
     },
     service::{
         format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        pipeline::execution::PipelinedExt, schema::get_upto_discard_error,
+        pipeline::execution::PipelineExt, schema::get_upto_discard_error,
     },
 };
 

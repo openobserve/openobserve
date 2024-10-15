@@ -50,7 +50,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        pipeline::execution::PipelinedExt,
+        pipeline::execution::PipelineExt,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,
         usage::report_request_usage_stats,

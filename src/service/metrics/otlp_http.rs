@@ -53,7 +53,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
-        pipeline::execution::PipelinedExt,
+        pipeline::execution::PipelineExt,
         schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },

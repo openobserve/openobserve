@@ -51,7 +51,7 @@ use crate::{
             write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels},
-        pipeline::execution::PipelinedExt,
+        pipeline::execution::PipelineExt,
         schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },

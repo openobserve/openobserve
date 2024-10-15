@@ -38,7 +38,7 @@ use crate::{
         },
         db::{self, scheduler::DerivedTriggerData},
         ingestion::ingestion_service,
-        pipeline::execution::PipelinedExt,
+        pipeline::execution::PipelineExt,
         usage::publish_triggers_usage,
     },
 };

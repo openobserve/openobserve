@@ -41,7 +41,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-use super::{logs::O2IngestJsonData, pipeline::execution::PipelinedExt};
+use super::{logs::O2IngestJsonData, pipeline::execution::PipelineExt};
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,

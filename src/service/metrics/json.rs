@@ -42,7 +42,7 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
-        pipeline::execution::PipelinedExt,
+        pipeline::execution::PipelineExt,
         schema::check_for_schema,
         usage::report_request_usage_stats,
     },

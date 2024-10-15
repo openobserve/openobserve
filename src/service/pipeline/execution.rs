@@ -35,7 +35,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait PipelinedExt: Sync + Send + 'static {
+pub trait PipelineExt: Sync + Send + 'static {
     /// Registers the function of all the FunctionNode of this pipeline once for execution.
     /// Returns a map of node_id -> VRLResultResolver for quick lookup
     async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>>;
@@ -56,7 +56,7 @@ pub trait PipelinedExt: Sync + Send + 'static {
 }
 
 #[async_trait]
-impl PipelinedExt for Pipeline {
+impl PipelineExt for Pipeline {
     async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>> {
         let mut vrl_map = HashMap::new();
         for node in &self.nodes {

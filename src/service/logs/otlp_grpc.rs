@@ -44,7 +44,7 @@ use crate::{
             check_ingestion_allowed,
             grpc::{get_val, get_val_with_type_retained},
         },
-        pipeline::execution::PipelinedExt,
+        pipeline::execution::PipelineExt,
         schema::get_upto_discard_error,
     },
 };

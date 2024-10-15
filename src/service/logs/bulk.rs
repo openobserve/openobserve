@@ -36,7 +36,7 @@ use config::{
 use crate::{
     common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     service::{
-        format_stream_name, ingestion::check_ingestion_allowed, pipeline::execution::PipelinedExt,
+        format_stream_name, ingestion::check_ingestion_allowed, pipeline::execution::PipelineExt,
         schema::get_upto_discard_error,
     },
 };
