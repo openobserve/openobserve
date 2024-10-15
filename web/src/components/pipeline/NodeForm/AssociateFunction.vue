@@ -120,6 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
+              use-input
+              input-debounce="300"
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="min-width: 220px"
               v-bind:readonly="isUpdating"
@@ -127,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :error-message="
                 selectedFunction ? 'Function is already associated' : ''
               "
+              @filter="filterFunctions"
               :error="functionExists"
             />
     
@@ -312,15 +315,17 @@ const dialog = ref({
 });
 
 watch(
-  () => props.functions,
-  (newVal) => {
-    filteredFunctions.value = [...newVal];
-  },
-  {
-    deep: true,
-    immediate: true,
-  },
-);
+      () => props.functions,
+      (newVal) => {
+        filteredFunctions.value = [...newVal].sort((a, b) => {
+          return a.localeCompare(b);
+        });
+      },
+      {
+        deep: true,
+        immediate: true,
+      }
+    );
 
 onBeforeMount(() => {
   
@@ -329,7 +334,6 @@ onBeforeMount(() => {
 onMounted(()=>{
  pipelineObj.userSelectedNode = {};
  selected.value = null
- console.log(formattedOptions.value,"fm")
 })
 
 
@@ -418,36 +422,19 @@ const deleteFunction = () => {
 
   emit("cancel:hideform");
 };
+const filterFunctions = (val, update) => {
+      const filtered = props.functions
+        .filter((func) =>
+          func.toLowerCase().includes(val.toLowerCase())
+        )
+        .sort((a, b) => a.localeCompare(b));
 
 
-const nodes = ref([
-  {
-    id: "8c6cbd97-356e-4ef0-813c-c4620d7274d7",
-    type: "input",
-    io_type: "input",
-    position: { x: 162, y: 66.66666666666667 },
-    data: {
-      label: "8c6cbd97-356e-4ef0-813c-c4620d7274d7",
-      node_type: "stream",
-      stream_name: {
-        _value: { label: "test_stream", value: "test_stream", isDisable: false }
-      },
-      org_id: "default"
-    }
-  },
-  {
-    id: "55549ada-9965-4984-9f52-fb50b3985eca",
-    type: "default",
-    io_type: "default",
-    position: { x: 132, y: 178 },
-    data: {
-      label: "55549ada-9965-4984-9f52-fb50b3985eca",
-      node_type: "function",
-      name: "ksjdflskjf",
-      after_flatten: false
-    }
-  }
-]);
+
+      update(() => {
+        filteredFunctions.value = filtered;
+      });
+    };
 
 // const formattedOptions = computed (() => {
 //   console.log( pipelineObj.previousNodeOptions,"op")
@@ -486,7 +473,7 @@ function getIcon(data:any) {
   const node : any = pipelineObj.nodeTypes.find(
     (node:any) => node.subtype === searchTerm && node.io_type === data.io_type,
   );
-  console.log(node,"node")
+
   switch (data.node_type as string) {
     case "stream":
       return streamImage;
