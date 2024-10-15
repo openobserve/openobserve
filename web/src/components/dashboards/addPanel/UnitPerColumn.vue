@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>Overrides</span>
+      <span>Override Config</span>
       <q-btn
         no-caps
         padding="xs"
