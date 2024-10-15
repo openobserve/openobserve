@@ -615,10 +615,11 @@ impl super::Db for NatsDb {
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
+                            let new_key = bucket_prefix.to_string() + &item_key;
                             let ret = match entry.operation {
                                 jetstream::kv::Operation::Put => {
                                     tx.try_send(Event::Put(EventData {
-                                        key: bucket_prefix.to_string() + &item_key,
+                                        key: new_key.clone(),
                                         value: Some(entry.value),
                                         start_dt: None,
                                     }))
@@ -626,14 +627,19 @@ impl super::Db for NatsDb {
                                 jetstream::kv::Operation::Delete
                                 | jetstream::kv::Operation::Purge => {
                                     tx.try_send(Event::Delete(EventData {
-                                        key: bucket_prefix.to_string() + &item_key,
+                                        key: new_key.clone(),
                                         value: None,
                                         start_dt: None,
                                     }))
                                 }
                             };
                             if let Err(e) = ret {
-                                log::warn!("[NATS:watch] prefix: {}, send error: {}", prefix, e);
+                                log::warn!(
+                                    "[NATS:watch] prefix: {}, key: {}, send error: {}",
+                                    prefix,
+                                    new_key,
+                                    e
+                                );
                             }
                         }
                     }
