@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="stream_type"
               :options="filteredStreamTypes"
               :label="t('alerts.streamType') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }"
+              :popup-content-style="{ textTransform: 'none' }"
               color="input-border"
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop no-case full-width"
@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
-
               @update:model-value="updateStreams()"
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
@@ -234,6 +233,8 @@ const filteredStreamTypes = computed(() => {
     });
 
 const getLogStream = (data: any) =>{
+  data.name = data.name.replace(/-/g, '_');
+
   stream_name.value = {label: data.name, value: data.name, isDisable: false};
   stream_type.value = data.stream_type;
   if(createNewStream.value){
@@ -358,6 +359,11 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   .q-separator {
     display: none !important;
   }
+}
+.q-field--labeled.showLabelOnTop.q-select .q-field__control-container .q-field__native > :first-child {
+  text-transform: none !important;
+  font-size: 0.875rem; /* Keep the font size and weight as needed */
+  font-weight: 600;
 }
 
 
