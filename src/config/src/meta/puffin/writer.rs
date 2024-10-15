@@ -71,7 +71,7 @@ impl<W> PuffinBytesWriter<W> {
 impl<W: io::Write> PuffinBytesWriter<W> {
     pub fn add_blob(
         &mut self,
-        raw_data: Vec<u8>,
+        raw_data: &Vec<u8>,
         object_type: String,
         file_name: String,
         compress: bool,
@@ -83,7 +83,7 @@ impl<W: io::Write> PuffinBytesWriter<W> {
             // compress blob raw data
             let mut encoder = zstd::Encoder::new(vec![], 3)?;
             encoder
-                .write_all(&raw_data)
+                .write_all(raw_data)
                 .context("Error encoding blob raw data")?;
             let compressed_bytes = encoder.finish()?;
             let compressed_bytes_len = compressed_bytes.len() as u64;
@@ -95,7 +95,7 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         } else {
             let raw_data_len = raw_data.len() as u64;
             // use raw data directly
-            (raw_data, raw_data_len, None)
+            (raw_data.to_owned(), raw_data_len, None)
         };
 
         self.writer.write_all(&final_data)?;

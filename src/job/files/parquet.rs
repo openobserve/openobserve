@@ -38,8 +38,8 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::{writer::PuffinBytesWriter, BLOB_TYPE},
+        puffin_dir::puffin_dir_writer::PuffinDirWriter,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
-        tantivy_inverted_index::PuffinDirectory,
     },
     metrics,
     utils::{
@@ -1343,7 +1343,7 @@ pub(crate) async fn create_tantivy_index(
         "[INGESTER:JOB]"
     };
 
-    let dir = PuffinDirectory::new();
+    let dir = PuffinDirWriter::new();
     let _ = generate_tantivy_index(
         dir.clone(),
         inverted_idx_batch,
@@ -1597,7 +1597,7 @@ pub(crate) fn prepare_fst_index_bytes(
 
     let mut puffin_buf: Vec<u8> = Vec::new();
     let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
-    puffin_writer.add_blob(writer, BLOB_TYPE.to_string(), "".to_string(), true)?;
+    puffin_writer.add_blob(&writer, BLOB_TYPE.to_string(), "".to_string(), true)?;
     puffin_writer.finish()?;
 
     file_meta.original_size = original_size as _;

@@ -1,63 +1,17 @@
-use std::{
-    io::{self, Write},
-    path::{Path, PathBuf},
-    sync::{Arc, LazyLock, RwLock},
-};
-
-use ahash::HashSet;
-use anyhow::{Context, Result};
-use futures::{AsyncRead, AsyncSeek};
-use itertools::Itertools;
-use tantivy::{
-    directory::{error::OpenReadError, Directory, RamDirectory, WatchCallback, WatchHandle},
-    doc,
-    schema::Schema,
-    HasLen,
-};
-
-use crate::{
-    get_config,
-    meta::puffin::{reader::PuffinBytesReader, writer::PuffinBytesWriter},
-};
-
-// This is an identifier for tantivy blobs inside puffin file.
-// Note: Tantivy blobs are not compressed.
-const TANTIVY_INDEX_VERSION: &str = "TIIv0.1.0";
-
-// We do not need all of the tantivy files, only the .term and .idx files
-// for getting doc IDs and also the meta.json file
-// This might change in the future when we add more features to the index
-const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos"];
-const META_JSON: &str = "meta.json";
-
-// Lazy loaded global instance of RAM directory which will contain
-// all the files of an empty tantivy index. This instance will be used to fill the missing files
-// from the `.ttv` file, as tantivy needs them regardless of the configuration of a field.
-static EMPTY_PUFFIN_DIRECTORY: LazyLock<PuffinDirectory> = LazyLock::new(|| {
-    let puffin_dir = PuffinDirectory::new();
-    let puffin_dir_clone = puffin_dir.clone();
-    let schema = Schema::builder().build();
-    let mut index_writer = tantivy::IndexBuilder::new()
-        .schema(schema)
-        .single_segment_index_writer(puffin_dir_clone, 50_000_000)
-        .unwrap();
-    let _ = index_writer.add_document(doc!());
-    index_writer.finalize().unwrap();
-    puffin_dir
-});
+use super::*;
 
 /// Puffin directory is a puffin file which contains all the tantivy files.
 /// Each tantivy file is stored as a blob in the puffin file, along with their file name.
 #[derive(Debug)]
-pub struct PuffinDirectory {
+pub struct PuffinDirWriter {
     ram_directory: Arc<RamDirectory>,
     /// record all the files paths in the puffin file
     file_paths: Arc<RwLock<HashSet<PathBuf>>>,
 }
 
-impl Clone for PuffinDirectory {
+impl Clone for PuffinDirWriter {
     fn clone(&self) -> Self {
-        PuffinDirectory {
+        PuffinDirWriter {
             ram_directory: self.ram_directory.clone(),
             file_paths: self.file_paths.clone(),
         }
@@ -66,7 +20,7 @@ impl Clone for PuffinDirectory {
 
 pub fn convert_puffin_dir_to_tantivy_dir(
     mut puffin_dir_path: PathBuf,
-    puffin_dir: PuffinDirectory,
+    puffin_dir: PuffinDirWriter,
 ) {
     // create directory
     let cfg = get_config();
@@ -105,9 +59,9 @@ pub fn convert_puffin_dir_to_tantivy_dir(
     }
 }
 
-impl PuffinDirectory {
+impl PuffinDirWriter {
     pub fn new() -> Self {
-        PuffinDirectory {
+        PuffinDirWriter {
             ram_directory: Arc::new(RamDirectory::create()),
             file_paths: Arc::new(RwLock::new(HashSet::default())),
         }
@@ -157,7 +111,7 @@ impl PuffinDirectory {
             );
             puffin_writer
                 .add_blob(
-                    file_data
+                    &file_data
                         .read_bytes()
                         .expect("failed to read file")
                         .to_vec(),
@@ -198,7 +152,7 @@ impl PuffinDirectory {
 
             puffin_writer
                 .add_blob(
-                    file_data
+                    &file_data
                         .read_bytes()
                         .expect("failed to read file")
                         .to_vec(),
@@ -212,42 +166,10 @@ impl PuffinDirectory {
         puffin_writer.finish().context("Failed to finish writing")?;
         Ok(puffin_buf)
     }
-
-    /// Open a puffin direcotry from the given bytes data
-    pub async fn from_bytes<R>(data: R) -> Result<Self>
-    where
-        R: AsyncRead + AsyncSeek + Unpin + Send,
-    {
-        let mut puffin_reader = PuffinBytesReader::new(data);
-        let puffin_dir = PuffinDirectory::new();
-
-        let puffin_meta = puffin_reader
-            .get_metadata()
-            .await
-            .context("Failed to get blobs meta")?;
-
-        for blob_meta in puffin_meta.blob_metadata {
-            let blob = puffin_reader.read_blob_bytes(&blob_meta).await?;
-            // Fetch the files names from the blob_meta itself
-            if let Some(file_name) = blob_meta.properties.get("file_name") {
-                let path = PathBuf::from(file_name);
-                let mut writer = puffin_dir
-                    .open_write(&path)
-                    .context("Failed to write to RAM directory")?;
-                writer.write_all(&blob)?;
-                writer.flush()?;
-                puffin_dir.add_file_path(path);
-            }
-        }
-        Ok(puffin_dir)
-    }
-
-    fn add_file_path(&self, path: PathBuf) {
-        self.file_paths.write().unwrap().insert(path);
-    }
 }
 
-impl Directory for PuffinDirectory {
+/// This implementation is used during index creation.
+impl Directory for PuffinDirWriter {
     fn get_file_handle(
         &self,
         path: &Path,
@@ -272,6 +194,7 @@ impl Directory for PuffinDirectory {
         self.ram_directory.open_write(path)
     }
 
+    // this should read from the puffin source
     fn atomic_read(&self, path: &Path) -> Result<Vec<u8>, OpenReadError> {
         self.ram_directory.atomic_read(path)
     }

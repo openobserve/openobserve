@@ -65,6 +65,7 @@ tracing-subscriber.workspace = true
 utoipa.workspace = true
 zstd.workspace = true
 tokio-util = { version = "0.7.12", features = ["compat"] }
+async-trait = "0.1.83"
 
 [dev-dependencies]
 criterion.workspace = true

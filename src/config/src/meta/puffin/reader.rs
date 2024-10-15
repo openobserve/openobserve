@@ -24,6 +24,7 @@ use super::{
 };
 use crate::meta::puffin::{CompressionCodec, MIN_FILE_SIZE};
 
+#[derive(Debug)]
 pub struct PuffinBytesReader<R> {
     source: R,
     metadata: Option<PuffinMeta>,
@@ -92,7 +93,8 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
 
         let puffin_meta = PuffinFooterBytesReader::new(&mut self.source, end_offset)
             .parse()
-            .await?;
+            .await
+            .unwrap();
         self.metadata = Some(puffin_meta.clone());
 
         Ok(puffin_meta)
@@ -104,7 +106,6 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
 struct PuffinFooterBytesReader<R> {
     source: R,
     file_size: u64,
-    chunk: FooterChunk,
     flags: PuffinFooterFlags,
     payload_size: u64,
     metadata: Option<PuffinMeta>,
@@ -115,7 +116,6 @@ impl<R> PuffinFooterBytesReader<R> {
         Self {
             source,
             file_size,
-            chunk: FooterChunk::FootMagic,
             flags: PuffinFooterFlags::empty(),
             payload_size: 0,
             metadata: None,
@@ -125,69 +125,45 @@ impl<R> PuffinFooterBytesReader<R> {
 
 impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
     async fn parse(mut self) -> Result<PuffinMeta> {
-        let mut buf = Vec::new();
-        while let Some((offset, size)) = self.next_chunk_to_read() {
-            self.source.seek(SeekFrom::Start(offset)).await?;
-            let size = size as usize;
-            buf.resize(size, 0);
-            let buf = &mut buf[..size];
-            self.source.read_exact(buf).await?;
-            self.parse_chunk(buf)?;
-        }
+        // read the footer magic and
+        self.source
+            .seek(SeekFrom::Start(self.footer_magic_offset()))
+            .await?;
+        let mut magic = [0u8; MAGIC_SIZE as usize];
+        self.source.read_exact(&mut magic).await?;
+        ensure!(magic == MAGIC, anyhow!("Footer MAGIC mismatch"));
 
-        ensure!(
-            self.chunk == FooterChunk::Finished,
-            anyhow!("Error parsing Puffin footer from bytes")
-        );
+        self.source
+            .seek(SeekFrom::Start(self.flags_offset()))
+            .await?;
+        let mut flags = [0u8; FLAGS_SIZE as usize];
+        self.source.read_exact(&mut flags).await?;
+        self.flags = PuffinFooterFlags::from_bits(u32::from_le_bytes(flags))
+            .ok_or_else(|| anyhow!("Error parsing Puffin flags from bytes"))?;
+
+        self.source
+            .seek(SeekFrom::Start(self.payload_size_offset()))
+            .await?;
+        let mut payload_size = [0u8; FOOTER_PAYLOAD_SIZE_SIZE as usize];
+        self.source.read_exact(&mut payload_size).await?;
+        self.payload_size = i32::from_le_bytes(payload_size) as u64;
+
+        self.source
+            .seek(SeekFrom::Start(self.payload_offset()))
+            .await?;
+        let mut payload: Vec<u8> = Vec::with_capacity(self.payload_size as usize);
+        payload.resize(self.payload_size as usize, 0);
+        self.source.read(&mut payload).await?;
+        self.metadata = Some(self.parse_payload(&payload)?);
+        self.validate_payload()?;
+
+        self.source
+            .seek(SeekFrom::Start(self.head_magic_offset()))
+            .await?;
+        self.source.read_exact(&mut magic).await?;
+        ensure!(magic == MAGIC, anyhow!("Footer MAGIC mismatch"));
 
         Ok(self.metadata.unwrap())
-    }
-
-    fn next_chunk_to_read(&mut self) -> Option<(u64, u64)> {
-        match self.chunk {
-            FooterChunk::FootMagic => Some((self.footer_magic_offset(), MAGIC_SIZE)),
-            FooterChunk::Flags => Some((self.flags_offset(), FLAGS_SIZE)),
-            FooterChunk::PayloadSize => {
-                Some((self.payload_size_offset(), FOOTER_PAYLOAD_SIZE_SIZE))
-            }
-            FooterChunk::Payload => Some((self.payload_offset(), self.payload_size)),
-            FooterChunk::HeadMagic => Some((self.head_magic_offset(), MAGIC_SIZE)),
-            FooterChunk::Finished => None,
-        }
-    }
-
-    fn parse_chunk(&mut self, bytes: &[u8]) -> Result<()> {
-        match self.chunk {
-            FooterChunk::FootMagic => {
-                ensure!(bytes == MAGIC, anyhow!("Head Magic mismatch"));
-                self.chunk = FooterChunk::Flags;
-            }
-            FooterChunk::Flags => {
-                let flag_bits = u32::from_le_bytes(bytes.try_into()?);
-                self.flags = PuffinFooterFlags::from_bits_truncate(flag_bits);
-                self.chunk = FooterChunk::PayloadSize;
-            }
-            FooterChunk::PayloadSize => {
-                let size = i32::from_le_bytes(bytes.try_into()?);
-                ensure!(
-                    size >= 0,
-                    anyhow!("Unexpected footer payload size {size}. Should be non-negative")
-                );
-                self.payload_size = size as _;
-                self.chunk = FooterChunk::Payload;
-            }
-            FooterChunk::Payload => {
-                self.metadata = Some(self.parse_payload(bytes)?);
-                self.validate_payload()?;
-                self.chunk = FooterChunk::HeadMagic;
-            }
-            FooterChunk::HeadMagic => {
-                ensure!(bytes == MAGIC, anyhow!("Magic Mismatch"));
-                self.chunk = FooterChunk::Finished;
-            }
-            FooterChunk::Finished => {}
-        }
-        Ok(())
     }
 
     fn parse_payload(&self, bytes: &[u8]) -> Result<PuffinMeta> {
@@ -197,7 +173,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
                 .map_err(|e| anyhow!("Error decompress footer payload {}", e.to_string()))
         } else {
             serde_json::from_slice(bytes)
-                .map_err(|e| anyhow!("Error decompress footer payload {}", e.to_string()))
+                .map_err(|e| anyhow!("Error serializing footer {}", e.to_string()))
         }
     }
 
@@ -244,14 +220,4 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
     fn head_magic_offset(&self) -> u64 {
         self.payload_offset() - MAGIC_SIZE
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FooterChunk {
-    FootMagic,
-    Flags,
-    PayloadSize,
-    Payload,
-    HeadMagic,
-    Finished,
 }

@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-use config::meta::tantivy_inverted_index::PuffinDirectory;
+use config::meta::puffin_dir::puffin_dir_reader::PuffinDirReader;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use futures::io::Cursor;
 use tantivy::query::QueryParser;
@@ -21,7 +21,7 @@ fn benchmark_puffin(c: &mut Criterion) {
             let mut file = File::open("./data/7250413177689604885.ttv").unwrap();
             let _ = file.read_to_end(&mut data);
             tokio::task::block_in_place(|| async {
-                let puffin_dir = PuffinDirectory::from_bytes(Cursor::new(black_box(data)))
+                let puffin_dir = PuffinDirReader::from_bytes(Cursor::new(black_box(data)))
                     .await
                     .unwrap();
                 let index = tantivy::Index::open(puffin_dir).unwrap();
@@ -34,7 +34,6 @@ fn benchmark_puffin(c: &mut Criterion) {
                 let _docs = searcher
                     .search(&query, &tantivy::collector::DocSetCollector)
                     .unwrap();
-                println!("docs: {}", _docs.len());
             })
             .await;
         });
@@ -53,7 +52,6 @@ fn benchmark_puffin(c: &mut Criterion) {
             let _docs = searcher
                 .search(&query, &tantivy::collector::DocSetCollector)
                 .unwrap();
-            println!("docs: {}", _docs.len());
         });
     });
 

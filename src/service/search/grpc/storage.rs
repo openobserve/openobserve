@@ -22,9 +22,9 @@ use config::{
     meta::{
         bitvec::BitVec,
         inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
+        puffin_dir::{convert_puffin_dir_to_tantivy_dir, puffin_dir_reader::PuffinDirReader},
         search::{ScanStats, StorageType},
         stream::FileKey,
-        tantivy_inverted_index::{convert_puffin_dir_to_tantivy_dir, PuffinDirectory},
     },
     utils::inverted_index::{
         convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
@@ -682,7 +682,7 @@ async fn search_tantivy_index(
 
     let puffin_dir = {
         let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
-        PuffinDirectory::from_bytes(Cursor::new(index_file_bytes)).await?
+        PuffinDirReader::from_bytes(Cursor::new(index_file_bytes)).await?
     };
 
     // convert_puffin_dir_to_tantivy_dir(PathBuf::from(tantivy_index_file_name),
