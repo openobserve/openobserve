@@ -1008,6 +1008,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-addpanel-config-time-shift-add-btn"
       />
     </div>
+
+    <div class="space"></div>
+    <UnitPerColumn
+      v-if="dashboardPanelData.data.type == 'table'"
+      :dashboardPanelData="dashboardPanelData"
+    />
+    <div class="space"></div>
   </div>
 </template>
 
@@ -1020,6 +1027,7 @@ import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import UnitPerColumn from "./UnitPerColumn.vue";
 
 export default defineComponent({
   components: {
@@ -1028,6 +1036,7 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    UnitPerColumn,
   },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
