@@ -865,6 +865,10 @@ export default defineComponent({
             item.expr.type === "aggr_func" &&
             item.expr?.args?.expr?.column?.value == fieldName
           ) {
+            return false;
+          }
+        }
+        return true;
       });
     }
 
