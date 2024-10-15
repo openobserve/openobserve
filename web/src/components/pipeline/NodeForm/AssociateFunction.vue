@@ -298,7 +298,7 @@ const store = useStore();
 const functionExists = ref(false);
 const selected = ref(null);
 
-watch(selected, (newValue) => {
+watch(selected, (newValue:any) => {
       pipelineObj.userSelectedNode = newValue; 
 });
 
@@ -317,7 +317,7 @@ const dialog = ref({
 watch(
       () => props.functions,
       (newVal) => {
-        filteredFunctions.value = [...newVal].sort((a, b) => {
+        filteredFunctions.value = [...newVal].sort((a:any, b:any) => {
           return a.localeCompare(b);
         });
       },
@@ -422,12 +422,12 @@ const deleteFunction = () => {
 
   emit("cancel:hideform");
 };
-const filterFunctions = (val, update) => {
+const filterFunctions = (val:any, update:any) => {
       const filtered = props.functions
-        .filter((func) =>
+        .filter((func:any) =>
           func.toLowerCase().includes(val.toLowerCase())
         )
-        .sort((a, b) => a.localeCompare(b));
+        .sort((a:any, b:any) => a.localeCompare(b));
 
 
 
