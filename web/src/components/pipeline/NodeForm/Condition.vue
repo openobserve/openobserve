@@ -107,7 +107,6 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
