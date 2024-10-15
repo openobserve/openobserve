@@ -57,7 +57,7 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    pub fn create_inverted_index(&self) -> bool {
+    pub fn is_basic_type(&self) -> bool {
         matches!(
             *self,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
