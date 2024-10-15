@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 150px; max-height: 31px"
           />
           <img
+            v-if="store.state.zoConfig.custom_hide_self_logo == false"
             class="appLogo"
             loading="lazy"
             :src="
