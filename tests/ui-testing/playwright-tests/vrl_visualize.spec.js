@@ -8,7 +8,7 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
 
-  // await page.getByText('Login as internal user').click();
+  //await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -188,6 +188,7 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
@@ -209,11 +210,6 @@ test.describe(" visualize UI testcases", () => {
       .click();
 
     await page.waitForTimeout(3000);
-
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    // await page.waitForTimeout(1000);
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
     await expect(
       page.getByText("There are some errors, please fix them and try again")
     ).toBeVisible();
@@ -362,16 +358,12 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRL=1000");
+      await page.waitForTimeout(3000);
 
     // Refresh visulize search bar
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .dblclick();
-
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .click();
-    await page.waitForTimeout(3000);
+      .click();
 
     // Add VRL function field to Breakdown
     await page
