@@ -37,7 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           @click="triggerExpand(props)"
         >
+        <q-tooltip position="bottom">
+                <PipelineView :pipeline="props.row" />
+              </q-tooltip>
           <q-td v-if="activeTab == 'scheduled' "  >
+            
             <q-btn
               dense
               flat
@@ -93,28 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.delete')"
               @click.stop="openDeleteDialog(props.row)"
             ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-view-details`"
-              icon="visibility"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              >
-              <q-tooltip position="bottom">
-                <PipelineView :pipeline="props.row" />
-              </q-tooltip>
-            </q-btn>
-
-          
           </template>
         </q-td>
 
+      
         </q-tr>
         <q-tr v-show="expandedRow === props.row.pipeline_id" :props="props" >
-
+         
           <q-td v-if="props.row?.sql_query"  colspan="100%">
 
             <div  class="text-left tw-px-2 q-mb-sm  expanded-content">

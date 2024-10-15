@@ -154,8 +154,8 @@ const queryImage = getImageURL("images/pipeline/query.svg");
   
   <style >
   .pipeline-view-tooltip {
-    width: 300px; /* Adjust the width */
-    height: 200px; /* Adjust the height */
+    width: 500px; /* Adjust the width */
+    height: 300px; /* Adjust the height */
     overflow: auto;
   }
 

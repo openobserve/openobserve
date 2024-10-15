@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="300px"
             >
               <span style="font-size: 14px"
-                >Configure the option to enable a cron job.</span
+                >Configure the option to enable a cron expression.</span
               >
             </q-tooltip>
           </q-icon>
@@ -636,7 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="triggerData.cron"
                   dense
                   filled
-                  :label="t('reports.cron') + ' *'"
+                  :label="t('reports.cronExpression') + ' *'"
                   style="background: none; width: 180px"
                   class="showLabelOnTop"
                   stack-label
@@ -782,7 +782,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-primary q-pt-xs"
             style="font-size: 12px; line-height: 12px ;padding: 8px 0px;"
           >
-            Note: The period should be the same as the cron expression.
+            Note: The period should be the same as frequency.
           </div>
         </div>
       </div>

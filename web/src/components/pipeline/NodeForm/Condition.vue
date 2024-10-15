@@ -36,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :conditions="streamRoute.conditions"
             @field:add="addField"
             @field:remove="removeField"
+            :enableNewValueMode="true" 
           />
+      <div>
+  </div>
         </div>
 
         <div
@@ -104,7 +107,6 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -168,6 +170,8 @@ const routeFormRef = ref<any>(null);
 const showTimezoneWarning = ref(false);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+
+
 
 let parser: any;
 

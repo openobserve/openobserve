@@ -24,6 +24,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("pipeline.associateFunction") }}
     </div>
     <q-separator />
+    <div class="q-px-md">
+      <q-select
+          color="input-border"
+          class="q-py-sm showLabelOnTop no-case tw-w-full "
+          stack-label
+          outlined
+          filled
+          dense
+          v-model="selected"
+          :options="filteredOptions"
+          use-input
+          input-debounce="300"
+          @filter="filterOptions"
+
+
+          label="Select Previous Node"
+          clearable
+        >
+        <template v-slot:option="scope">
+  <q-item
+    v-bind="scope.itemProps"
+    v-if="!scope.opt.isGroup"
+    class="full-width"
+    :style="{ backgroundColor: scope.opt.color  }"
+    style="color: black;"
+  >              
+    <q-item-section avatar class="w-full">
+      <q-img
+        :src="scope.opt.icon"
+        style="width: 24px; height: 24px"
+      />
+    </q-item-section>
+    
+    <div class="flex tw-justify-between tw-w-full"  >
+      <q-item-section>
+        <q-item-label v-html="scope.opt.label"></q-item-label>
+      </q-item-section>
+      <q-item-section>
+        <q-item-label class="tw-ml-auto" v-html="scope.opt.node_type"></q-item-label>
+      </q-item-section>
+    </div>
+  </q-item>
+
+  <!-- Render non-selectable group headers -->
+  <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+    <q-item-section >
+      <q-item-label v-html="scope.opt.label" />
+    </q-item-section>
+  </q-item>
+</template>
+
+        </q-select>
+      </div>
     <div v-if="loading">
       <q-spinner
         v-if="loading"
@@ -67,6 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
+              use-input
+              input-debounce="300"
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="min-width: 220px"
               v-bind:readonly="isUpdating"
@@ -74,8 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :error-message="
                 selectedFunction ? 'Function is already associated' : ''
               "
+              @filter="filterFunctions"
               :error="functionExists"
             />
+    
           </div>
         </div>
 
@@ -154,12 +211,23 @@ import {
   nextTick,
   defineAsyncComponent,
   onMounted,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { useQuasar } from "quasar";
+import { getImageURL } from "@/utils/zincutils";
+
+
+const functionImage = getImageURL("images/pipeline/function.svg");
+const streamImage = getImageURL("images/pipeline/stream.svg");
+const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
+const streamRouteImage = getImageURL("images/pipeline/route.svg");
+const conditionImage = getImageURL("images/pipeline/condition.svg");
+const queryImage = getImageURL("images/pipeline/query.svg");
+
 
 
 interface RouteCondition {
@@ -208,7 +276,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj , deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions } = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
@@ -223,11 +291,16 @@ const afterFlattening = ref((pipelineObj.currentSelectedNodeData?.data as { afte
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
-const $q = useQuasar();
+const q = useQuasar();
 
 const store = useStore();
 
 const functionExists = ref(false);
+const selected = ref(null);
+
+watch(selected, (newValue:any) => {
+      pipelineObj.userSelectedNode = newValue; 
+});
 
 const nodeLink = ref({
   from: "",
@@ -242,19 +315,26 @@ const dialog = ref({
 });
 
 watch(
-  () => props.functions,
-  (newVal) => {
-    filteredFunctions.value = [...newVal];
-  },
-  {
-    deep: true,
-    immediate: true,
-  },
-);
+      () => props.functions,
+      (newVal) => {
+        filteredFunctions.value = [...newVal].sort((a:any, b:any) => {
+          return a.localeCompare(b);
+        });
+      },
+      {
+        deep: true,
+        immediate: true,
+      }
+    );
 
 onBeforeMount(() => {
   
 });
+
+onMounted(()=>{
+ pipelineObj.userSelectedNode = {};
+ selected.value = null
+})
 
 
 const openCancelDialog = () => {
@@ -282,13 +362,13 @@ const openDeleteDialog = () => {
 
 const saveFunction = () => {
   functionExists.value = false;
-
+  
   if (createNewFunction.value) {
     if(addFunctionRef.value.formData.name == "" ){
       return;
     }
     if(addFunctionRef.value.formData.function == ""){
-     $q.notify({
+     q.notify({
         message: "Function is required",
         color: "negative",
         position: "bottom",
@@ -342,6 +422,81 @@ const deleteFunction = () => {
 
   emit("cancel:hideform");
 };
+const filterFunctions = (val:any, update:any) => {
+      const filtered = props.functions
+        .filter((func:any) =>
+          func.toLowerCase().includes(val.toLowerCase())
+        )
+        .sort((a:any, b:any) => a.localeCompare(b));
+
+
+
+      update(() => {
+        filteredFunctions.value = filtered;
+      });
+    };
+
+// const formattedOptions = computed (() => {
+//   console.log( pipelineObj.previousNodeOptions,"op")
+//   return pipelineObj.previousNodeOptions.map(node => {
+//     let label = node.data.label;
+//     let color = "#c8d6f5";
+//     if (node.io_type === 'input' || node.io_type === 'output' ) {
+//       label = node.io_type;
+//       if(node.io_type === "input"){
+//         color =" #c8d6f5"
+//       }
+//       else{
+//         color = "#8fd4b8"
+//       }
+//     } else if (node.type === 'default' && node.data.node_type === 'function') {
+//       label = node.data.name;
+//       color = "#efefef"
+//     }
+//     else if(node.type === 'default' && node.data.node_type === 'condition'){
+//       label = "Condition"
+//       color="#efefef"
+//     }
+//     return {
+//       id: node.id,
+//       label,
+//       node_type: node.data.node_type,
+//       io_type: node.io_type,
+//       icon:streamImage,
+//       color:color,
+//     };
+//   });
+// });
+
+function getIcon(data:any) {
+  const searchTerm = data.node_type;
+  const node : any = pipelineObj.nodeTypes.find(
+    (node:any) => node.subtype === searchTerm && node.io_type === data.io_type,
+  );
+
+  switch (data.node_type as string) {
+    case "stream":
+      return streamImage;
+      break;
+      case "function":
+      return functionImage ;
+      break;
+      case "output":
+      return streamOutputImage;
+      break;
+      case "condition":
+      return conditionImage;
+      break;
+    default:
+      "img:" + functionImage;
+      break;
+  }
+  // return node ? node.icon : undefined;
+}
+
+
+
+
 </script>
 
 <style scoped>
