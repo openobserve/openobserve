@@ -38,10 +38,10 @@ use crate::{
             functions,
             http::{
                 get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_work_group,
             },
         },
     },
-    handler::http::request::search::get_work_group,
     service::{
         search::{self as SearchService, RESULT_ARRAY},
         usage::report_request_usage_stats,
