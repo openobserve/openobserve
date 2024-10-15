@@ -1,11 +1,11 @@
 <template>
   <div style="padding: 0px 10px; width: 50%">
     <div
-      class="flex justify-between items-center q-pa-md header"
+      class="flex justify-between items-center q-py-md header"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span>Unit Per Column</span>
+        <span>Field Override</span>
       </div>
       <q-btn
         icon="close"
@@ -18,40 +18,50 @@
         @click.stop="closePopup"
       ></q-btn>
     </div>
-    <q-card-section>
+    <div
+      v-for="(unitMapping, index) in unitMappings"
+      :key="index"
+      class="q-mb-md flex items-center"
+      style="gap: 15px"
+    >
+      <q-select
+        v-model="unitMapping.selected_column"
+        :label="'Select Column ' + (index + 1)"
+        :options="columnsOptions"
+        style="width: 30%"
+        @change="updateUnitOptions(index)"
+      />
+
       <div
-        v-for="(unitMapping, index) in unitMappings"
-        :key="index"
-        class="q-mb-md"
+        class="flex items-center"
+        style="width: 65%; display: flex; align-items: center; gap: 10px"
       >
-        <q-select
-          v-model="unitMapping.selected_column"
-          :label="'Select Column ' + (index + 1)"
-          :options="columnsOptions"
-          @change="updateUnitOptions(index)"
-        />
         <q-select
           v-model="unitMapping.selected_unit"
           :label="'Select Unit'"
           :options="filteredUnitOptions(index)"
           :disable="!unitMapping.selected_column"
+          style="flex-grow: 1"
         />
         <q-btn
           @click="removeUnitMapping(index)"
-          icon="cancel"
-          class="q-ml-md"
+          icon="close"
+          class="delete-btn"
+          dense
+          flat
+          round
         />
       </div>
-      <q-btn
-        @click="addUnitMapping"
-        label="Add Another Mapping"
-        color="secondary"
-        class="q-mt-md"
-      />
-    </q-card-section>
+    </div>
+    <q-btn
+      @click="addUnitMapping"
+      label="+ Add field override"
+      no-caps
+      class="q-mt-md"
+    />
 
     <q-card-actions align="right">
-      <q-btn flat label="Save" color="primary" @click="saveMappings" />
+      <q-btn label="Save" color="primary" @click="saveMappings" />
     </q-card-actions>
   </div>
 </template>
