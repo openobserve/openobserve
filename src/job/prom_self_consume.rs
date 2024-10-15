@@ -25,7 +25,6 @@ use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     ingest_client::IngestClient, IngestionData, IngestionRequest, IngestionType, StreamType,
 };
-use serde_json::Value;
 use tokio::time::{self, Duration};
 use tonic::{
     codec::CompressionEncoding,
@@ -47,32 +46,6 @@ static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<(), tonic::Status> {
-    let req = IngestionRequest {
-        org_id: METRIC_INGEST_ORG.to_owned(),
-        stream_name: "".to_owned(),
-        stream_type: StreamType::Metrics.into(),
-        data: Some(IngestionData::from(metrics)),
-        ingestion_type: Some(IngestionType::Json.into()),
-    };
-    let org_header_key: MetadataKey<_> = config.grpc.org_header_key.parse().unwrap();
-    let token: MetadataValue<_> = get_internal_grpc_token().parse().unwrap();
-    let (_, channel) = get_ingester_channel().await?;
-    let mut client = IngestClient::with_interceptor(channel, move |mut req: Request<()>| {
-        req.metadata_mut().insert("authorization", token.clone());
-        req.metadata_mut()
-            .insert(org_header_key.clone(), METRIC_INGEST_ORG.parse().unwrap());
-        Ok(req)
-    });
-    client = client
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(config.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(config.grpc.max_message_size * 1024 * 1024);
-    client.ingest(req).await?;
-    Ok(())
-}
-
 pub async fn run() -> Result<(), anyhow::Error> {
     let config = get_config();
 
@@ -91,6 +64,22 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let timeout = zero_or(config.common.self_metrics_consumption_interval, 60);
     let mut interval = time::interval(Duration::from_secs(timeout));
     interval.tick().await; // Trigger the first run
+
+    // build the client
+    let org_header_key: MetadataKey<_> = config.grpc.org_header_key.parse().unwrap();
+    let token: MetadataValue<_> = get_internal_grpc_token().parse().unwrap();
+    let (_, channel) = get_ingester_channel().await?;
+    let mut client = IngestClient::with_interceptor(channel, move |mut req: Request<()>| {
+        req.metadata_mut().insert("authorization", token.clone());
+        req.metadata_mut()
+            .insert(org_header_key.clone(), METRIC_INGEST_ORG.parse().unwrap());
+        Ok(req)
+    });
+    client = client
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(config.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(config.grpc.max_message_size * 1024 * 1024);
 
     loop {
         // Wait for the interval before running the task again
@@ -116,7 +105,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         } else {
             let metrics = JsonEncoder::new().encode_to_json(&prom_data);
-            match send_metrics(&config, metrics).await {
+            let req = IngestionRequest {
+                org_id: METRIC_INGEST_ORG.to_owned(),
+                stream_name: "".to_owned(),
+                stream_type: StreamType::Metrics.into(),
+                data: Some(IngestionData::from(metrics)),
+                ingestion_type: Some(IngestionType::Json.into()),
+            };
+            match client.ingest(req).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("error in sending self-metrics : {:?}", e)
