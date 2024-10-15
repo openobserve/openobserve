@@ -74,6 +74,7 @@ const getDefaultDashboardPanelData: any = () => ({
       },
       drilldown: [],
       mark_line: [],
+      unit_mappings: [],
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
