@@ -36,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :conditions="streamRoute.conditions"
             @field:add="addField"
             @field:remove="removeField"
+            :enableNewValueMode="true" 
           />
+      <div>
+  </div>
         </div>
 
         <div
@@ -168,6 +171,8 @@ const routeFormRef = ref<any>(null);
 const showTimezoneWarning = ref(false);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+
+
 
 let parser: any;
 

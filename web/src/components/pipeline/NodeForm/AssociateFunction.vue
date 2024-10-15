@@ -24,6 +24,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("pipeline.associateFunction") }}
     </div>
     <q-separator />
+    <div class="q-px-md">
+      <q-select
+          color="input-border"
+          class="q-py-sm showLabelOnTop no-case tw-w-full "
+          stack-label
+          outlined
+          filled
+          dense
+          v-model="selected"
+          :options="filteredOptions"
+          use-input
+          input-debounce="300"
+          @filter="filterOptions"
+
+
+          label="Select Previous Node"
+          clearable
+        >
+        <template v-slot:option="scope">
+  <q-item
+    v-bind="scope.itemProps"
+    v-if="!scope.opt.isGroup"
+    class="full-width"
+    :style="{ backgroundColor: scope.opt.color  }"
+    style="color: black;"
+  >              
+    <q-item-section avatar class="w-full">
+      <q-img
+        :src="scope.opt.icon"
+        style="width: 24px; height: 24px"
+      />
+    </q-item-section>
+    
+    <div class="flex tw-justify-between tw-w-full"  >
+      <q-item-section>
+        <q-item-label v-html="scope.opt.label"></q-item-label>
+      </q-item-section>
+      <q-item-section>
+        <q-item-label class="tw-ml-auto" v-html="scope.opt.node_type"></q-item-label>
+      </q-item-section>
+    </div>
+  </q-item>
+
+  <!-- Render non-selectable group headers -->
+  <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+    <q-item-section >
+      <q-item-label v-html="scope.opt.label" />
+    </q-item-section>
+  </q-item>
+</template>
+
+        </q-select>
+      </div>
     <div v-if="loading">
       <q-spinner
         v-if="loading"
@@ -76,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :error="functionExists"
             />
+    
           </div>
         </div>
 
@@ -154,12 +208,23 @@ import {
   nextTick,
   defineAsyncComponent,
   onMounted,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { useQuasar } from "quasar";
+import { getImageURL } from "@/utils/zincutils";
+
+
+const functionImage = getImageURL("images/pipeline/function.svg");
+const streamImage = getImageURL("images/pipeline/stream.svg");
+const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
+const streamRouteImage = getImageURL("images/pipeline/route.svg");
+const conditionImage = getImageURL("images/pipeline/condition.svg");
+const queryImage = getImageURL("images/pipeline/query.svg");
+
 
 
 interface RouteCondition {
@@ -208,7 +273,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj , deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions } = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
@@ -223,11 +288,16 @@ const afterFlattening = ref((pipelineObj.currentSelectedNodeData?.data as { afte
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
-const $q = useQuasar();
+const q = useQuasar();
 
 const store = useStore();
 
 const functionExists = ref(false);
+const selected = ref(null);
+
+watch(selected, (newValue) => {
+      pipelineObj.userSelectedNode = newValue; 
+});
 
 const nodeLink = ref({
   from: "",
@@ -256,6 +326,12 @@ onBeforeMount(() => {
   
 });
 
+onMounted(()=>{
+ pipelineObj.userSelectedNode = {};
+ selected.value = null
+ console.log(formattedOptions.value,"fm")
+})
+
 
 const openCancelDialog = () => {
   if(!isUpdating){
@@ -282,13 +358,13 @@ const openDeleteDialog = () => {
 
 const saveFunction = () => {
   functionExists.value = false;
-
+  
   if (createNewFunction.value) {
     if(addFunctionRef.value.formData.name == "" ){
       return;
     }
     if(addFunctionRef.value.formData.function == ""){
-     $q.notify({
+     q.notify({
         message: "Function is required",
         color: "negative",
         position: "bottom",
@@ -342,6 +418,98 @@ const deleteFunction = () => {
 
   emit("cancel:hideform");
 };
+
+
+const nodes = ref([
+  {
+    id: "8c6cbd97-356e-4ef0-813c-c4620d7274d7",
+    type: "input",
+    io_type: "input",
+    position: { x: 162, y: 66.66666666666667 },
+    data: {
+      label: "8c6cbd97-356e-4ef0-813c-c4620d7274d7",
+      node_type: "stream",
+      stream_name: {
+        _value: { label: "test_stream", value: "test_stream", isDisable: false }
+      },
+      org_id: "default"
+    }
+  },
+  {
+    id: "55549ada-9965-4984-9f52-fb50b3985eca",
+    type: "default",
+    io_type: "default",
+    position: { x: 132, y: 178 },
+    data: {
+      label: "55549ada-9965-4984-9f52-fb50b3985eca",
+      node_type: "function",
+      name: "ksjdflskjf",
+      after_flatten: false
+    }
+  }
+]);
+
+// const formattedOptions = computed (() => {
+//   console.log( pipelineObj.previousNodeOptions,"op")
+//   return pipelineObj.previousNodeOptions.map(node => {
+//     let label = node.data.label;
+//     let color = "#c8d6f5";
+//     if (node.io_type === 'input' || node.io_type === 'output' ) {
+//       label = node.io_type;
+//       if(node.io_type === "input"){
+//         color =" #c8d6f5"
+//       }
+//       else{
+//         color = "#8fd4b8"
+//       }
+//     } else if (node.type === 'default' && node.data.node_type === 'function') {
+//       label = node.data.name;
+//       color = "#efefef"
+//     }
+//     else if(node.type === 'default' && node.data.node_type === 'condition'){
+//       label = "Condition"
+//       color="#efefef"
+//     }
+//     return {
+//       id: node.id,
+//       label,
+//       node_type: node.data.node_type,
+//       io_type: node.io_type,
+//       icon:streamImage,
+//       color:color,
+//     };
+//   });
+// });
+
+function getIcon(data:any) {
+  const searchTerm = data.node_type;
+  const node : any = pipelineObj.nodeTypes.find(
+    (node:any) => node.subtype === searchTerm && node.io_type === data.io_type,
+  );
+  console.log(node,"node")
+  switch (data.node_type as string) {
+    case "stream":
+      return streamImage;
+      break;
+      case "function":
+      return functionImage ;
+      break;
+      case "output":
+      return streamOutputImage;
+      break;
+      case "condition":
+      return conditionImage;
+      break;
+    default:
+      "img:" + functionImage;
+      break;
+  }
+  // return node ? node.icon : undefined;
+}
+
+
+
+
 </script>
 
 <style scoped>

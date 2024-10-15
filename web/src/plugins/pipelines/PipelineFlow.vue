@@ -66,11 +66,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="top-left">
     </Controls>
     </VueFlow>
+    <div v-if="isCanvasEmpty" class="empty-text">
+      Drag and drop nodes here
+    </div>
     <!-- Add UI elements or buttons to interact with the methods -->
 </template>
 
 <script>
-import { ref, onMounted, onActivated, watch } from "vue";
+import { ref, onMounted, onActivated, watch,computed } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
@@ -106,6 +109,8 @@ export default {
     const store = useStore();
 
     const vueFlowRef = ref(null);
+    const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
+
 
 
     onInit((vueFlowInstance) => {
@@ -165,6 +170,7 @@ function resetTransform() {
       vueFlowRef,
       buttonClass,
       resetTransform,
+      isCanvasEmpty,
     };
   },
 };
@@ -211,10 +217,21 @@ q-btn {
 }
 
 .warning-text {
-              color: #F5A623;
-              border: 1px solid #F5A623;
-              border-radius: 2px ;
-            }
+  color: #F5A623;
+  border: 1px solid #F5A623;
+  border-radius: 2px ;
+}
+
+  .empty-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #888; /* Light text color */
+  font-size: 1.5em;
+  text-align: center;
+  pointer-events: none;
+}
 
 
 </style>

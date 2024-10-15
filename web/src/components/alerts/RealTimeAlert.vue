@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @input:update="
         (name: string, field: any) => emits('input:update', name, field)
       "
+      :enableNewValueMode="enableNewValueMode"
     />
   </div>
 </template>
@@ -32,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import FieldsInput from "./FieldsInput.vue";
 
-defineProps(["columns", "conditions"]);
+defineProps(["columns", "conditions","enableNewValueMode"]);
 
 const emits = defineEmits(["field:add", "field:remove", "input:update"]);
 

@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 220px"
+            v-bind="newValueMode"
           />
         </div>
         <div
@@ -150,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { defineProps, ref } from "vue";
+import { defineProps, ref,computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
@@ -166,6 +167,11 @@ const props = defineProps({
     default: () => [],
     required: true,
   },
+  enableNewValueMode: {
+      type: Boolean,
+      default: false,
+    }
+  
 });
 var triggerOperators: any = ref([
   "=",
@@ -207,6 +213,10 @@ const filterColumns = (val: string, update: Function) => {
     );
   });
 };
+const newValueMode = computed(() => {
+      return props.enableNewValueMode ? { 'new-value-mode': 'unique' } : {};
+    });
+
 </script>
 
 <style lang="scss">
