@@ -1471,7 +1471,15 @@ pub async fn search_history(
     let user_id = in_req
         .headers()
         .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string());
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    // stream_type must be specified
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or(StreamType::Logs),
+        Err(_) => StreamType::Logs,
+    };
 
     let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -1482,16 +1490,60 @@ pub async fn search_history(
     // restrict history only to path org_id
     req.org_id = Some(org_id.clone());
     // restrict history only to requested user_id
-    req.user_email = user_id.clone();
+    req.user_email = Some(user_id.clone());
+    req.stream_type = Some(stream_type.to_string());
 
     // Search
     let stream_name = USAGE_STREAM;
+    let usage_stream_type = StreamType::Logs;
     let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
+
+    // Check permissions on stream
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        if !is_root_user(&user_id) {
+            let user: meta::user::User =
+                USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+            let stream_type_str = stream_type.to_string();
+
+            if user.is_external
+                && !crate::handler::http::auth::validator::check_permissions(
+                    &user_id,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "LIST".to_string(),
+                        o2_type: format!(
+                            "{}_history:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str.as_str())
+                                .map_or(stream_type_str.as_str(), |model| model.key),
+                            org_id
+                        ),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    Some(user.role),
+                )
+                .await
+            {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+        // Check permissions on stream ends
+    }
 
     // increment query queue
     metrics::QUERY_PENDING_NUMS
@@ -1522,12 +1574,11 @@ pub async fn search_history(
         .dec();
 
     let history_org_id = &cfg.common.usage_org;
-    let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,
-        history_org_id,
-        stream_type,
-        user_id.clone(),
+        &cfg.common.usage_org,
+        usage_stream_type,
+        Some(user_id.clone()),
         &search_query_req,
     )
     .instrument(http_span)
@@ -1539,7 +1590,7 @@ pub async fn search_history(
             http_report_metrics(
                 start,
                 &org_id,
-                stream_type,
+                usage_stream_type,
                 stream_name,
                 "500",
                 "_search_history",
@@ -1581,7 +1632,7 @@ pub async fn search_history(
     http_report_metrics(
         start,
         &org_id,
-        stream_type,
+        usage_stream_type,
         stream_name,
         "200",
         "_search_history",
@@ -1600,7 +1651,7 @@ pub async fn search_history(
         response_time: time_taken,
         size: search_res.scan_size as f64,
         request_body: Some(search_query_req.query.sql),
-        user_email: user_id,
+        user_email: Some(user_id),
         min_ts: Some(req.start_time),
         max_ts: Some(req.end_time),
         cached_ratio: Some(search_res.cached_ratio),
@@ -1614,7 +1665,7 @@ pub async fn search_history(
         req_stats,
         history_org_id,
         stream_name,
-        StreamType::Logs,
+        usage_stream_type,
         UsageType::SearchHistory,
         num_fn,
         started_at,

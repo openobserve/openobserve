@@ -16,12 +16,13 @@
 use std::cmp::Ordering;
 
 use hashbrown::HashSet;
-use infra::dist_lock;
+use infra::{db as infra_db, dist_lock};
 use o2_enterprise::enterprise::{
     common::infra::config::O2_CONFIG,
     openfga::{
         authorizer::authz::{
-            get_index_creation_tuples, get_org_creation_tuples, get_user_role_tuple, update_tuples,
+            get_history_creation_tuples, get_index_creation_tuples, get_org_creation_tuples,
+            get_user_role_tuple, update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
@@ -44,6 +45,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
     let mut need_migrate_index_streams = false;
+    let mut need_migrate_history_tuples = false;
     let mut existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
@@ -110,8 +112,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             version_compare::Version::from(&existing_model.version).unwrap();
         let v0_0_4 = version_compare::Version::from("0.0.4").unwrap();
         let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
+        let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
+        }
+        if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
+            need_migrate_history_tuples = true;
         }
     }
 
@@ -189,7 +195,35 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             } else {
                 for org_name in orgs {
-                    get_index_creation_tuples(org_name, &mut tuples).await;
+                    if need_migrate_index_streams {
+                        get_index_creation_tuples(org_name, &mut tuples).await;
+                    }
+                    if need_migrate_history_tuples {
+                        get_history_creation_tuples(org_name, &mut tuples).await;
+                    }
+                }
+                if need_migrate_history_tuples {
+                    let db = infra_db::get_db().await;
+                    log::info!("[Alert History:Migration]: Migrating alerts history");
+                    let db_key_prefix = "/alerts/".to_string();
+                    log::info!("[Alert History:Migration]: Listing all alerts");
+                    let data = db.list(&db_key_prefix).await?;
+
+                    for (key, val) in data {
+                        let db_key = key;
+                        let key = db_key.strip_prefix(&db_key_prefix).unwrap();
+                        log::info!(
+                            "[Alert History:Migration]: Start migrating alert history: {}",
+                            key
+                        );
+                        let keys: Vec<&str> = key.split('/').collect();
+                        if keys.len() < 2 {
+                            continue;
+                        }
+                        let alert_name = keys[keys.len() - 1];
+                        let alert_org = keys[1];
+                        get_tuple_for_new_alert_history(alert_org, alert_name, &mut tuples);
+                    }
                 }
             }
 

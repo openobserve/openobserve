@@ -61,6 +61,8 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 impl PartialEq for Alert {
@@ -92,6 +94,7 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
+            error: None,
         }
     }
 }
@@ -100,4 +103,15 @@ impl Default for Alert {
 pub struct AlertListFilter {
     pub enabled: Option<bool>,
     pub owner: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AlertHistoryFilter {
+    pub from: i64,
+    pub to: i64,
+    pub limit: i64,
+    pub offset: i64,
+    pub period: i64,
+    pub track_total_hits: bool,
+    pub status: Option<String>,
 }

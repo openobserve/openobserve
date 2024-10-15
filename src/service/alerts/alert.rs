@@ -21,8 +21,12 @@ use std::{
 use actix_web::http;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
-    get_config,
-    meta::stream::StreamType,
+    get_config, ider,
+    meta::{
+        search::SearchEventType,
+        stream::StreamType,
+        usage::{RequestStats, UsageType, TRIGGERS_USAGE_STREAM},
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -36,7 +40,7 @@ use crate::{
     common::{
         meta::{
             alerts::{
-                alert::{Alert, AlertListFilter},
+                alert::{Alert, AlertHistoryFilter, AlertListFilter},
                 destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 FrequencyType, Operator, QueryType,
             },
@@ -48,8 +52,9 @@ use crate::{
     service::{
         alerts::{build_sql, destinations},
         db,
-        search::sql::RE_ONLY_SELECT,
+        search::{self as SearchService, sql::RE_ONLY_SELECT},
         short_url,
+        usage::report_request_usage_stats,
     },
 };
 
@@ -75,6 +80,9 @@ pub async fn save(
     let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
+    // Even if we don't know if there is any error, we can set it to None.
+    // The alert manager will eventually set it to the actual error if there is any
+    alert.error = None;
 
     match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(old_alert)) => {
@@ -342,6 +350,218 @@ pub async fn trigger(
         .send_notification(&[], Utc::now().timestamp_micros(), None)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+pub async fn history(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+    user_id: &str,
+    filters: AlertHistoryFilter,
+) -> Result<config::meta::search::Response, (http::StatusCode, anyhow::Error)> {
+    let now = Utc::now().timestamp_micros();
+    let config = get_config();
+    if !config.common.usage_enabled {
+        return Err((
+            http::StatusCode::SERVICE_UNAVAILABLE,
+            anyhow::anyhow!("Usage tracking is disabled"),
+        ));
+    }
+    let usage_org = &config.common.usage_org;
+
+    let end_time = if filters.to == 0 { now } else { filters.to };
+    let start_time = if filters.from == 0 {
+        let period = if filters.period == 0 {
+            // 15 minutes ago by default
+            15
+        } else {
+            filters.period
+        };
+        end_time - Duration::minutes(period).num_microseconds().unwrap()
+    } else {
+        filters.from
+    };
+    let key = format!("{}/{}/{}", stream_type, stream_name, name);
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql: format!(
+                "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert' AND key = '{}'",
+                TRIGGERS_USAGE_STREAM, org_id, key
+            ),
+            size: filters.limit,
+            from: filters.offset,
+            end_time,
+            start_time,
+            track_total_hits: filters.track_total_hits,
+            ..Default::default()
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: Some(SearchEventType::UI),
+        index_type: "".to_string(),
+    };
+
+    let trace_id = ider::uuid();
+    let start = std::time::Instant::now();
+    // Fetch the alert trigger data from usage org
+    let res = match SearchService::search(&trace_id, usage_org, StreamType::Logs, None, &req).await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Err((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                anyhow::anyhow!("Error fetching alert trigger data: {e}"),
+            ));
+        }
+    };
+
+    // Publish usage event
+    let req_stats = RequestStats {
+        records: res.hits.len() as i64,
+        response_time: start.elapsed().as_secs_f64(),
+        size: res.scan_size as f64,
+        request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
+        min_ts: Some(start_time),
+        max_ts: Some(end_time),
+        cached_ratio: Some(res.cached_ratio),
+        search_type: Some(SearchEventType::UI),
+        trace_id: Some(trace_id),
+        took_wait_in_queue: if res.took_detail.is_some() {
+            let resp_took = res.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
+        ..Default::default()
+    };
+    let num_fn = req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        usage_org,
+        TRIGGERS_USAGE_STREAM,
+        StreamType::Logs,
+        UsageType::Search,
+        num_fn,
+        now,
+    )
+    .await;
+
+    Ok(res)
+}
+
+// TODO: use it in the alert history endpoint and fix the permitted
+pub async fn all_history(
+    org_id: &str,
+    user_id: &str,
+    filters: AlertHistoryFilter,
+    _permitted: Option<Vec<String>>,
+) -> Result<config::meta::search::Response, (http::StatusCode, anyhow::Error)> {
+    let now = Utc::now().timestamp_micros();
+    let config = get_config();
+    if !config.common.usage_enabled {
+        return Err((
+            http::StatusCode::SERVICE_UNAVAILABLE,
+            anyhow::anyhow!("Usage tracking is disabled"),
+        ));
+    }
+    let usage_org = &config.common.usage_org;
+
+    let end_time = if filters.to == 0 { now } else { filters.to };
+    let start_time = if filters.from == 0 {
+        let period = if filters.period == 0 {
+            // 15 minutes ago by default
+            15
+        } else {
+            filters.period
+        };
+        end_time - Duration::minutes(period).num_microseconds().unwrap()
+    } else {
+        filters.from
+    };
+    let sql = format!(
+        "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert'",
+        TRIGGERS_USAGE_STREAM, org_id
+    );
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql: match filters.status {
+                Some(v) => {
+                    if v.eq("completed") || v.eq("failed") || v.eq("condition_not_satisfied") {
+                        format!("{} AND status = '{}'", sql, v)
+                    } else {
+                        sql
+                    }
+                }
+                None => sql,
+            },
+            size: filters.limit,
+            from: filters.offset,
+            end_time,
+            start_time,
+            track_total_hits: filters.track_total_hits,
+            ..Default::default()
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: Some(SearchEventType::UI),
+        index_type: "".to_string(),
+    };
+
+    let trace_id = ider::uuid();
+    let start = std::time::Instant::now();
+    // Fetch the alert trigger data from usage org
+    let res = match SearchService::search(&trace_id, usage_org, StreamType::Logs, None, &req).await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Err((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                anyhow::anyhow!("Error fetching alert trigger data: {e}"),
+            ));
+        }
+    };
+
+    // Publish usage event
+    let req_stats = RequestStats {
+        records: res.hits.len() as i64,
+        response_time: start.elapsed().as_secs_f64(),
+        size: res.scan_size as f64,
+        request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
+        min_ts: Some(start_time),
+        max_ts: Some(end_time),
+        cached_ratio: Some(res.cached_ratio),
+        search_type: Some(SearchEventType::UI),
+        trace_id: Some(trace_id),
+        took_wait_in_queue: if res.took_detail.is_some() {
+            let resp_took = res.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
+        ..Default::default()
+    };
+    let num_fn = req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        usage_org,
+        TRIGGERS_USAGE_STREAM,
+        StreamType::Logs,
+        UsageType::Search,
+        num_fn,
+        now,
+    )
+    .await;
+
+    Ok(res)
 }
 
 impl Alert {
