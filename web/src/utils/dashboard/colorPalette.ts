@@ -13,7 +13,230 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-function shadeColor(color: any, value: any, min: any, max: any) {
+import { scaleLinear } from "d3-scale";
+
+export const classicColorPalette = [
+  "#154360",
+  "#16A085",
+  "#17BECF",
+  "#1ABC9C",
+  "#1F618D",
+  "#1F77B4",
+  "#212F3D",
+  "#27AE60",
+  "#2874A6",
+  "#2CA02C",
+  "#2E86C1",
+  "#2ECC71",
+  "#3498DB",
+  "#45B39D",
+  "#48C9B0",
+  "#4E79A7",
+  "#515A5A",
+  "#52BE80",
+  "#5499C7",
+  "#59A14F",
+  "#5D6D7E",
+  "#633974",
+  "#641E16",
+  "#688485",
+  "#729493",
+  "#737374",
+  "#73C6B6",
+  "#76B7B2",
+  "#76D7C4",
+  "#7DCEA0",
+  "#7FB3D5",
+  "#7b87a7",
+  "#7ba79a",
+  "#7ba7bc",
+  "#7bbc87",
+  "#7bbca7",
+  "#7f9f9b",
+  "#7f9fb9",
+  "#7fa27f",
+  "#82E0AA",
+  "#85929E",
+  "#877bbc",
+  "#8795b2",
+  "#87a0a3",
+  "#87a77b",
+  "#87b2a3",
+  "#87bca7",
+  "#8C564B",
+  "#8C6D31",
+  "#8E44AD",
+  "#9467BD",
+  "#98DF8A",
+  "#9B59B6",
+  "#9C755F",
+  "#9EDAE5",
+  "#9d8776",
+  "#9d9dae",
+  "#9f8eaa",
+  "#9fb39f",
+  "#A9CCE3",
+  "#A9DFBF",
+  "#AEC7E8",
+  "#AED6F1",
+  "#AF7AC5",
+  "#B07AA1",
+  "#B0E57C",
+  "#B3CDE3",
+  "#B9770E",
+  "#BAB0AC",
+  "#BB8FCE",
+  "#BCBD22",
+  "#C0392B",
+  "#C39BD3",
+  "#C49C94",
+  "#C5B0D5",
+  "#C7C7C7",
+  "#CE6DBD",
+  "#D35400",
+  "#D62728",
+  "#D6616B",
+  "#D7BDE2",
+  "#D98880",
+  "#E15759",
+  "#E377C2",
+  "#E59866",
+  "#E5D8BD",
+  "#E67E22",
+  "#E6B0AA",
+  "#E74C3C",
+  "#EB984E",
+  "#EC7063",
+  "#EDC948",
+  "#F0B27A",
+  "#F0E68C",
+  "#F1948A",
+  "#F1C40F",
+  "#F28E2B",
+  "#F4D03F",
+  "#F5CBA7",
+  "#F7B6D2",
+  "#F7DC6F",
+  "#F8C471",
+  "#FAD7A0",
+  "#FF9896",
+  "#FF9DA7",
+  "#FFBB78",
+  "#a1ab7b",
+  "#a27b87",
+  "#a2877b",
+  "#a57ba7",
+  "#a77bbc",
+  "#a7bc7b",
+  "#ac9488",
+  "#ad7b78",
+  "#b1ab87",
+  "#bc91a7",
+  "#bca57b",
+  "#bd7ba7",
+  "#c37b87",
+  "#c37ba7",
+  "#c3877b",
+  "#c3ac87",
+  "#c49182",
+  "#c49f82",
+  "#cbb1a6",
+];
+
+// export const classicColorPalette = [
+//   "#9d8776",
+//   "#ad7b78",
+//   "#c29d82",
+//   "#c3ac87",
+//   "#7f9f9b",
+//   "#688485",
+//   "#737374",
+//   "#3a3d42",
+//   "#aa7b78",
+//   "#9d9dae",
+//   "#c1a084",
+//   "#a88ca9",
+//   "#7f9fb9",
+//   "#729493",
+//   "#9fb39f",
+//   "#cbb1a6",
+//   "#ac9488",
+//   "#676767",
+//   "#c49182",
+//   "#c3877b",
+//   "#bd9f82",
+//   "#a57b7d",
+//   "#9f8eaa",
+//   "#87a0a3",
+//   "#c49f82",
+//   "#ab87a3",
+//   "#8795b2",
+//   "#7ba79a",
+//   "#b3b197",
+//   "#a27f7f",
+//   "#7fa27f",
+//   "#c3877b",
+//   "#bd9f7b",
+//   "#a57ba7",
+//   "#7ba1b2",
+//   "#87b2a3",
+//   "#b1ab87",
+//   "#a27b87",
+//   "#7fa27f",
+//   "#c37ba7",
+//   "#bd7ba7",
+//   "#a77bbc",
+//   "#7ba7bc",
+//   "#87bca7",
+//   "#bca57b",
+//   "#a2877b",
+//   "#7bbca7",
+//   "#c3877b",
+//   "#bd9f87",
+//   "#a7bc7b",
+//   "#7bbc87",
+//   "#877bbc",
+//   "#bd7b87",
+//   "#c37b87",
+//   "#bc91a7",
+//   "#a787bc",
+//   "#7b87a7",
+//   "#87a77b",
+//   "#c3877b",
+//   "#bd9f7b",
+//   "#a57ba1",
+//   "#7ba7bc",
+//   "#87bca7",
+//   "#a1ab7b",
+//   "#a2877b",
+//   "#7bbca7",
+//   "#c37b87",
+//   "#bd9f87",
+//   "#a7bc7b",
+//   "#7bbc87",
+//   "#877bbc",
+//   "#bd7b87",
+//   "#c37b87",
+//   "#bc91a7",
+//   "#a787bc",
+//   "#7b87a7",
+//   "#87a77b",
+//   "#c3877b",
+//   "#bd9f7b",
+//   "#a57ba1",
+//   "#7ba7bc",
+//   "#87bca7",
+//   "#a1ab7b",
+//   "#a2877b",
+//   "#7bbca7",
+//   "#c37b87",
+//   "#bd9f87",
+//   "#a7bc7b",
+//   "#7bbc87",
+//   "#877bbc",
+// ];
+
+export const shadeColor = (color: any, value: any, min: any, max: any) => {
   let percent = (value - min) / (max - min);
   let num = parseInt(color.replace("#", ""), 16),
     amt = Math.round(1.55 * percent * 100),
@@ -30,7 +253,7 @@ function shadeColor(color: any, value: any, min: any, max: any) {
     .toString(16)
     .slice(1);
   return "#" + newColor;
-}
+};
 
 export const getMetricMinMaxValue = (searchQueryData: any) => {
   // need min and max value for color
@@ -71,260 +294,227 @@ export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
   return [min, max];
 };
 
-const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
-  // if color is based on value then need to find seriesmin or seriesmax or last value
-  let seriesvalue =
-    values?.length > 0
-      ? !isNaN(values[values.length - 1][1])
-        ? +values[values.length - 1][1]
-        : 50
-      : 50;
-
-  if (
-    ["shades"].includes(panelSchema?.config?.color?.mode) ||
-    panelSchema?.config?.color?.mode.startsWith("continuous")
-  ) {
-    if (panelSchema?.config?.color?.seriesBy == "min") {
-      values.forEach((value: any) => {
-        // value[1] should not NaN
-        if (!isNaN(value[1])) {
-          seriesvalue = +Math.min(+value[1], +seriesvalue);
-        }
-      });
-    } else if (panelSchema?.config?.color?.seriesBy == "max") {
-      values.forEach((value: any) => {
-        // value[1] should not NaN
-        if (!isNaN(value[1])) {
-          seriesvalue = +Math.max(+value[1], +seriesvalue);
-        }
-      });
-    }
-  }
-
-  return seriesvalue;
-};
-
-const getSeriesValueFromArray = (panelSchema: any, values: any) => {
-  // if color is based on value then need to find seriesmin or seriesmax or last value
-  let seriesvalue =
-    values?.length > 0
-      ? !isNaN(values[values.length - 1])
-        ? values[values.length - 1]
-        : 50
-      : 50;
-  if (
-    ["shades"].includes(panelSchema?.config?.color?.mode) ||
-    panelSchema?.config?.color?.mode.startsWith("continuous")
-  ) {
-    if (panelSchema?.config?.color?.seriesBy == "min") {
-      values.forEach((value: any) => {
-        // value[1] should not NaN
-        if (!isNaN(value)) {
-          seriesvalue = Math.min(value, seriesvalue);
-        }
-      });
-    } else if (panelSchema?.config?.color?.seriesBy == "max") {
-      values.forEach((value: any) => {
-        // value[1] should not NaN
-        if (!isNaN(value)) {
-          seriesvalue = Math.max(value, seriesvalue);
-        }
-      });
-    }
-  }
-
-  return seriesvalue;
-};
-
-export const classicColorPalette = [
-  "#5470c6",
-  "#91cc75",
-  "#fac858",
-  "#ee6666",
-  "#73c0de",
-  "#3ba272",
-  "#fc8452",
-  "#9a60b4",
-  "#ea7ccc",
-  "#59c4e6",
-  "#edafda",
-  "#93b7e3",
-  "#a5e7f0",
-  "#cbb0e3",
-  "#3fb1e3",
-  "#6be6c1",
-  "#a0a7e6",
-  "#c4ebad",
-  "#96dee8",
-  "#2ec7c9",
-  "#b6a2de",
-  "#5ab1ef",
-  "#ffb980",
-  "#d87a80",
-  "#8d98b3",
-  "#e5cf0d",
-  "#97b552",
-  "#dc69aa",
-  "#07a2a4",
-  "#9a7fd1",
-  "#588dd5",
-  "#f5994e",
-  "#c9ab00",
-  "#7eb00a",
-  "#fcce10",
-  "#b5c334",
-  "#fe8463",
-  "#9bca63",
-  "#fad860",
-  "#60c0dd",
-  "#c6e579",
-  "#f4e001",
-  "#f0805a",
-  "#26c0c0",
-  "#ff715e",
-  "#ffaf51",
-  "#ffee51",
-  "#8c6ac4",
-  "#e6b600",
-  "#0098d9",
-  "#339ca8",
-  "#32a487",
-  "#d95850",
-  "#eb8146",
-  "#ffb248",
-  "#f2d643",
-  "#759aa0",
-  "#e69d87",
-  "#8dc1a9",
-  "#ea7e53",
-  "#eedd78",
-  "#73b9bc",
-  "#91ca8c",
-  "#f49f42",
-  "#4ea397",
-  "#22c3aa",
-  "#7bd9a5",
-  "#d0648a",
-  "#f58db2",
-  "#f2b3c9",
-  "#b8d2c7",
-  "#a4d8c2",
-  "#f3d999",
-  "#d3758f",
-  "#dcc392",
-  "#82b6e9",
-  "#a092f1",
-  "#eaf889",
-  "#6699FF",
-  "#ff6666",
-  "#3cb371",
-  "#d5b158",
-  "#38b6b6",
-  "#5AB2E0",
-  "#32C5E9",
-  "#94E9EC",
-  "#BFEFCF",
-  "#FF9F7F",
-  "#FB7293",
-  "#E26BB3",
-  "#9D96F5",
-  "#8378EA",
-  "#98C0FF",
-];
-
-function getColorBasedOnValue(
-  currentValue: any,
-  minValue: any,
-  maxValue: any,
-  colorArray: any,
-) {
-  // Calculate the size of each partition
-  var partitionSize = (maxValue - minValue) / colorArray.length;
-
-  // Calculate the index based on the current value's position within the partitions
-  var index = Math.floor((currentValue - minValue) / partitionSize);
-
-  // Ensure the index is within the bounds of the array
-  index = Math.max(0, index); // Ensure the index is not less than 0
-  index = Math.min(colorArray.length - 1, index); // Ensure the index is not greater than the array length - 1
-
-  return colorArray[index];
-}
-
-function getHashFromSeriesName(str: string) {
-  // remove unwanted space
-  str = str.trim();
-
+// need one function which will take some series name and will return hash which will be between 1 to 1000
+const getSeriesHash = (seriesName: string) => {
+  // Initialize a hash variable
   let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash += str.charCodeAt(i);
+
+  // If the seriesName is empty, return 1 as a default hash value
+  if (seriesName.length === 0) return 1;
+
+  // Loop through each character in the series name
+  for (let i = 0; i < seriesName.length; i++) {
+    const char = seriesName.charCodeAt(i); // Get the Unicode value of the character
+    hash = (hash << 5) - hash + char; // Bitwise hash computation
+    hash = hash & hash; // Convert to 32-bit integer
   }
-  return hash;
-}
 
-const getColorForSeries = (seriesName: string, colorArray: string[]) => {
-  // Calculate the hash of the series name
-  let hash = getHashFromSeriesName(seriesName);
-
-  // Use the hash to select a color from the color array
-  let index = Math.abs(hash) % colorArray.length;
-  return colorArray[index];
+  // Ensure the hash is positive and between 0 to 99
+  return Math.abs(hash) % 100;
 };
 
-export const getColor = (
-  panelSchema: any,
-  seriesName: any,
-  valuesArr?: any,
-  chartMin?: any,
-  chartMax?: any,
+const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: string) => {
+  switch (seriesBy) {
+    case "last":
+      return values[values.length - 1];
+    case "min":
+      return values.reduce((a: any, b: any) => (a < b ? a : b), values[0]);
+    case "max":
+      return values.reduce((a: any, b: any) => (a > b ? a : b), values[0]);
+    default:
+      return values[values.length - 1];
+  }
+};
+
+export const getSeriesColor = (
+  colorCfg: any,
+  seriesName: string,
+  value: any,
+  chartMin: any,
+  chartMax: any,
 ) => {
-  // switch case based on panelSchema.color type
-  switch (panelSchema?.config?.color?.mode) {
-    case "fixed": {
-      return panelSchema?.config?.color?.fixedColor
-        ? (panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53")
-        : "#53ca53";
-    }
-    case "shades": {
-      // based on selected color pass different shades of same color
-      return shadeColor(
-        panelSchema?.config?.color?.fixedColor
-          ? (panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53")
-          : "#53ca53",
-        panelSchema.queryType == "promql"
-          ? (getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50)
-          : (getSeriesValueFromArray(panelSchema, valuesArr) ?? 50),
-        chartMin ?? 0,
-        chartMax ?? 100,
-      );
-    }
-
-    case "palette-classic-by-series": {
-      return getColorForSeries(seriesName, classicColorPalette);
-    }
-
-    case "palette-classic": {
-      return null;
-    }
-
-    default: {
-      // if mode starts with "continuous", execute this code
-      if (panelSchema?.config?.color?.mode?.startsWith("continuous")) {
-        const value =
-          panelSchema?.queryType == "promql"
-            ? (getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50)
-            : (getSeriesValueFromArray(panelSchema, valuesArr) ?? 50);
-
-        return getColorBasedOnValue(
-          value,
-          chartMin ?? 0,
-          chartMax ?? 100,
-          panelSchema?.config?.color?.fixedColor ?? ["5470c6"],
-        );
-      }
-
-      // for all other cases, default will be palette-classic-by-series
-      return getColorForSeries(seriesName, classicColorPalette);
-    }
+  if (!colorCfg) {
+    return classicColorPalette[getSeriesHash(seriesName)];
+  } else if (colorCfg.mode === "fixed") {
+    return colorCfg.fixedColor[0];
+  } else if (colorCfg.mode === "shades") {
+    return shadeColor(
+      colorCfg.fixedColor[0],
+      getSeriesValueBasedOnSeriesBy(value, "last"),
+      chartMin,
+      chartMax,
+    );
+  } else if (colorCfg.mode === "palette-classic-by-series") {
+    return classicColorPalette[getSeriesHash(seriesName)];
+  } else if (colorCfg.mode === "palette-classic") {
+    return null;
+  } else {
+    const d3ColorObj = scaleLinear(
+      [chartMin, chartMax / 2, chartMax],
+      colorCfg?.fixedColor?.length ? colorCfg?.fixedColor : classicColorPalette,
+    );
+    return d3ColorObj(getSeriesValueBasedOnSeriesBy(value, colorCfg.seriesBy));
   }
 };
+
+// const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
+//   // if color is based on value then need to find seriesmin or seriesmax or last value
+//   let seriesvalue =
+//     values?.length > 0
+//       ? !isNaN(values[values.length - 1][1])
+//         ? +values[values.length - 1][1]
+//         : 50
+//       : 50;
+
+//   if (
+//     ["shades"].includes(panelSchema?.config?.color?.mode) ||
+//     panelSchema?.config?.color?.mode.startsWith("continuous")
+//   ) {
+//     if (panelSchema?.config?.color?.seriesBy == "min") {
+//       values.forEach((value: any) => {
+//         // value[1] should not NaN
+//         if (!isNaN(value[1])) {
+//           seriesvalue = +Math.min(+value[1], +seriesvalue);
+//         }
+//       });
+//     } else if (panelSchema?.config?.color?.seriesBy == "max") {
+//       values.forEach((value: any) => {
+//         // value[1] should not NaN
+//         if (!isNaN(value[1])) {
+//           seriesvalue = +Math.max(+value[1], +seriesvalue);
+//         }
+//       });
+//     }
+//   }
+
+//   return seriesvalue;
+// };
+
+// const getSeriesValueFromArray = (panelSchema: any, values: any) => {
+//   // if color is based on value then need to find seriesmin or seriesmax or last value
+//   let seriesvalue =
+//     values?.length > 0
+//       ? !isNaN(values[values.length - 1])
+//         ? values[values.length - 1]
+//         : 50
+//       : 50;
+//   if (
+//     ["shades"].includes(panelSchema?.config?.color?.mode) ||
+//     panelSchema?.config?.color?.mode.startsWith("continuous")
+//   ) {
+//     if (panelSchema?.config?.color?.seriesBy == "min") {
+//       values.forEach((value: any) => {
+//         // value[1] should not NaN
+//         if (!isNaN(value)) {
+//           seriesvalue = Math.min(value, seriesvalue);
+//         }
+//       });
+//     } else if (panelSchema?.config?.color?.seriesBy == "max") {
+//       values.forEach((value: any) => {
+//         // value[1] should not NaN
+//         if (!isNaN(value)) {
+//           seriesvalue = Math.max(value, seriesvalue);
+//         }
+//       });
+//     }
+//   }
+
+//   return seriesvalue;
+// };
+
+// function getColorBasedOnValue(
+//   currentValue: any,
+//   minValue: any,
+//   maxValue: any,
+//   colorArray: any,
+// ) {
+//   // Calculate the size of each partition
+//   var partitionSize = (maxValue - minValue) / colorArray.length;
+
+//   // Calculate the index based on the current value's position within the partitions
+//   var index = Math.floor((currentValue - minValue) / partitionSize);
+
+//   // Ensure the index is within the bounds of the array
+//   index = Math.max(0, index); // Ensure the index is not less than 0
+//   index = Math.min(colorArray.length - 1, index); // Ensure the index is not greater than the array length - 1
+
+//   return colorArray[index];
+// }
+
+// function getHashFromSeriesName(str: string) {
+//   // remove unwanted space
+//   str = str.trim();
+
+//   let hash = 0;
+//   for (let i = 0; i < str.length; i++) {
+//     hash += str.charCodeAt(i);
+//   }
+//   return hash;
+// }
+
+// const getColorForSeries = (seriesName: string, colorArray: string[]) => {
+//   // Calculate the hash of the series name
+//   let hash = getHashFromSeriesName(seriesName);
+
+//   // Use the hash to select a color from the color array
+//   let index = Math.abs(hash) % colorArray.length;
+//   return colorArray[index];
+// };
+
+// export const getColor = (
+//   panelSchema: any,
+//   seriesName: any,
+//   valuesArr?: any,
+//   chartMin?: any,
+//   chartMax?: any,
+// ) => {
+//   // switch case based on panelSchema.color type
+//   switch (panelSchema?.config?.color?.mode) {
+//     case "fixed": {
+//       return panelSchema?.config?.color?.fixedColor
+//         ? (panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53")
+//         : "#53ca53";
+//     }
+//     case "shades": {
+//       // based on selected color pass different shades of same color
+//       return shadeColor(
+//         panelSchema?.config?.color?.fixedColor
+//           ? (panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53")
+//           : "#53ca53",
+//         panelSchema.queryType == "promql"
+//           ? (getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50)
+//           : (getSeriesValueFromArray(panelSchema, valuesArr) ?? 50),
+//         chartMin ?? 0,
+//         chartMax ?? 100,
+//       );
+//     }
+
+//     case "palette-classic-by-series": {
+//       return getColorForSeries(seriesName, classicColorPalette);
+//     }
+
+//     case "palette-classic": {
+//       return null;
+//     }
+
+//     default: {
+//       // if mode starts with "continuous", execute this code
+//       if (panelSchema?.config?.color?.mode?.startsWith("continuous")) {
+//         const value =
+//           panelSchema?.queryType == "promql"
+//             ? (getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50)
+//             : (getSeriesValueFromArray(panelSchema, valuesArr) ?? 50);
+
+//         return getColorBasedOnValue(
+//           value,
+//           chartMin ?? 0,
+//           chartMax ?? 100,
+//           panelSchema?.config?.color?.fixedColor ?? ["5470c6"],
+//         );
+//       }
+
+//       // for all other cases, default will be palette-classic-by-series
+//       return getColorForSeries(seriesName, classicColorPalette);
+//     }
+//   }
+// };

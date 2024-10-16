@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :popup-content-style="{ height: '300px', width: '200px' }"
       >
         <template v-slot:option="props">
-          <q-item v-bind="props.itemProps">
+          <q-item v-if="!props.opt.isGroup" v-bind="props.itemProps">
             <q-item-section style="padding: 2px">
               <q-item-label>{{ props.opt.label }}</q-item-label>
               <q-item-label caption>
@@ -53,6 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ></div>
                 </div>
               </q-item-label>
+            </q-item-section>
+          </q-item>
+          <!-- Render non-selectable group headers -->
+          <q-item v-else>
+            <q-item-section>
+              <q-item-label v-html="props.opt.label" />
             </q-item-section>
           </q-item>
         </template>
@@ -109,24 +115,18 @@ export default defineComponent({
       if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
           mode: "palette-classic-by-series",
-          fixedColor: ["#53ca53"],
+          fixedColor: classicColorPalette,
           seriesBy: "last",
         };
       }
     });
     const colorOptions = [
       {
-        label: "Fixed",
-        subLabel: "Set a specific color to all series",
-        value: "fixed",
+        label: "<b>By Series</b>",
+        isGroup: true,
       },
       {
-        label: "Shades",
-        subLabel: "Different shades of specific color",
-        value: "shades",
-      },
-      {
-        label: "Palette-Classic (By Series)",
+        label: "Default Palette (By Series)",
         subLabel: "Series with the same name will use the same color",
         colorPalette: classicColorPalette,
         value: "palette-classic-by-series",
@@ -153,43 +153,75 @@ export default defineComponent({
         value: "palette-classic",
       },
       {
+        label: "Single Color",
+        subLabel: "Set a specific color to all series",
+        value: "fixed",
+      },
+      {
+        label: "Shades Of Specific Color",
+        subLabel: "Different shades of specific color",
+        value: "shades",
+      },
+      {
+        label: "<b>By Value</b>",
+        isGroup: true,
+      },
+      {
         label: "Green-Yellow-Red (By Value)",
         colorPalette: [
-          "#69B34C",
-          "#ACB334",
-          "#FAB733",
-          "#FF8E15",
-          "#FF4E11",
-          "#FF0D0D",
+          // "#69B34C",
+          // "#ACB334",
+          // "#FAB733",
+          // "#FF8E15",
+          // "#FF4E11",
+          // "#FF0D0D",
+          "green",
+          "yellow",
+          "red",
         ],
         value: "continuous-green-yellow-red",
       },
       {
         label: "Red-Yellow-Green (By Value)",
         colorPalette: [
-          "#FF0D0D",
-          "#FF4E11",
-          "#FF8E15",
-          "#FAB733",
-          "#ACB334",
-          "#69B34C",
+          // "#FF0D0D",
+          // "#FF4E11",
+          // "#FF8E15",
+          // "#FAB733",
+          // "#ACB334",
+          // "#69B34C",
+          "red",
+          "yellow",
+          "green",
         ],
         value: "continuous-red-yellow-green",
       },
       {
         label: "Temperature (By Value)",
-        colorPalette: ["#85CBD9", "#F6EADB", "#FBDBA2", "#FFC86D", "#FC8585"],
+        colorPalette: [
+          // "#85CBD9",
+          "#F6EADB",
+          "#FBDBA2",
+          "#FFC86D",
+          "#FC8585",
+        ],
         value: "continuous-temperature",
       },
       {
         label: "Positive (By Value)",
-        colorPalette: ["#D3E8D3", "#A7D1A7", "#7AB97A", "#4EA24E", "#228B22"],
+        colorPalette: [
+          // "#D3E8D3",
+          "#A7D1A7",
+          "#7AB97A",
+          "#4EA24E",
+          "#228B22",
+        ],
         value: "continuous-positive",
       },
       {
         label: "Negative (By Value)",
         colorPalette: [
-          "#FEEAEA",
+          // "#FEEAEA",
           "#FFD4D4",
           "#FFADAD",
           "#F77272",
@@ -201,7 +233,7 @@ export default defineComponent({
       {
         label: "Light To Dark Blue (By Value)",
         colorPalette: [
-          "#DBE9F3",
+          // "#DBE9F3",
           "#B8CCE0",
           "#96AFCD",
           "#7392BA",
@@ -226,6 +258,10 @@ export default defineComponent({
       if (["fixed", "shades"].includes(value.value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";
+      } else if (
+        ["palette-classic-by-series", "palette-classic"].includes(value.value)
+      ) {
+        dashboardPanelData.data.config.color.fixedColor = [];
       } else {
         // else assign sublabel to fixedcolor
         dashboardPanelData.data.config.color.fixedColor = value.colorPalette;
