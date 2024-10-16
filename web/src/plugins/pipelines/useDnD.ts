@@ -332,18 +332,6 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     markerEnd: { type: 'arrowclosed' },
   };
 
-
-  const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
-
-  
-  // If targetEdgeIfExist is found, filter it out from the edges array
-  if (targetEdgeIfExist) {
-    pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
-      (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
-    );
-  }
-  console.log(pipelineObj.currentSelectedPipeline.edges,"edges before")
-
   const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
   if(isCycle){
     $q.notify({
@@ -354,6 +342,15 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     
   });
   return;
+  }
+  const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
+
+    // If targetEdgeIfExist is found, filter it out from the edges array
+
+  if (targetEdgeIfExist) {
+    pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
+      (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
+    );
   }
   // Add the new edge to the edges array
   pipelineObj.currentSelectedPipeline.edges = [

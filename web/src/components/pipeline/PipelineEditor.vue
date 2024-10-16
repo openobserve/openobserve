@@ -536,12 +536,22 @@ const savePipeline = async () => {
 
   pipelineObj.currentSelectedPipeline.org =
     store.state.selectedOrganization.identifier;
+    if(findMissingEdges()){
+    q.notify({
+      message: "Please connect all nodes before saving",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
 
   const dismiss = q.notify({
     message: "Saving pipeline...",
     position: "bottom",
     spinner: true,
   });
+
 
   const saveOperation = pipelineObj.isEditPipeline
     ? pipelineService.updatePipeline({
@@ -552,6 +562,7 @@ const savePipeline = async () => {
         data: pipelineObj.currentSelectedPipeline,
         org_identifier: store.state.selectedOrganization.identifier,
       });
+      
 
   saveOperation
     .then(() => {
@@ -617,6 +628,30 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
+
+const findMissingEdges = () =>{
+  const nodeIds = pipelineObj.currentSelectedPipeline.nodes.map(node => node.id);
+
+  // Step 2: Collect node IDs that are part of edges (either source or target)
+  const connectedNodeIds = new Set();
+
+  // Go through each edge and collect both source and target nodes
+  pipelineObj.currentSelectedPipeline.edges.forEach(edge => {
+    connectedNodeIds.add(edge.source); // Add source node ID
+    connectedNodeIds.add(edge.target); // Add target node ID
+  });
+
+  // Step 3: Find nodes that are not connected by edges
+  const unconnectedNodes = nodeIds.filter(nodeId => !connectedNodeIds.has(nodeId));
+  if(unconnectedNodes.length > 0){
+    return true;
+  }
+
+  return false;
+
+  // Output the unconnected nodes
+
+}
 
 // Drag n Drop methods
 
