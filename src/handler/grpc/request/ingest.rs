@@ -55,6 +55,7 @@ impl Ingest for Ingester {
                 }
             }
             Ok(StreamType::Metrics) => {
+                log::info!("received metrics over grpc for ingestion");
                 let log_ingestion_type: IngestionType = req
                     .ingestion_type
                     .unwrap_or_default()
@@ -71,7 +72,7 @@ impl Ingest for Ingester {
                     let values = json::from_slice(&data).unwrap();
                     crate::service::metrics::json::ingest(&org_id, values)
                         .await
-                        .map(|_| ()) // we don't care about success response
+                        .map(|_| log::info!("successfully ingested metrics over grpc")) // we don't care about success response
                         .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
                 }
             }

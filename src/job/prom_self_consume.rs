@@ -98,7 +98,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             let metrics = JsonEncoder::new().encode_to_string(&prom_data).unwrap();
             let bytes = bytes::Bytes::from(metrics);
             match service::metrics::json::ingest(METRIC_INGEST_ORG, bytes).await {
-                Ok(_) => {}
+                Ok(_) => {
+                    log::info!("successfully ingested self-metrics");
+                }
                 Err(e) => {
                     log::error!("error in ingesting self-metrics : {:?}", e)
                 }
@@ -113,7 +115,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 ingestion_type: Some(IngestionType::Json.into()),
             };
             match client.ingest(req).await {
-                Ok(_) => {}
+                Ok(_) => {
+                    log::info!("successfully sent self-metrics for ingestion");
+                }
                 Err(e) => {
                     log::error!("error in sending self-metrics : {:?}", e)
                 }
