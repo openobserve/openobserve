@@ -908,13 +908,16 @@ fn create_const_labels() -> HashMap<String, String> {
 }
 
 pub fn create_prometheus_handler() -> PrometheusMetrics {
-    let registry = prometheus::Registry::new();
-    register_metrics(&registry);
-
     PrometheusMetricsBuilder::new(NAMESPACE)
         .endpoint(format!("{}/metrics", crate::config::get_config().common.base_uri).as_str())
         .const_labels(create_const_labels())
-        .registry(registry)
+        .registry(get_registry())
         .build()
         .expect("Prometheus build failed")
+}
+
+pub fn get_registry() -> Registry {
+    let registry = prometheus::Registry::new();
+    register_metrics(&registry);
+    registry
 }
