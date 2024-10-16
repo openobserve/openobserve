@@ -33,6 +33,8 @@
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
         filled
+        emit-value
+        map-options
         borderless
         dense
         class="tw-flex-1"
@@ -47,13 +49,15 @@
           :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
           input-debounce="0"
           filled
+          emit-value
+          map-options
           borderless
           dense
           class="tw-flex-1"
         />
         <q-input
-          v-if="overrideConfig.config[0].value.unit.value === 'custom'"
-          v-model="overrideConfig.config[0].value.custom_unit"
+          v-if="overrideConfig.config[0].value.unit === 'custom'"
+          v-model="overrideConfig.config[0].value.customUnit"
           :label="t('dashboard.customunitLabel')"
           color="input-border"
           bg-color="input-bg"
@@ -187,7 +191,7 @@ export default defineComponent({
           props.overrideConfig.overrideConfigs || [
             {
               field: { matchBy: "name", value: "" },
-              config: [{ type: "unit", value: { unit: "", custom_unit: "" } }],
+              config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
             },
           ],
         ),
@@ -211,7 +215,7 @@ export default defineComponent({
     const addOverrideConfig = () => {
       overrideConfigs.value.push({
         field: { matchBy: "name", value: "" },
-        config: [{ type: "unit", value: { unit: "", custom_unit: "" } }],
+        config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
       });
     };
 
@@ -240,7 +244,7 @@ export default defineComponent({
       (newUnits, oldUnits) => {
         newUnits.forEach((newUnit: any, index: any) => {
           if (newUnit !== "custom" && oldUnits[index] === "custom") {
-            overrideConfigs.value[index].config[0].value.custom_unit = "";
+            overrideConfigs.value[index].config[0].value.customUnit = "";
           }
         });
       },
