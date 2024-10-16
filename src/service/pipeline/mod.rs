@@ -31,6 +31,7 @@ use crate::common::{
     utils::auth::{remove_ownership, set_ownership},
 };
 
+pub mod batch_execution;
 pub mod execution;
 
 #[tracing::instrument(skip(pipeline))]

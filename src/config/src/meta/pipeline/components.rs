@@ -80,7 +80,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn get_node_data(&self) -> NodeData {
+    pub fn get_node_data(&self) -> NodeData {
         self.data.clone()
     }
 
@@ -95,9 +95,9 @@ impl Node {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Edge {
-    id: String,
-    pub(crate) source: String,
-    pub(crate) target: String,
+    pub id: String,
+    pub source: String,
+    pub target: String,
 }
 
 impl Edge {
