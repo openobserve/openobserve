@@ -555,6 +555,9 @@ const savePipeline = async () => {
 
   saveOperation
     .then(() => {
+      if(pipelineObj.isEditPipeline){
+        pipelineObj.isEditPipeline = false;
+      }
       q.notify({
         message: "Pipeline saved successfully",
         color: "positive",
@@ -569,6 +572,11 @@ const savePipeline = async () => {
       });
     })
     .catch((error) => {
+      if(pipelineObj.isEditPipeline){
+        pipelineObj.isEditPipeline = true;
+      }
+       
+
 
       if(error.response?.data?.message === "Invalid Pipeline: empty edges list"){
         q.notify({
@@ -589,7 +597,6 @@ const savePipeline = async () => {
       }
     })
     .finally(() => {
-      pipelineObj.isEditPipeline = false;
       dismiss();
     });
 };
