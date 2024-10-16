@@ -134,6 +134,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
         pipelineObj.currentSelectedPipeline = props.pipeline;
 
         setTimeout(() => {
+          if(vueFlowRef.value)
           vueFlowRef.value.fitView({ padding: 0.1});
         }, 100);
 

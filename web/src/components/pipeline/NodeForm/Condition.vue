@@ -38,7 +38,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:remove="removeField"
             :enableNewValueMode="true" 
           />
+
       <div>
+        <div class="previous-drop-down">
+      <q-select
+          color="input-border"
+          class="q-py-sm showLabelOnTop no-case tw-w-full "
+          stack-label
+          outlined
+          filled
+          dense
+          v-model="selected"
+          :options="filteredOptions"
+          use-input
+          input-debounce="300"
+          @filter="filterOptions"
+
+
+          label="Select Previous Node"
+          clearable
+        >
+        <template v-slot:option="scope">
+  <q-item
+    v-bind="scope.itemProps"
+    v-if="!scope.opt.isGroup"
+    class="full-width"
+    :style="{ backgroundColor: scope.opt.color  }"
+    style="color: black;"
+  >              
+    <q-item-section avatar class="w-full">
+      <q-img
+        :src="scope.opt.icon"
+        style="width: 24px; height: 24px"
+      />
+    </q-item-section>
+    
+    <div class="flex tw-justify-between tw-w-full"  >
+      <q-item-section>
+        <q-item-label v-html="scope.opt.label"></q-item-label>
+      </q-item-section>
+      <q-item-section>
+        <q-item-label class="tw-ml-auto" v-html="scope.opt.node_type"></q-item-label>
+      </q-item-section>
+    </div>
+  </q-item>
+
+  <!-- Render non-selectable group headers -->
+  <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+    <q-item-section >
+      <q-item-label v-html="scope.opt.label" />
+    </q-item-section>
+  </q-item>
+</template>
+
+        </q-select>
+      </div>
   </div>
         </div>
 
@@ -94,6 +148,7 @@ import {
   ref,
   type Ref,
   onBeforeMount,
+  watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../../alerts/RealTimeAlert.vue";
@@ -169,10 +224,12 @@ const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
 
-
-
+const selected = ref(null);
+watch(selected, (newValue:any) => {
+      pipelineObj.userSelectedNode = newValue; 
+});
 let parser: any;
 
 const nodeLink = ref({
@@ -229,9 +286,19 @@ onBeforeMount(async () => {
 });
 
 onMounted(async () => {
-  // updateStreamFields();
   await importSqlParser();
   getFields();
+  if(pipelineObj.isEditNode){
+    const selectedParentNode = currentSelectedParentNode();
+    if(selectedParentNode){
+      selected.value = selectedParentNode;
+
+    }
+  }
+  else{
+    pipelineObj.userSelectedNode = {};
+    selected.value = null;
+  }
 });
 
 const importSqlParser = async () => {
@@ -480,5 +547,8 @@ const validateSqlQuery = () => {
 
 .stream-routing-section {
   min-height: 100%;
+}
+.previous-drop-down{
+  width: 400px;
 }
 </style>

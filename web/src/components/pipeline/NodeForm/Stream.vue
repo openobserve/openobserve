@@ -26,6 +26,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div   class="stream-routing-container full-width q-pa-md">
+
+      <div v-if="selectedNodeType == 'output'" class="previous-drop-down">
+      <q-select
+          color="input-border"
+          class="q-py-sm showLabelOnTop no-case tw-w-full "
+          stack-label
+          outlined
+          filled
+          dense
+          v-model="selected"
+          :options="filteredOptions"
+          use-input
+          input-debounce="300"
+          @filter="filterOptions"
+
+
+          label="Select Previous Node"
+          clearable
+        >
+        <template v-slot:option="scope">
+  <q-item
+    v-bind="scope.itemProps"
+    v-if="!scope.opt.isGroup"
+    class="full-width"
+    :style="{ backgroundColor: scope.opt.color  }"
+    style="color: black;"
+  >              
+    <q-item-section avatar class="w-full">
+      <q-img
+        :src="scope.opt.icon"
+        style="width: 24px; height: 24px"
+      />
+    </q-item-section>
+    
+    <div class="flex tw-justify-between tw-w-full"  >
+      <q-item-section>
+        <q-item-label v-html="scope.opt.label"></q-item-label>
+      </q-item-section>
+      <q-item-section>
+        <q-item-label class="tw-ml-auto" v-html="scope.opt.node_type"></q-item-label>
+      </q-item-section>
+    </div>
+  </q-item>
+
+  <!-- Render non-selectable group headers -->
+  <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+    <q-item-section >
+      <q-item-label v-html="scope.opt.label" />
+    </q-item-section>
+  </q-item>
+</template>
+
+        </q-select>
+      </div>
       <q-toggle
       v-if="selectedNodeType == 'output'"
         data-test="create-stream-toggle"
@@ -163,7 +217,7 @@ const { t } = useI18n();
 
 const store = useStore();
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
 
 const { getStreams } = useStreams();
 const AddStream = defineAsyncComponent (
@@ -179,6 +233,8 @@ const indexOptions = ref([]);
 const schemaList = ref([]);
 const streams: any = ref({});
 
+const selected = ref(null);
+
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 //for testing purpose but remove metrics and traces as discuessedf
@@ -187,8 +243,23 @@ const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_n
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
 onMounted(async () => {
+  if(pipelineObj.isEditNode){
+    const selectedParentNode = currentSelectedParentNode();
+    if(selectedParentNode){
+      selected.value = selectedParentNode;
+
+    }
+  }
+  else{
+    pipelineObj.userSelectedNode = {};
+    selected.value = null;
+  }
   await getUsedStreamsList();
   await getStreamList();
+});
+
+watch(selected, (newValue:any) => {
+      pipelineObj.userSelectedNode = newValue; 
 });
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;

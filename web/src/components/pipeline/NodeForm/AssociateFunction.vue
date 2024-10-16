@@ -221,12 +221,6 @@ import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
 
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamImage = getImageURL("images/pipeline/stream.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
 
 
 
@@ -276,7 +270,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
@@ -326,14 +320,18 @@ watch(
         immediate: true,
       }
     );
-
-onBeforeMount(() => {
-  
-});
-
 onMounted(()=>{
- pipelineObj.userSelectedNode = {};
- selected.value = null
+  if(pipelineObj.isEditNode){
+    const selectedParentNode = currentSelectedParentNode();
+    if(selectedParentNode){
+      selected.value = selectedParentNode;
+
+    }
+  }
+  else{
+    pipelineObj.userSelectedNode = {};
+    selected.value = null;
+  }
 })
 
 
@@ -435,68 +433,6 @@ const filterFunctions = (val:any, update:any) => {
         filteredFunctions.value = filtered;
       });
     };
-
-// const formattedOptions = computed (() => {
-//   console.log( pipelineObj.previousNodeOptions,"op")
-//   return pipelineObj.previousNodeOptions.map(node => {
-//     let label = node.data.label;
-//     let color = "#c8d6f5";
-//     if (node.io_type === 'input' || node.io_type === 'output' ) {
-//       label = node.io_type;
-//       if(node.io_type === "input"){
-//         color =" #c8d6f5"
-//       }
-//       else{
-//         color = "#8fd4b8"
-//       }
-//     } else if (node.type === 'default' && node.data.node_type === 'function') {
-//       label = node.data.name;
-//       color = "#efefef"
-//     }
-//     else if(node.type === 'default' && node.data.node_type === 'condition'){
-//       label = "Condition"
-//       color="#efefef"
-//     }
-//     return {
-//       id: node.id,
-//       label,
-//       node_type: node.data.node_type,
-//       io_type: node.io_type,
-//       icon:streamImage,
-//       color:color,
-//     };
-//   });
-// });
-
-function getIcon(data:any) {
-  const searchTerm = data.node_type;
-  const node : any = pipelineObj.nodeTypes.find(
-    (node:any) => node.subtype === searchTerm && node.io_type === data.io_type,
-  );
-
-  switch (data.node_type as string) {
-    case "stream":
-      return streamImage;
-      break;
-      case "function":
-      return functionImage ;
-      break;
-      case "output":
-      return streamOutputImage;
-      break;
-      case "condition":
-      return conditionImage;
-      break;
-    default:
-      "img:" + functionImage;
-      break;
-  }
-  // return node ? node.icon : undefined;
-}
-
-
-
-
 </script>
 
 <style scoped>
