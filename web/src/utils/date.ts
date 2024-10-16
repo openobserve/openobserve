@@ -91,7 +91,7 @@ export const getQueryParamsForDuration = (obj: any) => {
   const to = obj.absolute.date.to + " " + obj.absolute.endTime;
 
   if (tab === "relative") {
-    const labelsTooverrideConfig: any = {
+    const labelsToUnitMapping: any = {
       Minutes: "m",
       Hours: "h",
       Days: "d",
@@ -101,7 +101,7 @@ export const getQueryParamsForDuration = (obj: any) => {
 
     const periodValue = obj.relative.value;
     const periodLabel = period.label;
-    const periodUnit = labelsTooverrideConfig[periodLabel];
+    const periodUnit = labelsToUnitMapping[periodLabel];
 
     if (periodLabel === "Minutes" && periodUnit === "m") {
       params["period"] = `${periodValue}${periodUnit}`;
