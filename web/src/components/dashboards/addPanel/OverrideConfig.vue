@@ -32,7 +32,11 @@
     <q-dialog v-model="showOverrideConfigPopup">
       <OverrideConfigPopup
         :columns="columns"
-        :override-config="overrideConfigs"
+        :override-config="
+          JSON.parse(
+            JSON.stringify(dashboardPanelData.data.config.override_config),
+          )
+        "
         @close="showOverrideConfigPopup = false"
         @save="saveOverrideConfigConfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
