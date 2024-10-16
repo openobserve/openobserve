@@ -50,6 +50,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let config = get_config();
 
     if !config.common.self_metrics_consumption_enabled {
+        log::info!("self-metrics consumption not enabled");
         return Ok(());
     }
     if METRICS_WHITELIST.is_empty() {
@@ -57,6 +58,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // no point in scraping if there are no metrics enabled
         return Ok(());
     }
+
+    log::info!("self-metrics consumption enabled");
 
     let registry = get_registry();
 
@@ -93,6 +96,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
             })
             .collect();
 
+        log::info!("attempting to consume self-metrics");
+
         // ingester can ingest its own metrics, others need to send to one of the ingesters
         if LOCAL_NODE.is_ingester() {
             let metrics = JsonEncoder::new().encode_to_string(&prom_data).unwrap();
@@ -123,5 +128,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 }
             }
         }
+        log::info!("self-metrics consumption done");
     }
 }
