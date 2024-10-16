@@ -62,7 +62,7 @@ export default defineComponent({
     );
 
     const showUnitMappingPopup = ref(false);
-    const columns = ref([]);
+    const columns: any = ref([]);
     const unitMappings = ref({});
     const commonUnit = ref(dashboardPanelData.data.config.commonUnit || null);
 
