@@ -15,7 +15,7 @@
 
 use config::{cluster::LOCAL_NODE, get_config};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::time;
 
 use crate::service;
@@ -40,7 +40,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // check super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let cluster_name =
             o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
         if !cluster_name.is_empty() {
