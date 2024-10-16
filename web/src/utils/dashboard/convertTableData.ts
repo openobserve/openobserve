@@ -180,15 +180,16 @@ export const convertTableData = (
           // Determine the unit to use
           let unitToUse = null;
           let customUnitToUse = null;
+          console.log("unitMappings", unitMappings);
 
           // Check if unitMappings is populated and find the corresponding unit
           if (unitMappings.length > 0) {
             const unitMapping = unitMappings.find(
-              (mapping: any) => mapping.selected_column.value === it.alias,
+              (mapping: any) => mapping.field.value.value === it.alias,
             );
             if (unitMapping) {
-              unitToUse = unitMapping.selected_unit.value;
-              customUnitToUse = unitMapping.custom_unit;
+              unitToUse = unitMapping.config[0].value.unit.value;
+              customUnitToUse = unitMapping.config[0].value.custom_unit;
             }
           }
 
