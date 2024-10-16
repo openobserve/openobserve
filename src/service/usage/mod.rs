@@ -106,6 +106,7 @@ pub async fn report_request_usage_stats(
             took_wait_in_queue: stats.took_wait_in_queue,
             result_cache_ratio: None,
             is_partial: stats.is_partial,
+            work_group: None,
         });
     };
 
@@ -142,6 +143,7 @@ pub async fn report_request_usage_stats(
         took_wait_in_queue: stats.took_wait_in_queue,
         result_cache_ratio: stats.result_cache_ratio,
         is_partial: stats.is_partial,
+        work_group: stats.work_group,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;
@@ -425,20 +427,18 @@ pub async fn run() {
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
 pub async fn run_audit_publish() {
-    use o2_enterprise::enterprise::common::{
-        auditor::publish_existing_audits, infra::config::O2_CONFIG,
-    };
-    if !O2_CONFIG.common.audit_enabled {
+    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    if !o2cfg.common.audit_enabled {
         return;
     }
     let mut audit_interval = time::interval(time::Duration::from_secs(
-        O2_CONFIG.common.audit_publish_interval.try_into().unwrap(),
+        o2cfg.common.audit_publish_interval.try_into().unwrap(),
     ));
     audit_interval.tick().await; // trigger the first run
     loop {
         log::debug!("Audit ingestion loop running");
         audit_interval.tick().await;
-        publish_existing_audits(publish_audit).await;
+        o2_enterprise::enterprise::common::auditor::publish_existing_audits(publish_audit).await;
     }
 }
 

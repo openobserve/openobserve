@@ -197,6 +197,8 @@ pub struct Response {
     pub new_end_time: Option<i64>,
     #[serde(default)]
     pub result_cache_ratio: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_group: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -241,6 +243,7 @@ impl Response {
             new_start_time: None,
             new_end_time: None,
             result_cache_ratio: 0,
+            work_group: None,
         }
     }
 
@@ -315,6 +318,10 @@ impl Response {
 
     pub fn set_histogram_interval(&mut self, val: Option<i64>) {
         self.histogram_interval = val;
+    }
+
+    pub fn set_work_group(&mut self, val: Option<String>) {
+        self.work_group = val;
     }
 }
 

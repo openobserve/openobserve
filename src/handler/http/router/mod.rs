@@ -35,7 +35,9 @@ use {
     actix_web::{web::BytesMut, HttpMessage},
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
-    o2_enterprise::enterprise::common::{auditor::AuditMessage, infra::config::O2_CONFIG},
+    o2_enterprise::enterprise::common::{
+        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+    },
 };
 
 use super::{
@@ -72,7 +74,7 @@ async fn audit_middleware(
     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
-    if O2_CONFIG.common.audit_enabled
+    if get_o2_config().common.audit_enabled
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
         let query_params = req.query_string().to_string();
@@ -315,9 +317,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     #[cfg(feature = "enterprise")]
     let server = format!(
         "{}-{}",
-        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .super_cluster
-            .region,
+        get_o2_config().super_cluster.region,
         get_config().common.instance_name_short
     );
     #[cfg(not(feature = "enterprise"))]
