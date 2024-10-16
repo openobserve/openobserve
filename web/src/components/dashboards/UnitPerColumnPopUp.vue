@@ -29,7 +29,12 @@
         :label="'Field'"
         :options="columnsOptions"
         style="width: 50%"
-        @change="updateUnitOptions(index)"
+        :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
+        input-debounce="0"
+        filled
+        borderless
+        dense
+        class="q-mb-xs tw-flex-1"
       />
       <div
         class="flex items-center"
@@ -41,6 +46,12 @@
           :options="filteredUnitOptions(index)"
           :disable="!unitMapping.selected_column"
           style="flex-grow: 1"
+          :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
+          input-debounce="0"
+          filled
+          borderless
+          dense
+          class="q-mb-xs tw-flex-1"
         />
         <q-input
           v-if="unitMapping.selected_unit?.value === 'custom'"
@@ -53,7 +64,7 @@
           filled
           dense
           label-slot
-          data-test="dashboard-config-custom-unit"
+          data-test="dashboard-config-unit"
         />
         <q-btn
           @click="removeUnitMapping(index)"
@@ -62,6 +73,7 @@
           dense
           flat
           round
+          :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
         />
       </div>
     </div>
@@ -88,6 +100,7 @@ export default defineComponent({
     columns: Array,
     valueMapping: Object,
   },
+  emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
 
@@ -167,11 +180,18 @@ export default defineComponent({
       },
     ];
 
-    // Initialize unitMappings from props valueMapping if available
+    const originalUnitMappings = ref(
+      JSON.parse(JSON.stringify(props.valueMapping.unitMappings || [])),
+    );
+
     const unitMappings = ref(
-      props.valueMapping.unitMappings || [
-        { selected_column: null, selected_unit: null, custom_unit: "" },
-      ],
+      JSON.parse(
+        JSON.stringify(
+          props.valueMapping.unitMappings || [
+            { selected_column: null, selected_unit: null, custom_unit: "" },
+          ],
+        ),
+      ),
     );
 
     // Computed property for columnsOptions
@@ -183,6 +203,9 @@ export default defineComponent({
     );
 
     const closePopup = () => {
+      unitMappings.value = JSON.parse(
+        JSON.stringify(originalUnitMappings.value),
+      );
       emit("close");
     };
 
@@ -198,25 +221,17 @@ export default defineComponent({
       unitMappings.value.splice(index, 1);
     };
 
-    const updateUnitOptions = (index: number) => {
-      console.log("index", index);
-      console.log(
-        `Column ${unitMappings.value[index].selected_column} selected.`,
-      );
-    };
-
     const filteredUnitOptions = (index: number) => {
       return unitOptions;
     };
 
     const saveMappings = () => {
-      console.log("unitMappings.value", unitMappings.value);
-      console.log("props.valueMapping", props.valueMapping);
-
+      originalUnitMappings.value = JSON.parse(
+        JSON.stringify(unitMappings.value),
+      );
       props.valueMapping.unitMappings = unitMappings.value;
-
       emit("save", unitMappings.value);
-      closePopup();
+      emit("close");
     };
 
     return {
@@ -226,7 +241,6 @@ export default defineComponent({
       closePopup,
       addUnitMapping,
       removeUnitMapping,
-      updateUnitOptions,
       filteredUnitOptions,
       saveMappings,
       t,
