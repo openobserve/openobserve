@@ -406,8 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="add-alert-submit-btn"
                 :label="t('alerts.trigger')"
-                class="q-mb-md text-bold no-border q-ml-md"
-                color="secondary"
+                class="q-mb-md text-bold q-ml-md no-border"
+                color="primary"
                 padding="sm xl"
                 no-caps
                 @click="triggerAlert"
