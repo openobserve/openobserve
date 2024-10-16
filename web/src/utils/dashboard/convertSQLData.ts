@@ -430,6 +430,78 @@ export const convertSQLData = async (
     return result;
   };
 
+  function getLargestLabel() {
+    if (
+      (panelSchema.type === "stacked" || panelSchema.type === "area-stacked") &&
+      breakDownKeys.length > 0
+    ) {
+      return largestStackLabel(yAxisKeys[0], breakDownKeys[0]);
+    } else {
+      return largestLabel(getAxisDataFromKey(yAxisKeys[0]));
+    }
+  }
+
+  /**
+   * Returns the largest label from the stacked chart data.
+   * Calculates the largest value for each unique breakdown and sums those values.
+   * @param axisKey - key of the yaxis
+   * @param breakDownkey - key of the breakdown
+   * @returns {number} - the largest value
+   */
+  const largestStackLabel = (axisKey: string, breakDownkey: string) => {
+    const data =
+      missingValueData?.filter((item: any) => {
+        return (
+          xAxisKeys.every((key: any) => item[key] != null) &&
+          yAxisKeys.every((key: any) => item[key] != null) &&
+          breakDownKeys.every((key: any) => item[key] != null)
+        );
+      }) || [];
+
+    const maxValues: any = {};
+
+    data.forEach((obj: any) => {
+      if (maxValues[obj[breakDownkey]]) {
+        if (obj[axisKey] > maxValues[obj[breakDownkey]]) {
+          maxValues[obj[breakDownkey]] = obj[axisKey];
+        }
+      } else {
+        maxValues[obj[breakDownkey]] =
+          typeof obj[axisKey] === "number" ? obj[axisKey] : 0;
+      }
+    });
+
+    return Object.values(maxValues).reduce((a: any, b: any) => a + b, 0);
+  };
+
+  /**
+   * Returns the pie chart radius that for
+   * @returns {number} - the largest value
+   */
+  const getPieChartRadius = () => {
+    if (!panelSchema.layout) {
+      return 80;
+    }
+    const minRadius = Math.min(
+      panelSchema.layout.w * 30,
+      panelSchema.layout.h * 30,
+    );
+
+    if (minRadius === 0) {
+      return 0;
+    }
+
+    const radius = minRadius / 2;
+
+    let multiplier = 110;
+
+    if (radius > 90) multiplier = 130;
+
+    if (radius > 150) multiplier = 150;
+
+    return (radius / minRadius) * multiplier;
+  };
+
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
   );
@@ -649,7 +721,7 @@ export const convertSQLData = async (
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
-        nameGap: 9 * (xAxisKeys.length + breakDownKeys.length - index + 1),
+        nameGap: 25,
         nameTextStyle: {
           fontWeight: "bold",
           fontSize: 14,
@@ -669,9 +741,8 @@ export const convertSQLData = async (
               : "truncate",
           // hide axis label if overlaps
           hideOverlap: true,
-          width: 100,
-          margin:
-            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5,
+          width: 120,
+          margin: 10,
         },
         splitLine: {
           show: true,
@@ -683,7 +754,7 @@ export const convertSQLData = async (
           show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
           align: "left",
           alignWithLabel: false,
-          length: 20 * (xAxisKeys.length + breakDownKeys.length - index),
+          length: 5,
           interval:
             panelSchema.type == "h-stacked"
               ? "auto"
@@ -707,7 +778,7 @@ export const convertSQLData = async (
             ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
             : formatUnitValue(
                 getUnitValue(
-                  largestLabel(getAxisDataFromKey(yAxisKeys[0])),
+                  getLargestLabel(),
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals,
@@ -756,6 +827,7 @@ export const convertSQLData = async (
     },
     series: [],
   };
+
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
 
   // Now set the series values as per the chart data
@@ -796,7 +868,7 @@ export const convertSQLData = async (
         };
         options.xAxis[0].axisLabel = {};
         options.xAxis[0].axisTick = {};
-        options.xAxis[0].nameGap = 20;
+        options.xAxis[0].nameGap = 25;
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
@@ -990,6 +1062,16 @@ export const convertSQLData = async (
         };
         return seriesObj;
       });
+
+      // When breakDownKey is present
+      options.xAxis.forEach((it: any, index: number) => {
+        it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 5;
+        it.axisLabel.margin =
+          18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5;
+        it.axisTick.length =
+          20 * (xAxisKeys.length + breakDownKeys.length - index);
+      });
+
       break;
     }
     case "h-bar": {
@@ -1020,14 +1102,33 @@ export const convertSQLData = async (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      options.yAxis.forEach((it: any) => {
-        it.nameGap = calculateWidthText(
+      // xAxisKeys will be 1
+      const xAxisMaxLabel =
+        calculateWidthText(
           xAxisKeys.reduce(
-            (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
+            (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
             "",
           ),
-        );
+        ) + 16;
+
+      // breakDownKeys will be 0 or 1
+      const breakDownMaxLabel =
+        calculateWidthText(
+          breakDownKeys.reduce(
+            (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
+            "",
+          ),
+        ) + 16;
+
+      options.yAxis.forEach((it: any) => {
+        it.axisLabel.overflow = "truncate";
+        it.nameGap =
+          Math.min(
+            Math.max(xAxisMaxLabel, breakDownMaxLabel),
+            it.axisLabel.width,
+          ) + 10;
       });
+
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
           ? panelSchema.queries[0]?.fields?.y[0]?.label
@@ -1082,6 +1183,10 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
+      if (options.series.length > 0 && panelSchema.layout) {
+        options.series[0].radius = `${getPieChartRadius()}%`;
+      }
+
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -1133,6 +1238,14 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
+      if (options.series.length > 0 && panelSchema.layout) {
+        const outerRadius: number = getPieChartRadius();
+
+        const innterRadius = outerRadius - 30;
+
+        options.series[0].radius = [`${innterRadius}%`, `${outerRadius}%`];
+      }
+
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -1164,7 +1277,7 @@ export const convertSQLData = async (
       options.xAxis[0].axisLabel.margin = 5;
       options.xAxis[0].axisLabel = {};
       options.xAxis[0].axisTick = {};
-      options.xAxis[0].nameGap = 20;
+      options.xAxis[0].nameGap = 25;
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -1411,10 +1524,18 @@ export const convertSQLData = async (
       const temp = options.xAxis;
       options.xAxis = options.yAxis;
       options.yAxis = temp;
+
+      const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
+        return Math.max(acc, it.axisLabel.width || 0);
+      }, 0);
+
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 20;
+        it.nameGap =
+          Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
+          10;
       });
-      options.xAxis.nameGap = 20;
+
+      options.xAxis.nameGap = 25;
       break;
     }
     case "metric": {
@@ -1447,7 +1568,10 @@ export const convertSQLData = async (
               type: "text",
               style: {
                 text: formatUnitValue(unitValue),
-                fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
+                fontSize: calculateOptimalFontSize(
+                  formatUnitValue(unitValue),
+                  params.coordSys.cx * 2,
+                ), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
                 align: "center",
                 verticalAlign: "middle",
@@ -2057,16 +2181,20 @@ const getLegendPosition = (legendPosition: string) => {
  * Useful to calculate nameGap for the left axis
  *
  * @param {string} text - The text to calculate the width of.
+ * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
-const calculateWidthText = (text: string): number => {
+const calculateWidthText = (
+  text: string,
+  fontSize: string = "12px",
+): number => {
   if (!text) return 0;
 
   const span = document.createElement("span");
   document.body.appendChild(span);
 
   span.style.font = "sans-serif";
-  span.style.fontSize = "12px";
+  span.style.fontSize = fontSize || "12px";
   span.style.height = "auto";
   span.style.width = "auto";
   span.style.top = "0px";
@@ -2085,12 +2213,15 @@ const calculateWidthText = (text: string): number => {
  * @param {any[]} data - An array of data.
  * @return {any} The largest label in the data array.
  */
-const largestLabel = (data: any) =>
-  data.reduce((largest: any, label: any) => {
+const largestLabel = (data: any) => {
+  const largestlabel = data.reduce((largest: any, label: any) => {
     return label?.toString().length > largest?.toString().length
       ? label
       : largest;
   }, "");
+
+  return largestlabel;
+};
 
 /**
  * Retrieves the properties for a given chart type and returns them as an object.
@@ -2258,4 +2389,30 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "bar",
       };
   }
+};
+
+/**
+ * Calculates the optimal font size for a given text that fits the canvas width.
+ * @param text - The text to calculate the font size for.
+ * @param canvasWidth - canvas width in pixels
+ * @returns {number} - The optimal font size in pixels.
+ */
+const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
+  let minFontSize = 1; // Start with the smallest font size
+  let maxFontSize = 90; // Set a maximum possible font size
+  let optimalFontSize = minFontSize;
+
+  while (minFontSize <= maxFontSize) {
+    const midFontSize = Math.floor((minFontSize + maxFontSize) / 2);
+    const textWidth = calculateWidthText(text, `${midFontSize}px`);
+
+    if (textWidth > canvasWidth) {
+      maxFontSize = midFontSize - 1; // Text is too wide, reduce font size
+    } else {
+      optimalFontSize = midFontSize; // Text fits, but we try larger
+      minFontSize = midFontSize + 1;
+    }
+  }
+
+  return optimalFontSize; // Return the largest font size that fits
 };
