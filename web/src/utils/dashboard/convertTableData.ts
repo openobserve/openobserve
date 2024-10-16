@@ -63,7 +63,7 @@ export const convertTableData = (
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
 
-  const unitMappings = panelSchema.config.unit_mappings || [];
+  const unitMappings = panelSchema.config.override_config || [];
   console.log("unitMappings", unitMappings);
 
   // use all response keys if tableDynamicColumns is true
