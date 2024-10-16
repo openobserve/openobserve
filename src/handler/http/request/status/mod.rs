@@ -18,7 +18,7 @@ use std::{io::Error, sync::Arc};
 use actix_web::{
     cookie,
     cookie::{Cookie, SameSite},
-    get,
+    get, head,
     http::header,
     put, web, HttpRequest, HttpResponse,
 };
@@ -142,6 +142,13 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(HealthzResponse {
         status: "ok".to_string(),
     }))
+}
+
+/// Healthz HEAD
+/// Vector pipeline healthcheck support
+#[head("/healthz")]
+pub async fn healthz_head() -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// Healthz of the node for scheduled status
