@@ -28,13 +28,12 @@
         v-model="unitMapping.selected_column"
         :label="'Field'"
         :options="columnsOptions"
-        style="width: 30%"
+        style="width: 50%"
         @change="updateUnitOptions(index)"
       />
-
       <div
         class="flex items-center"
-        style="width: 65%; display: flex; align-items: center; gap: 10px"
+        style="width: 45%; display: flex; align-items: center; gap: 10px"
       >
         <q-select
           v-model="unitMapping.selected_unit"
@@ -42,6 +41,19 @@
           :options="filteredUnitOptions(index)"
           :disable="!unitMapping.selected_column"
           style="flex-grow: 1"
+        />
+        <q-input
+          v-if="unitMapping.selected_unit?.value === 'custom'"
+          v-model="unitMapping.custom_unit"
+          :label="t('dashboard.customunitLabel')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          filled
+          dense
+          label-slot
+          data-test="dashboard-config-custom-unit"
         />
         <q-btn
           @click="removeUnitMapping(index)"
@@ -158,7 +170,7 @@ export default defineComponent({
     // Initialize unitMappings from props valueMapping if available
     const unitMappings = ref(
       props.valueMapping.unitMappings || [
-        { selected_column: null, selected_unit: null },
+        { selected_column: null, selected_unit: null, custom_unit: "" },
       ],
     );
 
@@ -175,7 +187,11 @@ export default defineComponent({
     };
 
     const addUnitMapping = () => {
-      unitMappings.value.push({ selected_column: null, selected_unit: null });
+      unitMappings.value.push({
+        selected_column: null,
+        selected_unit: null,
+        custom_unit: "",
+      });
     };
 
     const removeUnitMapping = (index: number) => {
