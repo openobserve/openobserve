@@ -90,6 +90,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { usage::run_audit_publish().await });
 
+    tokio::task::spawn(async move { prom_self_consume::run().await });
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() {
         return Ok(());
@@ -225,7 +226,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { flatten_compactor::run().await });
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
-    tokio::task::spawn(async move { prom_self_consume::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
 
     #[cfg(feature = "enterprise")]
