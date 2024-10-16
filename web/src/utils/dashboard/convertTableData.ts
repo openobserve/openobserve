@@ -180,7 +180,6 @@ export const convertTableData = (
           // Determine the unit to use
           let unitToUse = null;
           let customUnitToUse = null;
-          console.log("unitMappings", unitMappings);
 
           // Check if unitMappings is populated and find the corresponding unit
           if (unitMappings.length > 0) {
