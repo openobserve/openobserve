@@ -64,12 +64,6 @@ export default defineComponent({
     const showUnitMappingPopup = ref(false);
     const columns: any = ref([]);
     const unitMappings = ref({});
-    const commonUnit = ref(dashboardPanelData.data.config.commonUnit || null);
-
-    const tableData: any = ref({
-      rows: [],
-      columns: [],
-    });
 
     const fetchColumns = () => {
       const x = dashboardPanelData.data.queries[0].fields.x || [];
@@ -96,7 +90,7 @@ export default defineComponent({
       const mappings = dashboardPanelData.data.config.unit_mappings || {};
       const commonUnit = dashboardPanelData.data.config.commonUnit;
 
-      tableData.value.columns = columns.value.map((col: any) => {
+      columns.value = columns.value.map((col: any) => {
         return {
           name: col.alias,
           label: col.label,
@@ -107,8 +101,6 @@ export default defineComponent({
           },
         };
       });
-      console.log("tableData.value.columns", tableData.value.columns);
-      tableData.value.rows = dashboardPanelData.data.queries[0].data || [];
     };
 
     fetchColumns();
@@ -120,10 +112,8 @@ export default defineComponent({
       showUnitMappingPopup,
       openUnitMappingPopup,
       saveUnitMappingConfig,
-      tableData,
       columns,
       unitMappings,
-      commonUnit,
     };
   },
 });
