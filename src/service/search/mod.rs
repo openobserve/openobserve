@@ -47,7 +47,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::get_cached_channel,
-    o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
+    o2_enterprise::enterprise::{
+        common::infra::config::get_config as get_o2_config, search::TaskStatus,
+    },
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
     tracing::info_span,
 };
@@ -405,7 +407,7 @@ pub async fn search(
     let handle = tokio::task::spawn(
         async move {
             #[cfg(feature = "enterprise")]
-            if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
+            if get_o2_config().super_cluster.enabled && !local_cluster_search {
                 cluster::super_cluster::search(req, req_regions, req_clusters).await
             } else {
                 cluster::http::search(req).await

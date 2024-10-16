@@ -36,7 +36,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use {
     infra::{errors::Error, schema::mk_key},
-    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 
 use crate::{
@@ -58,7 +58,7 @@ pub async fn merge(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::schema_merge(
             &key,
@@ -83,7 +83,7 @@ pub async fn update_setting(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::schema_setting(
             &key,
@@ -108,7 +108,7 @@ pub async fn delete_fields(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::schema_delete_fields(
             &key,
@@ -133,7 +133,7 @@ pub async fn delete(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::delete(
             &key,

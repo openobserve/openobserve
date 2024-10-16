@@ -183,11 +183,11 @@ impl Metadata for DistinctValues {
         #[cfg(feature = "enterprise")]
         {
             use o2_enterprise::enterprise::{
-                common::infra::config::O2_CONFIG,
+                common::infra::config::get_config as get_o2_config,
                 openfga::authorizer::authz::set_ownership_if_not_exists,
             };
 
-            if O2_CONFIG.openfga.enabled {
+            if get_o2_config().openfga.enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),

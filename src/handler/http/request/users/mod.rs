@@ -245,9 +245,9 @@ pub async fn authentication(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
+    let native_login_enabled = get_o2_config().dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
