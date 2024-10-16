@@ -183,7 +183,7 @@ export const convertTableData = (
 
           if (overrideConfigs.length > 0) {
             const overrideConfig = overrideConfigs.find(
-              (override: any) => override.field.value.value === it.alias,
+              (override: any) => override.field?.value?.value === it.alias,
             );
             if (overrideConfig) {
               unitToUse = overrideConfig.config[0].value.unit.value;
