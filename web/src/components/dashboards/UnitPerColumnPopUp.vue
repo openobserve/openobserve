@@ -18,6 +18,7 @@
         @click.stop="closePopup"
       ></q-btn>
     </div>
+
     <div
       v-for="(unitMapping, index) in unitMappings"
       :key="index"
@@ -25,7 +26,7 @@
       style="gap: 15px"
     >
       <q-select
-        v-model="unitMapping.selected_column"
+        v-model="unitMapping.field.value"
         :label="'Field'"
         :options="columnsOptions"
         style="width: 50%"
@@ -36,15 +37,12 @@
         dense
         class="q-mb-xs tw-flex-1"
       />
-      <div
-        class="flex items-center"
-        style="width: 45%; display: flex; align-items: center; gap: 10px"
-      >
+      <div class="flex items-center" style="width: 45%; gap: 10px">
         <q-select
-          v-model="unitMapping.selected_unit"
+          v-model="unitMapping.config[0].value.unit"
           :label="'Unit'"
           :options="filteredUnitOptions(index)"
-          :disable="!unitMapping.selected_column"
+          :disable="!unitMapping.field.value"
           style="flex-grow: 1"
           :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
           input-debounce="0"
@@ -54,8 +52,8 @@
           class="q-mb-xs tw-flex-1"
         />
         <q-input
-          v-if="unitMapping.selected_unit?.value === 'custom'"
-          v-model="unitMapping.custom_unit"
+          v-if="unitMapping.config[0].value.unit.value === 'custom'"
+          v-model="unitMapping.config[0].value.custom_unit"
           :label="t('dashboard.customunitLabel')"
           color="input-border"
           bg-color="input-bg"
@@ -188,13 +186,15 @@ export default defineComponent({
       JSON.parse(
         JSON.stringify(
           props.valueMapping.unitMappings || [
-            { selected_column: null, selected_unit: null, custom_unit: "" },
+            {
+              field: { matchBy: "name", value: "" },
+              config: [{ type: "unit", value: { unit: "", custom_unit: "" } }],
+            },
           ],
         ),
       ),
     );
 
-    // Computed property for columnsOptions
     const columnsOptions = computed(() =>
       props.columns.map((column: any) => ({
         label: column.label,
@@ -211,9 +211,8 @@ export default defineComponent({
 
     const addUnitMapping = () => {
       unitMappings.value.push({
-        selected_column: null,
-        selected_unit: null,
-        custom_unit: "",
+        field: { matchBy: "name", value: "" },
+        config: [{ type: "unit", value: { unit: "", custom_unit: "" } }],
       });
     };
 
