@@ -45,7 +45,11 @@
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
-          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
+          v-if="
+            config.isEnterprise == 'true' &&
+            searchRequestTraceIds.length &&
+            disable
+          "
           class="q-ml-sm"
           outline
           padding="xs"
@@ -98,7 +102,10 @@
                 data-test="dashboard-viewpanel-variables-value-selector"
               />
               <div style="flex: 1; overflow: hidden">
-                <div class="tw-flex tw-justify-end tw-mr-2">
+                <div
+                  class="tw-flex tw-justify-end tw-mr-2"
+                  data-test="view-panel-last-refreshed-at"
+                >
                   <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                     <span class="lastRefreshedAtIcon">🕑</span
                     ><RelativeTime
@@ -122,6 +129,7 @@
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   @last-triggered-at-update="handleLastTriggeredAtUpdate"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
+                  style="height: calc(100% - 21px)"
                 />
               </div>
               <DashboardErrorsComponent
@@ -520,7 +528,7 @@ export default defineComponent({
     };
 
     const disable = ref(false);
-    
+
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
         variablesAndPanelsDataLoadingState.panels,
