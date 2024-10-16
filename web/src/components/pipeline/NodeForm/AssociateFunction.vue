@@ -276,7 +276,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
@@ -326,14 +326,18 @@ watch(
         immediate: true,
       }
     );
-
-onBeforeMount(() => {
-  
-});
-
 onMounted(()=>{
- pipelineObj.userSelectedNode = {};
- selected.value = null
+  if(pipelineObj.isEditNode){
+    const selectedParentNode = currentSelectedParentNode();
+    if(selectedParentNode){
+      selected.value = selectedParentNode;
+
+    }
+  }
+  else{
+    pipelineObj.userSelectedNode = {};
+    selected.value = null;
+  }
 })
 
 

@@ -25,6 +25,7 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 import { getImageURL } from "@/utils/zincutils";
+import { Notify , useQuasar} from "quasar";
 
 
 
@@ -43,8 +44,8 @@ const defaultPipelineObj = {
   source: {
     source_type: "realtime",
   },
-  nodes: [],
-  edges: [],
+  nodes:<any> [],
+  edges:<any> [],
   org: "",
   
 };
@@ -56,12 +57,12 @@ const defaultObject = {
   isEditNode: false,
   nodesChange:false,
   edgesChange:false,
-  draggedNode: null,
+  draggedNode:<any> null,
   isDragOver: false,
   isDragging: false,
   hasInputNode: false,
   currentSelectedNodeID: "",
-  currentSelectedNodeData: {
+  currentSelectedNodeData : <any> {
     stream_type: "logs",
     stream_name: "",
     data: {},
@@ -72,13 +73,15 @@ const defaultObject = {
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
   functions: {},
-  previousNodeOptions:[],
-  userSelectedNode:{},
+  previousNodeOptions:<any>[],
+  userSelectedNode:<any>{},
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
 export default function useDragAndDrop() {
+  const $q = useQuasar();
+
   const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges } =
     useVueFlow();
 
@@ -91,11 +94,11 @@ export default function useDragAndDrop() {
 
   function hasInputNodeFn() {
     pipelineObj.hasInputNode = pipelineObj.currentSelectedPipeline.nodes.some(
-      (node) => node.io_type === "input",
+      (node :any) => node.io_type === "input",
     );
   }
 
-  function onDragStart(event, node) {
+  function onDragStart(event:any, node:any) {
     if (event.dataTransfer) {
       event.dataTransfer.setData("application/vueflow", node.io_type);
       event.dataTransfer.effectAllowed = "move";
@@ -113,10 +116,10 @@ export default function useDragAndDrop() {
    *
    * @param {DragEvent} event
    */
-  function onDragOver(event) {
+  function onDragOver(event:any) {
     event.preventDefault();
 
-    if (pipelineObj.draggedNode.io_type) {
+    if (pipelineObj.draggedNode?.io_type) {
       pipelineObj.isDragOver = true;
 
       if (event.dataTransfer) {
@@ -140,7 +143,7 @@ export default function useDragAndDrop() {
    *
    * @param {DragEvent} event
    */
-  function onDrop(event) {
+  function onDrop(event:any) {
     const position = screenToFlowCoordinate({
       x: event.clientX,
       y: event.clientY,
@@ -178,17 +181,17 @@ export default function useDragAndDrop() {
     pipelineObj.isEditNode = false;
   }
 
-  function onNodeChange(changes) {
+  function onNodeChange(changes:any) {
 
     console.log("Node change", changes);
   }
 
-  function onNodesChange(changes) {
+  function onNodesChange(changes:any) {
     hasInputNodeFn();
 
   }
 
-  function onEdgesChange(changes) {
+  function onEdgesChange(changes:any) {
     if(pipelineObj.isEditPipeline == true ){
       pipelineObj.dirtyFlag = true;
 
@@ -199,7 +202,31 @@ export default function useDragAndDrop() {
     console.log("Edges change", changes);
   }
 
-  function onConnect(connection) {
+  function onConnect(connection:any) {
+    const isConnectionAlreadyAvailable = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === connection.target);
+    if(isConnectionAlreadyAvailable){
+      $q.notify({
+        message: "Only one Incoming Edge to the node is allowed",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      
+    });
+      return;
+    }
+
+    const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
+    if(isCycle){
+      console.log($q,"qusar")
+      $q.notify({
+        message: "Adding this edge will create a cycle in the pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      
+    });
+    return;
+    }
     // Add new connection (edge) to edges array
     const newEdge = {
       id: `e${connection.source}-${connection.target}`,
@@ -214,17 +241,62 @@ export default function useDragAndDrop() {
     pipelineObj.currentSelectedPipeline.edges = [
       ...pipelineObj.currentSelectedPipeline.edges,
       newEdge,
-      console.log(pipelineObj.currentSelectedPipeline.edges,"edges new"),
     ]; // Update edges state
   }
 
-  function validateConnection({ source, target, sourceHandle, targetHandle }) {
+  const detectCycle = (edges:any, newConnection:any) => {
+    // Step 1: Build the adjacency list from the current edges
+    const graph = <any> {};
+    edges.forEach((edge:any) => {
+        if (!graph[edge.sourceNode.id]) graph[edge.sourceNode.id] = [];
+        graph[edge.sourceNode.id].push(edge.targetNode.id);
+    });
+
+    // Add the new connection to the adjacency list
+    if (!graph[newConnection.source]) graph[newConnection.source] = [];
+    graph[newConnection.source].push(newConnection.target);
+
+    // Step 2: Define the DFS function to detect cycles
+    const dfs = (node:any, visited:any, recStack:any) => {
+        if (!visited.has(node)) {
+            // Mark the node as visited and add to recursion stack
+            visited.add(node);
+            recStack.add(node);
+
+            // Traverse all neighbors (adjacent nodes)
+            const neighbors = graph[node] || [];
+            for (let neighbor of neighbors) {
+                if (!visited.has(neighbor) && dfs(neighbor, visited, recStack)) {
+                    return true; // Cycle found
+                } else if (recStack.has(neighbor)) {
+                    return true; // Cycle found in recursion stack
+                }
+            }
+        }
+
+        // Remove the node from the recursion stack after exploration
+        recStack.delete(node);
+        return false;
+    };
+
+    // Step 3: Run DFS from the source node of the new connection
+    const visited = new Set();
+    const recStack = new Set();
+
+    if (dfs(newConnection.source, visited, recStack)) {
+        return true; // Cycle detected
+    }
+
+    return false; // No cycle detected
+};
+
+  function validateConnection({ source, target, sourceHandle, targetHandle }:any) {
     // Example validation rules
     const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find(
-      (node) => node.id === source,
+      (node:any) => node.id === source,
     );
     const targetNode = pipelineObj.currentSelectedPipeline.nodes.find(
-      (node) => node.id === target,
+      (node:any) => node.id === target,
     );
 
     // Input-only node (cannot be the source of a connection)
@@ -240,22 +312,45 @@ export default function useDragAndDrop() {
     return true; // Allow connection for 'both' nodes
   }
 
-  function addNode(newNode) {
+  function addNode(newNode:any) {
 
-if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
+if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
   const newEdge = {
-    id: `e${ pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
+    id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
     source:  pipelineObj.userSelectedNode.id,
     target:pipelineObj.currentSelectedNodeData.id,
     markerEnd: { type: 'arrowclosed' },
-
-
   };
+
+
+  const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
+
+  
+  // If targetEdgeIfExist is found, filter it out from the edges array
+  if (targetEdgeIfExist) {
+    pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
+      (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
+    );
+  }
+  console.log(pipelineObj.currentSelectedPipeline.edges,"edges before")
+
+  const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
+  if(isCycle){
+    $q.notify({
+      message: "Adding this edge will create a cycle in the pipeline",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    
+  });
+  return;
+  }
+  // Add the new edge to the edges array
   pipelineObj.currentSelectedPipeline.edges = [
     ...pipelineObj.currentSelectedPipeline.edges,
     newEdge,
-    console.log(pipelineObj.currentSelectedPipeline.edges,"edges new"),
-  ]; // Update edges state
+  ];
+  // Update edges state
 
 
 }
@@ -264,8 +359,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
       pipelineObj.dirtyFlag = true;
       pipelineObj.nodesChange = true;
     }
-    console.log(pipelineObj,"val before adding")
-    pipelineObj.previousNodeOptions.push(pipelineObj.currentSelectedNodeData) 
+    pipelineObj.previousNodeOptions.push(pipelineObj.currentSelectedNodeData); 
     let currentSelectedNode = pipelineObj.currentSelectedNodeData;
     if (pipelineObj.isEditNode == true && currentSelectedNode.id != "") {
       if (currentSelectedNode) {
@@ -273,7 +367,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
 
         //find the index from pipelineObj.currentSelectedPipeline.nodes based on id
         const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-          (node) => node.id === currentSelectedNode.id,
+          (node:any) => node.id === currentSelectedNode.id,
         );
 
         pipelineObj.currentSelectedPipeline.nodes[index] = currentSelectedNode;
@@ -298,21 +392,22 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
 
 
   const formattedOptions = computed(() => { 
-    const groupedOptions = {};
-    let conditionCounter = 1;
+    const groupedOptions :any = {};
+    let conditionCounter : number = 1;
   
     // Find the index of the current selected node, if it exists
     const currentIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-      node => node.id === pipelineObj.currentSelectedNodeData?.id
+      (node:any) => node.id === pipelineObj.currentSelectedNodeData?.id
     );
   
-    // Determine the nodes to process
     const nodesToProcess = currentIndex !== -1 
-      ? pipelineObj.currentSelectedPipeline.nodes.slice(0, currentIndex)
-      : pipelineObj.currentSelectedPipeline.nodes;
+    ? pipelineObj.currentSelectedPipeline.nodes.filter((_:any, index:any) => index !== currentIndex) 
+    : pipelineObj.currentSelectedPipeline.nodes;
+
+    // const nodesToProcess = pipelineObj.currentSelectedPipeline.nodes;
   
     // Map and group nodes by io_type
-    nodesToProcess.forEach(node => {
+    nodesToProcess.forEach((node:any) => {
       // Skip nodes with io_type 'output'
       if (node.io_type === 'output') {
         return;
@@ -355,7 +450,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
     });
   
     // Helper function to map io_type to custom group names
-    const getGroupName = (io_type) => {
+    const getGroupName = (io_type:any) => {
       switch (io_type) {
         case 'input':
           return 'Source';
@@ -367,7 +462,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
     };
   
     // Flatten the grouped options into an array with custom group headers
-    return Object.entries(groupedOptions).flatMap(([group, options]) => {
+    return Object.entries(groupedOptions).flatMap(([group, options]:any) => {
       return [
         { label: getGroupName(group), isGroup: true }, // Custom Group header
         ...options,
@@ -380,40 +475,69 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode.id){
  
   const filteredOptions = ref(formattedOptions.value);
 
-const filterOptions = (val, update) => {
-  if (val === '') {
-    filteredOptions.value = formattedOptions.value;
-  } else {
-    const filterFn = option =>
-      option.label.toLowerCase().includes(val.toLowerCase()) ||
-      (option.node_type && option.node_type.toLowerCase().includes(val.toLowerCase()));
+  const filterOptions = (val:any, update:any) => {
+    if (val === '') {
+      filteredOptions.value = formattedOptions.value;
+    } else {
+      const filterFn = (option:any) =>
+        option.label.toLowerCase().includes(val.toLowerCase()) ||
+        (option.node_type && option.node_type.toLowerCase().includes(val.toLowerCase()));
 
-    const filtered = [];
-    formattedOptions.value.forEach(option => {
-      if (option.isGroup) {
-        const groupItems = formattedOptions.value.filter(opt => opt.io_type === option.label && filterFn(opt));
-        if (groupItems.length > 0) {
+      const filtered : any = [];
+      formattedOptions.value.forEach(option => {
+        if (option.isGroup) {
+          const groupItems = formattedOptions.value.filter(opt => opt.io_type === option.label && filterFn(opt));
+          if (groupItems.length > 0) {
+            filtered.push(option);
+            filtered.push(...groupItems);
+          }
+        } else if (filterFn(option)) {
           filtered.push(option);
-          filtered.push(...groupItems);
         }
-      } else if (filterFn(option)) {
-        filtered.push(option);
-      }
-    });
+      });
 
-    filteredOptions.value = filtered;
+      filteredOptions.value = filtered;
+    }
+
+    update(() => filteredOptions.value);
+  };
+
+  const getParentNode = (nodeId:any) => {
+    const edge = pipelineObj.currentSelectedPipeline.edges.find(
+      (edge:any) => edge.target === nodeId,
+    );
+    if(edge){
+      return pipelineObj.currentSelectedPipeline.nodes.find(
+        (node:any) => node.id === edge.source,
+      );
+    }
+
   }
 
-  update(() => filteredOptions.value);
-};
+  const currentSelectedParentNode = () =>{
+
+    const parentNode = getParentNode(pipelineObj.currentSelectedNodeID);
+    if(parentNode){
+      const currentParentNode = formattedOptions.value.find(
+        (node)=> node?.id === parentNode.id
+      )
+      if(currentParentNode){
+        return currentParentNode;
+      }
+    }
+
+    else {
+      return null;
+    }
+  }
 
 
   
   
 
-  function editNode(updatedNode) {
+  function editNode(updatedNode:any) {
     const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-      (node) => node.id === updatedNode.id,
+      (node:any) => node.id === updatedNode.id,
     );
     if (index !== -1) {
       pipelineObj.currentSelectedPipeline.nodes[index] = {
@@ -422,10 +546,10 @@ const filterOptions = (val, update) => {
       };
     }
   }
-  const comparePipelinesById = (pipeline1, pipeline2) => {
-    const compareIds = (items1, items2) => {
-      const extractAndSortIds = (items) =>
-        items.map(item => item.id).sort();
+  const comparePipelinesById = (pipeline1:any, pipeline2:any) => {
+    const compareIds = (items1:any, items2:any) => {
+      const extractAndSortIds = (items:any) =>
+        items.map((item:any) => item.id).sort();
 
       const ids1 = extractAndSortIds(items1);
       const ids2 = extractAndSortIds(items2);
@@ -438,23 +562,21 @@ const filterOptions = (val, update) => {
     return nodesEqual;
   };
 
-  // delete the node from pipelineObj.currentSelectedPipeline.nodes and pipelineObj.currentSelectedPipeline.edges all reference associated with target and source
-  // also empty pipelineObj.currentSelectedNodeData
-  function deletePipelineNode(nodeId) {
+  function deletePipelineNode(nodeId:any) {
 
     pipelineObj.currentSelectedPipeline.nodes =
       pipelineObj.currentSelectedPipeline.nodes.filter(
-        (node) => node.id !== nodeId,
+        (node:any) => node.id !== nodeId,
       );
 
       pipelineObj.previousNodeOptions =
       pipelineObj.previousNodeOptions.filter(
-        (node) => node.id !== nodeId,
+        (node:any) => node.id !== nodeId,
       );
 
     pipelineObj.currentSelectedPipeline.edges =
       pipelineObj.currentSelectedPipeline.edges.filter(
-        (edge) => edge.source !== nodeId && edge.target !== nodeId,
+        (edge:any) => edge.source !== nodeId && edge.target !== nodeId,
       );
     pipelineObj.currentSelectedNodeData = null;
     hasInputNodeFn();
@@ -506,5 +628,7 @@ const filterOptions = (val, update) => {
     formattedOptions,
     filteredOptions,
     filterOptions,
+    getParentNode,
+    currentSelectedParentNode,
   };
 }
