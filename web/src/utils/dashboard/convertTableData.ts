@@ -179,28 +179,34 @@ export const convertTableData = (
           }
           // Determine the unit to use
           let unitToUse = null;
+          let customUnitToUse = null;
 
           // Check if unitMappings is populated and find the corresponding unit
           if (unitMappings.length > 0) {
             const unitMapping = unitMappings.find(
               (mapping: any) => mapping.selected_column.value === it.alias,
             );
-            unitToUse = unitMapping ? unitMapping.selected_unit.value : null;
+            if (unitMapping) {
+              unitToUse = unitMapping.selected_unit.value;
+              customUnitToUse = unitMapping.custom_unit;
+            }
           }
 
           // Fallback to the default unit if no mapping is found
           if (!unitToUse) {
             unitToUse = panelSchema.config?.unit;
+            customUnitToUse = panelSchema.config?.unit_custom;
           }
+
           return !Number.isNaN(val)
             ? `${
                 formatUnitValue(
                   getUnitValue(
                     val,
                     unitToUse,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals ?? 2
-                  )
+                    customUnitToUse,
+                    panelSchema.config?.decimals ?? 2,
+                  ),
                 ) ?? 0
               }`
             : val;
