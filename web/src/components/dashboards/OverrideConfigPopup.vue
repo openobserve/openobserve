@@ -20,13 +20,13 @@
     </div>
 
     <div
-      v-for="(unitMapping, index) in unitMappings"
+      v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
       class="q-mb-md flex items-center tw-w-full tw-flex"
       style="gap: 15px"
     >
       <q-select
-        v-model="unitMapping.field.value"
+        v-model="overrideConfig.field.value"
         :label="'Field'"
         :options="columnsOptions"
         style="width: 50%"
@@ -39,10 +39,10 @@
       />
       <div class="tw-flex items-center" style="width: 50%; gap: 10px">
         <q-select
-          v-model="unitMapping.config[0].value.unit"
+          v-model="overrideConfig.config[0].value.unit"
           :label="'Unit'"
           :options="filteredUnitOptions(index)"
-          :disable="!unitMapping.field.value"
+          :disable="!overrideConfig.field.value"
           style="flex-grow: 1"
           :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
           input-debounce="0"
@@ -52,8 +52,8 @@
           class="tw-flex-1"
         />
         <q-input
-          v-if="unitMapping.config[0].value.unit.value === 'custom'"
-          v-model="unitMapping.config[0].value.custom_unit"
+          v-if="overrideConfig.config[0].value.unit.value === 'custom'"
+          v-model="overrideConfig.config[0].value.custom_unit"
           :label="t('dashboard.customunitLabel')"
           color="input-border"
           bg-color="input-bg"
@@ -64,7 +64,7 @@
           data-test="dashboard-config-unit"
         />
         <q-btn
-          @click="removeUnitMapping(index)"
+          @click="removeOverrideConfig(index)"
           icon="close"
           class="delete-btn"
           dense
@@ -75,14 +75,14 @@
       </div>
     </div>
     <q-btn
-      @click="addUnitMapping"
+      @click="addOverrideConfig"
       label="+ Add field override"
       no-caps
       class="q-mt-md"
     />
 
     <q-card-actions align="right">
-      <q-btn label="Save" color="primary" @click="saveMappings" />
+      <q-btn label="Save" color="primary" @click="saveOverrides" />
     </q-card-actions>
   </div>
 </template>
@@ -92,10 +92,10 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
-  name: "UnitMappingPopup",
+  name: "OverrideConfigPopup",
   props: {
     columns: Array,
-    valueMapping: Object,
+    overrideConfig: Object,
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
@@ -177,14 +177,14 @@ export default defineComponent({
       },
     ];
 
-    const originalUnitMappings = ref(
-      JSON.parse(JSON.stringify(props.valueMapping.unitMappings || [])),
+    const originalOverrideConfigs = ref(
+      JSON.parse(JSON.stringify(props.overrideConfig.overrideConfigs || [])),
     );
 
-    const unitMappings = ref(
+    const overrideConfigs = ref(
       JSON.parse(
         JSON.stringify(
-          props.valueMapping.unitMappings || [
+          props.overrideConfig.overrideConfigs || [
             {
               field: { matchBy: "name", value: "" },
               config: [{ type: "unit", value: { unit: "", custom_unit: "" } }],
@@ -202,45 +202,45 @@ export default defineComponent({
     );
 
     const closePopup = () => {
-      unitMappings.value = JSON.parse(
-        JSON.stringify(originalUnitMappings.value),
+      overrideConfigs.value = JSON.parse(
+        JSON.stringify(originalOverrideConfigs.value),
       );
       emit("close");
     };
 
-    const addUnitMapping = () => {
-      unitMappings.value.push({
+    const addOverrideConfig = () => {
+      overrideConfigs.value.push({
         field: { matchBy: "name", value: "" },
         config: [{ type: "unit", value: { unit: "", custom_unit: "" } }],
       });
     };
 
-    const removeUnitMapping = (index: number) => {
-      unitMappings.value.splice(index, 1);
+    const removeOverrideConfig = (index: number) => {
+      overrideConfigs.value.splice(index, 1);
     };
 
     const filteredUnitOptions = (index: number) => {
       return unitOptions;
     };
 
-    const saveMappings = () => {
-      originalUnitMappings.value = JSON.parse(
-        JSON.stringify(unitMappings.value),
+    const saveOverrides = () => {
+      originalOverrideConfigs.value = JSON.parse(
+        JSON.stringify(overrideConfigs.value),
       );
-      props.valueMapping.unitMappings = unitMappings.value;
-      emit("save", unitMappings.value);
+      props.overrideConfig.overrideConfigs = overrideConfigs.value;
+      emit("save", overrideConfigs.value);
       emit("close");
     };
 
     return {
       unitOptions,
       columnsOptions,
-      unitMappings,
+      overrideConfigs,
       closePopup,
-      addUnitMapping,
-      removeUnitMapping,
+      addOverrideConfig,
+      removeOverrideConfig,
       filteredUnitOptions,
-      saveMappings,
+      saveOverrides,
       t,
     };
   },
