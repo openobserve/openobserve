@@ -17,7 +17,7 @@ use config::metrics;
 use infra::errors::{Error::ErrorCode, ErrorCodes};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
-    common::infra::config::O2_CONFIG,
+    common::infra::config::get_config as get_o2_config,
     search::{QueryManager, TaskStatus, WorkGroup},
 };
 use proto::cluster_rpc::{
@@ -170,7 +170,7 @@ impl Search for Searcher {
 
         // remove task
         #[cfg(feature = "enterprise")]
-        if !O2_CONFIG.super_cluster.enabled && !self.is_leader(&trace_id).await {
+        if !get_o2_config().super_cluster.enabled && !self.is_leader(&trace_id).await {
             self.remove(&trace_id, false).await;
         }
 

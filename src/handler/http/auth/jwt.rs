@@ -43,7 +43,7 @@ use {
         common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
         service::{db, users},
     },
-    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 #[cfg(feature = "enterprise")]
 use {serde_json::Value, std::collections::HashMap};
@@ -58,9 +58,10 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
+    let o2cfg = get_o2_config();
     let dec_token = res.1.unwrap();
 
-    let groups = match dec_token.claims.get(&O2_CONFIG.dex.group_claim) {
+    let groups = match dec_token.claims.get(&o2cfg.dex.group_claim) {
         None => vec![],
         Some(groups) => {
             if !groups.is_array() {
@@ -83,14 +84,14 @@ pub async fn process_token(
     let mut tuples_to_add = HashMap::new();
     if groups.is_empty() {
         source_orgs.push(UserOrg {
-            role: UserRole::from_str(&O2_CONFIG.dex.default_role).unwrap(),
-            name: O2_CONFIG.dex.default_org.clone(),
+            role: UserRole::from_str(&o2cfg.dex.default_role).unwrap(),
+            name: o2cfg.dex.default_org.clone(),
             ..UserOrg::default()
         });
     } else {
         for group in groups {
             let role_org = parse_dn(group.as_str().unwrap()).unwrap();
-            if O2_CONFIG.openfga.map_group_to_role {
+            if o2cfg.openfga.map_group_to_role {
                 custom_roles.push(format_role_name(
                     &role_org.org,
                     role_org.custom_role.unwrap(),
@@ -106,7 +107,7 @@ pub async fn process_token(
     }
 
     // Assign users custom roles in RBAC
-    if O2_CONFIG.openfga.map_group_to_role {
+    if o2cfg.openfga.map_group_to_role {
         map_group_to_custom_role(&user_email, &name, custom_roles).await;
         return;
     }
@@ -117,7 +118,7 @@ pub async fn process_token(
     if db_user.is_none() {
         log::info!("User does not exist in the database");
 
-        if O2_CONFIG.openfga.enabled {
+        if o2cfg.openfga.enabled {
             for (index, org) in source_orgs.iter().enumerate() {
                 let mut tuples = vec![];
                 get_user_creation_tuples(
@@ -159,7 +160,7 @@ pub async fn process_token(
         match users::update_db_user(updated_db_user).await {
             Ok(_) => {
                 log::info!("User added to the database");
-                if O2_CONFIG.openfga.enabled {
+                if o2cfg.openfga.enabled {
                     for (_, tuples) in tuples_to_add {
                         match update_tuples(tuples, vec![]).await {
                             Ok(_) => {
@@ -299,7 +300,7 @@ pub async fn process_token(
                 }
             }
         }
-        if O2_CONFIG.openfga.enabled {
+        if get_o2_config().openfga.enabled {
             if write_tuples.is_empty() && delete_tuples.is_empty() {
                 log::info!("No changes to the user information tuples");
             } else {
@@ -329,30 +330,31 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let mut custom_role = None;
     log::debug!("parse_dn dn is: {dn}");
 
-    if O2_CONFIG.openfga.map_group_to_role {
+    let o2cfg = get_o2_config();
+    if o2cfg.openfga.map_group_to_role {
         custom_role = Some(dn.to_owned());
-        org = &O2_CONFIG.dex.default_org;
+        org = &o2cfg.dex.default_org;
     } else {
         for part in dn.split(',') {
             let parts: Vec<&str> = part.split('=').collect();
             if parts.len() == 2 {
-                if parts[0].eq(&O2_CONFIG.dex.group_attribute) && org.is_empty() {
+                if parts[0].eq(&o2cfg.dex.group_attribute) && org.is_empty() {
                     org = parts[1];
                 }
-                if parts[0].eq(&O2_CONFIG.dex.role_attribute) && role.is_empty() {
+                if parts[0].eq(&o2cfg.dex.role_attribute) && role.is_empty() {
                     role = parts[1];
                 }
             }
         }
     }
     let role = if role.is_empty() {
-        UserRole::from_str(&O2_CONFIG.dex.default_role).unwrap()
+        UserRole::from_str(&o2cfg.dex.default_role).unwrap()
     } else {
         UserRole::from_str(role).unwrap()
     };
 
     if org.is_empty() {
-        org = &O2_CONFIG.dex.default_org;
+        org = &o2cfg.dex.default_org;
     }
     Some(RoleOrg {
         role,
@@ -363,6 +365,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
 
 #[cfg(feature = "enterprise")]
 async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Vec<String>) {
+    let o2cfg = get_o2_config();
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
     log::debug!("map_group_to_custom_role custom roles: {:#?}", custom_roles);
@@ -371,9 +374,9 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         let mut tuples = vec![];
         log::info!("group_to_custom_role: User does not exist in the database");
 
-        if O2_CONFIG.openfga.enabled {
+        if o2cfg.openfga.enabled {
             get_org_creation_tuples(
-                &O2_CONFIG.dex.default_org,
+                &o2cfg.dex.default_org,
                 &mut tuples,
                 OFGA_MODELS
                     .iter()
@@ -382,12 +385,12 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                 NON_OWNING_ORG.to_vec(),
             )
             .await;
-            tuples.push(get_user_org_tuple(&O2_CONFIG.dex.default_org, user_email));
+            tuples.push(get_user_org_tuple(&o2cfg.dex.default_org, user_email));
             tuples.push(get_user_org_tuple(user_email, user_email));
             let start = std::time::Instant::now();
             check_and_get_crole_tuple_for_new_user(
                 user_email,
-                &O2_CONFIG.dex.default_org,
+                &o2cfg.dex.default_org,
                 custom_roles,
                 &mut tuples,
             )
@@ -404,8 +407,8 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             password: "".to_owned(),
             salt: "".to_owned(),
             organizations: vec![UserOrg {
-                role: UserRole::from_str(&O2_CONFIG.dex.default_role).unwrap(),
-                name: O2_CONFIG.dex.default_org.clone(),
+                role: UserRole::from_str(&o2cfg.dex.default_role).unwrap(),
+                name: o2cfg.dex.default_org.clone(),
                 ..UserOrg::default()
             }],
             is_external: true,
@@ -415,7 +418,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         match users::update_db_user(updated_db_user).await {
             Ok(_) => {
                 log::info!("group_to_custom_role: User added to the database");
-                if O2_CONFIG.openfga.enabled {
+                if o2cfg.openfga.enabled {
                     let start = std::time::Instant::now();
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
@@ -468,7 +471,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
 
         check_and_get_crole_tuple_for_new_user(
             user_email,
-            &O2_CONFIG.dex.default_org,
+            &o2cfg.dex.default_org,
             new_roles,
             &mut add_tuples,
         )
@@ -479,7 +482,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             remove_tuples
         );
 
-        if O2_CONFIG.openfga.enabled {
+        if o2cfg.openfga.enabled {
             let start = std::time::Instant::now();
             match update_tuples(add_tuples, remove_tuples).await {
                 Ok(_) => {
