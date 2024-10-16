@@ -80,14 +80,14 @@ export default defineComponent({
       valueMapping: any,
       selectedCommonUnit: any,
     ) => {
-      dashboardPanelData.data.config.unit_mappings = valueMapping;
+      dashboardPanelData.data.config.override_config = valueMapping;
       dashboardPanelData.data.config.commonUnit = selectedCommonUnit;
       applyUnitMappings();
       showUnitMappingPopup.value = false;
     };
 
     const applyUnitMappings = () => {
-      const mappings = dashboardPanelData.data.config.unit_mappings || {};
+      const mappings = dashboardPanelData.data.config.override_config || {};
       const commonUnit = dashboardPanelData.data.config.commonUnit;
 
       columns.value = columns.value.map((col: any) => {
