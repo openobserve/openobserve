@@ -20,7 +20,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
-import { getColor, getMetricMinMaxValue } from "./colorPalette";
+import { getMetricMinMaxValue, getSeriesColor } from "./colorPalette";
 import { scaleLinear } from "d3-scale";
 
 let moment: any;
@@ -379,27 +379,6 @@ export const convertPromQLData = async (
 
   [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
 
-  const d3ColorObj = scaleLinear([0, 100], ["red", "yellow", "green"]);
-
-  // need one function which will take some series name and will return hash which will be between 1 to 1000
-  function getSeriesHash(seriesName: string) {
-    // Initialize a hash variable
-    let hash = 0;
-
-    // If the seriesName is empty, return 1 as a default hash value
-    if (seriesName.length === 0) return 1;
-
-    // Loop through each character in the series name
-    for (let i = 0; i < seriesName.length; i++) {
-      const char = seriesName.charCodeAt(i); // Get the Unicode value of the character
-      hash = (hash << 5) - hash + char; // Bitwise hash computation
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-
-    // Ensure the hash is positive and between 1 and 1000
-    return (Math.abs(hash) % 100) + 1;
-  }
-
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -429,17 +408,13 @@ export const convertPromQLData = async (
               return {
                 name: seriesName,
                 itemStyle: {
-                  // color: getColor(
-                  //   panelSchema,
-                  //   getPromqlLegendName(
-                  //     metric.metric,
-                  //     panelSchema.queries[index].config.promql_legend,
-                  //   ),
-                  //   metric.values,
-                  //   chartMin,
-                  //   chartMax,
-                  // ),
-                  color: d3ColorObj(getSeriesHash(seriesName)),
+                  color: getSeriesColor(
+                    panelSchema.config.color,
+                    seriesName,
+                    metric.values.map((value: any) => value[1]),
+                    chartMin,
+                    chartMax,
+                  ),
                 },
                 // colorBy: "data",
                 // if utc then simply return the values by removing z from string
@@ -520,18 +495,7 @@ export const convertPromQLData = async (
                 }`,
               },
             },
-            itemStyle: {
-              color: getColor(
-                panelSchema,
-                getPromqlLegendName(
-                  metric.metric,
-                  panelSchema.queries[index].config.promql_legend,
-                ),
-                values,
-                chartMin,
-                chartMax,
-              ),
-            },
+            itemStyle: {},
             title: {
               fontSize: 10,
               offsetCenter: [0, "70%"],
