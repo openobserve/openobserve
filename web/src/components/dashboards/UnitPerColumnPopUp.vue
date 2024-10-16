@@ -1,5 +1,5 @@
 <template>
-  <div style="padding: 0px 10px; width: 50%">
+  <div style="padding: 0px 10px; min-width: min(800px, 90vw)">
     <div
       class="flex justify-between items-center q-py-md header"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
@@ -22,7 +22,7 @@
     <div
       v-for="(unitMapping, index) in unitMappings"
       :key="index"
-      class="q-mb-md flex items-center"
+      class="q-mb-md flex items-center tw-w-full tw-flex"
       style="gap: 15px"
     >
       <q-select
@@ -35,9 +35,9 @@
         filled
         borderless
         dense
-        class="q-mb-xs tw-flex-1"
+        class="tw-flex-1"
       />
-      <div class="flex items-center" style="width: 45%; gap: 10px">
+      <div class="tw-flex items-center" style="width: 50%; gap: 10px">
         <q-select
           v-model="unitMapping.config[0].value.unit"
           :label="'Unit'"
@@ -49,7 +49,7 @@
           filled
           borderless
           dense
-          class="q-mb-xs tw-flex-1"
+          class="tw-flex-1"
         />
         <q-input
           v-if="unitMapping.config[0].value.unit.value === 'custom'"
@@ -57,7 +57,6 @@
           :label="t('dashboard.customunitLabel')"
           color="input-border"
           bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
           stack-label
           filled
           dense
