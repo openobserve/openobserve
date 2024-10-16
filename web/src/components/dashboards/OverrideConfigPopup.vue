@@ -188,7 +188,7 @@ export default defineComponent({
     const overrideConfigs = ref(
       JSON.parse(
         JSON.stringify(
-          props.overrideConfig.overrideConfigs || [
+          props.overrideConfig || [
             {
               field: { matchBy: "name", value: "" },
               config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
@@ -239,7 +239,7 @@ export default defineComponent({
     watch(
       () =>
         overrideConfigs.value.map(
-          (config: any) => config.config[0].value.unit.value,
+          (config: any) => config.config[0].value.unit,
         ),
       (newUnits, oldUnits) => {
         newUnits.forEach((newUnit: any, index: any) => {
