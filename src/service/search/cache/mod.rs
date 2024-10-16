@@ -34,7 +34,7 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::functions,
+        utils::{functions, http::get_work_group},
     },
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
@@ -148,6 +148,7 @@ pub async fn search(
 
     // Result caching check ends, start search
     let mut results = Vec::new();
+    let mut work_group_set = Vec::new();
     let mut res = if !should_exec_query {
         merge_response(
             trace_id,
@@ -240,6 +241,9 @@ pub async fn search(
         for task in tasks {
             results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
         }
+        for res in &results {
+            work_group_set.push(res.work_group.clone());
+        }
         if c_resp.has_cached_data {
             merge_response(
                 trace_id,
@@ -271,6 +275,7 @@ pub async fn search(
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
+    let work_group = get_work_group(work_group_set);
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
@@ -291,6 +296,7 @@ pub async fn search(
         } else {
             None
         },
+        work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };

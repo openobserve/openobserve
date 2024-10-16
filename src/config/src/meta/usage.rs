@@ -103,6 +103,10 @@ pub struct UsageData {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<String>,
+    #[serde(default)]
+    pub is_partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_group: Option<String>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -267,6 +271,8 @@ pub struct RequestStats {
     pub result_cache_ratio: Option<usize>,
     #[serde(default)]
     pub is_partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_group: Option<String>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -286,6 +292,7 @@ impl Default for RequestStats {
             took_wait_in_queue: None,
             result_cache_ratio: None,
             is_partial: false,
+            work_group: None,
         }
     }
 }
@@ -308,6 +315,7 @@ impl From<FileMeta> for RequestStats {
             took_wait_in_queue: None,
             result_cache_ratio: None,
             is_partial: false,
+            work_group: None,
         }
     }
 }
