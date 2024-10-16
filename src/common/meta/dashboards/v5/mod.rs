@@ -284,13 +284,6 @@ pub struct MarkLine {
 #[serde(rename_all = "camelCase")]
 pub struct OverrideConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
-    overrides: Option<Vec<Override>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Override {
-    #[serde(skip_serializing_if = "Option::is_none")]
     field: Option<Field>,
     #[serde(skip_serializing_if = "Option::is_none")]
     config: Option<Vec<Config>>,
