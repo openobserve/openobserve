@@ -29,16 +29,18 @@ pub async fn get(
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
     let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-    let value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
+    let mut value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
         v.iter().find(|x| x.name.eq(name)).cloned()
     } else {
+        None
+    };
+    if value.is_none() {
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-        match db::get(&key).await {
-            Ok(val) => json::from_slice(&val)?,
-            Err(_) => None,
+        if let Ok(val) = db::get(&key).await {
+            value = json::from_slice(&val)?;
         }
     };
-    if value.is_none() { Ok(None) } else { Ok(value) }
+    Ok(value)
 }
 
 pub async fn set(

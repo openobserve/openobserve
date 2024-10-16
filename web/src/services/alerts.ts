@@ -91,6 +91,16 @@ const alerts = {
     const url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}/preview?type=${stream_type}`;
     return http().get(url);
   },
+
+  trigger: (
+    org_identifier: string,
+    stream_name: string,
+    alert_name: string,
+    stream_type: string,
+  ) => {
+    const url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}/trigger?type=${stream_type}`;
+    return http().put(url);
+  },
 };
 
 export default alerts;
