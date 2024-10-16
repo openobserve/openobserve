@@ -287,6 +287,8 @@ pub struct UnitMapping {
     selected_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     selected_unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    custom_unit: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
