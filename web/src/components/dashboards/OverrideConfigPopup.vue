@@ -88,7 +88,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -231,6 +231,21 @@ export default defineComponent({
       emit("save", overrideConfigs.value);
       emit("close");
     };
+
+    watch(
+      () =>
+        overrideConfigs.value.map(
+          (config: any) => config.config[0].value.unit.value,
+        ),
+      (newUnits, oldUnits) => {
+        newUnits.forEach((newUnit: any, index: any) => {
+          if (newUnit !== "custom" && oldUnits[index] === "custom") {
+            overrideConfigs.value[index].config[0].value.custom_unit = "";
+          }
+        });
+      },
+      { deep: true },
+    );
 
     return {
       unitOptions,
