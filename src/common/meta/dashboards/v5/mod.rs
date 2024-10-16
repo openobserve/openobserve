@@ -214,7 +214,7 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     mark_line: Option<Vec<MarkLine>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    unit_mappings: Option<Vec<UnitMapping>>,
+    override_config: Option<Vec<OverrideConfig>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -282,13 +282,38 @@ pub struct MarkLine {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct UnitMapping {
+pub struct OverrideConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
-    selected_column: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    selected_unit: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    custom_unit: Option<String>,
+    overrides: <Option<Vec<Override>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Override {
+    field: Option<Field>,
+    config: <Option<Vec<Config>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Field {
+    match_by: String,
+    value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Config {
+    #[serde(rename = "type")]
+    typee: String, 
+    value: Option<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Value {
+    unit: String,
+    custom_unit: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
