@@ -20,7 +20,9 @@ use actix_web::{
     http::{header, Method},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, dex::service::auth::get_jwks};
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config, dex::service::auth::get_jwks,
+};
 
 use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
@@ -52,7 +54,7 @@ pub async fn token_validator(
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
-        &O2_CONFIG.dex.client_id,
+        &get_o2_config().dex.client_id,
         false,
     )
     .await
@@ -126,7 +128,7 @@ pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
     match jwt::verify_decode_token(
         auth_str.strip_prefix("Bearer").unwrap().trim(),
         &keys,
-        &O2_CONFIG.dex.client_id,
+        &get_o2_config().dex.client_id,
         false,
     )
     .await
