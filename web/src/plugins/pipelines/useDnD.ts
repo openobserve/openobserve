@@ -203,6 +203,16 @@ export default function useDragAndDrop() {
   }
 
   function onConnect(connection:any) {
+    if(connection.sourceHandle === "input" && connection.targetHandle === "input" || connection.sourceHandle === "output" && connection.targetHandle === "output"){
+      $q.notify({
+        message: "Same type of edges / nodes cannot be connected",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      
+    });
+      return;
+    }
     const isConnectionAlreadyAvailable = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === connection.target);
     if(isConnectionAlreadyAvailable){
       $q.notify({
