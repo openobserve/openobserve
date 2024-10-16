@@ -810,7 +810,8 @@
     "lastTriggered":"Last Triggered At",
     "lastSatisfied":"Last Satisfied At",
     "owner": "Owner",
-    "title": "Title"
+    "title": "Title",
+    "trigger": "Trigger"
   },
   "alert_templates": {
     "header": "Templates",

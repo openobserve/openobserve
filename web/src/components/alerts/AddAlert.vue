@@ -183,7 +183,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-else>
-
               <scheduled-alert
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
@@ -200,7 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:promql_condition="
                   formData.query_condition.promql_condition
                 "
-                v-model:multi_time_range ="formData.query_condition.multi_time_range"
+                v-model:multi_time_range="
+                  formData.query_condition.multi_time_range
+                "
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
@@ -404,6 +405,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-btn
                 data-test="add-alert-submit-btn"
+                :label="t('alerts.trigger')"
+                class="q-mb-md text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                no-caps
+                @click="triggerAlert"
+              />
+              <q-btn
+                data-test="add-alert-submit-btn"
                 :label="t('alerts.save')"
                 class="q-mb-md text-bold no-border q-ml-md"
                 color="secondary"
@@ -502,7 +512,7 @@ const defaultValue: any = () => {
       },
       promql_condition: null,
       vrl_function: null,
-      multi_time_range:[],
+      multi_time_range: [],
     },
     trigger_condition: {
       period: 10,
@@ -1187,11 +1197,22 @@ export default defineComponent({
         vrlFunctionError.value = "";
       }
     };
-    const updateMultiTimeRange = (value : any) =>{
-      if(value){
+    const updateMultiTimeRange = (value: any) => {
+      if (value) {
         formData.value.query_condition.multi_time_range = value;
       }
-    }
+    };
+
+    const triggerAlert = () => {
+      if (validateInputs(formData.value)) {
+        alertsService.trigger(
+          store.state.selectedOrganization.identifier,
+          formData.value.stream_name,
+          formData.value.name,
+          formData.value.stream_type,
+        );
+      }
+    };
 
     return {
       t,
@@ -1257,6 +1278,7 @@ export default defineComponent({
       getTimezonesByOffset,
       showTimezoneWarning,
       updateMultiTimeRange,
+      triggerAlert,
     };
   },
 
