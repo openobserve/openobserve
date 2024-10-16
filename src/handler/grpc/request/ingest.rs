@@ -68,9 +68,7 @@ impl Ingest for Ingester {
                     ))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    // we can be fairly certain here that data will actually be json
-                    let values = json::from_slice(&data).unwrap();
-                    crate::service::metrics::json::ingest(&org_id, values)
+                    crate::service::metrics::json::ingest(&org_id, data)
                         .await
                         .map(|_| log::info!("successfully ingested metrics over grpc")) // we don't care about success response
                         .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
