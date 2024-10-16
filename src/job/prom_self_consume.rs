@@ -21,11 +21,11 @@ use config::{
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
 };
 use hashbrown::HashSet;
-use serde_json::Value;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     ingest_client::IngestClient, IngestionData, IngestionRequest, IngestionType, StreamType,
 };
+use serde_json::Value;
 use tokio::time::{self, Duration};
 use tonic::{
     codec::CompressionEncoding,
@@ -57,19 +57,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
     };
     let org_header_key: MetadataKey<_> = config.grpc.org_header_key.parse().unwrap();
     let token: MetadataValue<_> = get_internal_grpc_token().parse().unwrap();
-    let (addr, _) = get_ingester_channel().await?;
-    let channel = tonic::transport::Channel::from_shared(addr.to_string())
-        .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(
-            config::get_config().grpc.connect_timeout,
-        ))
-        .keep_alive_while_idle(false)
-        .connect()
-        .await
-        .map_err(|err| {
-            log::error!("gRPC node: {}, connect err: {:?}", &addr, err);
-            tonic::Status::internal("connect to gRPC node error".to_string())
-        })?;
+    let (_, channel) = get_ingester_channel().await?;
     let mut client = IngestClient::with_interceptor(channel, move |mut req: Request<()>| {
         req.metadata_mut().insert("authorization", token.clone());
         req.metadata_mut()
@@ -88,8 +76,12 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
 pub async fn run() -> Result<(), anyhow::Error> {
     let config = get_config();
 
+    log::debug!(
+        "self-metrics consumption enabled status : {}",
+        config.common.self_metrics_consumption_enabled
+    );
+
     if !config.common.self_metrics_consumption_enabled {
-        log::info!("self-metrics consumption not enabled");
         return Ok(());
     }
     if METRICS_WHITELIST.is_empty() {
@@ -97,8 +89,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // no point in scraping if there are no metrics enabled
         return Ok(());
     }
-
-    log::info!("self-metrics consumption enabled");
 
     let registry = get_registry();
 
@@ -118,8 +108,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 METRICS_WHITELIST.contains(name)
             })
             .collect();
-
-        log::info!("attempting to consume self-metrics");
 
         // ingester can ingest its own metrics, others need to send to one of the ingesters
         if LOCAL_NODE.is_ingester() {
@@ -144,6 +132,5 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 }
             }
         }
-        log::info!("self-metrics consumption done");
     }
 }
