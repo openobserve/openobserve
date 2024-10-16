@@ -1259,10 +1259,12 @@ defineExpose({
 }
 .scheduled-alerts {
   .monaco-editor {
-    width: 500px !important;
-    height: 100px !important;
-    border: 1px solid $border-color;
-  }
+  min-width: 500px !important;
+  min-height: 100px !important;
+  border: 1px solid $border-color;
+  resize: both;
+  overflow: auto; /* Ensure content adjusts when resized */
+}
 
   .q-btn {
     &.icon-dark {
