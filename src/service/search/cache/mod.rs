@@ -424,6 +424,9 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
+        // TODO: here we can't plus cluster_total, it is query in parallel
+        // TODO: and, use this value also is wrong, the cluster_total should be the total time of
+        // TODO: the query, here only calculate the time of the delta query
         if let Some(mut took_details) = res.took_detail {
             res_took.cluster_total += took_details.cluster_total;
             res_took.cluster_wait_queue += took_details.cluster_wait_queue;
