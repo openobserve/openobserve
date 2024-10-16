@@ -42,7 +42,7 @@ static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
         .common
         .self_metrics_consumption_whitelist
         .split(',')
-        .map(|x| x.to_string())
+        .map(|x| x.trim().to_string())
         .filter(|x| !x.trim().is_empty())
         .collect()
 });
