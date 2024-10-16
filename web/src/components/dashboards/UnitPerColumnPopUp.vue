@@ -76,7 +76,7 @@ export default defineComponent({
     columns: Array,
     valueMapping: Object,
   },
-  setup(props, { emit }) {
+  setup(props: any, { emit }) {
     const { t } = useI18n();
 
     const unitOptions = [
