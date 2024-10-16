@@ -34,7 +34,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
-import { getColor, getSQLMinMaxValue } from "./colorPalette";
+import { getSQLMinMaxValue } from "./colorPalette";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -932,19 +932,19 @@ export const convertSQLData = async (
                     null
                 ),
                 large: true,
-                color:
-                  getColor(
-                    panelSchema,
-                    yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
-                    options.xAxis[0].data.map(
-                      (it: any) =>
-                        data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
-                          yAxis
-                        ] ?? null,
-                    ),
-                    chartMin,
-                    chartMax,
-                  ) ?? "#5960b2",
+                // color:
+                //   getColor(
+                //     panelSchema,
+                //     yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
+                //     options.xAxis[0].data.map(
+                //       (it: any) =>
+                //         data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
+                //           yAxis
+                //         ] ?? null,
+                //     ),
+                //     chartMin,
+                //     chartMax,
+                //   ) ?? "#5960b2",
               };
               return seriesObj;
             });
@@ -957,16 +957,16 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
-            color:
-              getColor(
-                panelSchema,
-                panelSchema?.queries[0]?.fields?.y.find(
-                  (it: any) => it.alias == key,
-                )?.label,
-                getAxisDataFromKey(key),
-                chartMin,
-                chartMax,
-              ) ?? "#5960b2",
+            // color:
+            //   getColor(
+            //     panelSchema,
+            //     panelSchema?.queries[0]?.fields?.y.find(
+            //       (it: any) => it.alias == key,
+            //     )?.label,
+            //     getAxisDataFromKey(key),
+            //     chartMin,
+            //     chartMax,
+            //   ) ?? "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -1056,16 +1056,16 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
-            color:
-              getColor(
-                panelSchema,
-                panelSchema?.queries[0]?.fields?.y.find(
-                  (it: any) => it.alias == key,
-                )?.label,
-                getAxisDataFromKey(key),
-                chartMin,
-                chartMax,
-              ) ?? "#5960b2",
+            // color:
+            //   getColor(
+            //     panelSchema,
+            //     panelSchema?.queries[0]?.fields?.y.find(
+            //       (it: any) => it.alias == key,
+            //     )?.label,
+            //     getAxisDataFromKey(key),
+            //     chartMin,
+            //     chartMax,
+            //   ) ?? "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -1089,16 +1089,16 @@ export const convertSQLData = async (
           name: panelSchema?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key
           )?.label,
-          color:
-            getColor(
-              panelSchema,
-              panelSchema?.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key,
-              )?.label,
-              getAxisDataFromKey(key),
-              chartMin,
-              chartMax,
-            ) ?? "#5960b2",
+          // color:
+          //   getColor(
+          //     panelSchema,
+          //     panelSchema?.queries[0]?.fields?.y.find(
+          //       (it: any) => it.alias == key,
+          //     )?.label,
+          //     getAxisDataFromKey(key),
+          //     chartMin,
+          //     chartMax,
+          //   ) ?? "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           // markLine if exist
@@ -1131,16 +1131,16 @@ export const convertSQLData = async (
           name: panelSchema?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key
           )?.label,
-          color:
-            getColor(
-              panelSchema,
-              panelSchema?.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key,
-              )?.label,
-              getAxisDataFromKey(key),
-              chartMin,
-              chartMax,
-            ) ?? "#5960b2",
+          // color:
+          //   getColor(
+          //     panelSchema,
+          //     panelSchema?.queries[0]?.fields?.y.find(
+          //       (it: any) => it.alias == key,
+          //     )?.label,
+          //     getAxisDataFromKey(key),
+          //     chartMin,
+          //     chartMax,
+          //   ) ?? "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           // markLine if exist
