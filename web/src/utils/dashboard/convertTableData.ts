@@ -63,8 +63,8 @@ export const convertTableData = (
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
 
-  const unitMappings = panelSchema.config.override_config || [];
-  console.log("unitMappings", unitMappings);
+  const overrideConfigs = panelSchema.config.override_config || [];
+  console.log("overrideConfigs", overrideConfigs);
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -177,22 +177,20 @@ export const convertTableData = (
           if (valueMapping != null) {
             return valueMapping;
           }
-          // Determine the unit to use
+
           let unitToUse = null;
           let customUnitToUse = null;
 
-          // Check if unitMappings is populated and find the corresponding unit
-          if (unitMappings.length > 0) {
-            const unitMapping = unitMappings.find(
-              (mapping: any) => mapping.field.value.value === it.alias,
+          if (overrideConfigs.length > 0) {
+            const overrideConfig = overrideConfigs.find(
+              (override: any) => override.field.value.value === it.alias,
             );
-            if (unitMapping) {
-              unitToUse = unitMapping.config[0].value.unit.value;
-              customUnitToUse = unitMapping.config[0].value.custom_unit;
+            if (overrideConfig) {
+              unitToUse = overrideConfig.config[0].value.unit.value;
+              customUnitToUse = overrideConfig.config[0].value.custom_unit;
             }
           }
 
-          // Fallback to the default unit if no mapping is found
           if (!unitToUse) {
             unitToUse = panelSchema.config?.unit;
             customUnitToUse = panelSchema.config?.unit_custom;
@@ -347,27 +345,13 @@ export const convertTableData = (
             if (valueMapping != null) {
               return valueMapping;
             }
-            // Determine the unit to use
-            let unitToUse = null;
 
-            // Check if unitMappings is populated and find the corresponding unit
-            if (unitMappings.length > 0) {
-              const unitMapping = unitMappings.find(
-                (mapping: any) => mapping.selected_column.value === it.alias,
-              );
-              unitToUse = unitMapping ? unitMapping.selected_unit.value : null;
-            }
-
-            // Fallback to the default unit if no mapping is found
-            if (!unitToUse) {
-              unitToUse = panelSchema.config?.unit;
-            }
             return !Number.isNaN(val)
               ? `${
                   formatUnitValue(
                     getUnitValue(
                       val,
-                      unitToUse,
+                      panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
                       panelSchema.config?.decimals ?? 2
                     )

@@ -22,20 +22,19 @@
     </div>
 
     <q-btn
-      @click="openUnitMappingPopup"
+      @click="openOverrideConfigPopup"
       style="cursor: pointer; padding: 0px 5px"
       :label="' Add field override'"
       no-caps
-      data-test="dashboard-addpanel-config-unit-mapping-add-btn"
+      data-test="dashboard-addpanel-config-override-config-add-btn"
     />
 
-    <q-dialog v-model="showUnitMappingPopup">
-      <UnitPerColumnPopUp
+    <q-dialog v-model="showOverrideConfigPopup">
+      <OverrideConfigPopup
         :columns="columns"
-        :value-mapping="unitMappings"
-        :common-unit="dashboardPanelData.data.config.commonUnit"
-        @close="showUnitMappingPopup = false"
-        @save="saveUnitMappingConfig"
+        :override-config="overrideConfigs"
+        @close="showOverrideConfigPopup = false"
+        @save="saveOverrideConfigConfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
     </q-dialog>
@@ -45,12 +44,12 @@
 <script lang="ts">
 import { defineComponent, ref, inject } from "vue";
 import { useStore } from "vuex";
-import UnitPerColumnPopUp from "../UnitPerColumnPopUp.vue";
+import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
 export default defineComponent({
-  name: "UnitPerColumn",
-  components: { UnitPerColumnPopUp },
+  name: "OverrideConfig",
+  components: { OverrideConfigPopup },
   setup() {
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
@@ -61,9 +60,9 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
 
-    const showUnitMappingPopup = ref(false);
+    const showOverrideConfigPopup = ref(false);
     const columns: any = ref([]);
-    const unitMappings = ref({});
+    const overrideConfigs = ref({});
 
     const fetchColumns = () => {
       const x = dashboardPanelData.data.queries[0].fields.x || [];
@@ -71,24 +70,19 @@ export default defineComponent({
       columns.value = [...x, ...y];
     };
 
-    const openUnitMappingPopup = () => {
+    const openOverrideConfigPopup = () => {
       fetchColumns();
-      showUnitMappingPopup.value = true;
+      showOverrideConfigPopup.value = true;
     };
 
-    const saveUnitMappingConfig = (
-      valueMapping: any,
-      selectedCommonUnit: any,
-    ) => {
-      dashboardPanelData.data.config.override_config = valueMapping;
-      dashboardPanelData.data.config.commonUnit = selectedCommonUnit;
-      applyUnitMappings();
-      showUnitMappingPopup.value = false;
+    const saveOverrideConfigConfig = (overrideConfig: any) => {
+      dashboardPanelData.data.config.override_config = overrideConfig;
+      applyOverrideConfigs();
+      showOverrideConfigPopup.value = false;
     };
 
-    const applyUnitMappings = () => {
-      const mappings = dashboardPanelData.data.config.override_config || {};
-      const commonUnit = dashboardPanelData.data.config.commonUnit;
+    const applyOverrideConfigs = () => {
+      const overrides = dashboardPanelData.data.config.override_config || {};
 
       columns.value = columns.value.map((col: any) => {
         return {
@@ -96,7 +90,7 @@ export default defineComponent({
           label: col.label,
           field: col.alias,
           format: (val: any) => {
-            const unit = mappings[col.alias] || commonUnit || "";
+            const unit = overrides[col.alias] || "";
             return `${val} ${unit}`;
           },
         };
@@ -104,16 +98,16 @@ export default defineComponent({
     };
 
     fetchColumns();
-    applyUnitMappings();
+    applyOverrideConfigs();
 
     return {
       store,
       dashboardPanelData,
-      showUnitMappingPopup,
-      openUnitMappingPopup,
-      saveUnitMappingConfig,
+      showOverrideConfigPopup,
+      openOverrideConfigPopup,
+      saveOverrideConfigConfig,
       columns,
-      unitMappings,
+      overrideConfigs,
     };
   },
 });
