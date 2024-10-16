@@ -17,7 +17,6 @@ use std::io::{BufRead, BufReader};
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::utils::inverted_index::convert_parquet_idx_file_name;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
