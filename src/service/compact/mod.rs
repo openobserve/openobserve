@@ -23,15 +23,12 @@ use config::{
     },
 };
 use infra::{
-    dist_lock, file_list as infra_file_list,
+    file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
 };
 use tokio::sync::{mpsc, Semaphore};
 
-use crate::{
-    common::infra::cluster::{get_node_by_uuid, get_node_from_consistent_hash},
-    service::db,
-};
+use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
 mod file_list;
 pub mod file_list_deleted;
@@ -375,40 +372,15 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // get the working node for the organization
-        let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
-            continue;
-        }
-
-        // before start processing, set current node to lock the organization
-        let lock_key = format!("/compact/organization/{org_id}");
-        let locker = dist_lock::lock(&lock_key, 0, None).await?;
-        // check the working node for the organization again, maybe other node locked it
-        // first
-        let (offset, node) =
-            db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
-            dist_lock::unlock(&locker).await?;
-            continue;
-        }
-        let ret = if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-            db::compact::organization::set_offset(
-                &org_id,
-                "file_list_deleted",
-                offset,
-                Some(&LOCAL_NODE.uuid.clone()),
-            )
-            .await
-        } else {
-            Ok(())
+        let Some(node_name) = get_node_from_consistent_hash(&org_id, &Role::Compactor, None).await
+        else {
+            continue; // no compactor node
         };
-        // already bind to this node, we can unlock now
-        dist_lock::unlock(&locker).await?;
-        drop(locker);
-        ret?;
+        if LOCAL_NODE.name.ne(&node_name) {
+            continue; // not this node
+        }
 
+        let (offset, _) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         let batch_size = 10000;
         loop {
             match file_list_deleted::delete(&org_id, offset, time_max, batch_size).await {
