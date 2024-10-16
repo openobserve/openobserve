@@ -51,7 +51,9 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config, search::WorkGroup,
+};
 
 use super::{
     file_type::{FileType, GetExt},
@@ -313,7 +315,7 @@ pub async fn prepare_datafusion_context(
             let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
                 DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
             })?;
-            if O2_CONFIG.search_group.cpu_limit_enabled {
+            if get_o2_config().search_group.cpu_limit_enabled {
                 target_partition = target_partition * cpu as usize / 100;
             }
             memory_size = memory_size * mem as usize / 100;
