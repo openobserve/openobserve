@@ -88,7 +88,6 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
   options.yAxis = [];
   options.series = panelSchema.queries.map((query: any, index: any) => {
     return {
-      name: "USA PopEstimates",
       type: "map",
       map: "world",
       emphasis: {
