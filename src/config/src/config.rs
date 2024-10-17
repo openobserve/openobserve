@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1046,7 +1046,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 100,
+        default = 500,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,

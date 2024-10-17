@@ -16,7 +16,7 @@
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use regex::Regex;
 
 use crate::{
@@ -228,7 +228,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // RBAC model
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         if let Err(e) = crate::common::infra::ofga::init().await {
             log::error!("OFGA init failed: {}", e);
         }
