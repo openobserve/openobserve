@@ -21,7 +21,7 @@ use config::{
     get_config,
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{self, components::NodeData, Pipeline},
+        pipeline::{self, components::NodeData, Pipeline, PipelineExecDFS},
         stream::StreamParams,
     },
     utils::{flatten, json::Value},
@@ -29,10 +29,30 @@ use config::{
 use vector_enrichment::TableRegistry;
 use vrl::compiler::runtime::Runtime;
 
+use super::batch_execution::PipelineExecBatch;
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::ingestion::{apply_vrl_fn, compile_vrl_function},
 };
+
+#[derive(Clone)]
+pub enum PipelineExecutionPlan {
+    DFS(PipelineExecDFS),
+    Batch(PipelineExecBatch),
+}
+
+impl PipelineExecutionPlan {
+    pub fn get_all_destination_streams(&self) -> Vec<StreamParams> {
+        match self {
+            PipelineExecutionPlan::DFS((pl, node_map, graph, _)) => {
+                pl.get_all_destination_streams(node_map, graph)
+            }
+            PipelineExecutionPlan::Batch(pl_exec_batch) => {
+                pl_exec_batch.get_all_destination_streams()
+            }
+        }
+    }
+}
 
 #[async_trait]
 pub trait PipelineExt: Sync + Send + 'static {

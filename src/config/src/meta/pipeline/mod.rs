@@ -32,7 +32,7 @@ use crate::{
 pub mod components;
 
 // (pipeline, node_map, graph, vrl_map)
-pub type PipelineParams = (
+pub type PipelineExecDFS = (
     Pipeline,
     HashMap<String, NodeData>,
     HashMap<String, Vec<String>>,

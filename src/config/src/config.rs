@@ -794,6 +794,12 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(
+        name = "ZO_PIPELINE_EXECUTION_PLAN",
+        default = "dfs",
+        help = "Plans to execute pipelines"
+    )]
+    pub pipeline_execution_plan: String,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
 }
@@ -1006,6 +1012,12 @@ pub struct Limit {
     pub upper_bound_for_max_ts: i64,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
+    #[env_config(
+        name = "ZO_PIPELINE_NODE_BUFFER_SIZE",
+        default = 1024,
+        help = "buffer for upper bound in mins"
+    )]
+    pub pipeline_node_buffer_size: usize,
 }
 
 #[derive(EnvConfig)]

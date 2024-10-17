@@ -24,7 +24,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        pipeline::PipelineParams,
+        pipeline::PipelineExecDFS,
         stream::{StreamParams, StreamType},
         usage::UsageType,
     },
@@ -75,7 +75,7 @@ pub async fn ingest(
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_pipeline_params: HashMap<String, PipelineParams> = HashMap::new();
+    let mut stream_pipeline_params: HashMap<String, PipelineExecDFS> = HashMap::new();
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     let mut streams_need_original_set: HashSet<String> = HashSet::new();
 

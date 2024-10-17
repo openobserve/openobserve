@@ -19,7 +19,7 @@ use config::{
     meta::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
         function::Transform,
-        pipeline::PipelineParams,
+        pipeline::PipelineExecDFS,
         stream::StreamParams,
     },
     RwAHashMap, RwHashMap,
@@ -38,6 +38,7 @@ use crate::{
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
+        pipeline::execution::PipelineExecutionPlan,
     },
 };
 
@@ -82,7 +83,9 @@ pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
-pub static STREAM_PIPELINES: Lazy<RwAHashMap<StreamParams, PipelineParams>> =
+pub static STREAM_PIPELINES: Lazy<RwAHashMap<StreamParams, PipelineExecDFS>> =
+    Lazy::new(Default::default);
+pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, PipelineExecutionPlan>> =
     Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);

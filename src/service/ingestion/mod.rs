@@ -27,7 +27,7 @@ use config::{
     meta::{
         alerts::alert::Alert,
         function::{VRLResultResolver, VRLRuntimeConfig},
-        pipeline::PipelineParams,
+        pipeline::PipelineExecDFS,
         stream::{
             PartitionTimeLevel, PartitioningDetails, StreamParams, StreamPartition, StreamType,
         },
@@ -45,7 +45,9 @@ use vrl::{
     prelude::state,
 };
 
-use super::{db::pipeline, usage::publish_triggers_usage};
+use super::{
+    db::pipeline, pipeline::execution::PipelineExecutionPlan, usage::publish_triggers_usage,
+};
 use crate::{
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
@@ -154,9 +156,18 @@ pub async fn get_stream_pipeline_params(
     org_id: &str,
     stream_name: &str,
     stream_type: &StreamType,
-) -> Option<PipelineParams> {
+) -> Option<PipelineExecDFS> {
     let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
     pipeline::get_by_stream(&stream_params).await
+}
+
+pub async fn get_stream_pipeline_execution_plan(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: &StreamType,
+) -> Option<PipelineExecutionPlan> {
+    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
+    pipeline::get_pipeline_execution_plan(&stream_params).await
 }
 
 pub async fn get_stream_alerts(
