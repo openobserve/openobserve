@@ -143,8 +143,11 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
     let expired_before = Utc::now() - retention_period;
 
     // get expired ids
-    if let Ok(expired_short_ids) =
-        short_url::get_expired(expired_before, Some(SHORT_URL_CACHE_LIMIT)).await
+    if let Ok(expired_short_ids) = short_url::get_expired(
+        expired_before.timestamp_micros(),
+        Some(SHORT_URL_CACHE_LIMIT),
+    )
+    .await
     {
         if !expired_short_ids.is_empty() {
             // delete from db
