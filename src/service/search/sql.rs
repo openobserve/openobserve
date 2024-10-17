@@ -689,6 +689,10 @@ pub(crate) fn generate_quick_mode_fields(
             fields.push(field.to_string());
         }
     }
+    // check _o2_id
+    if !fields.contains(&ID_COL_NAME.to_string()) && schema.field_with_name(ID_COL_NAME).is_ok() {
+        fields.push(ID_COL_NAME.to_string());
+    }
     fields
 }
 
