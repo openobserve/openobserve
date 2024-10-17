@@ -1175,6 +1175,9 @@ fn generate_select_start_search_schema(
         if !fields.contains(&cfg.common.column_timestamp) {
             fields.insert(cfg.common.column_timestamp.to_string());
         }
+        if !fields.contains(config::ID_COL_NAME) {
+            fields.insert(config::ID_COL_NAME.to_string());
+        }
         if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
             fields.insert(cfg.common.column_all.to_string());
         }
