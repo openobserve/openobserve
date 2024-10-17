@@ -47,8 +47,10 @@ use crate::{
         StreamStatus,
     },
     service::{
-        format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        pipeline::execution::PipelineExt, schema::get_upto_discard_error,
+        format_stream_name, get_formatted_stream_name,
+        ingestion::check_ingestion_allowed,
+        pipeline::execution::{PipelineExecutionPlan, PipelineExt},
+        schema::get_upto_discard_error,
     },
 };
 
@@ -80,16 +82,18 @@ pub async fn ingest(
 
     // Start retrieve associated pipeline and construct pipeline components
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let pipeline_params = crate::service::ingestion::get_stream_pipeline_params(
-        org_id,
-        &stream_name,
-        &StreamType::Logs,
-    )
-    .await;
+    let mut pipeline_execution_plan =
+        crate::service::ingestion::get_stream_pipeline_execution_plan(
+            org_id,
+            &stream_name,
+            &StreamType::Logs,
+        )
+        .await;
+    let mut pipeline_inputs = Vec::new();
     // End pipeline params construction
 
-    if let Some((pl, node_map, graph, _)) = &pipeline_params {
-        let pl_destinations = pl.get_all_destination_streams(node_map, graph);
+    if let Some(pl_exec_plan) = &pipeline_execution_plan {
+        let pl_destinations = pl_exec_plan.get_all_destination_streams();
         stream_params.extend(pl_destinations);
     }
 
@@ -172,89 +176,15 @@ pub async fn ingest(
         // store a copy of original data before it's being transformed and/or flattened, unless
         // 1. original data is not an object -> won't be flattened.
         // 2. no pipeline and current StreamName not in streams_need_original_set
-        let original_data = if item.is_object() {
-            if pipeline_params.is_none() && !streams_need_original_set.contains(&stream_name) {
-                None
-            } else {
-                // otherwise, make a copy in case the routed stream needs original data
-                Some(item.to_string())
-            }
+        let original_data = if item.is_object() && !streams_need_original_set.is_empty() {
+            // make a copy in case the routed stream needs original data
+            Some(item.to_string())
         } else {
             None // `item` won't be flattened, no need to store original
         };
 
-        if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) = pipeline_params.as_ref() {
-            match pipeline.execute(item, pl_node_map, pl_graph, vrl_map, &mut runtime) {
-                Err(e) => {
-                    log::error!(
-                        "[Pipeline] {}/{}/{}: Execution error: {}. Skip this record",
-                        pipeline.org,
-                        pipeline.name,
-                        pipeline.id,
-                        e
-                    );
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = format!("Pipeline execution error: {}", e);
-                }
-                Ok(pl_results) => {
-                    for (stream_params, mut res) in pl_results {
-                        if stream_params.stream_type != StreamType::Logs {
-                            continue;
-                        }
-
-                        // JSON Flattening
-                        res = flatten::flatten_with_level(res, cfg.limit.ingest_flatten_level)?;
-
-                        // get json object
-                        let mut local_val = match res.take() {
-                            json::Value::Object(val) => val,
-                            _ => unreachable!(),
-                        };
-
-                        if let Some(fields) =
-                            user_defined_schema_map.get(stream_params.stream_name.as_str())
-                        {
-                            local_val = crate::service::logs::refactor_map(local_val, fields);
-                        }
-
-                        // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_set.contains(stream_params.stream_name.as_str())
-                            && original_data.is_some()
-                        {
-                            local_val.insert(
-                                ORIGINAL_DATA_COL_NAME.to_string(),
-                                original_data.clone().unwrap().into(),
-                            );
-                            let record_id = crate::service::ingestion::generate_record_id(
-                                org_id,
-                                &stream_params.stream_name,
-                                &StreamType::Logs,
-                            );
-                            local_val.insert(
-                                ID_COL_NAME.to_string(),
-                                json::Value::String(record_id.to_string()),
-                            );
-                        }
-
-                        // handle timestamp
-                        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
-                            Ok(ts) => ts,
-                            Err(e) => {
-                                stream_status.status.failed += 1;
-                                stream_status.status.error = e.to_string();
-                                continue;
-                            }
-                        };
-
-                        let function_no = pipeline.num_of_func();
-                        let (ts_data, fn_num) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
-                            .or_insert_with(|| (Vec::new(), None));
-                        ts_data.push((timestamp, local_val));
-                        *fn_num = need_usage_report.then_some(function_no);
-                    }
-                }
-            }
+        if pipeline_execution_plan.is_some() {
+            pipeline_inputs.push((item, original_data));
         } else {
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
@@ -300,6 +230,158 @@ pub async fn ingest(
                 .or_insert_with(|| (Vec::new(), None));
             ts_data.push((timestamp, local_val));
             *fn_num = need_usage_report.then_some(0); // no pl -> no func
+        }
+    }
+
+    if let Some(pl_exec_plan) = &mut pipeline_execution_plan {
+        match pl_exec_plan {
+            PipelineExecutionPlan::DFS((pl, node_map, graph, vrl_map)) => {
+                for (item, original_data) in pipeline_inputs {
+                    match pl.execute(item, node_map, graph, vrl_map, &mut runtime) {
+                        Err(e) => {
+                            log::error!(
+                                "[Pipeline] {}/{}/{}: DFS Execution error: {}. Skip this record",
+                                pl.org,
+                                pl.name,
+                                pl.id,
+                                e
+                            );
+                            stream_status.status.failed += 1;
+                            stream_status.status.error = format!("Pipeline execution error: {}", e);
+                        }
+                        Ok(pl_results) => {
+                            for (stream_params, mut res) in pl_results {
+                                if stream_params.stream_type != StreamType::Logs {
+                                    continue;
+                                }
+
+                                // get json object
+                                let mut local_val = match res.take() {
+                                    json::Value::Object(val) => val,
+                                    _ => unreachable!(),
+                                };
+
+                                if let Some(fields) =
+                                    user_defined_schema_map.get(stream_params.stream_name.as_str())
+                                {
+                                    local_val =
+                                        crate::service::logs::refactor_map(local_val, fields);
+                                }
+
+                                // add `_original` and '_record_id` if required by StreamSettings
+                                if streams_need_original_set
+                                    .contains(stream_params.stream_name.as_str())
+                                    && original_data.is_some()
+                                {
+                                    local_val.insert(
+                                        ORIGINAL_DATA_COL_NAME.to_string(),
+                                        original_data.clone().unwrap().into(),
+                                    );
+                                    let record_id = crate::service::ingestion::generate_record_id(
+                                        org_id,
+                                        &stream_params.stream_name,
+                                        &StreamType::Logs,
+                                    );
+                                    local_val.insert(
+                                        ID_COL_NAME.to_string(),
+                                        json::Value::String(record_id.to_string()),
+                                    );
+                                }
+
+                                // handle timestamp
+                                let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+                                    Ok(ts) => ts,
+                                    Err(e) => {
+                                        stream_status.status.failed += 1;
+                                        stream_status.status.error = e.to_string();
+                                        continue;
+                                    }
+                                };
+
+                                let function_no = pl.num_of_func();
+                                let (ts_data, fn_num) = json_data_by_stream
+                                    .entry(stream_params.stream_name.to_string())
+                                    .or_insert_with(|| (Vec::new(), None));
+                                ts_data.push((timestamp, local_val));
+                                *fn_num = need_usage_report.then_some(function_no);
+                            }
+                        }
+                    }
+                }
+            }
+            PipelineExecutionPlan::Batch(pl_exec_batch) => {
+                let (records, original_data): (Vec<_>, Vec<_>) =
+                    pipeline_inputs.into_iter().unzip();
+                match pl_exec_batch.process_batch(org_id, records).await {
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline] for stream {}/{}: Batch execution error: {}.",
+                            org_id,
+                            stream_name,
+                            e
+                        );
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = format!("Pipeline execution error: {}", e);
+                    }
+                    Ok(pl_results) => {
+                        for (stream_params, (idx, mut res)) in pl_results {
+                            if stream_params.stream_type != StreamType::Logs {
+                                continue;
+                            }
+
+                            // get json object
+                            let mut local_val = match res.take() {
+                                json::Value::Object(val) => val,
+                                _ => unreachable!(),
+                            };
+
+                            if let Some(fields) =
+                                user_defined_schema_map.get(stream_params.stream_name.as_str())
+                            {
+                                local_val = crate::service::logs::refactor_map(local_val, fields);
+                            }
+
+                            // add `_original` and '_record_id` if required by StreamSettings
+                            let original = original_data.get(idx).cloned().flatten();
+                            if streams_need_original_set
+                                .contains(stream_params.stream_name.as_str())
+                                && original.is_some()
+                            {
+                                local_val.insert(
+                                    ORIGINAL_DATA_COL_NAME.to_string(),
+                                    original.unwrap().into(),
+                                );
+                                let record_id = crate::service::ingestion::generate_record_id(
+                                    org_id,
+                                    &stream_params.stream_name,
+                                    &StreamType::Logs,
+                                );
+                                local_val.insert(
+                                    ID_COL_NAME.to_string(),
+                                    json::Value::String(record_id.to_string()),
+                                );
+                            }
+
+                            // handle timestamp
+                            let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+                                Ok(ts) => ts,
+                                Err(e) => {
+                                    stream_status.status.failed += 1;
+                                    stream_status.status.error = e.to_string();
+                                    continue;
+                                }
+                            };
+
+                            let function_no = pl_exec_batch.num_of_func();
+                            let (ts_data, fn_num) = json_data_by_stream
+                                .entry(stream_params.stream_name.to_string())
+                                .or_insert_with(|| (Vec::new(), None));
+                            ts_data.push((timestamp, local_val));
+                            *fn_num = need_usage_report.then_some(function_no);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -356,7 +438,8 @@ pub async fn ingest(
         ])
         .inc();
 
-    drop(pipeline_params);
+    drop(streams_need_original_set);
+    drop(pipeline_execution_plan);
     drop(user_defined_schema_map);
 
     Ok(IngestionResponse::new(
