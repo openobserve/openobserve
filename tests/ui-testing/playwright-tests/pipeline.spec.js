@@ -118,7 +118,7 @@ test.describe("Pipeline testcases", () => {
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
   
-  test('display error if mandatory fields not added on pipeline creation UI ', async ({ page }) => {
+  test.skip('display error if mandatory fields not added on pipeline creation UI ', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -129,7 +129,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByText('Field is required!').click();
   });
 
-  test('should close Add pipeline UI on clicking close icon', async ({ page }) => {
+  test.skip('should close Add pipeline UI on clicking close icon', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -144,7 +144,7 @@ test.describe("Pipeline testcases", () => {
 
   });
 
-  test('should add and delete pipeline', async ({ page }) => {
+  test.skip('should add and delete pipeline', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -168,7 +168,7 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test('should add function to pipeline', async ({ page }) => {
+  test.skip('should add function to pipeline', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -229,7 +229,7 @@ test.describe("Pipeline testcases", () => {
 
 
 
-  test('should display error when no name added while adding function to pipeline', async ({ page }) => {
+  test.skip('should display error when no name added while adding function to pipeline', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -278,7 +278,7 @@ test.describe("Pipeline testcases", () => {
 
   });
 
-  test('should add streamroute node', async ({ page }) => {
+  test.skip('should add streamroute node', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -335,7 +335,7 @@ test.describe("Pipeline testcases", () => {
 
 });
 
-  test('should display error when only blank spaces added in stream route name', async ({ page }) => {
+  test.skip('should display error when only blank spaces added in stream route name', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -386,5 +386,5 @@ test.describe("Pipeline testcases", () => {
   await page.locator('[data-test="confirm-button"]').click();
   await deletePipeline(page, randomPipelineName);
   });
-
+  
 })

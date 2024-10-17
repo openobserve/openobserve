@@ -415,7 +415,12 @@
     "routing": "Routing",
     "nodes": "Nodes",
     "associateFunction": "Associate Function",
-    "derivedStream": "Derived Stream"
+    "derivedStream": "Derived Stream",
+    "pipelineName": "Enter Pipeline Name",
+    "flatteningLbl": "After Flattening",
+    "streamTitle": "Associate Stream",
+    "conditionTitle": "Associate Condition",
+    "query": "Associate Query"
   },
   "function": {
     "header": "Functions",
@@ -451,7 +456,7 @@
     "selectFunction": "Select Function",
     "appendData": "Append data to existing Enrichment Table",
     "deleteAssociatedFunction": "Delete Associated Function",
-    "streamPipeline": "Stream Pipelines",
+    "streamPipeline": "Pipelines",
     "streamRouting": "Stream Routing"
   },
   "confirmDialog": {
@@ -811,7 +816,9 @@
     "lastTriggered":"Last Triggered At",
     "lastSatisfied":"Last Satisfied At",
     "owner": "Owner",
-    "title": "Title"
+    "title": "Title",
+    "createFunction": "Create Function",
+    "newFunctionAssociationMsg": "Note: The function will be created, after which you will be redirected to the previous form to associate the newly created function with the pipeline."
   },
   "alert_templates": {
     "header": "Templates",
