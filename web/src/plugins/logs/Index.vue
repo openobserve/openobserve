@@ -131,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @click="toggleErrorDetails"
                         size="sm"
-                        data-test="logs-page-result-error-details-btn"
-                        >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                        data-test="logs-page-result-error-details-btn-result-not-found"
+                        >{{ t("search.functionErrorBtnLabel") }}</q-btn
                       >
                     </div>
                     <div data-test="logs-search-error-message" v-else>
@@ -204,8 +204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
                       @click="toggleErrorDetails"
                       size="sm"
-                      data-test="logs-page-result-error-details-btn"
-                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                      data-test="logs-page-result-error-details-btn-norecord"
+                      >{{ t("search.functionErrorBtnLabel") }}</q-btn
                     ><br />
                   </h6>
                 </div>
