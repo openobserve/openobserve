@@ -133,7 +133,7 @@ fn has_join(query: &Query) -> bool {
         select.from.len() > 1
             || select
                 .from
-                .get(0)
+                .first()
                 .map_or(false, |table| !table.joins.is_empty())
     } else {
         false
