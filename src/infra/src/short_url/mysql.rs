@@ -46,7 +46,7 @@ impl ShortUrl for MysqlShortUrl {
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 short_id VARCHAR(32) NOT NULL,
-                original_url VARCHAR(2048) NOT NULL,
+                original_url LONGTEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         "#;

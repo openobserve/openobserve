@@ -46,7 +46,7 @@ impl ShortUrl for PostgresShortUrl {
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 short_id VARCHAR(32) NOT NULL,
-                original_url VARCHAR(2048) NOT NULL,
+                original_url TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             "#;
