@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="min-height: inherit">
     <q-table
       data-test="log-stream-table"
+      class="org-streams-table"
       ref="qTable"
       v-model:selected="selected"
       :rows="logStream"
@@ -403,7 +404,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
         columns.value = columns.value.filter(
-          (column) => column.name !== "doc_num"
+          (column) => column.name !== "doc_num",
         );
       }
 
@@ -426,7 +427,7 @@ export default defineComponent({
         if (!value) {
           onChangeStreamFilter(selectedStreamType.value);
         }
-      }
+      },
     );
 
     const getLogStream = (refresh: boolean = false) => {
@@ -470,7 +471,7 @@ export default defineComponent({
                   schema: data.schema ? data.schema : [],
                   stream_type: data.stream_type,
                 };
-              })
+              }),
             );
             duplicateStreamList.value = [...logStream.value];
 
@@ -556,7 +557,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           deleteStreamName,
-          deleteStreamType
+          deleteStreamType,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -586,18 +587,18 @@ export default defineComponent({
           streamService.delete(
             store.state.selectedOrganization.identifier,
             stream.name,
-            stream.stream_type
-          )
+            stream.stream_type,
+          ),
         );
       });
 
       Promise.all(promises)
         .then((responses) => {
           const successfulDeletions = responses.filter(
-            (res) => res.data.code === 200
+            (res) => res.data.code === 200,
           );
           const failedDeletions = responses.filter(
-            (res) => res.data.code !== 200
+            (res) => res.data.code !== 200,
           );
 
           if (successfulDeletions.length > 0) {
@@ -621,7 +622,7 @@ export default defineComponent({
             selected.value = selected.value.filter(
               (item: any) =>
                 item.name !== stream.name &&
-                item.stream_type !== stream.stream_type
+                item.stream_type !== stream.stream_type,
             );
           });
 
@@ -702,7 +703,7 @@ export default defineComponent({
       selectedStreamType.value = value;
       logStream.value = filterData(
         duplicateStreamList.value,
-        filterQuery.value.toLowerCase()
+        filterQuery.value.toLowerCase(),
       );
       resultTotal.value = logStream.value.length;
     };
@@ -765,6 +766,16 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.org-streams-table {
+  ::v-deep .q-table th,
+  ::v-deep .q-table td {
+    padding: 0px 16px;
+    height: 32px;
+  }
+}
+</style>
 
 <style lang="scss">
 .q-table {
