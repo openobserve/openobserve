@@ -19,8 +19,8 @@ import {
   convertSQLData,
 } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
-import { convertMapData } from "@/utils/dashboard/convertMapData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
+import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -36,7 +36,7 @@ export const convertPanelData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   resultMetaData: any,
-  metadata: any
+  metadata: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -67,7 +67,7 @@ export const convertPanelData = async (
             data,
             store,
             chartPanelRef,
-            hoveredSeriesState
+            hoveredSeriesState,
           )),
         };
       } else {
@@ -82,7 +82,7 @@ export const convertPanelData = async (
             chartPanelRef,
             hoveredSeriesState,
             resultMetaData,
-            metadata
+            metadata,
           )),
         };
       }
@@ -96,13 +96,13 @@ export const convertPanelData = async (
     case "geomap": {
       return {
         chartType: panelSchema.type,
-        ...convertMapData(panelSchema, data),
+        ...convertGeoMapData(panelSchema, data),
       };
     }
-    case "maps": {      
+    case "maps": {
       return {
         chartType: panelSchema.type,
-        ...convertGeoMapData(panelSchema, data),
+        ...convertMapsData(panelSchema, data),
       };
     }
     case "sankey": {

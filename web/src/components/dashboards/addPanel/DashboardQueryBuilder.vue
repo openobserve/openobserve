@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.type == "table"
                 ? t("panel.firstColumn")
                 : dashboardPanelData.data.type == "h-bar" ||
-                  dashboardPanelData.data.type == "h-stacked"
-                ? t("panel.yAxis")
-                : t("panel.xAxis")
+                    dashboardPanelData.data.type == "h-stacked"
+                  ? t("panel.yAxis")
+                  : t("panel.xAxis")
             }}
             <q-icon name="info_outline" class="q-ml-xs">
               <q-tooltip>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'x',
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.x?.length || 0
+                ].fields?.x?.length || 0,
               )
             "
             @dragenter="onDragEnter($event, 'x', null)"
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               getHistoramIntervalField(
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.x[index]
+                                ].fields?.x[index],
                               )
                             "
                             @update:modelValue="
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'breakdown',
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.breakdown?.length || 0
+                ].fields?.breakdown?.length || 0,
               )
             "
             @dragenter="onDragEnter($event, 'breakdown', null)"
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               getHistoramIntervalField(
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.breakdown[index]
+                                ].fields?.breakdown[index],
                               )
                             "
                             @update:modelValue="
@@ -520,9 +520,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == "table"
             ? t("panel.otherColumn")
             : dashboardPanelData.data.type == "h-bar" ||
-              dashboardPanelData.data.type == "h-stacked"
-            ? t("panel.xAxis")
-            : t("panel.yAxis")
+                dashboardPanelData.data.type == "h-stacked"
+              ? t("panel.xAxis")
+              : t("panel.yAxis")
         }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
@@ -546,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'y',
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields?.y?.length || 0
+            ].fields?.y?.length || 0,
           )
         "
         @dragenter="onDragEnter($event, 'y', null)"
@@ -653,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="color-input-wrapper"
                         v-if="
                           !['table', 'pie'].includes(
-                            dashboardPanelData.data.type
+                            dashboardPanelData.data.type,
                           )
                         "
                       >
@@ -691,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           getHistoramIntervalField(
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index]
+                            ].fields.y[index],
                           )
                         "
                         @update:modelValue="
@@ -797,7 +797,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'z',
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.z?.length || 0
+              ].fields?.z?.length || 0,
             )
           "
           @dragenter="onDragEnter($event, 'z', null)"
@@ -883,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="color-input-wrapper"
                           v-if="
                             !['table', 'pie'].includes(
-                              dashboardPanelData.data.type
+                              dashboardPanelData.data.type,
                             )
                           "
                         >
@@ -968,8 +968,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="dashboardData"
     ></DashboardFiltersOption>
   </div>
-  <DashboardMapQueryBuilder :dashboardData="dashboardData" />
-  <DashboardGeoMapQueryBuilder :dashboardData="dashboardData" />
+  <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
+  <DashboardMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardSankeyChartBuilder :dashboardData="dashboardData" />
 </template>
 
@@ -978,8 +978,8 @@ import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
-import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
-import DashboardGeoMapQueryBuilder from "./DashboardGeoMapQueryBuilder.vue";
+import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
+import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
@@ -991,10 +991,10 @@ import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFilters
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
-    DashboardMapQueryBuilder,
+    DashboardGeoMapsQueryBuilder,
     SortByBtnGrp,
     HistogramIntervalDropDown,
-    DashboardGeoMapQueryBuilder,
+    DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
@@ -1017,7 +1017,7 @@ export default defineComponent({
     });
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const {
       dashboardPanelData,
@@ -1101,7 +1101,7 @@ export default defineComponent({
           expansionItems.config = false;
           expansionItems.filter = true;
         }
-      }
+      },
     );
 
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
@@ -1116,7 +1116,7 @@ export default defineComponent({
         const draggedItem = dashboardPanelData.meta.dragAndDrop.dragElement;
         fieldList?.splice(
           dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
-          1
+          1,
         );
         fieldList?.splice(droppedAtIndex, 0, draggedItem);
       } else {
@@ -1149,7 +1149,7 @@ export default defineComponent({
           reorderItems(
             targetAxis,
             dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
-            droppedAtIndex
+            droppedAtIndex,
           );
         } else {
           // move the item from field list to axis
@@ -1157,17 +1157,17 @@ export default defineComponent({
 
           const dragName =
             selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-              (item: any) => item?.name === dragElement?.column
+              (item: any) => item?.name === dragElement?.column,
             );
           const customDragName =
             dashboardPanelData.meta.stream.customQueryFields.find(
-              (item: any) => item?.name === dragElement?.column
+              (item: any) => item?.name === dragElement?.column,
             );
 
           if (dragName || customDragName) {
             const axisArray = getAxisArray(targetAxis);
             const duplicateName = axisArray.some(
-              (item: any) => item.column === (dragName || customDragName).name
+              (item: any) => item.column === (dragName || customDragName).name,
             );
 
             if (duplicateName) {
@@ -1250,7 +1250,7 @@ export default defineComponent({
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields[targetAxis]?.length - 1 || 0,
-              droppedAtIndex
+              droppedAtIndex,
             );
           }
           updateArrayAlias();
@@ -1262,7 +1262,7 @@ export default defineComponent({
     const reorderItems = (
       targetAxis: string,
       sourceIndex: number,
-      targetIndex: number
+      targetIndex: number,
     ) => {
       const fieldList =
         dashboardPanelData.data.queries[
@@ -1331,7 +1331,7 @@ export default defineComponent({
       e: any,
       item: any,
       axis: string,
-      index: number
+      index: number,
     ) => {
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;

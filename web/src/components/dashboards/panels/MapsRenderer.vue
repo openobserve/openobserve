@@ -33,7 +33,7 @@ import worldMap from "./../../../locales/languages/map.json";
 echarts.use([MapChart]);
 
 export default defineComponent({
-  name: "GeoJSONMapRenderer",
+  name: "MapsRenderer",
   props: {
     data: {
       required: true,
