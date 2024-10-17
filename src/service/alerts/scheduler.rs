@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{str::FromStr, time::Instant};
 
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
@@ -79,6 +79,21 @@ pub async fn handle_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyh
     }
 }
 
+/// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
+fn get_max_considerable_delay(frequency: i64) -> i64 {
+    // Calculate the maximum delay that can be considered for the alert evaluation.
+    // If the delay is more than this, the alert will be skipped.
+    // The maximum delay is the lowest of 1 hour or 20% of the frequency.
+    // E.g. if the frequency is 5 mins, the maximum delay is 1 min.
+    let frequency = Duration::try_seconds(frequency)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+    let max_delay = Duration::try_hours(1).unwrap().num_microseconds().unwrap();
+    let max_considerable_delay = (frequency as f64 * 0.2) as i64;
+    std::cmp::min(max_delay, max_considerable_delay)
+}
+
 async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
     log::debug!(
         "Inside handle_alert_triggers: processing trigger: {}",
@@ -125,32 +140,6 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         }
     };
     let now = Utc::now().timestamp_micros();
-    // The delay in processing the trigger from the time it was supposed to run
-    let processing_delay = if trigger.next_run_at == 0 {
-        0
-    } else {
-        now - trigger.next_run_at
-    };
-    // This is the end time of the last trigger timerange  + 1.
-    // This will be used in alert evaluation as the start time.
-    // If this is None, alert will use the period to evaluate alert
-    let start_time = if trigger.data.is_empty() {
-        // approximate the start time involving the alert manager delay
-        Some(
-            now - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                - processing_delay,
-        )
-    } else {
-        let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
-        if let Ok(last_data) = last_data {
-            Some(last_data.period_end_time + 1)
-        } else {
-            None
-        }
-    };
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: now,
@@ -168,6 +157,69 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
+
+    // The delay in processing the trigger from the time it was supposed to run
+    let (processing_delay, use_period) = if trigger.next_run_at == 0 {
+        (0, true)
+    } else {
+        let delay = now - trigger.next_run_at;
+
+        // Skip Alerts: Say for some reason, this alert trigger (period: 10mins, frequency 5mins)
+        // which was supposed to run at 10am is now processed after a delay of 5 mins (may be alert
+        // manager was stuck or something). In that case, only use the period strictly to evaluate
+        // the alert. If the delay is within the max considerable delay, consider the delay with
+        // period, otherwise strictly use the period only. Also, since we are skipping this alert
+        // (9:50am to 10am timerange), we need to report this event to the `triggers` usage stream.
+        if delay > get_max_considerable_delay(alert.trigger_condition.frequency) {
+            publish_triggers_usage(TriggerData {
+                _timestamp: triggered_at - 1,
+                org: org_id.clone(),
+                module: TriggerDataType::Alert,
+                key: trigger.module_key.clone(),
+                next_run_at: triggered_at,
+                is_realtime: trigger.is_realtime,
+                is_silenced: trigger.is_silenced,
+                status: TriggerDataStatus::Skipped,
+                start_time: trigger.next_run_at
+                    - Duration::try_minutes(alert.trigger_condition.period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                end_time: trigger.next_run_at,
+                retries: trigger.retries,
+                delay_in_seconds: Some(Duration::microseconds(delay).num_seconds()),
+                error: None,
+                success_response: None,
+                is_partial: None,
+                evaluation_took_in_secs: None,
+            })
+            .await;
+            (0, true)
+        } else {
+            (delay, false)
+        }
+    };
+
+    // This is the end time of the last trigger timerange  + 1.
+    // This will be used in alert evaluation as the start time.
+    // If this is None, alert will use the period to evaluate alert
+    let start_time = if trigger.data.is_empty() || use_period {
+        // approximate the start time involving the alert manager delay
+        Some(
+            now - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
+                - processing_delay,
+        )
+    } else {
+        let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
+        if let Ok(last_data) = last_data {
+            Some(last_data.period_end_time + 1)
+        } else {
+            None
+        }
+    };
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
@@ -190,10 +242,15 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         error: None,
         success_response: None,
         is_partial: None,
+        delay_in_seconds: Some(Duration::microseconds(processing_delay).num_seconds()),
+        evaluation_took_in_secs: None,
     };
 
+    let evalutaion_took = Instant::now();
     // evaluate alert
     let result = alert.evaluate(None, start_time).await;
+    let evaluation_took = evalutaion_took.elapsed().as_secs_f64();
+    trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
         let err = result.err().unwrap();
         trigger_data_stream.status = TriggerDataStatus::Failed;
@@ -557,6 +614,8 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         error: None,
         success_response: None,
         is_partial: None,
+        delay_in_seconds: None,
+        evaluation_took_in_secs: None,
     };
 
     match report.send_subscribers().await {
@@ -767,6 +826,8 @@ async fn handle_derived_stream_triggers(
         error: None,
         success_response: None,
         is_partial: None,
+        delay_in_seconds: None,
+        evaluation_took_in_secs: None,
     };
 
     // ingest evaluation result into destination
