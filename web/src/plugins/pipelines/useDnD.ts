@@ -251,11 +251,11 @@ export default function useDragAndDrop() {
         width: 20,  // Increase arrow width
         height: 20, // Increase arrow height
       },
-      type: 'button',
       
       style:{
         strokeWidth: 2,
-      }
+      },
+      animated:true,
 
 
     };
@@ -352,7 +352,9 @@ export default function useDragAndDrop() {
         
         style:{
           strokeWidth: 2,
-        }
+        },
+        animated:true,
+
 
       };
       //not required because we create new nodes every time we click on shortcuts
@@ -388,7 +390,9 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     
     style:{
       strokeWidth: 2,
-    }
+    },
+    animated:true,
+
 
 
   };

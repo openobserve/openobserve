@@ -469,6 +469,7 @@ const getPipelines = async () => {
               style:{
                 strokeWidth: 2,
               },
+              animated: true,
             updatable: true 
           }));
           pipeline.type = pipeline.source.source_type;

@@ -416,12 +416,12 @@ const getPipeline = () => {
           width: 20,  // Increase arrow width
           height: 20, // Increase arrow height
         };
-
         edge.style = {
           ...edge.style, // Preserve existing styles
           strokeWidth: 2,
         };
-        edge.type = 'button'
+        edge.type = 'button';
+        edge.animated = true;
       });
 
 
