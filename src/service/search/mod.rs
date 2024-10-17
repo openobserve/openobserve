@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,6 +54,7 @@ use {
     crate::service::grpc::get_cached_channel,
     config::meta::cluster::get_internal_grpc_token,
     o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup,
     std::collections::HashSet,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
     tracing::info_span,
@@ -439,8 +440,19 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] in leader task finish");
 
     // remove task because task if finished
+    let mut _work_group = None;
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(&trace_id, false).await;
+    {
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
+            if let Some((_, stat)) = status.first() {
+                match stat.work_group.as_ref() {
+                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                    None => _work_group = None,
+                }
+            }
+        };
+    }
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[org_id])
@@ -448,7 +460,8 @@ pub async fn search(
 
     // do this because of clippy warning
     match res {
-        Ok(res) => {
+        Ok(mut res) => {
+            res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
             let (report_usage, search_type) = match in_req.search_type {
                 Some(search_type) => match search_type {
@@ -495,6 +508,7 @@ pub async fn search(
                     } else {
                         None
                     },
+                    work_group: _work_group,
                     ..Default::default()
                 };
                 let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
