@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -143,8 +143,11 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
     let expired_before = Utc::now() - retention_period;
 
     // get expired ids
-    if let Ok(expired_short_ids) =
-        short_url::get_expired(expired_before, Some(SHORT_URL_CACHE_LIMIT)).await
+    if let Ok(expired_short_ids) = short_url::get_expired(
+        expired_before.timestamp_micros(),
+        Some(SHORT_URL_CACHE_LIMIT),
+    )
+    .await
     {
         if !expired_short_ids.is_empty() {
             // delete from db
