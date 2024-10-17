@@ -130,7 +130,11 @@ fn has_having(query: &Query) -> bool {
 
 fn has_join(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
-        select.from.len() > 1 || !select.from[0].joins.is_empty()
+        select.from.len() > 1
+            || select
+                .from
+                .get(0)
+                .map_or(false, |table| !table.joins.is_empty())
     } else {
         false
     }
