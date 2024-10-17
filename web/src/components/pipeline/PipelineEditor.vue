@@ -630,19 +630,19 @@ const resetConfirmDialog = () => {
 };
 
 const findMissingEdges = () =>{
-  const nodeIds = pipelineObj.currentSelectedPipeline.nodes.map(node => node.id);
+  const nodeIds = pipelineObj.currentSelectedPipeline.nodes.map((node:any) => node.id);
 
   // Step 2: Collect node IDs that are part of edges (either source or target)
   const connectedNodeIds = new Set();
 
   // Go through each edge and collect both source and target nodes
-  pipelineObj.currentSelectedPipeline.edges.forEach(edge => {
+  pipelineObj.currentSelectedPipeline.edges.forEach((edge:any) => {
     connectedNodeIds.add(edge.source); // Add source node ID
     connectedNodeIds.add(edge.target); // Add target node ID
   });
 
   // Step 3: Find nodes that are not connected by edges
-  const unconnectedNodes = nodeIds.filter(nodeId => !connectedNodeIds.has(nodeId));
+  const unconnectedNodes = nodeIds.filter((nodeId:any) => !connectedNodeIds.has(nodeId));
   if(unconnectedNodes.length > 0){
     return true;
   }

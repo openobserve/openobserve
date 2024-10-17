@@ -20,6 +20,15 @@ import useDragAndDrop from "./useDnD";
 import { defineEmits, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { getImageURL } from "@/utils/zincutils";
+
+const streamImage = getImageURL("images/pipeline/stream.svg");
+
+const functionImage = getImageURL("images/pipeline/function.svg");
+const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
+const streamRouteImage = getImageURL("images/pipeline/route.svg");
+const conditionImage = getImageURL("images/pipeline/condition.svg");
+const queryImage = getImageURL("images/pipeline/query.svg");
 
 const props = defineProps({
   id: {
@@ -34,10 +43,70 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["delete:node"]);
+const { pipelineObj, deletePipelineNode,onDragStart,onDrop } = useDragAndDrop();
+const menu = ref(false)
+
+
+const onFunctionClick = (data,event,id) =>{
+  console.log(data,"data")
+  console.log(id,"id")
+  console.log(event,"event")
+  const dataToOpen  =   {
+    label: "Function",
+    subtype: "function",
+    io_type: "default",
+    icon: "img:" + functionImage,
+    tooltip: "Function Node",
+    isSectionHeader: false,
+  };
+  pipelineObj.userClickedNode = id;
+  onDragStart(event,dataToOpen)
+  onDrop(event,{x:100,y:100});
+  menu.value = false
+}
+
+const onConditionClick = (data,event,id) =>{
+  console.log(data,"data")
+  const dataToOpen  =   {
+    label: "Condition",
+    subtype: "condition",
+    io_type: "default",
+    icon: "img:" + conditionImage,
+    tooltip: "Condition Node",
+    isSectionHeader: false,
+  }
+  pipelineObj.userClickedNode = id
+  onDragStart(event,dataToOpen)
+  onDrop(event,{x:100,y:100});
+  menu.value = false
+}
+
+const onStreamOutputClick = (data,event,id) =>{
+  console.log(data,"data")
+  console.log(id,"id")
+  if(!id){
+    pipelineObj.userClickedNode = data.label;
+  }
+  else{
+    pipelineObj.userClickedNode = id;
+  }
+  const dataToOpen  =    
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "output",
+    icon: "img:" + streamOutputImage,
+    tooltip: "Destination: Stream Node",
+    isSectionHeader: false,
+  }
+  // pipelineObj.userClickedNode = id
+  onDragStart(event,dataToOpen)
+  onDrop(event,{x:100,y:100});
+  menu.value = false
+}
 
 const { t } = useI18n();
 
-const { pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 const editNode = (id) => {
   //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
@@ -115,6 +184,28 @@ function getIcon(data, ioType) {
         cursor: pointer;
       "
     >
+      <q-menu  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-list >
+    
+      <q-item clickable @click="(event) => onFunctionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable @click="(event) => onStreamOutputClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <!-- Add more items similarly for other images -->
+    </q-list>
+  </q-menu>
+
     <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
   <div>
     <strong>Name:</strong> {{ functionInfo(data).name }}<br />
@@ -194,6 +285,30 @@ function getIcon(data, ioType) {
 
       "
     >
+
+       <q-menu v-if="io_type == 'input'"  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-list >
+      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <!-- Add more items similarly for other images -->
+    </q-list>
+  </q-menu>
+
+  
+
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
@@ -267,6 +382,27 @@ function getIcon(data, ioType) {
 
       "
     >
+    <q-menu  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-list >
+      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <!-- Add more items similarly for other images -->
+    </q-list>
+  </q-menu>
+
     <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
   <div>
     <strong>SQL:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{ data.query_condition.sql }}</pre><br />
@@ -278,6 +414,7 @@ function getIcon(data, ioType) {
     <strong>Silence:</strong> {{ data.trigger_condition.silence }}
   </div>
 </q-tooltip>
+
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
@@ -338,6 +475,28 @@ function getIcon(data, ioType) {
         cursor: pointer;
       "
     >
+    <q-menu   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-list >
+
+      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <q-item class="q-item-output" clickable  @click="(event) => onStreamOutputClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+        </q-item-section>
+      </q-item>
+      <!-- Add more items similarly for other images -->
+    </q-list>
+  </q-menu>
+
     <q-tooltip>
       <div v-for="(condition, index) in data.conditions" :key="index">
         <div>
@@ -405,6 +564,7 @@ function getIcon(data, ioType) {
       type="source"
       :position="'bottom'"
       :style="{ filter: 'invert(100%)' }"
+      
     />
   </div>
 
@@ -430,4 +590,9 @@ function getIcon(data, ioType) {
   background-color: var(--vf-node-bg);
   border-color: var(--vf-node-color);
 }
+.menu-list{
+  margin: 0px 10px;
+  background-color: var(--vf-node-bg);
+}
+
 </style>

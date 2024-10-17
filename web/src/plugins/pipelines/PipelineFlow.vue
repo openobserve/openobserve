@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :max-zoom="4"
       @dragleave="onDragLeave"
       class="basic-flow"
-
+      
     >
 
       <DropzoneBackground
