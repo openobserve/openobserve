@@ -50,7 +50,7 @@ impl ShortUrl for SqliteShortUrl {
                 (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
                     short_id     VARCHAR(32) NOT NULL,
-                    original_url VARCHAR(2048) NOT NULL,
+                    original_url TEXT NOT NULL,
                     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 "#,
