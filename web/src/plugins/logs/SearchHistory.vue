@@ -248,6 +248,7 @@
   import type { Ref } from "vue";
   import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
+
   export default defineComponent({
     name: "SearchHistoryComponent",
     components: {
@@ -275,12 +276,18 @@
       const {t} = useI18n();
       const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
       const searchDateTimeRef = ref(null)
-      const { searchObj } = useLogs();
+      const { searchObj, extractTimestamps } = useLogs();
       const dataToBeLoaded :any = ref([]);
-      const dateTimeToBeSent : any = ref({});
+      const dateTimeToBeSent = ref({
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      });
       const columnsToBeRendered = ref([]);
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
+      const isDateTimeChanged = ref(false);
 
 
       const perPageOptions: any = [
@@ -364,16 +371,21 @@
   });
 };
 
-      const fetchSearchHistory = async ( ) => {
+      const fetchSearchHistory = async () => {
+
         columnsToBeRendered.value = [];
         dataToBeLoaded.value = [];
         expandedRow.value = [];
      try {
       const {org_identifier} = router.currentRoute.value.query;
         isLoading.value = true;
+        if(dateTimeToBeSent.value.valueType === "relative"){
+          const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
+          dateTimeToBeSent.value.startTime = convertedData.from;
+          dateTimeToBeSent.value.endTime = convertedData.to;
+        }
         const {startTime, endTime} = dateTimeToBeSent.value;
- 
-        const response = await searchService.get_history( org_identifier,startTime,endTime,
+         const response = await searchService.get_history( org_identifier,startTime,endTime,
            );
            const limitedHits = response.data.hits;
            const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
@@ -512,65 +524,64 @@
     });
 
       
-      const updateDateTime = async (value: any) => {
+      const updateDateTime = async(value: any) => {
         const {startTime, endTime} = value;
-        dateTimeToBeSent.value = {
-          startTime,
-          endTime,
-        };
+        dateTimeToBeSent.value = value;
+        searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+
       };
       const  formatTime = (took)  => {
       return `${took.toFixed(2)} sec`;
       }
-      const calculateDuration = (startTime, endTime) => {
-  const durationMicroseconds = endTime - startTime;
-  const durationSeconds = durationMicroseconds / 1e6;
+    const calculateDuration = (startTime, endTime) => {
+        const durationMicroseconds = endTime - startTime;
+        const durationSeconds = durationMicroseconds / 1e6;
 
-  // Store the raw duration in a separate property
-  const rawDuration = durationSeconds;
+        // Store the raw duration in a separate property
+        const rawDuration = durationSeconds;
 
-  let result = '';
+        let result = '';
 
-  if (durationSeconds < 60) {
-    result = `${durationSeconds.toFixed(2)} seconds`;
-  } else if (durationSeconds < 3600) {
-    const minutes = Math.floor(durationSeconds / 60);
-    const seconds = durationSeconds % 60;
-    result = `${minutes} minutes`;
-    if (seconds > 0) {
-      result += ` and ${seconds.toFixed(2)} seconds`;
-    }
-  } else if (durationSeconds < 86400) {
-    const hours = Math.floor(durationSeconds / 3600);
-    const minutes = Math.floor((durationSeconds % 3600) / 60);
-    result = `${hours} hours`;
-    if (minutes > 0) {
-      result += ` and ${minutes} minutes`;
-    }
-  } else if (durationSeconds < 2592000) {
-    const days = Math.floor(durationSeconds / 86400);
-    const hours = Math.floor((durationSeconds % 86400) / 3600);
-    result = `${days} days`;
-    if (hours > 0) {
-      result += ` and ${hours} hours`;
-    }
-  } else if (durationSeconds < 31536000) {
-    const months = Math.floor(durationSeconds / 2592000);
-    const days = Math.floor((durationSeconds % 2592000) / 86400);
-    result = `${months} months`;
-    if (days > 0) {
-      result += ` and ${days} days`;
-    }
-  } else {
-    const years = Math.floor(durationSeconds / 31536000);
-    const months = Math.floor((durationSeconds % 31536000) / 2592000);
-    result = `${years} years`;
-    if (months > 0) {
-      result += ` and ${months} months`;
-    }
-  }
+        if (durationSeconds < 60) {
+          result = `${durationSeconds.toFixed(2)} seconds`;
+        } else if (durationSeconds < 3600) {
+          const minutes = Math.floor(durationSeconds / 60);
+          const seconds = durationSeconds % 60;
+          result = `${minutes} minutes`;
+          if (seconds > 0) {
+            result += ` and ${seconds.toFixed(2)} seconds`;
+          }
+        } else if (durationSeconds < 86400) {
+          const hours = Math.floor(durationSeconds / 3600);
+          const minutes = Math.floor((durationSeconds % 3600) / 60);
+          result = `${hours} hours`;
+          if (minutes > 0) {
+            result += ` and ${minutes} minutes`;
+          }
+        } else if (durationSeconds < 2592000) {
+          const days = Math.floor(durationSeconds / 86400);
+          const hours = Math.floor((durationSeconds % 86400) / 3600);
+          result = `${days} days`;
+          if (hours > 0) {
+            result += ` and ${hours} hours`;
+          }
+        } else if (durationSeconds < 31536000) {
+          const months = Math.floor(durationSeconds / 2592000);
+          const days = Math.floor((durationSeconds % 2592000) / 86400);
+          result = `${months} months`;
+          if (days > 0) {
+            result += ` and ${days} days`;
+          }
+        } else {
+          const years = Math.floor(durationSeconds / 31536000);
+          const months = Math.floor((durationSeconds % 31536000) / 2592000);
+          result = `${years} years`;
+          if (months > 0) {
+            result += ` and ${months} months`;
+          }
+        }
 
-  return { formatted: result, raw: rawDuration };
+      return { formatted: result, raw: rawDuration };
 };
 
 
@@ -634,6 +645,7 @@
       // pagination.value.page = 1;
       
     };
+
 
       watch(() => props.isClicked, (value) => {
         if(value == true && !isLoading.value){

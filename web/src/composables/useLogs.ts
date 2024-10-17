@@ -4230,6 +4230,7 @@ const useLogs = () => {
     validateFilterForMultiStream,
     cancelQuery,
     reorderSelectedFields,
+    extractTimestamps,
   };
 };
 
