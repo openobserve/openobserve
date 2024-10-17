@@ -137,11 +137,6 @@ export default defineComponent({
         id: "h-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
-        title: t("dashboard.heatmapLabel"),
-        id: "heatmap",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
         title: t("dashboard.geomapLabel"),
         id: "geomap",
@@ -162,6 +157,11 @@ export default defineComponent({
         id: "donut",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
+        title: t("dashboard.heatmapLabel"),
+        id: "heatmap",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/table.png"),
         title: t("dashboard.tableLabel"),
         id: "table",
@@ -172,6 +172,11 @@ export default defineComponent({
         id: "metric",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
+        title: "Gauge",
+        id: "gauge",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
         title: "HTML",
         id: "html",
@@ -180,11 +185,6 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
         title: "Markdown",
         id: "markdown",
-      },
-      {
-        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
-        id: "gauge",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
