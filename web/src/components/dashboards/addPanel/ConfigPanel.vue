@@ -1071,7 +1071,7 @@ export default defineComponent({
     const mapTypeOptions = [
       {
         label: t("dashboard.world"),
-        value: "World",
+        value: "world",
       },
     ];
     onBeforeMount(() => {
