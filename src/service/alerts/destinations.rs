@@ -76,6 +76,14 @@ pub async fn save(
                 ));
             }
         }
+        DestinationType::Sns => {
+            if destination.sns_topic_arn.is_none() || destination.aws_region.is_none() {
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Topic ARN and Region are required for SNS destinations"),
+                ));
+            }
+        }
     }
 
     if !name.is_empty() {

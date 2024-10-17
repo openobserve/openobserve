@@ -178,6 +178,7 @@ ingester.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
+aws-sdk-sns.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -315,3 +316,5 @@ url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 zstd = "0.13"
+aws-config = { version= "1.5.5", features = ["behavior-version-latest"] }
+aws-sdk-sns = "1.40.0"
