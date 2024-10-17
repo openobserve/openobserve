@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::Row;
 
 use crate::{
@@ -174,13 +174,8 @@ impl ShortUrl for PostgresShortUrl {
         self.len().await == 0
     }
 
-    async fn get_expired(
-        &self,
-        expired_before: DateTime<Utc>,
-        limit: Option<i64>,
-    ) -> Result<Vec<String>> {
+    async fn get_expired(&self, expired_before: i64, limit: Option<i64>) -> Result<Vec<String>> {
         let pool = CLIENT.clone();
-        let expired_before_ts = expired_before.timestamp_micros();
 
         let mut query = r#"
             SELECT short_id FROM short_urls
@@ -192,7 +187,7 @@ impl ShortUrl for PostgresShortUrl {
             query.push_str(" LIMIT $2");
         }
 
-        let mut query = sqlx::query_as(&query).bind(expired_before_ts);
+        let mut query = sqlx::query_as(&query).bind(expired_before);
 
         if let Some(limit_value) = limit {
             query = query.bind(limit_value);
