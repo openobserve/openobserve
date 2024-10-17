@@ -1746,18 +1746,7 @@ const useLogs = () => {
           await generateHistogramData();
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {
-              title: getHistogramTitle(),
-              unparsed_x_data: [],
-              timezone: "",
-            },
-            errorCode: 0,
-            errorMsg: "Histogram is not available for limit queries.",
-            errorDetail: "",
-          };
+          resetHistogramWithLimitError();
         } else {
           let aggFlag = false;
           if (parsedSQL) {
@@ -1805,6 +1794,21 @@ const useLogs = () => {
       notificationMsg.value = "";
     }
   };
+
+  function resetHistogramWithLimitError() {
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {
+        title: getHistogramTitle(),
+        unparsed_x_data: [],
+        timezone: "",
+      },
+      errorCode: 0,
+      errorMsg: "Histogram is not available for limit queries.",
+      errorDetail: "",
+    };
+  }
 
   function isTimestampASC(orderby: any) {
     if (orderby) {
@@ -2479,6 +2483,7 @@ const useLogs = () => {
                 }
               }
             }
+
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
@@ -2514,14 +2519,16 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
 
-            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
             searchObjDebug["histogramEndTime"] = performance.now();
+
             dismiss();
             resolve(true);
           })
@@ -4222,12 +4229,15 @@ const useLogs = () => {
     refreshPartitionPagination,
     filterHitsColumns,
     getHistogramQueryData,
+    generateHistogramSkeleton,
     fnParsedSQL,
     addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
     reorderSelectedFields,
+    resetHistogramWithLimitError,
+    isNonAggregatedQuery,
   };
 };
 

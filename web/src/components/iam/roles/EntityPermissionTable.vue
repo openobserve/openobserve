@@ -163,7 +163,7 @@ const updateTableData = () => {
   } else {
     rows.value = getResourceEntities().filter((entity: Entity) => {
       const showEntity = Object.values(entity.permission).some(
-        (permission: any) => permission
+        (permission: any) => permission,
       );
 
       return showEntity;
@@ -182,12 +182,11 @@ watch(
   },
   {
     immediate: true,
-  }
+  },
 );
 
 const filterEntities = (rows: Entity[], terms: string) => {
   var filtered = [];
-  console.log("entity", rows, terms);
   terms = terms.toLowerCase();
   for (var i = 0; i < rows.length; i++) {
     if (rows[i]["name"].toLowerCase().includes(terms)) {
