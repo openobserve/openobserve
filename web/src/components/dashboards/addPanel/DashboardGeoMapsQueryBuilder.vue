@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
-    <!-- name container -->
+  <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
+    <!-- latitude container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
-        {{ t("panel.mapname") }}
+        {{ t("panel.latitude") }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
@@ -33,20 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'latitude',
         }"
         @dragend="onDragEnd()"
-        @dragover="onDragOver($event, 'name')"
-        @drop="onDrop($event, 'name')"
-        @dragenter="onDragEnter($event, 'name', null)"
-        data-test="dashboard-name-layout"
+        @dragover="onDragOver($event, 'latitude')"
+        @drop="onDrop($event, 'latitude')"
+        @dragenter="onDragEnter($event, 'latitude', null)"
+        data-test="dashboard-latitude-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields?.name
+            ].fields?.latitude
           "
           :draggable="true"
           @dragstart="
@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.name.column,
-              'name',
+              ].fields?.latitude.column,
+              'latitude',
             )
           "
         >
@@ -76,33 +76,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
+                ].fields?.latitude?.column
               "
               class="q-pl-sm"
-              :data-test="`dashboard-name-item-${
+              :data-test="`dashboard-latitude-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
+                ].fields?.latitude?.column
               }`"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-name-item-${
+                :data-test="`dashboard-latitude-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.name?.column
+                  ].fields?.latitude?.column
                 }-menu`"
               >
                 <div>
                   <q-input
                     dense
                     filled
-                    data-test="dashboard-name-item-input"
+                    data-test="dashboard-latitude-item-input"
                     :label="t('common.label')"
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.name.label
+                      ].fields.latitude.label
                     "
                     :rules="[(val: any) => val > 0 || 'Required']"
                   />
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :fieldObj="
                         dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
-                        ].fields.name
+                        ].fields.latitude
                       "
                     />
                   </div>
@@ -129,12 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-name-item-${
+              :data-test="`dashboard-latitude-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
+                ].fields?.latitude?.column
               }-remove`"
-              @click="removeMapName()"
+              @click="removeLatitude()"
               icon="close"
             />
           </div>
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.name == null
+            ].fields.latitude == null
           "
         >
           <div class="q-mt-xs">{{ Hint }}</div>
@@ -152,10 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <!-- value for maps container -->
+    <!-- longitude container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
-        {{ t("panel.mapvalue") }}
+        {{ t("panel.longitude") }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
@@ -169,21 +169,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.currentDragArea ==
-              'value_for_maps',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'longitude',
         }"
         @dragend="onDragEnd()"
-        @dragover="onDragOver($event, 'value_for_maps')"
-        @drop="onDrop($event, 'value_for_maps')"
-        @dragenter="onDragEnter($event, 'value_for_maps', null)"
-        data-test="dashboard-value_for_maps-layout"
+        @dragover="onDragOver($event, 'longitude')"
+        @drop="onDrop($event, 'longitude')"
+        @dragenter="onDragEnter($event, 'longitude', null)"
+        data-test="dashboard-longitude-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields?.value_for_maps
+            ].fields?.longitude
           "
           :draggable="true"
           @dragstart="
@@ -191,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value_for_maps.column,
-              'value_for_maps',
+              ].fields?.longitude.column,
+              'longitude',
             )
           "
         >
@@ -210,20 +209,156 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               color="primary"
               size="sm"
-              :label="valueLabel"
-              :data-test="`dashboard-value_for_maps-item-${
+              :label="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value_for_maps?.column
+                ].fields?.longitude?.column
+              "
+              :data-test="`dashboard-longitude-item-${
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields?.longitude?.column
               }`"
               class="q-pl-sm"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-value_for_maps-item-${
+                :data-test="`dashboard-longitude-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.value_for_maps?.column
+                  ].fields?.longitude?.column
+                }-menu`"
+              >
+                <div>
+                  <q-input
+                    dense
+                    filled
+                    label="Label"
+                    data-test="dashboard-longitude-item-input"
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.longitude.label
+                    "
+                    :rules="[(val: any) => val > 0 || 'Required']"
+                  />
+                  <div
+                    v-if="
+                      !dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                      dashboardPanelData.data.queryType == 'sql'
+                    "
+                  >
+                    <SortByBtnGrp
+                      :fieldObj="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.longitude
+                      "
+                    />
+                  </div>
+                </div>
+              </q-menu>
+            </q-btn>
+            <q-btn
+              style="height: 100%"
+              size="xs"
+              dense
+              :data-test="`dashboard-longitude-item-${
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields?.longitude?.column
+              }-remove`"
+              @click="removeLongitude()"
+              icon="close"
+            />
+          </div>
+        </q-btn-group>
+        <div
+          class="text-caption text-weight-bold text-center q-py-xs"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.longitude == null
+          "
+        >
+          <div class="q-mt-xs">{{ Hint }}</div>
+        </div>
+      </div>
+    </div>
+    <q-separator />
+    <!-- weight container -->
+    <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div class="layout-name">
+        {{ t("panel.weight") }}
+        <q-icon name="info_outline" class="q-ml-xs">
+          <q-tooltip>
+            {{ WeightHint }}
+          </q-tooltip>
+        </q-icon>
+      </div>
+      <span class="layout-separator">:</span>
+      <div
+        class="axis-container droppable scroll"
+        :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered':
+            dashboardPanelData.meta.dragAndDrop.dragging &&
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'weight',
+        }"
+        @dragend="onDragEnd()"
+        @dragover="onDragOver($event, 'weight')"
+        @drop="onDrop($event, 'weight')"
+        @dragenter="onDragEnter($event, 'weight', null)"
+        data-test="dashboard-weight-layout"
+      >
+        <q-btn-group
+          class="axis-field q-mr-sm q-my-xs"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.weight
+          "
+          :draggable="true"
+          @dragstart="
+            onFieldDragStart(
+              $event,
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.weight.column,
+              'weight',
+            )
+          "
+        >
+          <div>
+            <q-icon
+              name="drag_indicator"
+              color="grey-13"
+              size="13px"
+              class="'cursor-grab q-my-xs'"
+            />
+            <q-btn
+              square
+              icon-right="arrow_drop_down"
+              no-caps
+              dense
+              color="primary"
+              size="sm"
+              :label="weightLabel"
+              :data-test="`dashboard-weight-item-${
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields?.weight?.column
+              }`"
+              class="q-pl-sm"
+            >
+              <q-menu
+                class="q-pa-md"
+                :data-test="`dashboard-weight-item-${
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields?.weight?.column
                 }-menu`"
               >
                 <div>
@@ -241,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value_for_maps.aggregationFunction
+                          ].fields.weight.aggregationFunction
                         "
                         :options="triggerOperators"
                         dense
@@ -249,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         emit-value
                         map-options
                         :label="t('common.aggregation')"
-                        data-test="dashboard-value_for_maps-item-dropdown"
+                        data-test="dashboard-weight-item-dropdown"
                       >
                         <template v-slot:append>
                           <q-icon
@@ -258,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop.prevent="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.value_for_maps.aggregationFunction = null
+                              ].fields.weight.aggregationFunction = null
                             "
                             class="cursor-pointer"
                           />
@@ -270,11 +405,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     filled
                     :label="t('common.label')"
-                    data-test="dashboard-value_for_maps-item-input"
+                    data-test="dashboard-weight-item-input"
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.value_for_maps.label
+                      ].fields.weight.label
                     "
                     :rules="[(val: any) => val > 0 || 'Required']"
                   />
@@ -290,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :fieldObj="
                         dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value_for_maps
+                        ].fields.weight
                       "
                     />
                   </div>
@@ -301,12 +436,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-value_for_maps-item-${
+              :data-test="`dashboard-weight-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value_for_maps?.column
+                ].fields?.weight?.column
               }-remove`"
-              @click="removeMapValue()"
+              @click="removeWeight()"
               icon="close"
             />
           </div>
@@ -316,10 +451,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.value_for_maps == null
+            ].fields.weight == null
           "
         >
-          <div class="q-mt-xs">{{ Hint }}</div>
+          <div class="q-mt-xs">{{ WeightHint }}</div>
         </div>
       </div>
     </div>
@@ -337,13 +472,14 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { inject } from "vue";
+import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 
 export default defineComponent({
-  name: "DashboardGeoMapQueryBuilder",
+  name: "DashboardGeoMapsQueryBuilder",
   components: {
     SortByBtnGrp,
     CommonAutoComplete,
@@ -353,23 +489,30 @@ export default defineComponent({
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();
-    const $q = useQuasar();
+    const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
-      name: true,
-      value_for_maps: true,
+      latitude: true,
+      longitude: true,
+      weight: true,
       filter: false,
     });
-
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
     const {
       dashboardPanelData,
-      addMapName,
-      addMapValue,
+      addLatitude,
+      addLongitude,
+      addWeight,
+      removeLatitude,
+      removeLongitude,
+      removeWeight,
       addFilteredItem,
-      removeMapName,
-      removeMapValue,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData();
+      selectedStreamFieldsBasedOnUserDefinedSchema,
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
       { label: t("dashboard.countDistinct"), value: "count-distinct" },
@@ -399,8 +542,9 @@ export default defineComponent({
       () => dashboardPanelData.meta.dragAndDrop.dragging,
       (newVal: boolean, oldVal: boolean) => {
         if (oldVal == false && newVal == true) {
-          expansionItems.name = true;
-          expansionItems.value_for_maps = true;
+          expansionItems.latitude = true;
+          expansionItems.longitude = true;
+          expansionItems.weight = true;
           expansionItems.filter = true;
         }
       },
@@ -417,11 +561,14 @@ export default defineComponent({
         }
 
         switch (targetAxis) {
-          case "name":
-            addMapName(dragElement);
+          case "latitude":
+            addLatitude(dragElement);
             break;
-          case "value_for_maps":
-            addMapValue(dragElement);
+          case "longitude":
+            addLongitude(dragElement);
+            break;
+          case "weight":
+            addWeight(dragElement);
             break;
           case "f":
             addFilteredItem(dragElement?.name);
@@ -432,7 +579,7 @@ export default defineComponent({
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         const dragName =
-          dashboardPanelData.meta.stream.selectedStreamFields.find(
+          selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
             (item: any) => item?.name === dragElement,
           );
         const customDragName =
@@ -447,40 +594,41 @@ export default defineComponent({
             ].fields;
           if (targetAxis !== "f") {
             if (
-              (targetAxis === "name" && currentQueryField.name) ||
-              (targetAxis === "value_for_maps" &&
-                currentQueryField.value_for_maps)
+              (targetAxis === "latitude" && currentQueryField.latitude) ||
+              (targetAxis === "longitude" && currentQueryField.longitude) ||
+              (targetAxis === "weight" && currentQueryField.weight)
             ) {
               const maxAllowedAxisFields = 1;
 
               const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-              $q.notify({
-                type: "negative",
-                message: errorMessage,
-                timeout: 5000,
-              });
+              showErrorNotification(errorMessage);
               cleanupDraggingFields();
               return;
             }
 
             // Remove from the original axis
             const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-            if (dragSource === "name") {
-              removeMapName();
-            } else if (dragSource === "value_for_maps") {
-              removeMapValue();
+            if (dragSource === "latitude") {
+              removeLatitude();
+            } else if (dragSource === "longitude") {
+              removeLongitude();
+            } else if (dragSource === "weight") {
+              removeWeight();
             }
           }
         }
         if (targetAxis === "f") {
           return;
         }
+
         // Add to the new axis
-        if (targetAxis === "name") {
-          addMapName(dragName || customDragName);
-        } else if (targetAxis === "value_for_maps") {
-          addMapValue(dragName || customDragName);
+        if (targetAxis === "latitude") {
+          addLatitude(dragName || customDragName);
+        } else if (targetAxis === "longitude") {
+          addLongitude(dragName || customDragName);
+        } else if (targetAxis === "weight") {
+          addWeight(dragName || customDragName);
         }
       }
 
@@ -494,7 +642,6 @@ export default defineComponent({
     const onDragOver = (e: any, area: string) => {
       e.preventDefault();
     };
-
     const onDragEnter = (e: any, area: string, index: any) => {
       if (
         dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
@@ -522,8 +669,17 @@ export default defineComponent({
     };
     const Hint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
-        case "maps":
+        case "geomap":
           return t("dashboard.oneFieldMessage");
+        default:
+          return t("dashboard.maxtwofieldMessage");
+      }
+    });
+
+    const WeightHint = computed((e: any) => {
+      switch (dashboardPanelData.data.type) {
+        case "geomap":
+          return t("dashboard.oneFieldConfigMessage");
         default:
           return t("dashboard.maxtwofieldMessage");
       }
@@ -545,20 +701,20 @@ export default defineComponent({
       }
     };
 
-    const valueLabel = computed(() => {
-      const valueField =
+    const weightLabel = computed(() => {
+      const weightField =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.value_for_maps;
-      return commonBtnLabel(valueField);
+        ].fields.weight;
+      return commonBtnLabel(weightField);
     });
 
     return {
       t,
       dashboardPanelData,
-      removeMapName,
-      removeMapValue,
-      valueLabel,
+      removeLatitude,
+      removeLongitude,
+      removeWeight,
       triggerOperators,
       pagination: ref({
         rowsPerPage: 0,
@@ -567,13 +723,15 @@ export default defineComponent({
       tab: ref("General"),
       getImageURL,
       onDrop,
+      onDragEnter,
       onDragStart,
       onDragEnd,
       onDragOver,
-      onDragEnter,
       expansionItems,
       Hint,
+      WeightHint,
       promqlMode,
+      weightLabel,
       onFieldDragStart,
       options: [
         "=",
