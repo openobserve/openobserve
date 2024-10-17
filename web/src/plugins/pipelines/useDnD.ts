@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
-import { useVueFlow  } from "@vue-flow/core";
+import { useVueFlow,MarkerType  } from "@vue-flow/core";
 import { watch, reactive ,computed , ref} from "vue";
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -245,8 +245,17 @@ export default function useDragAndDrop() {
       id: `e${connection.source}-${connection.target}`,
       source: connection.source,
       target: connection.target,
-      markerEnd: { type: 'arrowclosed' }, // Add arrow marker
-
+      
+      markerEnd: {
+        type: MarkerType.Arrow,
+        width: 20,  // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+      type: 'button',
+      
+      style:{
+        strokeWidth: 2,
+      }
 
 
     };
@@ -334,7 +343,17 @@ export default function useDragAndDrop() {
         id: `e${pipelineObj.userClickedNode}-${pipelineObj.currentSelectedNodeData.id}`,
         source:  pipelineObj.userClickedNode,
         target:pipelineObj.currentSelectedNodeData.id,
-        markerEnd: { type: 'arrowclosed' },
+        markerEnd: {
+          type: MarkerType.Arrow,
+          width: 20,  // Increase arrow width
+          height: 20, // Increase arrow height
+        },
+        type: 'button',
+        
+        style:{
+          strokeWidth: 2,
+        }
+
       };
       //not required because we create new nodes every time we click on shortcuts
       // const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
@@ -360,7 +379,18 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
     source:  pipelineObj.userSelectedNode.id,
     target:pipelineObj.currentSelectedNodeData.id,
-    markerEnd: { type: 'arrowclosed' },
+      markerEnd: {
+        type: MarkerType.Arrow,
+        width: 20,  // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+    type: 'button',
+    
+    style:{
+      strokeWidth: 2,
+    }
+
+
   };
 
 

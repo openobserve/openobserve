@@ -162,6 +162,8 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
+import {MarkerType} from "@vue-flow/core";
+
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -407,6 +409,23 @@ const getPipeline = () => {
       const _pipeline = response.data.list.find(
         (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
+
+      _pipeline.edges.forEach((edge: any) => {
+        edge.markerEnd = {
+          type: MarkerType.Arrow,
+          width: 20,  // Increase arrow width
+          height: 20, // Increase arrow height
+        };
+
+        edge.style = {
+          ...edge.style, // Preserve existing styles
+          strokeWidth: 2,
+        };
+        edge.type = 'button'
+      });
+
+
+      console.log(_pipeline, "pipeline");
 
       _pipeline.nodes.forEach((node : any) => {
         node.type = node.io_type;

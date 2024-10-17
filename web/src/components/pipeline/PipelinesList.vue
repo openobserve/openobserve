@@ -212,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script setup lang="ts">
 import { ref, onBeforeMount, computed, watch, reactive, onActivated, onMounted } from "vue";
+import {MarkerType} from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
@@ -459,8 +460,15 @@ const getPipelines = async () => {
           const updatedEdges = pipeline.edges.map((edge : any) => ({
             ...edge,
             markerEnd: {
-              type: "arrowclosed"
-            },
+                type: MarkerType.Arrow,
+                width: 20,  // Increase arrow width
+                height: 20, // Increase arrow height
+              },
+              type: 'button',
+              
+              style:{
+                strokeWidth: 2,
+              },
             updatable: true 
           }));
           pipeline.type = pipeline.source.source_type;
