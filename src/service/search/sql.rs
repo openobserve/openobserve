@@ -322,6 +322,10 @@ fn generate_schema_fields(
             fields.push(field.clone());
         }
     }
+    // check _o2_id
+    if !fields.contains(&ID_COL_NAME.to_string()) && schema.field_with_name(ID_COL_NAME).is_ok() {
+        fields.push(ID_COL_NAME.to_string());
+    }
     fields
 }
 
