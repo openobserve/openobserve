@@ -1062,9 +1062,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :min="0"
         @update:model-value="
           (value: any) =>
-            (dashboardPanelData.data.config.line_thickness = value
-              ? value
-              : 1.5)
+            (dashboardPanelData.data.config.line_thickness =
+              typeof value == 'number' && value >= 0 ? value : 1.5)
         "
         label="Line Thickness"
         color="input-border"
