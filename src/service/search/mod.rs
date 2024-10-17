@@ -1161,7 +1161,8 @@ fn generate_select_start_search_schema(
     }
     // add not exists field in group schema but used in sql
     let mut new_fields = Vec::new();
-    for field in generate_used_fields_in_query(sql).iter() {
+    let used_fields = generate_used_fields_in_query(sql);
+    for field in used_fields.iter() {
         if schema_fields_map.get(field).is_none() {
             if let Some(field) = schema_latest_map.get(field) {
                 new_fields.push(Arc::new(field.as_ref().clone()));
@@ -1195,26 +1196,25 @@ fn generate_select_start_search_schema(
     };
 
     // skip selecting "_original" column if `SELECT * ...`
-    new_schema_fields.retain(|field| field.name() != config::ORIGINAL_DATA_COL_NAME);
+    if !used_fields.contains(config::ORIGINAL_DATA_COL_NAME) {
+        new_schema_fields.retain(|field| field.name() != config::ORIGINAL_DATA_COL_NAME);
+    }
 
     Ok((Arc::new(Schema::new(new_schema_fields)), diff_fields))
 }
 
-fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {
+fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> FxIndexSet<String> {
     let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
 
     // note field name maybe equal to alias name
-    let used_fields: FxIndexSet<_> = sql
-        .meta
+    sql.meta
         .group_by
         .iter()
         .chain(sql.meta.order_by.iter().map(|(f, _)| f))
         .filter(|f| !alias_map.contains(*f))
         .chain(&sql.meta.fields)
         .cloned()
-        .collect();
-
-    used_fields.into_iter().collect()
+        .collect()
 }
 
 // generate parquet file search schema
