@@ -251,7 +251,7 @@ export default function useDragAndDrop() {
         width: 20,  // Increase arrow width
         height: 20, // Increase arrow height
       },
-      
+      type: 'button',      
       style:{
         strokeWidth: 2,
       },

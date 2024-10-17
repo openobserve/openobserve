@@ -425,7 +425,6 @@ const getPipeline = () => {
       });
 
 
-      console.log(_pipeline, "pipeline");
 
       _pipeline.nodes.forEach((node : any) => {
         node.type = node.io_type;
@@ -648,29 +647,34 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
-const findMissingEdges = () =>{
-  const nodeIds = pipelineObj.currentSelectedPipeline.nodes.map((node:any) => node.id);
+const findMissingEdges = () => {
+  const nodes = pipelineObj.currentSelectedPipeline.nodes;
+  const edges = pipelineObj.currentSelectedPipeline.edges;
 
-  // Step 2: Collect node IDs that are part of edges (either source or target)
-  const connectedNodeIds = new Set();
+  // Collect node IDs that are part of edges (either source or target)
+  const outgoingConnections = new Set(edges.map((edge) => edge.source));
+  const incomingConnections = new Set(edges.map((edge) => edge.target));
 
-  // Go through each edge and collect both source and target nodes
-  pipelineObj.currentSelectedPipeline.edges.forEach((edge:any) => {
-    connectedNodeIds.add(edge.source); // Add source node ID
-    connectedNodeIds.add(edge.target); // Add target node ID
+  // Find nodes that are not connected properly
+  const unconnectedNodes = nodes.filter((node) => {
+    if (node.type === 'default') {
+      // Check for both incoming and outgoing edges
+      return !incomingConnections.has(node.id) || !outgoingConnections.has(node.id);
+    } else {
+      // Check for at least one connection (incoming or outgoing)
+      return !incomingConnections.has(node.id) && !outgoingConnections.has(node.id);
+    }
   });
 
-  // Step 3: Find nodes that are not connected by edges
-  const unconnectedNodes = nodeIds.filter((nodeId:any) => !connectedNodeIds.has(nodeId));
-  if(unconnectedNodes.length > 0){
-    return true;
+  if (unconnectedNodes.length > 0) {
+    console.log(unconnectedNodes, "unconnectedNodes");
+    return true; // There are unconnected nodes
   }
 
-  return false;
+  return false; // All nodes are properly connected
+};
 
-  // Output the unconnected nodes
 
-}
 
 // Drag n Drop methods
 
