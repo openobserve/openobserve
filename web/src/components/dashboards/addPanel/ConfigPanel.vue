@@ -252,7 +252,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="showLabelOnTop"
         stack-label
         emit-value
-        :display-value="'World'"
         data-test="dashboard-config-map-type"
       >
       </q-select>

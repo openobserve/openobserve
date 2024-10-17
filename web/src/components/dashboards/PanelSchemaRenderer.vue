@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
-        <GeoJSONMapRenderer
+        <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
-        ></GeoJSONMapRenderer>
+        ></MapsRenderer>
         <GeoMapRenderer
           v-else-if="panelSchema.type == 'geomap'"
           :data="
@@ -192,8 +192,8 @@ const GeoMapRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/GeoMapRenderer.vue");
 });
 
-const GeoJSONMapRenderer = defineAsyncComponent(() => {
-  return import("@/components/dashboards/panels/GeoJSONMapRenderer.vue");
+const MapsRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/MapsRenderer.vue");
 });
 
 const HTMLRenderer = defineAsyncComponent(() => {
@@ -210,7 +210,7 @@ export default defineComponent({
     ChartRenderer,
     TableRenderer,
     GeoMapRenderer,
-    GeoJSONMapRenderer,
+    MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
   },
@@ -319,7 +319,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {}, searchRequestTraceIds: {} }
+      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -368,57 +368,57 @@ export default defineComponent({
               maxIndex: string | number,
               obj: {},
               currentIndex: any,
-              array: { [x: string]: {} }
+              array: { [x: string]: {} },
             ) => {
               const numAttributes = Object.keys(obj).length;
               const maxNumAttributes = Object.keys(array[maxIndex]).length;
               return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
             },
-            0
+            0,
           );
 
-            const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
+          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
 
-            const responseFields = Object.keys(recordwithMaxAttribute);
+          const responseFields = Object.keys(recordwithMaxAttribute);
 
-            emit("updated:vrlFunctionFieldList", responseFields);
+          emit("updated:vrlFunctionFieldList", responseFields);
+        }
+
+        // panelData.value = convertPanelData(panelSchema.value, data.value, store);
+        if (!errorDetail.value) {
+          try {
+            // passing chartpanelref to get width and height of DOM element
+            panelData.value = await convertPanelData(
+              panelSchema.value,
+              data.value,
+              store,
+              chartPanelRef,
+              hoveredSeriesState,
+              resultMetaData,
+              metadata.value,
+            );
+
+            errorDetail.value = "";
+          } catch (error: any) {
+            errorDetail.value = error.message;
           }
-
-          // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-          if (!errorDetail.value) {
-            try {
-              // passing chartpanelref to get width and height of DOM element
-              panelData.value = await convertPanelData(
-                panelSchema.value,
-                data.value,
-                store,
-                chartPanelRef,
-                hoveredSeriesState,
-                resultMetaData,
-                metadata.value,
-              );
-
-              errorDetail.value = "";
-            } catch (error: any) {
-              errorDetail.value = error.message;
-            }
-          } else {
-            // if no data is available, then show the default data
-            // if there is an error config in the panel schema, then show the default data on error
-            // if no default data on error is set, then show the custom error message
-            if (
-              panelSchema.value?.error_config?.custom_error_handeling &&
-              panelSchema.value?.error_config?.default_data_on_error
-            ) {
-              data.value = JSON.parse(
-                panelSchema.value?.error_config?.default_data_on_error,
-              );
-              errorDetail.value = "";
-            }
+        } else {
+          // if no data is available, then show the default data
+          // if there is an error config in the panel schema, then show the default data on error
+          // if no default data on error is set, then show the custom error message
+          if (
+            panelSchema.value?.error_config?.custom_error_handeling &&
+            panelSchema.value?.error_config?.default_data_on_error
+          ) {
+            data.value = JSON.parse(
+              panelSchema.value?.error_config?.default_data_on_error,
+            );
+            errorDetail.value = "";
           }
-        },
-        { deep: true },
-      );
+        }
+      },
+      { deep: true },
+    );
 
     // when we get the new metadata from the apis, emit the metadata update
     watch(
@@ -426,7 +426,7 @@ export default defineComponent({
       () => {
         emit("metadata-update", metadata.value);
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(
@@ -434,7 +434,7 @@ export default defineComponent({
       () => {
         emit("result-metadata-update", resultMetaData.value);
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(lastTriggeredAt, () => {
@@ -444,19 +444,19 @@ export default defineComponent({
     watch(isCachedDataDifferWithCurrentTimeRange, () => {
       emit(
         "is-cached-data-differ-with-current-time-range-update",
-        isCachedDataDifferWithCurrentTimeRange.value
+        isCachedDataDifferWithCurrentTimeRange.value,
       );
     });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
       const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
       const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
 
       switch (panelType) {
@@ -484,7 +484,7 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every(
               (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0
+                data.value[0][0][y] != null || data.value[0][0][y] === 0,
             )
           );
         }
@@ -695,7 +695,7 @@ export default defineComponent({
           selectedTimeObj?.value?.start_time != "Invalid Date"
         ) {
           drilldownVariables.start_time = new Date(
-            selectedTimeObj?.value?.start_time?.toISOString()
+            selectedTimeObj?.value?.start_time?.toISOString(),
           ).getTime();
         }
 
@@ -704,7 +704,7 @@ export default defineComponent({
           selectedTimeObj?.value?.end_time != "Invalid Date"
         ) {
           drilldownVariables.end_time = new Date(
-            selectedTimeObj?.value?.end_time?.toISOString()
+            selectedTimeObj?.value?.end_time?.toISOString(),
           ).getTime();
         }
 
@@ -717,7 +717,7 @@ export default defineComponent({
         drilldownVariables.query_encoded = b64EncodeUnicode(
           metadata?.value?.queries[0]?.query ??
             panelSchema?.value?.queries[0]?.query ??
-            ""
+            "",
         );
 
         // if chart type is 'table' then we need to pass the table name
@@ -781,7 +781,7 @@ export default defineComponent({
             // open url
             return window.open(
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
-              drilldownData.targetBlank ? "_blank" : "_self"
+              drilldownData.targetBlank ? "_blank" : "_self",
             );
           } catch (error) {}
         } else if (drilldownData.type == "byDashboard") {
@@ -797,7 +797,7 @@ export default defineComponent({
             await getFoldersList(store);
           }
           const folderId = store.state.organizationData.folders.find(
-            (folder: any) => folder.name == drilldownData.data.folder
+            (folder: any) => folder.name == drilldownData.data.folder,
           )?.folderId;
 
           if (!folderId) {
@@ -807,10 +807,10 @@ export default defineComponent({
           // get dashboard id
           const allDashboardData = await getAllDashboardsByFolderId(
             store,
-            folderId
+            folderId,
           );
           const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title == drilldownData.data.dashboard
+            (dashboard: any) => dashboard.title == drilldownData.data.dashboard,
           );
 
           if (!dashboardData) {
@@ -820,7 +820,7 @@ export default defineComponent({
           // get tab id
           const tabId =
             dashboardData.tabs.find(
-              (tab: any) => tab.name == drilldownData.data.tab
+              (tab: any) => tab.name == drilldownData.data.tab,
             )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
@@ -853,7 +853,7 @@ export default defineComponent({
                 url.searchParams.set(
                   "var-" +
                     replacePlaceholders(variable.name, drilldownVariables),
-                  replacePlaceholders(variable.value, drilldownVariables)
+                  replacePlaceholders(variable.value, drilldownVariables),
                 );
               }
             });
