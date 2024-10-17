@@ -22,7 +22,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
-    SQL_FULL_TEXT_SEARCH_FIELDS,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
@@ -110,12 +110,19 @@ pub async fn check_for_schema(
         if !is_schema_changed {
             // check defined_schema_fields
             let stream_setting = get_settings(org_id, stream_name, stream_type).await;
-            let defined_schema_fields = stream_setting
-                .and_then(|s| s.defined_schema_fields)
-                .unwrap_or_default();
+            let (defined_schema_fields, need_original) = match stream_setting {
+                Some(s) => (
+                    s.defined_schema_fields.unwrap_or_default(),
+                    s.store_original_data,
+                ),
+                None => (Vec::new(), false),
+            };
             if !defined_schema_fields.is_empty() {
-                let schema =
-                    generate_schema_for_defined_schema_fields(schema, &defined_schema_fields);
+                let schema = generate_schema_for_defined_schema_fields(
+                    schema,
+                    &defined_schema_fields,
+                    need_original,
+                );
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
             return Ok((
@@ -351,7 +358,8 @@ async fn handle_diff_schema(
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
-    if stream_setting.store_original_data {
+    let need_original = stream_setting.store_original_data;
+    if need_original {
         if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
             entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
         }
@@ -361,8 +369,11 @@ async fn handle_diff_schema(
     drop(w);
 
     // update thread cache
-    let final_schema =
-        generate_schema_for_defined_schema_fields(&final_schema, &defined_schema_fields);
+    let final_schema = generate_schema_for_defined_schema_fields(
+        &final_schema,
+        &defined_schema_fields,
+        need_original,
+    );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Ok(Some(SchemaEvolution {
@@ -376,18 +387,28 @@ async fn handle_diff_schema(
 pub fn generate_schema_for_defined_schema_fields(
     schema: &SchemaCache,
     fields: &[String],
+    need_original: bool,
 ) -> SchemaCache {
     if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
         return schema.clone();
     }
 
     let cfg = get_config();
+    let (o2_id_col, original_col) = (ID_COL_NAME.to_string(), ORIGINAL_DATA_COL_NAME.to_string());
     let mut fields: HashSet<_> = fields.iter().collect();
     if !fields.contains(&cfg.common.column_timestamp) {
         fields.insert(&cfg.common.column_timestamp);
     }
     if !fields.contains(&cfg.common.column_all) {
         fields.insert(&cfg.common.column_all);
+    }
+    if need_original {
+        if !fields.contains(&o2_id_col) {
+            fields.insert(&o2_id_col);
+        }
+        if !fields.contains(&original_col) {
+            fields.insert(&original_col);
+        }
     }
     let mut new_fields = Vec::with_capacity(fields.len());
     for field in fields {
