@@ -377,7 +377,13 @@ export const convertPromQLData = async (
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
 
-  [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+  if (
+    !["palette-classic-by-series", "palette-classic", "fixed"].includes(
+      panelSchema.config?.color?.mode,
+    )
+  ) {
+    [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+  }
 
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
