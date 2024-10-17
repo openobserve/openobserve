@@ -466,6 +466,12 @@ export const convertPromQLData = async (
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
+
+          const seriesName = getPromqlLegendName(
+            metric.metric,
+            panelSchema.queries[index].config.promql_legend,
+          );
+
           return {
             ...getPropsByChartTypeForSeries(panelSchema.type),
             min: panelSchema?.queries[index]?.config?.min || 0,
@@ -525,10 +531,7 @@ export const convertPromQLData = async (
             ],
             data: [
               {
-                name: getPromqlLegendName(
-                  metric.metric,
-                  panelSchema.queries[index].config.promql_legend,
-                ),
+                name: seriesName,
                 // taking first value for gauge
                 value: values[0][1],
                 detail: {
@@ -541,6 +544,16 @@ export const convertPromQLData = async (
                     );
                     return unitValue.value + unitValue.unit;
                   },
+                },
+                itemStyle: {
+                  color:
+                    getSeriesColor(
+                      panelSchema?.config?.color,
+                      seriesName,
+                      values[0][1],
+                      chartMin,
+                      chartMax,
+                    ) ?? null,
                 },
               },
             ],
