@@ -60,7 +60,7 @@ const getDefaultDashboardPanelData: any = () => ({
         type: "osm",
       },
       map_type: {
-        type: "World",
+        type: "world",
       },
       map_view: {
         zoom: 1,
