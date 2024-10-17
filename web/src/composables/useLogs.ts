@@ -553,7 +553,10 @@ const useLogs = () => {
 
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
-    if(query.hasOwnProperty("type") && query.type == "search_history_re_apply"){
+    if (
+      query.hasOwnProperty("type") &&
+      query.type == "search_history_re_apply"
+    ) {
       delete query.type;
     }
     router.push({ query });
@@ -2473,6 +2476,7 @@ const useLogs = () => {
                 }
               }
             }
+
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
@@ -2508,14 +2512,16 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
 
-            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
             searchObjDebug["histogramEndTime"] = performance.now();
+
             dismiss();
             resolve(true);
           })
@@ -3706,9 +3712,12 @@ const useLogs = () => {
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
-      if(router.currentRoute.value.query.hasOwnProperty("type") &&  router.currentRoute.value.query.type == "search_history_re_apply"){
-       delete router.currentRoute.value.query.type;
-        }   
+      if (
+        router.currentRoute.value.query.hasOwnProperty("type") &&
+        router.currentRoute.value.query.type == "search_history_re_apply"
+      ) {
+        delete router.currentRoute.value.query.type;
+      }
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -3826,7 +3835,10 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
-    if(queryParams.hasOwnProperty("type") &&  queryParams.type == "search_history_re_apply"){
+    if (
+      queryParams.hasOwnProperty("type") &&
+      queryParams.type == "search_history_re_apply"
+    ) {
       delete queryParams.type;
     }
     // TODO OK : Replace push with replace and test all scenarios
@@ -4215,6 +4227,7 @@ const useLogs = () => {
     refreshPartitionPagination,
     filterHitsColumns,
     getHistogramQueryData,
+    generateHistogramSkeleton,
     fnParsedSQL,
     addOrderByToQuery,
     getRegionInfo,

@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory"  id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -235,7 +234,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                        :htmlContent="
+                          searchObj.data.errorMsg +
+                          '<h6 style=\'font-size: 14px; margin: 0;\'>' +
+                          searchObj.data.errorDetail +
+                          '</h6>'
+                        "
+                      />
                     </span>
                   </h5>
                 </div>
@@ -256,11 +261,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-show="showSearchHistory">
       <search-history
-      ref="searchHistoryRef"
+        ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
-
-        />
+      />
     </div>
   </q-page>
 </template>
@@ -455,10 +459,11 @@ export default defineComponent({
       resetSearchObj,
       resetStreamData,
       getHistogramQueryData,
+      generateHistogramSkeleton,
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
-       getStreamList,
+      getStreamList,
       getFunctions,
       extractFields,
     } = useLogs();
@@ -522,7 +527,6 @@ export default defineComponent({
     // });
 
     onActivated(async () => {
-      
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
@@ -569,7 +573,6 @@ export default defineComponent({
         // visualize tab
         handleRunQueryFn();
       }
-
     });
 
     onBeforeMount(async () => {
@@ -601,12 +604,14 @@ export default defineComponent({
         searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
       }
     });
-    onMounted( async() => {
+    onMounted(async () => {
       //
-        if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
+      if (
+        router.currentRoute.value.query.hasOwnProperty("action") &&
+        router.currentRoute.value.query.action == "history"
+      ) {
         showSearchHistory.value = true;
       }
-
     });
 
     /**
@@ -617,11 +622,9 @@ export default defineComponent({
 
     watch(
       () => router.currentRoute.value.query.type,
-      
+
       (type, prev) => {
-
         if (
-
           searchObj.shouldIgnoreWatcher == false &&
           router.currentRoute.value.name === "logs" &&
           prev === "stream_explorer" &&
@@ -633,15 +636,18 @@ export default defineComponent({
       },
     );
     watch(
-      ()=> router.currentRoute.value.query,
-      ()=>{
-       if(!router.currentRoute.value.query.hasOwnProperty("action") ){
-        showSearchHistory.value = false;
-      }
-      if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
-        showSearchHistory.value = true;
-      }
-    }
+      () => router.currentRoute.value.query,
+      () => {
+        if (!router.currentRoute.value.query.hasOwnProperty("action")) {
+          showSearchHistory.value = false;
+        }
+        if (
+          router.currentRoute.value.query.hasOwnProperty("action") &&
+          router.currentRoute.value.query.action == "history"
+        ) {
+          showSearchHistory.value = true;
+        }
+      },
       // (action) => {
       //   if (action === "history") {
       //     showSearchHistory.value = true;
@@ -651,10 +657,13 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.type,
       async (type) => {
-        if(type == "search_history_re_apply"){
-          searchObj.organizationIdetifier = router.currentRoute.value.query.org_identifier;
-          searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
-          searchObj.data.stream.streamType = router.currentRoute.value.query.stream_type;
+        if (type == "search_history_re_apply") {
+          searchObj.organizationIdetifier =
+            router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value =
+            router.currentRoute.value.query.stream;
+          searchObj.data.stream.streamType =
+            router.currentRoute.value.query.stream_type;
           resetSearchObj();
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
@@ -671,7 +680,6 @@ export default defineComponent({
         }
       },
     );
-
 
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");
@@ -850,19 +858,16 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
-
       router.push({
-          name: "logs",
-          query: {
-            action: "history",
-            org_identifier: store.state.selectedOrganization.identifier,
-            type: "search_history",
-          },
-        });
+        name: "logs",
+        query: {
+          action: "history",
+          org_identifier: store.state.selectedOrganization.identifier,
+          type: "search_history",
+        },
+      });
       showSearchHistory.value = true;
-
-
-    }
+    };
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
@@ -1211,6 +1216,7 @@ export default defineComponent({
       resetSearchObj,
       resetStreamData,
       getHistogramQueryData,
+      generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,
       handleQuickModeChange,
       handleRunQueryFn,
@@ -1284,7 +1290,7 @@ export default defineComponent({
         ? this.searchObj.config.lastSplitterPosition
         : 0;
     },
-    showHistogram() {
+    async showHistogram() {
       if (
         this.searchObj.meta.showHistogram &&
         !this.searchObj.shouldIgnoreWatcher
@@ -1297,6 +1303,9 @@ export default defineComponent({
           this.searchObj.meta.histogramDirtyFlag = false;
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
+
+          this.searchObj.data.queryResults.aggs = [];
+          await this.generateHistogramSkeleton();
 
           this.getHistogramQueryData(this.searchObj.data.histogramQuery)
             .then((res: any) => {
