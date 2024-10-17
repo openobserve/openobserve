@@ -1514,6 +1514,7 @@ const useLogs = () => {
       searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
       if (
         !searchObj.data.stream.streamLists?.length ||
         searchObj.data.stream.selectedStream.length == 0
@@ -2116,6 +2117,13 @@ const useLogs = () => {
         .then(async (res) => {
           if (
             res.data.hasOwnProperty("function_error") &&
+            res.data.function_error != ""
+          ) {
+            searchObj.data.functionError = res.data.function_error;
+          }
+
+          if (
+            res.data.hasOwnProperty("function_error") &&
             res.data.function_error != "" &&
             res.data.hasOwnProperty("new_start_time") &&
             res.data.hasOwnProperty("new_end_time")
@@ -2258,26 +2266,26 @@ const useLogs = () => {
             setTimeout(async () => {
               processPostPaginationData();
 
-              searchObj.data.functionError = "";
-              if (
-                res.data.hasOwnProperty("function_error") &&
-                res.data.function_error
-              ) {
-                searchObj.data.functionError = res.data.function_error;
-              }
+              // searchObj.data.functionError = "";
+              // if (
+              //   res.data.hasOwnProperty("function_error") &&
+              //   res.data.function_error
+              // ) {
+              //   searchObj.data.functionError = res.data.function_error;
+              // }
             }, 0);
             await getPaginatedData(queryReq, true);
           }
 
           await processPostPaginationData();
 
-          searchObj.data.functionError = "";
-          if (
-            res.data.hasOwnProperty("function_error") &&
-            res.data.function_error
-          ) {
-            searchObj.data.functionError = res.data.function_error;
-          }
+          // searchObj.data.functionError = "";
+          // if (
+          //   res.data.hasOwnProperty("function_error") &&
+          //   res.data.function_error
+          // ) {
+          //   searchObj.data.functionError = res.data.function_error;
+          // }
 
           searchObj.loading = false;
           searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
@@ -3429,6 +3437,7 @@ const useLogs = () => {
     try {
       searchObj.loading = true;
       searchObj.data.errorCode = 0;
+      searchObj.data.functionError = "";
       const sqlContext: any = [];
       let query_context: any = "";
       const query = searchObj.data.query;
