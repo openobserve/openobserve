@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -404,7 +404,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
         columns.value = columns.value.filter(
-          (column) => column.name !== "doc_num",
+          (column) => column.name !== "doc_num"
         );
       }
 
@@ -427,7 +427,7 @@ export default defineComponent({
         if (!value) {
           onChangeStreamFilter(selectedStreamType.value);
         }
-      },
+      }
     );
 
     const getLogStream = (refresh: boolean = false) => {
@@ -471,7 +471,7 @@ export default defineComponent({
                   schema: data.schema ? data.schema : [],
                   stream_type: data.stream_type,
                 };
-              }),
+              })
             );
             duplicateStreamList.value = [...logStream.value];
 
@@ -557,7 +557,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           deleteStreamName,
-          deleteStreamType,
+          deleteStreamType
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -587,18 +587,18 @@ export default defineComponent({
           streamService.delete(
             store.state.selectedOrganization.identifier,
             stream.name,
-            stream.stream_type,
-          ),
+            stream.stream_type
+          )
         );
       });
 
       Promise.all(promises)
         .then((responses) => {
           const successfulDeletions = responses.filter(
-            (res) => res.data.code === 200,
+            (res) => res.data.code === 200
           );
           const failedDeletions = responses.filter(
-            (res) => res.data.code !== 200,
+            (res) => res.data.code !== 200
           );
 
           if (successfulDeletions.length > 0) {
@@ -622,7 +622,7 @@ export default defineComponent({
             selected.value = selected.value.filter(
               (item: any) =>
                 item.name !== stream.name &&
-                item.stream_type !== stream.stream_type,
+                item.stream_type !== stream.stream_type
             );
           });
 
@@ -659,7 +659,9 @@ export default defineComponent({
     const getSelectedString = () => {
       return selected.value.length === 0
         ? ""
-        : `${selected.value.length} record${selected.value.length > 1 ? "s" : ""} selected`;
+        : `${selected.value.length} record${
+            selected.value.length > 1 ? "s" : ""
+          } selected`;
     };
 
     const exploreStream = (props: any) => {
@@ -701,7 +703,7 @@ export default defineComponent({
       selectedStreamType.value = value;
       logStream.value = filterData(
         duplicateStreamList.value,
-        filterQuery.value.toLowerCase(),
+        filterQuery.value.toLowerCase()
       );
       resultTotal.value = logStream.value.length;
     };

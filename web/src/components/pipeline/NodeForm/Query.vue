@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -137,7 +137,7 @@ import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue"),
+  () => import("@/components/alerts/VariablesInput.vue")
 );
 
 interface RouteCondition {
@@ -305,7 +305,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
+      (column: any) => column.toLowerCase().indexOf(value) > -1
     );
   });
   return filteredOptions;
@@ -326,7 +326,7 @@ const updateStreamFields = async () => {
   const streams: any = await getStream(
     props.streamName,
     props.streamType,
-    true,
+    true
   );
 
   if (streams && Array.isArray(streams.schema)) {
@@ -451,7 +451,7 @@ const addVariable = () => {
 const removeVariable = (variable: any) => {
   streamRoute.value.context_attributes =
     streamRoute.value.context_attributes.filter(
-      (_variable: any) => _variable.id !== variable.id,
+      (_variable: any) => _variable.id !== variable.id
     );
 };
 

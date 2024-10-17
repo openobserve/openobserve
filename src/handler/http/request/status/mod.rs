@@ -18,7 +18,7 @@ use std::{io::Error, sync::Arc};
 use actix_web::{
     cookie,
     cookie::{Cookie, SameSite},
-    get,
+    get, head,
     http::header,
     put, web, HttpRequest, HttpResponse,
 };
@@ -50,7 +50,7 @@ use {
     o2_enterprise::enterprise::{
         common::{
             auditor::AuditMessage,
-            infra::config::O2_CONFIG,
+            infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
             settings::{get_logo, get_logo_text},
         },
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
@@ -105,6 +105,7 @@ struct ConfigResponse<'a> {
     rum: Rum,
     custom_logo_img: Option<String>,
     custom_hide_menus: String,
+    custom_hide_self_logo: bool,
     meta_org: String,
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
@@ -142,6 +143,13 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     }))
 }
 
+/// Healthz HEAD
+/// Vector pipeline healthcheck support
+#[head("/healthz")]
+pub async fn healthz_head() -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok().finish())
+}
+
 /// Healthz of the node for scheduled status
 #[utoipa::path(
     path = "/schedulez",
@@ -173,37 +181,39 @@ pub async fn schedulez() -> Result<HttpResponse, Error> {
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    let sso_enabled = O2_CONFIG.dex.dex_enabled;
+    let o2cfg = get_o2_config();
+    #[cfg(feature = "enterprise")]
+    let sso_enabled = o2cfg.dex.dex_enabled;
     #[cfg(not(feature = "enterprise"))]
     let sso_enabled = false;
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
+    let native_login_enabled = o2cfg.dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
     #[cfg(feature = "enterprise")]
-    let rbac_enabled = O2_CONFIG.openfga.enabled;
+    let rbac_enabled = o2cfg.openfga.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
 
     #[cfg(feature = "enterprise")]
-    let super_cluster_enabled = O2_CONFIG.super_cluster.enabled;
+    let super_cluster_enabled = o2cfg.super_cluster.enabled;
     #[cfg(not(feature = "enterprise"))]
     let super_cluster_enabled = false;
 
     #[cfg(feature = "enterprise")]
     let custom_logo_text = match get_logo_text().await {
         Some(data) => data,
-        None => O2_CONFIG.common.custom_logo_text.clone(),
+        None => o2cfg.common.custom_logo_text.clone(),
     };
     #[cfg(not(feature = "enterprise"))]
     let custom_logo_text = "".to_string();
     #[cfg(feature = "enterprise")]
-    let custom_slack_url = &O2_CONFIG.common.custom_slack_url;
+    let custom_slack_url = &o2cfg.common.custom_slack_url;
     #[cfg(not(feature = "enterprise"))]
     let custom_slack_url = "";
     #[cfg(feature = "enterprise")]
-    let custom_docs_url = &O2_CONFIG.common.custom_docs_url;
+    let custom_docs_url = &o2cfg.common.custom_docs_url;
     #[cfg(not(feature = "enterprise"))]
     let custom_docs_url = "";
 
@@ -214,9 +224,14 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let logo = None;
 
     #[cfg(feature = "enterprise")]
-    let custom_hide_menus = &O2_CONFIG.common.custom_hide_menus;
+    let custom_hide_menus = &o2cfg.common.custom_hide_menus;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_menus = "";
+
+    #[cfg(feature = "enterprise")]
+    let custom_hide_self_logo = o2cfg.common.custom_hide_self_logo;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_hide_self_logo = false;
 
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
@@ -252,6 +267,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
         custom_hide_menus: custom_hide_menus.to_string(),
+        custom_hide_self_logo,
         rum: Rum {
             enabled: cfg.rum.enabled,
             client_token: cfg.rum.client_token.to_string(),
@@ -338,6 +354,12 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 #[get("")]
 pub async fn config_reload() -> Result<HttpResponse, Error> {
     if let Err(e) = config::refresh_config() {
+        return Ok(
+            HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
+        );
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = refresh_o2_config() {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
@@ -445,7 +467,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let access_token = login_data.access_token;
             let keys = get_jwks().await;
             let token_ver =
-                verify_decode_token(&access_token, &keys, &O2_CONFIG.dex.client_id, true).await;
+                verify_decode_token(&access_token, &keys, &get_o2_config().dex.client_id, true)
+                    .await;
             let id_token;
             match token_ver {
                 Ok(res) => {

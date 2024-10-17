@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -58,21 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start items-center no-wrap"
           ref="spanMarkerRef"
         >
-          <q-icon
-            dense
-            round
-            flat
-            name="expand_more"
-            class="collapse-btn"
-            :style="{
-              rotate: isSpanSelected ? '0deg' : '270deg',
-            }"
-            @click.prevent.stop="toggleSpanDetails()"
-          />
-
           <div
             :style="{
-              width: 'calc(100% - 21px)',
+              width: 'calc(100% - 6px)',
               height: '100%',
               borderRadius: '2px',
               backgroundColor: span.style?.color || '#58508d',
@@ -193,7 +181,7 @@ export default defineComponent({
 
     const isSpanSelected = computed(() => {
       return searchObj.data.traceDetails.expandedSpans.includes(
-        props.span.spanId,
+        props.span.spanId
       );
     });
 
@@ -211,7 +199,7 @@ export default defineComponent({
         (
           (props.span?.durationMs / props.baseTracePosition?.durationMs) *
           100
-        ).toFixed(2),
+        ).toFixed(2)
       );
     };
 
@@ -226,7 +214,7 @@ export default defineComponent({
       },
       {
         immediate: true,
-      },
+      }
     );
 
     watch(
@@ -237,21 +225,21 @@ export default defineComponent({
       {
         immediate: true,
         deep: true,
-      },
+      }
     );
 
     watch(
       () => props.span?.durationMs + props.baseTracePosition?.durationMs,
       () => {
         spanWidth.value = getSpanWidth();
-      },
+      }
     );
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
       (val) => {
         durationStyle.value = getDurationStyle();
-      },
+      }
     );
 
     const getDurationStyle = () => {
@@ -268,7 +256,7 @@ export default defineComponent({
         style.right = 0;
         style.top = "-5px";
       } else if (leftPosition.value > 50) {
-        style.left = leftPosition.value * onePercent - labelWidth + 10 + "px";
+        style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {
         const left =
           leftPosition.value +
@@ -297,7 +285,7 @@ export default defineComponent({
       } else {
         searchObj.data.traceDetails.expandedSpans =
           searchObj.data.traceDetails.expandedSpans.filter(
-            (val) => props.span.spanId !== val,
+            (val) => props.span.spanId !== val
           );
       }
     };
