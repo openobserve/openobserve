@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::Row;
 
 use crate::{
@@ -51,7 +51,7 @@ impl ShortUrl for SqliteShortUrl {
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
                     short_id     VARCHAR(32) NOT NULL,
                     original_url TEXT NOT NULL,
-                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_ts   BIGINT NOT NULL
                 );
                 "#,
         )
@@ -65,10 +65,10 @@ impl ShortUrl for SqliteShortUrl {
     async fn create_table_index(&self) -> Result<()> {
         create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
         create_index(
-            "short_urls_created_at_idx",
+            "short_urls_created_ts_idx",
             "short_urls",
             false,
-            &["created_at"],
+            &["created_ts"],
         )
         .await?;
         Ok(())
@@ -78,11 +78,15 @@ impl ShortUrl for SqliteShortUrl {
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
+        let created_ts = Utc::now().timestamp_micros();
+
         let mut tx = client.begin().await?;
-        let query = r#"INSERT INTO short_urls (short_id, original_url) VALUES ($1, $2);"#;
+        let query =
+            r#"INSERT INTO short_urls (short_id, original_url, created_ts) VALUES ($1, $2, $3);"#;
         let result = sqlx::query(query)
             .bind(short_id)
             .bind(original_url)
+            .bind(created_ts)
             .execute(&mut *tx)
             .await;
 
@@ -128,7 +132,7 @@ impl ShortUrl for SqliteShortUrl {
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let client = CLIENT_RO.clone();
         let mut query =
-            r#"SELECT short_id, original_url FROM short_urls ORDER BY id DESC"#.to_string();
+            r#"SELECT short_id, original_url FROM short_urls ORDER BY created_ts DESC"#.to_string();
 
         if limit.is_some() {
             query.push_str(" LIMIT $1");
@@ -193,16 +197,12 @@ impl ShortUrl for SqliteShortUrl {
         self.len().await == 0
     }
 
-    async fn get_expired(
-        &self,
-        expired_before: DateTime<Utc>,
-        limit: Option<i64>,
-    ) -> Result<Vec<String>> {
+    async fn get_expired(&self, expired_before: i64, limit: Option<i64>) -> Result<Vec<String>> {
         let client = CLIENT_RO.clone();
 
         let mut query = r#"
             SELECT short_id FROM short_urls
-            WHERE created_at < $1
+            WHERE created_ts < $1
             "#
         .to_string();
 
