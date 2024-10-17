@@ -106,6 +106,7 @@ OpenObserve is available in three different editions:
 | Reports | ✅ | ✅ | ✅ |
 | VRL functions | ✅ | ✅ | ✅ |
 | Pipelines | ✅ | ✅ | ✅ |
+| Opentelemetry support | ✅ | ✅ | ❌ |
 | High Availability | ✅ | ✅ | ✅ |
 | Multitenancy (Organizations) | ✅ | ✅ | ✅ |
 | Dynamic schema and schema evolution | ✅ | ✅ | ✅ |
