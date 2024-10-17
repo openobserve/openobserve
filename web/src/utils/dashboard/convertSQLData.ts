@@ -2308,6 +2308,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         step: ["step-start", "step-end", "step-middle"].includes(
           panelSchema.config?.line_interpolation,
         )
+        // TODO: replace this with type integrations
           ? panelSchema.config.line_interpolation.replace("step-", "")
           : false,
         showSymbol: panelSchema.config?.show_symbol ?? false,
