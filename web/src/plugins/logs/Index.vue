@@ -124,11 +124,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       Result not found.
+                      <q-btn
+                        v-if="
+                          searchObj.data.errorMsg != '' ||
+                          searchObj?.data?.functionError != ''
+                        "
+                        @click="toggleErrorDetails"
+                        size="sm"
+                        data-test="logs-page-result-error-details-btn"
+                        >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                      >
                     </div>
                     <div data-test="logs-search-error-message" v-else>
                       Error occurred while retrieving search events.
                       <q-btn
-                        v-if="searchObj.data.errorMsg != ''"
+                        v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
                         @click="toggleErrorDetails"
                         size="sm"
                         data-test="logs-page-result-error-details-btn"
@@ -191,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
-                      v-if="searchObj.data.errorMsg != ''"
+                      v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
                       @click="toggleErrorDetails"
                       size="sm"
                       data-test="logs-page-result-error-details-btn"
@@ -235,7 +245,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                        :htmlContent="
+                          searchObj.data.errorMsg +
+                          '<h6 style=\'font-size: 14px; margin: 0;\'>' +
+                          searchObj.data.errorDetail +
+                          '</h6>'
+                        "
+                      />
+                      <SanitizedHtmlRenderer
+                        data-test="logs-search-detail-function-error-message"
+                        :htmlContent="searchObj?.data?.functionError"
+                      />
                     </span>
                   </h5>
                 </div>
