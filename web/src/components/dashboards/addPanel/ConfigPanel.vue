@@ -1197,23 +1197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="space"></div>
-    <ColorPaletteDropDown
-      v-if="
-        [
-          'area',
-          'area-stacked',
-          'bar',
-          'h-bar',
-          'line',
-          'scatter',
-          'stacked',
-          'h-stacked',
-          'pie',
-          'donut',
-          'gauge',
-        ].includes(dashboardPanelData.data.type)
-      "
-    />
+    <ColorPaletteDropDown v-if="showColorPalette" />
     <div class="space"></div>
 
     <div class="space"></div>
@@ -1645,6 +1629,22 @@ export default defineComponent({
       ].config.time_shift.splice(index, 1);
     };
 
+    const showColorPalette = computed(() => {
+      return [
+        "area",
+        "area-stacked",
+        "bar",
+        "h-bar",
+        "line",
+        "scatter",
+        "stacked",
+        "h-stacked",
+        "pie",
+        "donut",
+        "gauge",
+      ].includes(dashboardPanelData.data.type);
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1665,6 +1665,7 @@ export default defineComponent({
       selectPromQlNameOption,
       addTimeShift,
       removeTimeShift,
+      showColorPalette,
     };
   },
 });

@@ -161,7 +161,12 @@ export const classicColorPalette = [
 // ];
 
 export const shadeColor = (color: any, value: any, min: any, max: any) => {
-  let percent = (value - min) / (max - min);
+  let percent = 0;
+  if (max === min) {
+    percent = 0;
+  } else {
+    percent = (value - min) / (max - min);
+  }
   let num = parseInt(color.replace("#", ""), 16),
     amt = Math.round(1.55 * percent * 100),
     R = (num >> 16) + amt,
@@ -189,7 +194,7 @@ export const getMetricMinMaxValue = (searchQueryData: any) => {
         if (valuesArr.values && Array.isArray(valuesArr.values)) {
           valuesArr.values.forEach((val: any) => {
             // val[1] should not NaN
-            if (!isNaN(val[1])) {
+            if (!Number.isNaN(val[1])) {
               min = Math.min(min, val[1]);
               max = Math.max(max, val[1]);
             }
@@ -208,7 +213,11 @@ export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
 
   searchQueryData[0]?.forEach((data: any) => {
     yaxiskeys?.forEach((key: any) => {
-      if (data[key] !== undefined && !isNaN(data[key]) && data[key] !== null) {
+      if (
+        data[key] !== undefined &&
+        !Number.isNaN(data[key]) &&
+        data[key] !== null
+      ) {
         min = Math.min(min, data[key]);
         max = Math.max(max, data[key]);
       }
