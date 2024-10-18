@@ -466,7 +466,7 @@ export default defineComponent({
       getStreamList,
       getFunctions,
       extractFields,
-      resetHistogramWithLimitError,
+      resetHistogramWithError,
       isNonAggregatedQuery,
     } = useLogs();
     const searchResultRef = ref(null);
@@ -1227,7 +1227,7 @@ export default defineComponent({
       visualizeErrorData,
       disableMoreErrorDetails,
       closeSearchHistoryfn,
-      resetHistogramWithLimitError,
+      resetHistogramWithError,
       fnParsedSQL,
       isNonAggregatedQuery,
     };
@@ -1310,7 +1310,9 @@ export default defineComponent({
           this.searchObj.meta.sqlMode &&
           !this.isNonAggregatedQuery(parsedSQL)
         ) {
-          this.resetHistogramWithLimitError();
+          this.resetHistogramWithError(
+            "Histogram is not available for limit queries.",
+          );
         } else if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
           // this.handleRunQuery();

@@ -1749,7 +1749,9 @@ const useLogs = () => {
           await generateHistogramData();
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
-          resetHistogramWithLimitError();
+          resetHistogramWithError(
+            "Histogram is not available for limit queries.",
+          );
         } else {
           let aggFlag = false;
           if (parsedSQL) {
@@ -1798,7 +1800,7 @@ const useLogs = () => {
     }
   };
 
-  function resetHistogramWithLimitError() {
+  function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
     searchObj.data.histogram = {
       xData: [],
       yData: [],
@@ -1807,8 +1809,8 @@ const useLogs = () => {
         unparsed_x_data: [],
         timezone: "",
       },
-      errorCode: 0,
-      errorMsg: "Histogram is not available for limit queries.",
+      errorCode,
+      errorMsg,
       errorDetail: "",
     };
   }
@@ -4238,7 +4240,7 @@ const useLogs = () => {
     validateFilterForMultiStream,
     cancelQuery,
     reorderSelectedFields,
-    resetHistogramWithLimitError,
+    resetHistogramWithError,
     isNonAggregatedQuery,
   };
 };
