@@ -137,6 +137,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="markFormDirty"
               />
             </div>
+            <div class="row flex items-center q-pb-xs q-mt-lg">
+            <q-toggle
+                data-test="log-stream-use_approx-toggle-btn"
+                v-model="approxPartition"
+                :label="t('logStream.approxPartition')"
+                @click="formDirtyFlag = true"
+        />
+           </div>
           
           </template>
 
@@ -448,6 +456,7 @@ export default defineComponent({
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
     let previousSchemaVersion: any = null;
+    const approxPartition = ref(false);
 
     const selectedFields = ref([]);
 
@@ -489,6 +498,7 @@ export default defineComponent({
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
       storeOriginalData.value = false;
+      approxPartition.value = false;
     });
 
     const isSchemaEvolutionEnabled = computed(() => {
@@ -644,6 +654,7 @@ export default defineComponent({
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
       storeOriginalData.value = streamResponse.settings.store_original_data;
+      approxPartition.value = streamResponse.settings.approx_partition;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -727,6 +738,7 @@ export default defineComponent({
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
       settings["store_original_data"] = storeOriginalData.value; 
+      settings["approx_partition"] = approxPartition.value; 
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
@@ -1005,6 +1017,7 @@ export default defineComponent({
       getImageURL,
       dataRetentionDays,
       storeOriginalData,
+      approxPartition,
       maxQueryRange,
       showDataRetention,
       formatSizeFromMB,

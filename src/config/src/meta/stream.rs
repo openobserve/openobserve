@@ -521,6 +521,8 @@ pub struct StreamSettings {
     pub max_query_range: i64,
     #[serde(default)]
     pub store_original_data: bool,
+    #[serde(default)]
+    pub approx_partition: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -654,6 +656,11 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let approx_partition = settings
+            .get("approx_partition")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         Self {
             partition_time_level,
             partition_keys,
@@ -665,6 +672,7 @@ impl From<&str> for StreamSettings {
             flatten_level,
             defined_schema_fields,
             store_original_data,
+            approx_partition,
         }
     }
 }
