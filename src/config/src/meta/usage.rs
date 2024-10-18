@@ -103,8 +103,6 @@ pub struct UsageData {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<String>,
-    #[serde(default)]
-    pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
 }
