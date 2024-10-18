@@ -16,14 +16,12 @@
 use std::io::Error;
 
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::metrics::{
-        otlp_http::{metrics_json_handler, metrics_proto_handler},
-        {self},
-    },
+    service::metrics::{self, otlp_grpc::handle_grpc_request},
 };
 
 /// _json ingestion API
@@ -77,16 +75,41 @@ pub async fn otlp_metrics_write(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
-    if content_type.eq(CONTENT_TYPE_PROTO) {
-        // log::info!("otlp::metrics_proto_handler");
-        metrics_proto_handler(&org_id, body).await
+
+    let metrics = if content_type.eq(CONTENT_TYPE_PROTO) {
+        match <ExportMetricsServiceRequest as prost::Message>::decode(body) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!("Invalid json: {}", e),
+                )));
+            }
+        }
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        // log::info!("otlp::metrics_json_handler");
-        metrics_json_handler(&org_id, body).await
+        match config::utils::json::from_slice(body.as_ref()) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!("Invalid json: {}", e),
+                )));
+            }
+        }
     } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             "Bad Request".to_string(),
-        )))
+        )));
+    };
+
+    match handle_grpc_request(&org_id, metrics, false).await {
+        Ok(r) => Ok(r),
+        Err(e) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            )),
+        ),
     }
 }
