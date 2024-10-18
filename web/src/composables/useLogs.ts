@@ -1264,7 +1264,10 @@ const useLogs = () => {
               searchObj.data.errorMsg =
                 "Error while processing partition request.";
               if (err.response != undefined) {
-                searchObj.data.errorMsg = err.response?.data?.error || err.response?.data?.message || "";
+                searchObj.data.errorMsg =
+                  err.response?.data?.error ||
+                  err.response?.data?.message ||
+                  "";
                 if (err.response.data.hasOwnProperty("error_detail")) {
                   searchObj.data.errorDetail = err.response.data.error_detail;
                 }
@@ -2311,7 +2314,8 @@ const useLogs = () => {
               ? err
               : "Error while processing histogram request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response?.data?.error || err.response?.data?.message || "";
+            searchObj.data.errorMsg =
+              err.response?.data?.error || err.response?.data?.message || "";
             if (err.response.data.hasOwnProperty("error_detail")) {
               searchObj.data.errorDetail =
                 err.response?.data?.error_detail || "";
