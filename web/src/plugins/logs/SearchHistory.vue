@@ -381,8 +381,8 @@
         isLoading.value = true;
         if(dateTimeToBeSent.value.valueType === "relative"){
           const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
-          dateTimeToBeSent.value.startTime = convertedData.from;
-          dateTimeToBeSent.value.endTime = convertedData.to;
+          dateTimeToBeSent.value.startTime = convertedData.from * 1000;
+          dateTimeToBeSent.value.endTime = convertedData.to * 1000;
         }
         const {startTime, endTime} = dateTimeToBeSent.value;
          const response = await searchService.get_history( org_identifier,startTime,endTime,
