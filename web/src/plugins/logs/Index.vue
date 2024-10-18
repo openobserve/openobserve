@@ -461,7 +461,6 @@ export default defineComponent({
       getHistogramQueryData,
       generateHistogramSkeleton,
       fnParsedSQL,
-      addOrderByToQuery,
       getRegionInfo,
       getStreamList,
       getFunctions,
