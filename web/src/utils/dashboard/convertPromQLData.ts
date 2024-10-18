@@ -422,7 +422,6 @@ export const convertPromQLData = async (
                     chartMax,
                   ),
                 },
-                // colorBy: "data",
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
