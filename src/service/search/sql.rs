@@ -24,7 +24,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
-    ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -280,6 +280,9 @@ fn generate_user_defined_schema(
     if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
         fields.insert(cfg.common.column_all.to_string());
     }
+    if !fields.contains(ID_COL_NAME) {
+        fields.insert(ID_COL_NAME.to_string());
+    }
     let new_fields = fields
         .iter()
         .filter_map(|name| schema.field_with_name(name).cloned())
@@ -303,7 +306,12 @@ fn generate_schema_fields(
         columns.insert(get_config().common.column_timestamp.clone());
     }
 
-    // 2. add field from full text search
+    // 2. check _o2_id
+    if !columns.contains(ID_COL_NAME) {
+        columns.insert(ID_COL_NAME.to_string());
+    }
+
+    // 3. add field from full text search
     if has_match_all {
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -315,16 +323,12 @@ fn generate_schema_fields(
         }
     }
 
-    // 3. generate fields
+    // 4. generate fields
     let mut fields = Vec::with_capacity(columns.len());
     for column in columns {
         if let Some(field) = schema.field_with_name(&column) {
             fields.push(field.clone());
         }
-    }
-    // check _o2_id
-    if !fields.contains(&ID_COL_NAME.to_string()) && schema.field_with_name(ID_COL_NAME).is_ok() {
-        fields.push(ID_COL_NAME.to_string());
     }
     fields
 }
