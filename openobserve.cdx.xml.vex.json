@@ -1,0 +1,82 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://openvex.dev/docs/public/vex-94f9b4050a0c62053f8b8afe512a3a9f54e9aa041f2f15d6485f54580353d8cd",
+  "author": "Unknown Author",
+  "timestamp": "2024-10-04T15:26:15.091671+02:00",
+  "last_updated": "2024-10-04T15:26:15.242077+02:00",
+  "version": 6,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2021-38187"
+      },
+      "timestamp": "2024-10-04T15:26:15.091672+02:00",
+      "products": [
+        {
+          "@id": "pkg:cargo/anymap@1.0.0-beta.2"
+        }
+      ],
+      "status": "under_investigation"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2023-49092"
+      },
+      "timestamp": "2024-10-04T15:26:15.132381+02:00",
+      "products": [
+        {
+          "@id": "pkg:cargo/rsa@0.9.6"
+        }
+      ],
+      "status": "under_investigation"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2024-32650"
+      },
+      "timestamp": "2024-10-04T15:26:15.161061+02:00",
+      "products": [
+        {
+          "@id": "pkg:cargo/rustls@0.21.10"
+        }
+      ],
+      "status": "under_investigation"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2024-32650"
+      },
+      "timestamp": "2024-10-04T15:26:15.189786+02:00",
+      "products": [
+        {
+          "@id": "pkg:cargo/rustls@0.22.3"
+        }
+      ],
+      "status": "under_investigation"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2024-32650"
+      },
+      "timestamp": "2024-10-04T15:26:15.216188+02:00",
+      "products": [
+        {
+          "@id": "pkg:cargo/rustls@0.23.4"
+        }
+      ],
+      "status": "under_investigation"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2024-41178"
+      },
+      "timestamp": "2024-10-04T15:26:15.242078+02:00",
+      "products": [
+        {
+          "@id": "pkg:cargo/object_store@0.9.1"
+        }
+      ],
+      "status": "under_investigation"
+    }
+  ]
+}
