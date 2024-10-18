@@ -605,7 +605,7 @@ export default defineComponent({
 
         searchObj.organizationIdentifier =
           store.state.selectedOrganization.identifier;
-        restoreUrlQueryParams();
+          restoreUrlQueryParams();
         if (searchObj.loading == false) {
           resetSearchObj();
           resetStreamData();

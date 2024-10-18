@@ -556,6 +556,18 @@ export default defineComponent({
       { deep: true }
     );
 
+    watch(
+      () => {
+        props.defaultType;
+      },
+      () => {
+        if (props.defaultType == "absolute") {
+          selectedType.value = "absolute";
+        }
+      },
+      { deep: true }
+    );
+
     const setRelativeDate = (period, value) => {
       selectedType.value = "relative";
       relativePeriod.value = period;
