@@ -65,7 +65,7 @@ pub struct TriggerData {
     pub error: Option<String>,
     pub success_response: Option<String>,
     pub is_partial: Option<bool>,
-    pub delay_in_seconds: Option<i64>,
+    pub delay_in_secs: Option<i64>,
     pub evaluation_took_in_secs: Option<f64>,
 }
 

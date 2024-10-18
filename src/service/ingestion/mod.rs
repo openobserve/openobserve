@@ -254,7 +254,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             error: None,
             success_response: None,
             is_partial: None,
-            delay_in_seconds: None,
+            delay_in_secs: None,
             evaluation_took_in_secs: None,
         };
         match alert.send_notification(val, now, None).await {

@@ -187,7 +187,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                         .unwrap(),
                 end_time: trigger.next_run_at,
                 retries: trigger.retries,
-                delay_in_seconds: Some(Duration::microseconds(delay).num_seconds()),
+                delay_in_secs: Some(Duration::microseconds(delay).num_seconds()),
                 error: None,
                 success_response: None,
                 is_partial: None,
@@ -242,7 +242,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         error: None,
         success_response: None,
         is_partial: None,
-        delay_in_seconds: Some(Duration::microseconds(processing_delay).num_seconds()),
+        delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
     };
 
@@ -614,7 +614,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         error: None,
         success_response: None,
         is_partial: None,
-        delay_in_seconds: None,
+        delay_in_secs: None,
         evaluation_took_in_secs: None,
     };
 
@@ -826,7 +826,7 @@ async fn handle_derived_stream_triggers(
         error: None,
         success_response: None,
         is_partial: None,
-        delay_in_seconds: None,
+        delay_in_secs: None,
         evaluation_took_in_secs: None,
     };
 
