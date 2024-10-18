@@ -155,8 +155,9 @@ async fn update_settings(
     stream_settings: web::Json<UpdateStreamSettings>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
     let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_stream_name {
+    if !cfg.common.skip_formatting_stream_name {
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -194,30 +195,40 @@ async fn update_settings(
 
     // sync the data retention to index stream
     if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
-        let index_stream_name = format!("{}_{}", stream_name, stream_type);
-        let index_stream_settings = UpdateStreamSettings {
-            data_retention: stream_settings.data_retention,
-            ..Default::default()
-        };
-        if let Err(e) = stream::update_stream_settings(
-            &org_id,
-            &index_stream_name,
-            StreamType::Index,
-            index_stream_settings,
-        )
-        .await
+        let index_stream_name =
+            if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
+                stream_name.to_string()
+            } else {
+                format!("{}_{}", stream_name, stream_type)
+            };
+        if infra::schema::get(&org_id, &index_stream_name, StreamType::Index)
+            .await
+            .is_ok()
         {
-            log::error!(
-                "Failed to sync data retention settings to index stream {}: {}",
-                index_stream_name,
-                e
-            );
-        } else {
-            log::info!(
-                "Data retention settings for {} synced to index stream {}",
-                stream_name,
-                index_stream_name
-            );
+            let index_stream_settings = UpdateStreamSettings {
+                data_retention: stream_settings.data_retention,
+                ..Default::default()
+            };
+            if let Err(e) = stream::update_stream_settings(
+                &org_id,
+                &index_stream_name,
+                StreamType::Index,
+                index_stream_settings,
+            )
+            .await
+            {
+                log::error!(
+                    "Failed to sync data retention settings to index stream {}: {}",
+                    index_stream_name,
+                    e
+                );
+            } else {
+                log::debug!(
+                    "Data retention settings for {} synced to index stream {}",
+                    stream_name,
+                    index_stream_name
+                );
+            }
         }
     }
 
