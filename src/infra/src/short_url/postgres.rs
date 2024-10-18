@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::Row;
 
 use crate::{
@@ -46,8 +46,8 @@ impl ShortUrl for PostgresShortUrl {
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 short_id VARCHAR(32) NOT NULL,
-                original_url VARCHAR(2048) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                original_url TEXT NOT NULL,
+                created_ts BIGINT NOT NULL
             );
             "#;
         sqlx::query(query).execute(&pool).await?;
@@ -58,10 +58,10 @@ impl ShortUrl for PostgresShortUrl {
     async fn create_table_index(&self) -> Result<()> {
         create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
         create_index(
-            "short_urls_created_at_idx",
+            "short_urls_created_ts_idx",
             "short_urls",
             false,
-            &["created_at"],
+            &["created_ts"],
         )
         .await?;
         Ok(())
@@ -70,10 +70,14 @@ impl ShortUrl for PostgresShortUrl {
     /// Add a new entry to the short_urls table
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"INSERT INTO short_urls (short_id, original_url) VALUES ($1, $2);"#;
+        let created_ts = Utc::now().timestamp_micros();
+
+        let query =
+            r#"INSERT INTO short_urls (short_id, original_url, created_ts) VALUES ($1, $2, $3);"#;
         let result = sqlx::query(query)
             .bind(short_id)
             .bind(original_url)
+            .bind(created_ts)
             .execute(&pool)
             .await;
 
@@ -109,7 +113,7 @@ impl ShortUrl for PostgresShortUrl {
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
         let mut query =
-            r#"SELECT short_id, original_url FROM short_urls ORDER BY id DESC"#.to_string();
+            r#"SELECT short_id, original_url FROM short_urls ORDER BY created_ts DESC"#.to_string();
 
         if limit.is_some() {
             query.push_str(" LIMIT $1");
@@ -170,16 +174,12 @@ impl ShortUrl for PostgresShortUrl {
         self.len().await == 0
     }
 
-    async fn get_expired(
-        &self,
-        expired_before: DateTime<Utc>,
-        limit: Option<i64>,
-    ) -> Result<Vec<String>> {
+    async fn get_expired(&self, expired_before: i64, limit: Option<i64>) -> Result<Vec<String>> {
         let pool = CLIENT.clone();
 
         let mut query = r#"
             SELECT short_id FROM short_urls
-            WHERE created_at < $1
+            WHERE created_ts < $1
             "#
         .to_string();
 
