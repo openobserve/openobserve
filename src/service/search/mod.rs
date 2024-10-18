@@ -551,7 +551,8 @@ pub async fn search_partition(
     let max_query_range = stream_settings.max_query_range * 1000 * 1000 * 60 * 60;
 
     // data retention in seconds
-    let data_retention = stream_settings.data_retention * 24 * 60 * 60;
+
+    let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
 
     // data duration in seconds
     let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
@@ -567,6 +568,9 @@ pub async fn search_partition(
 
     let (records, original_size, compressed_size, files_len) = if use_stream_stats_for_partition {
         let stats = stats::get_stream_stats(org_id, &meta.stream_name, stream_type);
+        let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+        let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+        data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
         (
             (stats.doc_num as i64 * query_duration) / data_retention,
             (stats.storage_size as i64 * query_duration) / data_retention,
