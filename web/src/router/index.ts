@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -71,10 +71,20 @@ export default function (store: any) {
         to.path != "/web/cb" &&
         sessionUserInfo === null
       ) {
-        if (to.path !== "/logout" &&
+        if (
+          to.path !== "/logout" &&
           to.path !== "/cb" &&
-          to.path != "/web/cb") {
-          window.sessionStorage.setItem("redirectURI", window.location.href);
+          to.path != "/web/cb"
+        ) {
+          // if query params contains redirect_url, store that URL in session storage
+          // else store the current URL in session storage
+          // this conditions added specifically for short URL feature where user will be redirected to backend API endpoint
+          // if user is not logged in, then user will be redirected to login page and after successful login, user will be redirected to the short URL
+          if (Object.hasOwn(to.query, "short_url")) {
+            window.sessionStorage.setItem("redirectURI", to.query.short_url);
+          } else {
+            window.sessionStorage.setItem("redirectURI", window.location.href);
+          }
         }
         next({ path: "/login" });
       } else {

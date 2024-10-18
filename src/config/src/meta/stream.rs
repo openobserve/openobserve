@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -57,7 +57,7 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    pub fn create_inverted_index(&self) -> bool {
+    pub fn is_basic_type(&self) -> bool {
         matches!(
             *self,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces

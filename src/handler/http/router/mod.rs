@@ -35,7 +35,9 @@ use {
     actix_web::{web::BytesMut, HttpMessage},
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
-    o2_enterprise::enterprise::common::{auditor::AuditMessage, infra::config::O2_CONFIG},
+    o2_enterprise::enterprise::common::{
+        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+    },
 };
 
 use super::{
@@ -72,7 +74,7 @@ async fn audit_middleware(
     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
-    if O2_CONFIG.common.audit_enabled
+    if get_o2_config().common.audit_enabled
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
         let query_params = req.query_string().to_string();
@@ -206,7 +208,9 @@ async fn proxy(
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(status::healthz).service(status::schedulez);
+    cfg.service(status::healthz)
+        .service(status::healthz_head)
+        .service(status::schedulez);
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -224,15 +228,6 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .service(status::cache_status)
             .service(status::enable_node)
             .service(status::flush_node),
-    );
-
-    cfg.service(
-        web::scope("/short")
-            .wrap(HttpAuthentication::with_fn(
-                super::auth::validator::validate_short_or_redirect,
-            ))
-            .wrap(cors.clone())
-            .service(short_url::retrieve),
     );
 
     if get_config().common.swagger_enabled {
@@ -322,9 +317,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     #[cfg(feature = "enterprise")]
     let server = format!(
         "{}-{}",
-        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .super_cluster
-            .region,
+        get_o2_config().super_cluster.region,
         get_config().common.instance_name_short
     );
     #[cfg(not(feature = "enterprise"))]
@@ -497,7 +490,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
             .service(stream::delete_stream_cache)
-            .service(short_url::shorten),
+            .service(short_url::shorten)
+            .service(short_url::retrieve),
     );
 }
 
