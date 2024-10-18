@@ -1012,12 +1012,6 @@ pub struct Limit {
     pub upper_bound_for_max_ts: i64,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
-    #[env_config(
-        name = "ZO_PIPELINE_NODE_BUFFER_SIZE",
-        default = 1024,
-        help = "buffer for upper bound in mins"
-    )]
-    pub pipeline_node_buffer_size: usize,
 }
 
 #[derive(EnvConfig)]

@@ -304,7 +304,7 @@ async fn update_cache(
                             )),
                         );
                     } else {
-                        match PipelineExecBatch::new(&pipeline).await {
+                        match PipelineExecBatch::new(pipeline).await {
                             Err(e) => {
                                 log::error!(
                                     "[Pipeline] {}/{}/{}: Error converting to PipelineExecBatch: {}",

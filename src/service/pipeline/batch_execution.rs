@@ -17,7 +17,6 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
 use config::{
-    get_config,
     meta::{
         function::VRLResultResolver,
         pipeline::{components::NodeData, Pipeline},
@@ -82,24 +81,25 @@ impl PipelineExecBatch {
         &mut self,
         org_id: &str,
         records: Vec<Value>,
-    ) -> Result<HashMap<StreamParams, (usize, Value)>> {
-        let cfg = get_config();
+    ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
+        let batch_size = records.len();
+        log::debug!("[Pipeline]: process batch of size {}", batch_size);
+
         let (result_sender, mut result_receiver) =
-            channel::<(usize, StreamParams, Value)>(cfg.limit.pipeline_node_buffer_size);
+            channel::<(usize, StreamParams, Value)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
 
         for node_id in &self.sorted_nodes {
-            let (sender, receiver) =
-                channel::<(usize, Value, bool)>(cfg.limit.pipeline_node_buffer_size);
+            let (sender, receiver) = channel::<(usize, Value, bool)>(batch_size);
             node_senders.insert(node_id.to_string(), sender);
             node_receivers.insert(node_id.to_string(), receiver);
         }
 
         // Spawn tasks for each node
         let mut node_tasks = Vec::new();
-        for node_id in &self.sorted_nodes {
+        for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
             let org_id_cp = org_id.to_string();
             let node = self.node_map.get(node_id).unwrap().clone();
             let node_receiver = node_receivers.remove(node_id).unwrap();
@@ -113,6 +113,7 @@ impl PipelineExecBatch {
 
             let task = tokio::spawn(async move {
                 process_node(
+                    idx,
                     org_id_cp,
                     node,
                     node_receiver,
@@ -125,6 +126,22 @@ impl PipelineExecBatch {
             node_tasks.push(task);
         }
 
+        let result_task = tokio::spawn(async move {
+            // Collect results
+            log::debug!("[Pipeline]: starts result collecting job");
+            let mut count: usize = 0;
+            let mut results = HashMap::new();
+            while let Some((idx, stream_params, record)) = result_receiver.recv().await {
+                results
+                    .entry(stream_params)
+                    .or_insert(Vec::new())
+                    .push((idx, record));
+                count += 1;
+            }
+            log::debug!("[Pipeline]: collected {count} records");
+            results
+        });
+
         // Send records to the source node to begin processing
         let source_sender = node_senders.remove(&self.source_node_id).unwrap();
         for (idx, record) in records.into_iter().enumerate() {
@@ -135,18 +152,20 @@ impl PipelineExecBatch {
                 break;
             }
         }
-        drop(source_sender); // Close the source channel
-
-        // Collect results
-        let mut results = HashMap::new();
-        while let Some((idx, stream_params, record)) = result_receiver.recv().await {
-            results.insert(stream_params, (idx, record));
-        }
+        drop(source_sender);
+        drop(result_sender);
+        drop(node_senders);
+        log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!("[Pipeline] node processing jobs failed: {}", e);
         }
+
+        let results = result_task.await.map_err(|e| {
+            log::error!("[Pipeline] result collecting job failed: {}", e);
+            anyhow!("[Pipeline] result collecting job failed: {}", e)
+        })?;
 
         Ok(results)
     }
@@ -177,6 +196,7 @@ impl PipelineExecBatch {
 }
 
 async fn process_node(
+    node_id: usize,
     org_id: String,
     node: ExecutableNode,
     mut receiver: Receiver<(usize, Value, bool)>,
@@ -185,18 +205,17 @@ async fn process_node(
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
 ) -> Result<()> {
     let cfg = config::get_config();
+    let mut count: usize = 0;
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
+                log::debug!("[Node-{node_id}]: Leaf node starts processing");
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
-                while let Some((idx, mut record, flattened)) = receiver.recv().await {
-                    if !flattened {
-                        record =
-                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
-                                .map_err(|e| anyhow!("LeafNode error with flattening: {}", e))?;
-                    }
+                while let Some((idx, mut record, _)) = receiver.recv().await {
+                    record = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
+                        .map_err(|e| anyhow!("LeafNode error with flattening: {}", e))?;
                     if let Err(send_err) = result_sender
                         .send((idx, stream_params.clone(), record))
                         .await
@@ -206,18 +225,21 @@ async fn process_node(
                         );
                         break;
                     }
+                    count += 1;
                 }
-                drop(result_sender);
-                log::debug!("Leaf StreamNode done processing");
+                log::debug!("[Node-{node_id}]: leaf node done processing {count} records");
             } else {
+                log::debug!("[Node-{node_id}]: source node starts processing");
                 // source stream node: send received record to all its children
                 while let Some(item) = receiver.recv().await {
                     send_to_children(&mut child_senders, item, "StreamNode").await;
+                    count += 1;
                 }
-                log::debug!("Source StreamNode done processing");
+                log::debug!("[Node-{node_id}]: source node done processing {count} records");
             }
         }
         NodeData::Condition(condition_params) => {
+            log::debug!("[Node-{node_id}]: cond node starts processing");
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 // value must be flattened before condition params can take effect
                 if !flattened {
@@ -231,32 +253,42 @@ async fn process_node(
                     .iter()
                     .all(|cond| cond.evaluate(record.as_object().unwrap()))
                 {
+                    log::debug!(
+                        "[Pipeline::CondNode]: processed 1 item and sending to its children"
+                    );
                     send_to_children(&mut child_senders, (idx, record, flattened), "QueryNode")
                         .await;
+                    count += 1;
                 }
             }
-            log::debug!("ConditionNode done processing");
+            log::debug!("[Node-{node_id}]: cond node done processing {count} records");
         }
         NodeData::Function(func_params) => {
+            log::debug!("[Node-{node_id}]: func node starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
-            let vrl_runtime = vrl_runtime.unwrap();
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
-                if func_params.after_flatten && !flattened {
-                    record = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
-                        .map_err(|e| anyhow!("FunctionNode error with flattening: {}", e))?;
-                    flattened = true;
+                if let Some(vrl_runtime) = &vrl_runtime {
+                    if func_params.after_flatten && !flattened {
+                        record =
+                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
+                                .map_err(|e| {
+                                    anyhow!("FunctionNode error with flattening: {}", e)
+                                })?;
+                        flattened = true;
+                    }
+                    record = apply_vrl_fn(
+                        &mut runtime,
+                        vrl_runtime,
+                        &record,
+                        &org_id,
+                        &["pipeline".to_string()],
+                    );
                 }
-                record = apply_vrl_fn(
-                    &mut runtime,
-                    &vrl_runtime,
-                    &record,
-                    &org_id,
-                    &["pipeline".to_string()],
-                );
                 send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
                     .await;
+                count += 1;
             }
-            log::debug!("FunctionNode done processing");
+            log::debug!("[Node-{node_id}]: func node done processing {count} records");
         }
         NodeData::Query(_) => {
             // source node for Scheduled pipeline. Directly send to children nodes
@@ -265,7 +297,6 @@ async fn process_node(
             }
         }
     }
-    drop(child_senders);
 
     Ok(())
 }
