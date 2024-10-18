@@ -46,6 +46,10 @@ const emit = defineEmits(["delete:node"]);
 const { pipelineObj, deletePipelineNode,onDragStart,onDrop } = useDragAndDrop();
 const menu = ref(false)
 
+const hanldeMouseOver = () => {
+  console.log("mouse over")
+}
+
 
 const onFunctionClick = (data,event,id) =>{
   console.log(data,"data")
@@ -183,8 +187,10 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
       "
+      @mouseover="menu = true"
+      @mouseleave="menu = false"
     >
-      <q-menu  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+      <q-menu      @mouseover="menu = true" @mouseleave="menu = false"  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
     <q-list >
     
       <q-item clickable @click="(event) => onFunctionClick(data, event,id)">
@@ -284,9 +290,11 @@ function getIcon(data, ioType) {
         padding: 5px 2px;
 
       "
+       @mouseover="menu = true"
+      @mouseleave="menu = false"
     >
 
-       <q-menu v-if="io_type == 'input'"  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+       <q-menu v-if="io_type == 'input'" @mouseover="menu = true" @mouseleave="menu = false"   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
     <q-list >
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
@@ -381,8 +389,10 @@ function getIcon(data, ioType) {
         padding: 5px 2px;
 
       "
+       @mouseover="menu = true"
+      @mouseleave="menu = false"
     >
-    <q-menu  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-menu  v-model="menu" @mouseover="menu = true" @mouseleave="menu = false"  name="myMenu" class="menu-list" anchor="top right" self="top left">
     <q-list >
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
@@ -474,8 +484,10 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
       "
+       @mouseover="menu = true"
+      @mouseleave="menu = false"
     >
-    <q-menu   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-menu   v-model="menu" @mouseover="menu = true" @mouseleave="menu = false"  name="myMenu" class="menu-list" anchor="top right" self="top left">
     <q-list >
 
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
