@@ -214,6 +214,11 @@ const defaultObject = {
   },
 };
 
+// TODO OK:
+// useStreamManagement for stream-related functions
+// useQueryProcessing for query-related functions
+// useDataVisualization for histogram and data display functions
+
 const searchObj = reactive(Object.assign({}, defaultObject));
 const searchObjDebug = reactive({
   queryDataStartTime: 0,
