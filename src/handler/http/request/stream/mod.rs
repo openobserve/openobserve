@@ -187,13 +187,33 @@ async fn update_settings(
     };
 
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    stream::update_stream_settings(
-        &org_id,
-        &stream_name,
-        stream_type,
-        stream_settings.into_inner(),
-    )
-    .await
+    let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
+    let main_stream_res =
+        stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
+            .await?;
+
+    // sync the data retention to index stream
+    if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
+        let index_stream_name = format!("{}_{}", stream_name, stream_type);
+        let index_stream_settings = UpdateStreamSettings {
+            data_retention: stream_settings.data_retention,
+            ..Default::default()
+        };
+        stream::update_stream_settings(
+            &org_id,
+            &index_stream_name,
+            StreamType::Index,
+            index_stream_settings,
+        )
+        .await?;
+        log::info!(
+            "Data retention settings for {} synced to index stream {}",
+            stream_name,
+            index_stream_name
+        );
+    }
+
+    Ok(main_stream_res)
 }
 
 /// DeleteStreamFields
