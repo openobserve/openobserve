@@ -494,6 +494,8 @@ pub struct UpdateStreamSettings {
     pub max_query_range: Option<i64>,
     #[serde(default)]
     pub store_original_data: Option<bool>,
+    #[serde(default)]
+    pub approx_partition: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -546,6 +548,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
+        state.serialize_field("approx_partition", &self.approx_partition)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
