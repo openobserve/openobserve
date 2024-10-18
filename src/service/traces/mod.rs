@@ -650,7 +650,8 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Traces.to_string(), stream_name).await;
+    let writer =
+        ingester::get_writer(0, org_id, &StreamType::Traces.to_string(), stream_name).await;
     let req_stats = write_file(&writer, stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

@@ -298,7 +298,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
 
         let writer =
-            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
         // if let Err(e) = writer.sync().await {
         //     log::error!("ingestion error while syncing writer: {}", e);

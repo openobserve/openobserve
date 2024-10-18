@@ -260,6 +260,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs(
+            0,
             org_id,
             &routed_stream_name,
             &mut status,
