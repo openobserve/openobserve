@@ -138,14 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div class="row flex items-center q-pb-xs q-mt-lg">
-            <q-toggle
+              <q-toggle
                 data-test="log-stream-use_approx-toggle-btn"
                 v-model="approxPartition"
                 :label="t('logStream.approxPartition')"
                 @click="formDirtyFlag = true"
-        />
-           </div>
-          
+              />
+            </div>
           </template>
 
           <template
@@ -177,23 +176,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <q-separator class="q-mt-lg q-mb-lg" />
 
-          <div class="title flex tw-justify-between items-center" data-test="schema-log-stream-mapping-title-text">
-           <div>
-            {{ t("logStream.mapping") }}
-            <label
-              v-show="indexData.defaultFts"
-              class="warning-msg"
-              style="font-weight: normal"
-              >- Using default fts keys, as no fts keys are set for
-              stream.</label
-            >
-           </div>
+          <div
+            class="title flex tw-justify-between items-center"
+            data-test="schema-log-stream-mapping-title-text"
+          >
+            <div>
+              {{ t("logStream.mapping") }}
+              <label
+                v-show="indexData.defaultFts"
+                class="warning-msg"
+                style="font-weight: normal"
+                >- Using default fts keys, as no fts keys are set for
+                stream.</label
+              >
+            </div>
             <q-toggle
-                data-test="log-stream-store-original-data-toggle-btn"
-                v-model="storeOriginalData"
-                :label="t('logStream.storeOriginalData')"
-                @click="formDirtyFlag = true"
-        />
+              data-test="log-stream-store-original-data-toggle-btn"
+              v-model="storeOriginalData"
+              :label="t('logStream.storeOriginalData')"
+              @click="formDirtyFlag = true"
+            />
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -653,8 +655,9 @@ export default defineComponent({
           store.state.zoConfig.data_retention_days;
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
-      storeOriginalData.value = streamResponse.settings.store_original_data;
-      approxPartition.value = streamResponse.settings.approx_partition;
+      storeOriginalData.value =
+        streamResponse.settings.store_original_data || false;
+      approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -699,7 +702,6 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
-
           setSchema(streamResponse);
           loadingState.value = false;
           dismiss();
@@ -737,8 +739,8 @@ export default defineComponent({
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
-      settings["store_original_data"] = storeOriginalData.value; 
-      settings["approx_partition"] = approxPartition.value; 
+      settings["store_original_data"] = storeOriginalData.value;
+      settings["approx_partition"] = approxPartition.value;
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
