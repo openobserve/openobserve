@@ -55,6 +55,7 @@ impl LogsService for LogsServer {
         };
 
         match crate::service::logs::otlp_grpc::handle_grpc_request(
+            0,
             org_id.unwrap().to_str().unwrap(),
             in_req,
             true,
