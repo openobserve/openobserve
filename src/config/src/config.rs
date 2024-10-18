@@ -299,7 +299,7 @@ static SNS_CLIENT: tokio::sync::OnceCell<aws_sdk_sns::Client> = tokio::sync::Onc
 
 async fn init_sns_client() -> aws_sdk_sns::Client {
     let cfg = get_config();
-    let shared_config = aws_config::load_from_env().await;
+    let shared_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
 
     let sns_config = aws_sdk_sns::config::Builder::from(&shared_config)
         .endpoint_url(cfg.sns.endpoint.clone())
@@ -1836,12 +1836,13 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // Validate endpoint URL if provided
-    if !cfg.sns.endpoint.is_empty() {
-        if !cfg.sns.endpoint.starts_with("http://") && !cfg.sns.endpoint.starts_with("https://") {
-            return Err(anyhow::anyhow!(
-                "Invalid SNS endpoint URL. It must start with http:// or https://"
-            ));
-        }
+    if !cfg.sns.endpoint.is_empty()
+        && !cfg.sns.endpoint.starts_with("http://")
+        && !cfg.sns.endpoint.starts_with("https://")
+    {
+        return Err(anyhow::anyhow!(
+            "Invalid SNS endpoint URL. It must start with http:// or https://"
+        ));
     }
 
     // Validate timeouts

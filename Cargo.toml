@@ -67,6 +67,7 @@ argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 awc = "3.5"
+aws-sdk-sns.workspace = true
 base64.workspace = true
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
@@ -178,7 +179,6 @@ ingester.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-aws-sdk-sns.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -220,6 +220,8 @@ argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"
 async-walkdir = "1.0.0"
+aws-config = "1.5.8"
+aws-sdk-sns = "1.47.0"
 base64 = "0.21"
 bitvec = "1.0"
 bytes = "1.4"
@@ -316,5 +318,3 @@ url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 zstd = "0.13"
-aws-config = { version= "1.5.5", features = ["behavior-version-latest"] }
-aws-sdk-sns = "1.40.0"

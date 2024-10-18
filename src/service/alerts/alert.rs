@@ -552,7 +552,7 @@ pub async fn send_email_notification(
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
-        Ok(resp) => Ok(format!("sent response code: {}", resp.code())),
+        Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
 }
@@ -561,7 +561,7 @@ pub async fn send_sns_notification(
     alert_name: &str,
     dest: &DestinationWithTemplate,
     msg: String,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let mut message_attributes = HashMap::new();
     message_attributes.insert(
         "AlertName".to_string(),
@@ -572,8 +572,7 @@ pub async fn send_sns_notification(
     );
 
     let sns_client = config::get_sns_client().await;
-
-    sns_client
+    let ret = sns_client
         .publish()
         .topic_arn(
             dest.sns_topic_arn
@@ -583,9 +582,15 @@ pub async fn send_sns_notification(
         .message(msg)
         .set_message_attributes(Some(message_attributes))
         .send()
-        .await?;
-
-    Ok(())
+        .await;
+    match ret {
+        Ok(resp) => Ok(format!(
+            "sent SNS response message_id: {:?}, sequence_number: {:?}",
+            resp.message_id(),
+            resp.sequence_number()
+        )),
+        Err(e) => Err(anyhow::anyhow!("Error sending SNS notification: {e}")),
+    }
 }
 
 fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
