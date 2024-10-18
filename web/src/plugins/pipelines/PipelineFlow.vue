@@ -39,9 +39,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :max-zoom="4"
       @dragleave="onDragLeave"
       class="basic-flow"
-
+      
     >
 
+    <template #edge-button="buttonEdgeProps">
+      <EdgeWithButton
+        :id="buttonEdgeProps.id"
+        :source-x="buttonEdgeProps.sourceX"
+        :source-y="buttonEdgeProps.sourceY"
+        :target-x="buttonEdgeProps.targetX"
+        :target-y="buttonEdgeProps.targetY"
+        :source-position="buttonEdgeProps.sourcePosition"
+        :target-position="buttonEdgeProps.targetPosition"
+        :marker-end="buttonEdgeProps.markerEnd"
+        :style="buttonEdgeProps.style"
+      />
+    </template>
       <DropzoneBackground
         :style="{
           backgroundColor: isDragOver ? '#e7f3ff' : 'transparent',
@@ -80,6 +93,7 @@ import { ControlButton, Controls } from '@vue-flow/controls'
 import CustomNode from "./CustomNode.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
+import EdgeWithButton from "./EdgeWithButton.vue";
 
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
@@ -91,7 +105,7 @@ import { useStore } from "vuex";
 const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton
+  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton
    },
   setup() {
     const {

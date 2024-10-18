@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
-import { useVueFlow  } from "@vue-flow/core";
+import { useVueFlow,MarkerType  } from "@vue-flow/core";
 import { watch, reactive ,computed , ref} from "vue";
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -75,6 +75,7 @@ const defaultObject = {
   functions: {},
   previousNodeOptions:<any>[],
   userSelectedNode:<any>{},
+  userClickedNode : <any>{},
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
@@ -99,6 +100,7 @@ export default function useDragAndDrop() {
   }
 
   function onDragStart(event:any, node:any) {
+ 
     if (event.dataTransfer) {
       event.dataTransfer.setData("application/vueflow", node.io_type);
       event.dataTransfer.effectAllowed = "move";
@@ -107,6 +109,7 @@ export default function useDragAndDrop() {
     pipelineObj.draggedNode = node;
     pipelineObj.isDragging = true;
     pipelineObj.currentSelectedNodeData = null;
+
 
     document.addEventListener("drop", onDragEnd);
   }
@@ -143,10 +146,10 @@ export default function useDragAndDrop() {
    *
    * @param {DragEvent} event
    */
-  function onDrop(event:any) {
+  function onDrop(event:any ,offSet:any = {x:0,y:0}) {
     const position = screenToFlowCoordinate({
-      x: event.clientX,
-      y: event.clientY,
+      x: event.clientX + offSet.x,
+      y: event.clientY + offSet.y,
     });
 
     const nodeId = getUUID();
@@ -242,8 +245,18 @@ export default function useDragAndDrop() {
       id: `e${connection.source}-${connection.target}`,
       source: connection.source,
       target: connection.target,
-      markerEnd: { type: 'arrowclosed' }, // Add arrow marker
+      
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,  // Increase arrow width
+        height: 20, // Increase arrow height
 
+      },
+      type: 'step',      
+      style:{
+        strokeWidth: 2,
+      },
+      animated:true,
 
 
     };
@@ -323,14 +336,70 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode:any) {
+    if(pipelineObj.userClickedNode && pipelineObj.currentSelectedNodeData.id && !pipelineObj.userSelectedNode?.id ){
+
+
+
+      const newEdge = {
+        id: `e${pipelineObj.userClickedNode}-${pipelineObj.currentSelectedNodeData.id}`,
+        source:  pipelineObj.userClickedNode,
+        target:pipelineObj.currentSelectedNodeData.id,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 20,  // Increase arrow width
+          height: 20, // Increase arrow height
+        },
+        type: 'step',
+        
+        style:{
+          strokeWidth: 2,
+        },
+        animated:true,
+
+
+      };
+      //not required because we create new nodes every time we click on shortcuts
+      // const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
+      // if(isCycle){
+      //   $q.notify({
+      //     message: "Adding this edge will create a cycle in the pipeline",
+      //     color: "negative",
+      //     position: "bottom",
+      //     timeout: 3000,
+        
+      // });
+      // return;
+      // }
+      pipelineObj.currentSelectedPipeline.edges = [
+        ...pipelineObj.currentSelectedPipeline.edges,
+        newEdge,
+      ];
+      pipelineObj.userClickedNode = {};
+    }
 
 if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
   const newEdge = {
     id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
     source:  pipelineObj.userSelectedNode.id,
     target:pipelineObj.currentSelectedNodeData.id,
-    markerEnd: { type: 'arrowclosed' },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,  // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+    type: 'step',
+    
+    style:{
+      strokeWidth: 2,
+    },
+    animated:true,
+
+
+
   };
+
+
+  
 
   const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
   if(isCycle){
@@ -391,9 +460,9 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
 
     
     pipelineObj.isEditNode = false;
-    pipelineObj.currentSelectedNodeData = dialogObj;
+    // pipelineObj.currentSelectedNodeData = dialogObj;
     pipelineObj.userSelectedNode = {};
-
+    console.log(pipelineObj.currentSelectedNodeData,"pipelineObj.currentSelectedPipeline")
   }
 
 
@@ -543,6 +612,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
   
 
   function editNode(updatedNode:any) {
+    console.log(updateNode,"update Node")
     const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
       (node:any) => node.id === updatedNode.id,
     );
@@ -570,7 +640,6 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
   };
 
   function deletePipelineNode(nodeId:any) {
-
     pipelineObj.currentSelectedPipeline.nodes =
       pipelineObj.currentSelectedPipeline.nodes.filter(
         (node:any) => node.id !== nodeId,
@@ -587,14 +656,11 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
       );
     pipelineObj.currentSelectedNodeData = null;
     hasInputNodeFn();
-    console.log(pipelineObj.currentSelectedPipeline,"current")
-    console.log(pipelineObj.pipelineWithoutChange,"past")
 
     const arePipelinesEqualById = comparePipelinesById(
       pipelineObj.currentSelectedPipeline,
       pipelineObj.pipelineWithoutChange
     );
-    console.log(pipelineObj.edgesChange,"edges")
     if(arePipelinesEqualById == true && pipelineObj.edgesChange == false && pipelineObj.isEditPipeline == true){
       pipelineObj.dirtyFlag = false;
     }
@@ -602,7 +668,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
       pipelineObj.dirtyFlag = true;
     }
     
-    
+    console.log(pipelineObj.currentSelectedPipeline,"edges")
   }
 
   const resetPipelineData = () => {

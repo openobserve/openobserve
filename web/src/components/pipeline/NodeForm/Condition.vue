@@ -31,15 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-py-sm showLabelOnTop text-bold text-h7"
           data-test="add-alert-query-input-title"
         >
-          <real-time-alert
-            :columns="filteredColumns"
-            :conditions="streamRoute.conditions"
-            @field:add="addField"
-            @field:remove="removeField"
-            :enableNewValueMode="true" 
-          />
-
-      <div>
+        <div>
         <div class="previous-drop-down">
       <q-select
           color="input-border"
@@ -94,6 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
       </div>
   </div>
+          <real-time-alert
+            :columns="filteredColumns"
+            :conditions="streamRoute.conditions"
+            @field:add="addField"
+            @field:remove="removeField"
+            :enableNewValueMode="true" 
+          />
+
+   
         </div>
 
         <div
@@ -373,17 +374,20 @@ const getFields = async () => {
         inputStreamNode.data?.stream_type,
       );
     } else {
-      const filteredQuery : any = inputQueryNode?.data?.query_condition.sql
+      const filteredQuery: any = inputQueryNode?.data?.query_condition.sql
         .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
+        .filter((line: string) => line.length > 0 && !line.trim().startsWith("--")) // Only process non-empty lines
         .join("\n");
-      const parsedSql = parser.astify(filteredQuery);
-      if (parsedSql && parsedSql.from) {
-        const streamNames = parsedSql.from.map((item : any) => item.table);
-        for (const streamName of streamNames) {
-          await updateStreamFields(streamName, inputQueryNode?.data?.stream_type);
+        if(filteredQuery){
+          const parsedSql = parser.astify(filteredQuery);
+          if (parsedSql && parsedSql.from) {
+            const streamNames = parsedSql.from.map((item : any) => item.table);
+            for (const streamName of streamNames) {
+              await updateStreamFields(streamName, inputQueryNode?.data?.stream_type);
+            }
+          }
         }
-      }
+      
     }
   } catch (e) {
     console.error(e);
@@ -549,6 +553,6 @@ const validateSqlQuery = () => {
   min-height: 100%;
 }
 .previous-drop-down{
-  width: 400px;
+  width: 600px;
 }
 </style>
