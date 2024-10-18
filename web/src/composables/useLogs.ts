@@ -247,6 +247,8 @@ const searchAggData = reactive({
   hasAggregation: false,
 });
 
+const selectedStreamFieldType:any = {};
+
 let histogramResults: any = [];
 let histogramMappedData: any = [];
 const intervalMap: any = {
@@ -2704,6 +2706,7 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+            console.log("stream", stream)
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
@@ -4230,6 +4233,67 @@ const useLogs = () => {
     return selectedFields;
   };
 
+  const getFilterExpressionByFieldType = (
+    field: string,
+    field_value: string|number|boolean,
+    action: string,
+  ) => {
+    let operator = action == "include" ? "=" : "!=";
+    try {
+      let fieldTypeList: any = {};
+      let fieldType: string = "utf8";
+      searchObj.data.streamResults.list.forEach((stream: any) => {
+        if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+          if (
+            Object.hasOwn(stream, "schema") &&
+            !Object.hasOwn(selectedStreamFieldType, stream.name)
+          ) {
+            selectedStreamFieldType[stream.name] = {};
+            stream.schema.forEach((schema: any) => {
+              selectedStreamFieldType[stream.name][schema.name] = schema.type;
+            });
+            fieldTypeList = {
+              ...fieldTypeList,
+              ...selectedStreamFieldType[stream.name],
+            };
+          } else {
+            if (Object.hasOwn(selectedStreamFieldType, stream.name)) {
+              fieldTypeList = {
+                ...fieldTypeList,
+                ...selectedStreamFieldType[stream.name],
+              };
+            }
+          }
+        }
+      });
+
+      if (Object.hasOwn(fieldTypeList, field)) {
+        fieldType = fieldTypeList[field];
+      }
+
+      if (field_value == "null" || field_value == "NULL" || field_value == "") {
+        operator = action == "include" ? "is" : "is not";
+        field_value = "null";
+      }
+      let expression = field_value == "null" ? `${field} ${operator} ${field_value}` : `${field} ${operator} '${field_value}'`;
+
+      if (
+        fieldType.toLowerCase() == "int64" ||
+        fieldType.toLowerCase() == "float64"
+      ) {
+        expression = `${field} ${operator} ${field_value}`;
+      } else if (fieldType.toLowerCase() == "boolean") {
+        operator = action == "include" ? "is" : "is not";
+        expression = `${field} ${operator} ${field_value}`;
+      }
+
+      return expression;
+    } catch (e: any) {
+      console.log("Error while getting filter expression by field type", e);
+      return `${field} ${operator} '${field_value}'`;
+    }
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -4271,6 +4335,7 @@ const useLogs = () => {
     resetHistogramWithError,
     isNonAggregatedQuery,
     extractTimestamps,
+    getFilterExpressionByFieldType,
   };
 };
 

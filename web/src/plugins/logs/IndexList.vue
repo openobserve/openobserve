@@ -437,7 +437,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 size="6px"
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}='${value.key}'`
+                                    props.row.name,
+                                    value.key,
+                                    'include',
                                   )
                                 "
                                 title="Include Term"
@@ -452,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 size="6px"
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`
+                                    props.row.name,value.key, 'exclude',
                                   )
                                 "
                                 title="Exclude Term"
@@ -700,6 +702,7 @@ export default defineComponent({
       extractFields,
       validateFilterForMultiStream,
       reorderSelectedFields,
+      getFilterExpressionByFieldType,
     } = useLogs();
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -1009,9 +1012,18 @@ export default defineComponent({
       }
     };
 
-    const addSearchTerm = (term: string) => {
+    const addSearchTerm = (
+      field: string,
+      field_value: string | number | boolean,
+      action: string,
+    ) => {
       // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
+      const expression = getFilterExpressionByFieldType(
+        field,
+        field_value,
+        action,
+      );
+      searchObj.data.stream.addToFilter = expression;
     };
 
     // const onStreamChange = () => {
