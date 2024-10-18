@@ -232,10 +232,12 @@ impl ShortUrl for MysqlShortUrl {
 async fn add_created_ts_column() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
-    if let Err(e) =
-        sqlx::query(r#"ALTER TABLE short_urls ADD COLUMN created_ts BIGINT NOT NULL DEFAULT 0;"#)
-            .execute(&mut *tx)
-            .await
+    let now_ts = Utc::now().timestamp_micros();
+    if let Err(e) = sqlx::query(&format!(
+        "ALTER TABLE short_urls ADD COLUMN created_ts BIGINT NOT NULL DEFAULT {now_ts};"
+    ))
+    .execute(&mut *tx)
+    .await
     {
         if !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column
