@@ -33,6 +33,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
+    cache::stats,
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
@@ -544,23 +545,17 @@ pub async fn search_partition(
     let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let max_query_range = stream_settings.max_query_range * 1000 * 1000 * 60 * 60;
-    let files = cluster::get_file_list(
-        trace_id,
-        &meta,
-        stream_type,
-        partition_time_level,
-        &stream_settings.partition_keys,
-    )
-    .await;
 
-    let file_list_took = start.elapsed().as_millis() as usize;
-    log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
-        meta.meta.time_range,
-        files.len(),
-        file_list_took,
-    );
+    let use_stream_stats_for_partition = stream_settings.approx_partition;
+
+    let max_query_range = stream_settings.max_query_range * 1000 * 1000 * 60 * 60;
+
+    // data retention in seconds
+
+    let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+
+    // data duration in seconds
+    let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -571,19 +566,56 @@ pub async fn search_partition(
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
-    let (records, original_size, compressed_size) =
-        files
-            .iter()
-            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
-                (
-                    records + f.meta.records,
-                    original_size + f.meta.original_size,
-                    compressed_size + f.meta.compressed_size,
-                )
-            });
+    let (records, original_size, compressed_size, files_len) = if use_stream_stats_for_partition {
+        let stats = stats::get_stream_stats(org_id, &meta.stream_name, stream_type);
+        let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+        let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+        data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
+        (
+            (stats.doc_num as i64 * query_duration) / data_retention,
+            (stats.storage_size as i64 * query_duration) / data_retention,
+            (stats.compressed_size as i64 * query_duration) / data_retention,
+            ((stats.file_num * query_duration) / data_retention) as usize,
+        )
+    } else {
+        let files = cluster::get_file_list(
+            trace_id,
+            &meta,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
+        )
+        .await;
+
+        let file_list_took = start.elapsed().as_millis() as usize;
+        log::info!(
+            "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+            meta.meta.time_range,
+            files.len(),
+            file_list_took,
+        );
+
+        let (records, original_size, compressed_size) =
+            files
+                .iter()
+                .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
+                    (
+                        records + f.meta.records,
+                        original_size + f.meta.original_size,
+                        compressed_size + f.meta.compressed_size,
+                    )
+                });
+
+        (
+            records,
+            original_size,
+            compressed_size,
+            files.len() as usize,
+        )
+    };
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
-        file_num: files.len(),
+        file_num: files_len,
         records: records as usize,
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
