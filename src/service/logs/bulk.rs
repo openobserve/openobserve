@@ -48,6 +48,7 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
 pub async fn ingest(
+    thread_id: usize,
     org_id: &str,
     body: web::Bytes,
     user_email: &str,
@@ -368,6 +369,7 @@ pub async fn ingest(
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Bulk(bulk_res);
         let write_result = super::write_logs_by_stream(
+            thread_id,
             org_id,
             user_email,
             (started_at, &start),

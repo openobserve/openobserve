@@ -197,6 +197,7 @@ pub async fn save_enrichment_data(
 
     // write data to wal
     let writer = ingester::get_writer(
+        0,
         org_id,
         &StreamType::EnrichmentTables.to_string(),
         stream_name,
