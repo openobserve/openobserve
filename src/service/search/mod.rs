@@ -550,11 +550,11 @@ pub async fn search_partition(
 
     let max_query_range = stream_settings.max_query_range * 1000 * 1000 * 60 * 60;
 
-    // data retension in mins
-    let data_retention = stream_settings.data_retention * 24 * 60;
+    // data retention in seconds
+    let data_retention = stream_settings.data_retention * 24 * 60 * 60;
 
-    // data retension in mins
-    let query_duration = (req.end_time - req.start_time) / 1000 / 1000 / 60;
+    // data duration in seconds
+    let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
