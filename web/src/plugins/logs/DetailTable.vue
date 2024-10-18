@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="
-                              toggleIncludeSearchTerm(`${value}='${key}'`)
+                              toggleIncludeSearchTerm(value, key, "include")
                             "
                             ><q-btn
                               title="Add to search query"
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
                             @click="
-                              toggleExcludeSearchTerm(`${value}!='${key}'`)
+                              toggleExcludeSearchTerm(value, key, "exclude")
                             "
                             ><q-btn
                               title="Add to search query"
@@ -386,19 +386,21 @@ export default defineComponent({
   },
   methods: {
 
-    toggleIncludeSearchTerm(term: string) {
-      // if (flag == false) {
-      this.$emit("add:searchterm", term);
-      // } else {
-      //   this.$emit("remove:searchterm", term);
-      // }
+    toggleIncludeSearchTerm(field: string|number, field_value: string|number|boolean, action: string) {
+      const searchExpression = getFilterExpressionByFieldType(
+        field,
+        field_value,
+        action,
+      );
+      this.$emit("add:searchterm", searchExpression);
     },
-    toggleExcludeSearchTerm(term: string) {
-      // if (flag == false) {
-      this.$emit("add:searchterm", term);
-      // } else {
-      //   this.$emit("remove:searchterm", term);
-      // }
+    toggleExcludeSearchTerm(field: string|number, field_value: string|number|boolean, action: string) {
+      const searchExpression = getFilterExpressionByFieldType(
+        field,
+        field_value,
+        action,
+      );
+      this.$emit("add:searchterm", searchExpression);
     },
     searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
@@ -416,7 +418,7 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj } = useLogs();
+    const { searchObj, getFilterExpressionByFieldType } = useLogs();
     const $q = useQuasar();
     let multiStreamFields: any = ref([]);
 
