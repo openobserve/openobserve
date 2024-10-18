@@ -1025,13 +1025,9 @@ export default defineComponent({
 
       if (expression) {
         searchObj.data.stream.addToFilter = expression;
-      } else {
         console.error("Failed to generate filter expression");
       }
     };
-
-    // const onStreamChange = () => {
-    //   alert("onStreamChange")
     //   const query = searchObj.meta.sqlMode
     //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
     //     : "";

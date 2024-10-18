@@ -188,11 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="
                               toggleExcludeSearchTerm(value, key, 'exclude')
                             "
-                            ><q-btn
                               title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
                             >
                               <q-icon color="currentColor">
                                 <NotEqualIcon></NotEqualIcon>
