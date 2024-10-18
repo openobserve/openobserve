@@ -199,18 +199,26 @@ async fn update_settings(
             data_retention: stream_settings.data_retention,
             ..Default::default()
         };
-        stream::update_stream_settings(
+        if let Err(e) = stream::update_stream_settings(
             &org_id,
             &index_stream_name,
             StreamType::Index,
             index_stream_settings,
         )
-        .await?;
-        log::info!(
-            "Data retention settings for {} synced to index stream {}",
-            stream_name,
-            index_stream_name
-        );
+        .await
+        {
+            log::error!(
+                "Failed to sync data retention settings to index stream {}: {}",
+                index_stream_name,
+                e
+            );
+        } else {
+            log::info!(
+                "Data retention settings for {} synced to index stream {}",
+                stream_name,
+                index_stream_name
+            );
+        }
     }
 
     Ok(main_stream_res)
