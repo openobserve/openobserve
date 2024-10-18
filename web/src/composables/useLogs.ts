@@ -4256,6 +4256,7 @@ const useLogs = () => {
     reorderSelectedFields,
     resetHistogramWithError,
     isNonAggregatedQuery,
+    extractTimestamps,
   };
 };
 
