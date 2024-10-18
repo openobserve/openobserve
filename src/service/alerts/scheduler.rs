@@ -595,6 +595,8 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     }
 
     let triggered_at = trigger.start_time.unwrap_or_default();
+    let processing_delay = triggered_at - trigger.next_run_at;
+
     let mut trigger_data_stream = TriggerData {
         _timestamp: triggered_at,
         org: trigger.org.clone(),
@@ -614,7 +616,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         error: None,
         success_response: None,
         is_partial: None,
-        delay_in_secs: None,
+        delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
     };
 
