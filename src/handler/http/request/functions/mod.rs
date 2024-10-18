@@ -13,15 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-
-use crate::common::{
-    meta,
-    meta::functions::{StreamOrder, Transform},
-    utils::http::get_stream_type_from_request,
-};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use config::meta::function::Transform;
 
 /// CreateFunction
 #[utoipa::path(
@@ -152,129 +147,4 @@ pub async fn update_function(
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
     crate::service::functions::update_function(&org_id, name, transform).await
-}
-
-/// ListStreamFunctions
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Functions",
-    operation_id = "listStreamFunctions",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = StreamFunctionsList),
-    )
-)]
-#[get("/{org_id}/streams/{stream_name}/functions")]
-async fn list_stream_functions(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-    crate::service::functions::list_stream_functions(&org_id, stream_type, &stream_name).await
-}
-
-/// RemoveStreamFunction
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Functions",
-    operation_id = "removeStreamFunction",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-        ("name" = String, Path, description = "Function name"),
-    ),
-    responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[delete("/{org_id}/streams/{stream_name}/functions/{name}")]
-async fn delete_stream_function(
-    path: web::Path<(String, String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name, name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-    crate::service::functions::delete_stream_function(&org_id, stream_type, &stream_name, &name)
-        .await
-}
-
-/// ApplyFunctionToStream
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Functions",
-    operation_id = "applyFunctionToStream",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-        ("name" = String, Path, description = "Function name"),
-    ),
-    request_body(content = StreamOrder, description = "Function data", content_type = "application/json"),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[put("/{org_id}/streams/{stream_name}/functions/{name}")]
-pub async fn add_function_to_stream(
-    path: web::Path<(String, String, String)>,
-    stream_order: web::Json<StreamOrder>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name, name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-    crate::service::functions::add_function_to_stream(
-        &org_id,
-        stream_type,
-        &stream_name,
-        &name,
-        stream_order.into_inner(),
-    )
-    .await
 }
