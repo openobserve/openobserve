@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
+    ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -50,7 +51,6 @@ use sqlparser::{
 };
 
 use super::request::Request;
-use crate::common::meta::ingestion::ORIGINAL_DATA_COL_NAME;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -151,7 +151,8 @@ impl Sql {
         // 5. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
-            used_schemas = generate_select_star_schema(total_schemas);
+            let has_original_column = has_original_column(&column_visitor.columns);
+            used_schemas = generate_select_star_schema(total_schemas, has_original_column);
         } else {
             for (table_name, schema) in total_schemas.iter() {
                 let columns = match column_visitor.columns.get(table_name) {
@@ -230,13 +231,15 @@ impl std::fmt::Display for Sql {
 
 fn generate_select_star_schema(
     schemas: HashMap<String, Arc<SchemaCache>>,
+    has_original_column: HashMap<String, bool>,
 ) -> HashMap<String, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+        let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() {
+        if defined_schema_fields.is_empty() && !has_original_column {
             if schema.contains_field(ORIGINAL_DATA_COL_NAME) {
                 // skip selecting "_original" column if `SELECT * ...`
                 let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
@@ -313,6 +316,19 @@ fn generate_schema_fields(
         }
     }
     fields
+}
+
+// check if has original column in sql
+fn has_original_column(columns: &HashMap<String, HashSet<String>>) -> HashMap<String, bool> {
+    let mut has_original_column = HashMap::with_capacity(columns.len());
+    for (name, column) in columns.iter() {
+        if column.contains(ORIGINAL_DATA_COL_NAME) {
+            has_original_column.insert(name.clone(), true);
+        } else {
+            has_original_column.insert(name.clone(), false);
+        }
+    }
+    has_original_column
 }
 
 /// visit a sql to get all columns

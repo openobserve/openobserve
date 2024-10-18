@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -684,7 +684,7 @@ async fn merge_files(
     let buf = Bytes::from(buf);
     match storage::put(&new_file_key, buf).await {
         Ok(_) => {
-            if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
+            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
                 // generate inverted index RecordBatch
                 if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
                     new_schema.clone(),

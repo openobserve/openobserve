@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -836,7 +836,7 @@ async fn process_dest_template(
     };
 
     // Shorten the alert url
-    let alert_url = match short_url::shorten(&alert_url).await {
+    let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
         Ok(short_url) => short_url,
         Err(e) => {
             log::error!("Error shortening alert url: {e}");

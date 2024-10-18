@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -618,7 +618,7 @@ async fn generate_report(
     log::debug!("done with headless browser");
 
     // convert to short_url
-    let email_dashb_url = match short_url::shorten(&email_dashb_url).await {
+    let email_dashb_url = match short_url::shorten(org_id, &email_dashb_url).await {
         Ok(short_url) => short_url,
         Err(e) => {
             log::error!("Error shortening email dashboard url: {e}");

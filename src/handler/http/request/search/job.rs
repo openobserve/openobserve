@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use actix_web::{delete, get, put, web, HttpResponse};
 #[cfg(feature = "enterprise")]
 use {
     crate::common::meta::http::HttpResponse as MetaHttpResponse,
-    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 
 #[cfg(feature = "enterprise")]
@@ -87,7 +87,7 @@ async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<HttpResp
         if trace_id.is_empty() {
             continue;
         }
-        let ret = if O2_CONFIG.super_cluster.enabled {
+        let ret = if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::search::cancel_query(org_id, trace_id).await
         } else {
             crate::service::search::cancel_query(org_id, trace_id).await

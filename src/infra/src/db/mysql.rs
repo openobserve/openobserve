@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -61,15 +61,22 @@ async fn cache_indices() -> HashSet<DBIndex> {
         .inc();
     let var_name = r#"SELECT INDEX_NAME,TABLE_NAME FROM information_schema.statistics;"#;
     let sql = var_name;
-    let res = sqlx::query_as::<_, (String, String)>(sql)
+    // for some reason, mysql reports table_name as varbinary, hence we have to use Vec<u8>
+    let res = sqlx::query_as::<_, (String, Vec<u8>)>(sql)
         .fetch_all(&client)
         .await;
     match res {
         Ok(r) => r
             .into_iter()
-            .map(|(name, table)| DBIndex { name, table })
+            .map(|(name, table)| DBIndex {
+                name,
+                table: String::from_utf8_lossy(&table).into_owned(),
+            })
             .collect(),
-        Err(_) => HashSet::new(),
+        Err(e) => {
+            log::debug!("error in caching indices : {}", e);
+            HashSet::new()
+        }
     }
 }
 

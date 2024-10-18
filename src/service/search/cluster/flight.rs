@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ pub async fn search(
     sql: Arc<Sql>,
     mut req: Request,
     query: SearchQuery,
-) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
@@ -90,7 +90,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, 0));
+        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string()));
     }
 
     // 1. get file id list
@@ -221,7 +221,7 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if super::super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender, true)
         .await
         .is_err()
     {
@@ -289,7 +289,7 @@ pub async fn search(
     drop(_defer);
 
     // 9. get data from datafusion
-    let (data, mut scan_stats): (Vec<RecordBatch>, ScanStats) = match task {
+    let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
         Err(err) => Err(Error::Message(err.to_string())),
@@ -298,7 +298,14 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: search finished");
 
     scan_stats.format_to_mb();
-    Ok((data, scan_stats, took_wait, false, idx_took))
+    Ok((
+        data,
+        scan_stats,
+        took_wait,
+        !partial_err.is_empty(),
+        idx_took,
+        partial_err,
+    ))
 }
 
 #[tracing::instrument(name = "service:search:cluster:flight:run_datafusion", skip_all)]
@@ -309,7 +316,7 @@ pub async fn run_datafusion(
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<String, Vec<Vec<i64>>>,
     idx_file_list: Vec<FileKey>,
-) -> Result<(Vec<RecordBatch>, ScanStats)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
 
@@ -397,7 +404,7 @@ pub async fn run_datafusion(
         Err(e.into())
     } else {
         log::info!("[trace_id {trace_id}] flight->search: datafusion collect done");
-        ret.map(|data| (data, visit.scan_stats))
+        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,10 @@ use std::io::Error;
 use actix_web::{get, HttpResponse};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
-use {o2_enterprise::enterprise::common::infra::config::O2_CONFIG, std::io::ErrorKind};
+use {
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    std::io::ErrorKind,
+};
 
 /// ListClusters
 #[utoipa::path(
@@ -35,7 +38,7 @@ use {o2_enterprise::enterprise::common::infra::config::O2_CONFIG, std::io::Error
 #[get("/clusters")]
 pub async fn list_clusters() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    let clusters = if O2_CONFIG.super_cluster.enabled {
+    let clusters = if get_o2_config().super_cluster.enabled {
         let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list()
             .await
             .map_err(|e| Error::new(ErrorKind::Other, e))?;
