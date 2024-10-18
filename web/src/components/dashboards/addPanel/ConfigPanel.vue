@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.unit
             ? unitOptions.find(
-                (it) => it.value == dashboardPanelData.data.config.unit
+                (it) => it.value == dashboardPanelData.data.config.unit,
               )?.label
             : 'Default'
         }`"
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 1,
-                'min'
+                'min',
               )
             "
             :label="t('dashboard.minimum')"
@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 100,
-                'max'
+                'max',
               )
             "
             :label="t('dashboard.maximum')"
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             handleBlur(
               dashboardPanelData.data.config.map_symbol_style,
               2,
-              'size_fixed'
+              'size_fixed',
             )
           "
           :label="t('dashboard.fixedValue')"
@@ -678,7 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="
           ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
@@ -691,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-input
         v-if="
           ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
@@ -767,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config,
             1,
-            'weight_fixed'
+            'weight_fixed',
           )
         "
         :label="t('common.weight')"
@@ -898,7 +898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         :variablesData="variablesData"
@@ -1010,23 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="space"></div>
-    <ColorPaletteDropDown
-      v-if="
-        [
-          'area',
-          'area-stacked',
-          'bar',
-          'h-bar',
-          'line',
-          'scatter',
-          'stacked',
-          'h-stacked',
-          'pie',
-          'donut',
-          'gauge',
-        ].includes(dashboardPanelData.data.type)
-      "
-    />
+    <ColorPaletteDropDown v-if="showColorPalette" />
     <div class="space"></div>
   </div>
 </template>
@@ -1055,10 +1039,10 @@ export default defineComponent({
   setup(props) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
 
@@ -1311,8 +1295,8 @@ export default defineComponent({
             label: it.name,
             value: it.name,
           };
-        }
-      )
+        },
+      ),
     );
 
     const timeShifts = [];
@@ -1354,6 +1338,22 @@ export default defineComponent({
       ].config.time_shift.splice(index, 1);
     };
 
+    const showColorPalette = computed(() => {
+      return [
+        "area",
+        "area-stacked",
+        "bar",
+        "h-bar",
+        "line",
+        "scatter",
+        "stacked",
+        "h-stacked",
+        "pie",
+        "donut",
+        "gauge",
+      ].includes(dashboardPanelData.data.type);
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1371,6 +1371,7 @@ export default defineComponent({
       selectPromQlNameOption,
       addTimeShift,
       removeTimeShift,
+      showColorPalette,
     };
   },
 });
