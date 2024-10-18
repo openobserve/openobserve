@@ -598,7 +598,6 @@ export default defineComponent({
     });
 
     onBeforeMount(async () => {
-      restoreUrlQueryParams();
       await importSqlParser();
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         // searchObj.loading = true;
@@ -613,6 +612,7 @@ export default defineComponent({
 
         searchObj.organizationIdetifier =
           store.state.selectedOrganization.identifier;
+          restoreUrlQueryParams();
         if (searchObj.loading == false) {
           resetSearchObj();
           resetStreamData();
