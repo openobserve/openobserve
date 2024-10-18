@@ -14,6 +14,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div style="display: flex; align-items: center">
+      <!-- dropdown to select color palette type/mode -->
       <q-select
         v-model="dashboardPanelData.data.config.color.mode"
         :options="colorOptions"
@@ -28,6 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :popup-content-style="{ height: '300px', width: '200px' }"
       >
         <template v-slot:option="props">
+          <!-- label -->
+          <!-- sublabel -->
+          <!-- color palette as gradient -->
           <q-item v-if="!props.opt.isGroup" v-bind="props.itemProps">
             <q-item-section style="padding: 2px">
               <q-item-label>{{ props.opt.label }}</q-item-label>
@@ -63,6 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </template>
       </q-select>
+
+      <!-- color picker for fixed and shades typed color mode -->
       <div
         class="color-input-wrapper"
         v-if="
@@ -75,10 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <input
           type="color"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
-          format-model="rgb"
         />
       </div>
     </div>
+
+    <!-- color by button group -->
     <div
       class="q-pt-md"
       v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
@@ -110,16 +117,17 @@ export default defineComponent({
   name: "ColorPaletteDropdown",
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
-    // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
     onBeforeMount(() => {
+      // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
       if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
           mode: "palette-classic-by-series",
-          fixedColor: classicColorPalette,
+          fixedColor: [],
           seriesBy: "last",
         };
       }
     });
+
     const colorOptions = [
       {
         label: "<b>By Series</b>",
@@ -197,16 +205,19 @@ export default defineComponent({
         value: "continuous-light-to-dark-blue",
       },
     ];
+
     const selectedOptionLabel = computed(() => {
       const selectedOption = colorOptions.find(
         (option) =>
-          option.value === dashboardPanelData?.data?.config?.color?.mode ??
-          "palette-classic-by-series",
+          option.value ===
+          (dashboardPanelData?.data?.config?.color?.mode ??
+            "palette-classic-by-series"),
       );
       return selectedOption
         ? selectedOption.label
         : "Palette-Classic (By Series)";
     });
+
     const onColorModeChange = (value: any) => {
       // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor as a default
       if (["fixed", "shades"].includes(value.value)) {
@@ -215,6 +226,7 @@ export default defineComponent({
       } else if (
         ["palette-classic-by-series", "palette-classic"].includes(value.value)
       ) {
+        // do not store fixedcolor in config for palette-classic-by-series and palette-classic
         dashboardPanelData.data.config.color.fixedColor = [];
       } else {
         // else assign sublabel to fixedcolor

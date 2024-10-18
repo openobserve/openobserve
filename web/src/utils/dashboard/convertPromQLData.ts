@@ -175,7 +175,7 @@ export const convertPromQLData = async (
             : 50
           : panelSchema.config?.axis_width == null
             ? 5
-            : "25",
+            : 25,
     },
     tooltip: {
       show: true,
@@ -415,7 +415,7 @@ export const convertPromQLData = async (
                 name: seriesName,
                 itemStyle: {
                   color: getSeriesColor(
-                    panelSchema.config.color,
+                    panelSchema?.config?.color,
                     seriesName,
                     metric.values.map((value: any) => value[1]),
                     chartMin,
@@ -506,7 +506,6 @@ export const convertPromQLData = async (
                 }`,
               },
             },
-            itemStyle: {},
             title: {
               fontSize: 10,
               offsetCenter: [0, "70%"],
