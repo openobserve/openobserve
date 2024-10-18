@@ -51,6 +51,13 @@ impl ShortUrl for PostgresShortUrl {
             );
             "#;
         sqlx::query(query).execute(&pool).await?;
+
+        // create created_ts column for old version <= 0.12.1-hf2
+        let has_created_ts = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='short_urls' AND column_name='created_ts';").fetch_one(&pool).await?;
+        if has_created_ts == 0 {
+            add_created_ts_column().await?;
+        }
+
         Ok(())
     }
 
@@ -215,4 +222,25 @@ impl ShortUrl for PostgresShortUrl {
         sqlx::query(query).bind(&short_ids).execute(&pool).await?;
         Ok(())
     }
+}
+
+async fn add_created_ts_column() -> Result<()> {
+    let pool = CLIENT.clone();
+    let mut tx = pool.begin().await?;
+    if let Err(e) =
+        sqlx::query(r#"ALTER TABLE short_urls ADD COLUMN created_ts BIGINT NOT NULL DEFAULT 0;"#)
+            .execute(&mut *tx)
+            .await
+    {
+        log::error!("[POSTGRES] Error in adding column created_ts: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::info!("[POSTGRES] Error in committing transaction: {}", e);
+        return Err(e.into());
+    };
+    Ok(())
 }
