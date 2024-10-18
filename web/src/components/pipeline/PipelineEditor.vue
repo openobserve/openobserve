@@ -412,7 +412,7 @@ const getPipeline = () => {
 
       _pipeline.edges.forEach((edge: any) => {
         edge.markerEnd = {
-          type: MarkerType.Arrow,
+          type: MarkerType.ArrowClosed,
           width: 20,  // Increase arrow width
           height: 20, // Increase arrow height
         };
@@ -420,7 +420,7 @@ const getPipeline = () => {
           ...edge.style, // Preserve existing styles
           strokeWidth: 2,
         };
-        edge.type = 'button';
+        edge.type = 'step';
         edge.animated = true;
       });
 

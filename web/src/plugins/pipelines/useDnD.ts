@@ -247,11 +247,12 @@ export default function useDragAndDrop() {
       target: connection.target,
       
       markerEnd: {
-        type: MarkerType.Arrow,
+        type: MarkerType.ArrowClosed,
         width: 20,  // Increase arrow width
         height: 20, // Increase arrow height
+
       },
-      type: 'button',      
+      type: 'step',      
       style:{
         strokeWidth: 2,
       },
@@ -344,11 +345,11 @@ export default function useDragAndDrop() {
         source:  pipelineObj.userClickedNode,
         target:pipelineObj.currentSelectedNodeData.id,
         markerEnd: {
-          type: MarkerType.Arrow,
+          type: MarkerType.ArrowClosed,
           width: 20,  // Increase arrow width
           height: 20, // Increase arrow height
         },
-        type: 'button',
+        type: 'step',
         
         style:{
           strokeWidth: 2,
@@ -382,11 +383,11 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     source:  pipelineObj.userSelectedNode.id,
     target:pipelineObj.currentSelectedNodeData.id,
       markerEnd: {
-        type: MarkerType.Arrow,
+        type: MarkerType.ArrowClosed,
         width: 20,  // Increase arrow width
         height: 20, // Increase arrow height
       },
-    type: 'button',
+    type: 'step',
     
     style:{
       strokeWidth: 2,

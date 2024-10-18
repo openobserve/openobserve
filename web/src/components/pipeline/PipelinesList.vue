@@ -460,11 +460,11 @@ const getPipelines = async () => {
           const updatedEdges = pipeline.edges.map((edge : any) => ({
             ...edge,
             markerEnd: {
-                type: MarkerType.Arrow,
+                type: MarkerType.ArrowClosed,
                 width: 20,  // Increase arrow width
                 height: 20, // Increase arrow height
               },
-              type: 'button',
+              type: 'step',
               
               style:{
                 strokeWidth: 2,
