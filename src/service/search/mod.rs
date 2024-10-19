@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashSet, sync::Arc};
+use std::{
+    cmp::{max, min},
+    collections::HashSet,
+    sync::Arc,
+};
 
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
@@ -545,16 +549,12 @@ pub async fn search_partition(
     let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-
     let use_stream_stats_for_partition = stream_settings.approx_partition;
-
     let max_query_range = stream_settings.max_query_range * 1000 * 1000 * 60 * 60;
 
     // data retention in seconds
-
     let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
-
-    // data duration in seconds
+    // query duration in seconds
     let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
@@ -568,14 +568,14 @@ pub async fn search_partition(
 
     let (records, original_size, compressed_size, files_len) = if use_stream_stats_for_partition {
         let stats = stats::get_stream_stats(org_id, &meta.stream_name, stream_type);
-        let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+        let data_end_time = min(Utc::now().timestamp_micros(), stats.doc_time_max);
         let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
-        data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
+        data_retention = min(data_retention, data_retention_based_on_stats);
         (
-            (stats.doc_num as i64 * query_duration) / data_retention,
-            (stats.storage_size as i64 * query_duration) / data_retention,
-            (stats.compressed_size as i64 * query_duration) / data_retention,
-            ((stats.file_num * query_duration) / data_retention) as usize,
+            (stats.doc_num as i64) / (max(1, data_retention / query_duration)),
+            (stats.storage_size as i64) / (max(1, data_retention / query_duration)),
+            (stats.compressed_size as i64) / (max(1, data_retention / query_duration)),
+            (stats.file_num / (max(1, data_retention / query_duration))) as usize,
         )
     } else {
         let files = cluster::get_file_list(
@@ -663,6 +663,11 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    if part_num == 1 {
+        resp.partitions.push([req.start_time, req.end_time]);
+        return Ok(resp);
+    }
+
     // if the partition number is too large, we limit it to 1000
     if part_num > 1000 {
         part_num = 1000;
