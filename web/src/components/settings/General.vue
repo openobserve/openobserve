@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, ref } from "vue";
+import { defineComponent, onActivated, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -217,6 +217,8 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
+import DOMPurify from 'dompurify';
+
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -252,6 +254,16 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
     });
+
+    watch(
+      () => editingText.value,
+      (value) => {
+        if (!value) {
+          customText.value = store.state.zoConfig.custom_logo_text;
+        }
+      }
+
+    )
 
     const onSubmit = useLoading(async () => {
       try {
@@ -381,6 +393,16 @@ export default defineComponent({
         });
     };
 
+
+    const sanitizeInput = (text: string): string => {
+      // Limit input to 100 characters
+      const limitedInput = text.slice(0, 100);
+      
+      // Used DOMPurify for thorough sanitization
+      return DOMPurify.sanitize(limitedInput);
+    };
+
+
     const updateCustomText = () => {
       loadingState.value = true;
       let orgIdentifier = "default";
@@ -389,6 +411,8 @@ export default defineComponent({
           orgIdentifier = item.identifier;
         }
       }
+
+      customText.value = sanitizeInput(customText.value);
 
       settingsService
         .updateCustomText(
@@ -443,7 +467,7 @@ export default defineComponent({
       onSubmit,
       files,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .gif, .bmp, .tif formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),
@@ -464,6 +488,7 @@ export default defineComponent({
       editingText,
       updateCustomText,
       confirmDeleteImage: ref(false),
+      sanitizeInput,
     };
   },
 });
