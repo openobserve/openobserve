@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, ref } from "vue";
+import { defineComponent, onActivated, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -252,6 +252,16 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
     });
+
+    watch(
+      () => editingText.value,
+      (value) => {
+        if (!value) {
+          customText.value = store.state.zoConfig.custom_logo_text;
+        }
+      }
+
+    )
 
     const onSubmit = useLoading(async () => {
       try {
@@ -381,6 +391,20 @@ export default defineComponent({
         });
     };
 
+    const sanitizeInput = (text : any) => {
+  // Limit input to 100 characters
+    let limitedInput = text.slice(0, 100);
+    
+    // Remove potentially harmful special characters
+    limitedInput = limitedInput.replace(/[<>\/\\]/g, '');
+
+    // Sanitize input
+    const div = document.createElement('div');
+    div.textContent = limitedInput;
+    return div.innerHTML;
+  }
+
+
     const updateCustomText = () => {
       loadingState.value = true;
       let orgIdentifier = "default";
@@ -389,6 +413,8 @@ export default defineComponent({
           orgIdentifier = item.identifier;
         }
       }
+
+      customText.value = sanitizeInput(customText.value);
 
       settingsService
         .updateCustomText(
@@ -443,7 +469,7 @@ export default defineComponent({
       onSubmit,
       files,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .gif, .bmp, .tif formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),
@@ -464,6 +490,7 @@ export default defineComponent({
       editingText,
       updateCustomText,
       confirmDeleteImage: ref(false),
+      sanitizeInput,
     };
   },
 });
