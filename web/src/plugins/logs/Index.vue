@@ -251,9 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
                         :htmlContent="
-                          searchObj.data.errorMsg +
+                          searchObj?.data?.errorMsg +
                           '<h6 style=\'font-size: 14px; margin: 0;\'>' +
-                          searchObj.data.errorDetail +
+                          searchObj?.data?.errorDetail +
                           '</h6>'
                         "
                       />
