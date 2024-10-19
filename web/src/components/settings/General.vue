@@ -391,7 +391,7 @@ export default defineComponent({
         });
     };
 
-    const sanitizeInput = (text : any) => {
+    const sanitizeInput = (text : string) => {
   // Limit input to 100 characters
     let limitedInput = text.slice(0, 100);
     
