@@ -217,6 +217,8 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
+import DOMPurify from 'dompurify';
+
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -391,18 +393,14 @@ export default defineComponent({
         });
     };
 
-    const sanitizeInput = (text : string) => {
-  // Limit input to 100 characters
-    let limitedInput = text.slice(0, 100);
-    
-    // Remove potentially harmful special characters
-    limitedInput = limitedInput.replace(/[<>\/\\]/g, '');
 
-    // Sanitize input
-    const div = document.createElement('div');
-    div.textContent = limitedInput;
-    return div.innerHTML;
-  }
+    const sanitizeInput = (text: string): string => {
+      // Limit input to 100 characters
+      const limitedInput = text.slice(0, 100);
+      
+      // Used DOMPurify for thorough sanitization
+      return DOMPurify.sanitize(limitedInput);
+    };
 
 
     const updateCustomText = () => {
