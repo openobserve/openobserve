@@ -209,7 +209,7 @@ async fn process_node(
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::debug!("[Node-{node_id}]: Leaf node starts processing");
+                log::debug!("[Pipeline]: Leaf node {node_id} starts processing");
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
@@ -227,19 +227,19 @@ async fn process_node(
                     }
                     count += 1;
                 }
-                log::debug!("[Node-{node_id}]: leaf node done processing {count} records");
+                log::debug!("[Pipeline]: leaf node {node_id} done processing {count} records");
             } else {
-                log::debug!("[Node-{node_id}]: source node starts processing");
+                log::debug!("[Pipeline]: source node {node_id} starts processing");
                 // source stream node: send received record to all its children
                 while let Some(item) = receiver.recv().await {
                     send_to_children(&mut child_senders, item, "StreamNode").await;
                     count += 1;
                 }
-                log::debug!("[Node-{node_id}]: source node done processing {count} records");
+                log::debug!("[Pipeline]: source node {node_id} done processing {count} records");
             }
         }
         NodeData::Condition(condition_params) => {
-            log::debug!("[Node-{node_id}]: cond node starts processing");
+            log::debug!("[Pipeline]: cond node {node_id} starts processing");
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 // value must be flattened before condition params can take effect
                 if !flattened {
@@ -253,18 +253,19 @@ async fn process_node(
                     .iter()
                     .all(|cond| cond.evaluate(record.as_object().unwrap()))
                 {
-                    log::debug!(
-                        "[Pipeline::CondNode]: processed 1 item and sending to its children"
-                    );
-                    send_to_children(&mut child_senders, (idx, record, flattened), "QueryNode")
-                        .await;
+                    send_to_children(
+                        &mut child_senders,
+                        (idx, record, flattened),
+                        "ConditionNode",
+                    )
+                    .await;
                     count += 1;
                 }
             }
-            log::debug!("[Node-{node_id}]: cond node done processing {count} records");
+            log::debug!("[Pipeline]: cond node {node_id} done processing {count} records");
         }
         NodeData::Function(func_params) => {
-            log::debug!("[Node-{node_id}]: func node starts processing");
+            log::debug!("[Pipeline]: func node {node_id} starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 if let Some(vrl_runtime) = &vrl_runtime {
@@ -288,15 +289,20 @@ async fn process_node(
                     .await;
                 count += 1;
             }
-            log::debug!("[Node-{node_id}]: func node done processing {count} records");
+            log::debug!("[Pipeline]: func node {node_id} done processing {count} records");
         }
         NodeData::Query(_) => {
             // source node for Scheduled pipeline. Directly send to children nodes
+            log::debug!("[Pipeline]: query node {node_id} starts processing");
             while let Some(item) = receiver.recv().await {
                 send_to_children(&mut child_senders, item, "QueryNode").await;
+                count += 1;
             }
+            log::debug!("[Pipeline]: query node {node_id} done processing {count} records");
         }
     }
+
+    // all cloned senders dropped when function goes out of scope -> close the channel
 
     Ok(())
 }

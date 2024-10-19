@@ -318,6 +318,7 @@ pub async fn ingest(
             PipelineExecutionPlan::Batch(pl_exec_batch) => {
                 let (records, original_data): (Vec<_>, Vec<_>) =
                     pipeline_inputs.into_iter().unzip();
+                let records_count = records.len();
                 match pl_exec_batch.process_batch(org_id, records).await {
                     Err(e) => {
                         log::error!(
@@ -326,8 +327,9 @@ pub async fn ingest(
                             stream_name,
                             e
                         );
-                        stream_status.status.failed += 1;
-                        stream_status.status.error = format!("Pipeline execution error: {}", e);
+                        stream_status.status.failed += records_count as u32;
+                        stream_status.status.error =
+                            format!("Pipeline batch execution error: {}", e);
                     }
                     Ok(pl_results) => {
                         for (stream_params, stream_pl_results) in pl_results {
@@ -350,14 +352,13 @@ pub async fn ingest(
                                 }
 
                                 // add `_original` and '_record_id` if required by StreamSettings
-                                let original = original_data.get(idx).cloned().flatten();
                                 if streams_need_original_set
                                     .contains(stream_params.stream_name.as_str())
-                                    && original.is_some()
+                                    && original_data[idx].is_some()
                                 {
                                     local_val.insert(
                                         ORIGINAL_DATA_COL_NAME.to_string(),
-                                        original.unwrap().into(),
+                                        original_data[idx].clone().unwrap().into(),
                                     );
                                     let record_id = crate::service::ingestion::generate_record_id(
                                         org_id,
