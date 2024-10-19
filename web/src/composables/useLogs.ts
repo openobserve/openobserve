@@ -1264,7 +1264,10 @@ const useLogs = () => {
               searchObj.data.errorMsg =
                 "Error while processing partition request.";
               if (err.response != undefined) {
-                searchObj.data.errorMsg = err.response.data.error;
+                searchObj.data.errorMsg =
+                  err.response?.data?.error ||
+                  err.response?.data?.message ||
+                  "";
                 if (err.response.data.hasOwnProperty("error_detail")) {
                   searchObj.data.errorDetail = err.response.data.error_detail;
                 }
@@ -1282,7 +1285,7 @@ const useLogs = () => {
 
               if (err?.request?.status >= 429) {
                 notificationMsg.value = err?.response?.data?.message;
-                searchObj.data.errorMsg = err?.response?.data?.message;
+                searchObj.data.errorMsg = err?.response?.data?.message || "";
                 searchObj.data.errorDetail = err?.response?.data?.error_detail;
               }
 
@@ -2304,6 +2307,8 @@ const useLogs = () => {
           resolve(true);
         })
         .catch((err) => {
+          // TODO OK : create handleError function, which will handle error and return error message and detail
+
           searchObj.loading = false;
           let trace_id = "";
           searchObj.data.errorMsg =
@@ -2311,22 +2316,26 @@ const useLogs = () => {
               ? err
               : "Error while processing histogram request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg =
+              err.response?.data?.error || err.response?.data?.message || "";
             if (err.response.data.hasOwnProperty("error_detail")) {
-              searchObj.data.errorDetail = err.response.data.error_detail;
+              searchObj.data.errorDetail =
+                err.response?.data?.error_detail || "";
             }
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
-            searchObj.data.errorMsg = err.message;
+            searchObj.data.errorMsg = err?.message || "";
             if (err.hasOwnProperty("trace_id")) {
               trace_id = err?.trace_id;
             }
           }
 
-          const customMessage = logsErrorMessage(err?.response?.data.code);
-          searchObj.data.errorCode = err?.response?.data.code;
+          const customMessage = logsErrorMessage(
+            err?.response?.data?.code || "",
+          );
+          searchObj.data.errorCode = err?.response?.data?.code || "";
 
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage);
@@ -2335,9 +2344,10 @@ const useLogs = () => {
           notificationMsg.value = searchObj.data.errorMsg;
 
           if (err?.request?.status >= 429) {
-            notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg = err?.response?.data?.message;
-            searchObj.data.errorDetail = err?.response?.data?.error_detail;
+            notificationMsg.value = err?.response?.data?.message || "";
+            searchObj.data.errorMsg = err?.response?.data?.message || "";
+            searchObj.data.errorDetail =
+              err?.response?.data?.error_detail || "";
           }
 
           if (trace_id) {
