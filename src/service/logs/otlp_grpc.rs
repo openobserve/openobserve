@@ -50,6 +50,7 @@ use crate::{
 };
 
 pub async fn handle_grpc_request(
+    thread_id: usize,
     org_id: &str,
     request: ExportLogsServiceRequest,
     is_grpc: bool,
@@ -333,6 +334,7 @@ pub async fn handle_grpc_request(
 
     let mut status = IngestionStatus::Record(stream_status.status);
     let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        thread_id,
         org_id,
         user_email,
         (started_at, &start),
@@ -465,7 +467,7 @@ mod tests {
         };
 
         let result =
-            handle_grpc_request(org_id, request, true, Some("test_stream"), "a@a.com").await;
+            handle_grpc_request(0, org_id, request, true, Some("test_stream"), "a@a.com").await;
         assert!(result.is_ok());
     }
 }

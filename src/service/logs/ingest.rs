@@ -55,6 +55,7 @@ use crate::{
 };
 
 pub async fn ingest(
+    thread_id: usize,
     org_id: &str,
     in_stream_name: &str,
     in_req: IngestionRequest<'_>,
@@ -406,6 +407,7 @@ pub async fn ingest(
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs_by_stream(
+            thread_id,
             org_id,
             user_email,
             (started_at, &start),

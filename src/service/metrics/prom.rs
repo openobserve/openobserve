@@ -475,7 +475,7 @@ pub async fn remote_write(
 
         // write to file
         let writer =
-            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         let fns_length: usize = stream_pipeline_params

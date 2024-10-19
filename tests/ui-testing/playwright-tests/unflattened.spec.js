@@ -128,6 +128,7 @@ test.describe("Unflattened testcases", () => {
     await page.locator('[data-test="date-time-relative-tab"]').click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.waitForTimeout(2000);
     await page.getByText('arrow_drop_down_timestamp:').click();
   });
 
