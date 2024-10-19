@@ -2307,6 +2307,8 @@ const useLogs = () => {
           resolve(true);
         })
         .catch((err) => {
+          // TODO OK : create handleError function, which will handle error and return error message and detail
+
           searchObj.loading = false;
           let trace_id = "";
           searchObj.data.errorMsg =
