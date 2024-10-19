@@ -77,6 +77,7 @@ pub async fn search_parquet(
 
     let mut scan_stats = ScanStats::new();
     let mut lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
+
     let cfg = get_config();
     // get file metadata to build file_list
     let files_num = files.len();
