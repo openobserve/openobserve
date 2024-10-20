@@ -87,7 +87,8 @@ use crate::{
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
-static SKIPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static SKIPPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
@@ -223,7 +224,7 @@ async fn prepare_files(
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
             // check if the file is still locking
-            if SKIPED_LOCK_FILES.read().await.contains(&file_key)
+            if SKIPPED_LOCK_FILES.read().await.contains(&file_key)
                 && !wal::lock_files_exists(&file_key)
             {
                 log::warn!(
@@ -239,7 +240,7 @@ async fn prepare_files(
                     // need release all the files
                     PROCESSING_FILES.write().await.remove(&file_key);
                     // delete from skip list
-                    SKIPED_LOCK_FILES.write().await.remove(&file_key);
+                    SKIPPED_LOCK_FILES.write().await.remove(&file_key);
                 }
             }
             continue;
@@ -489,7 +490,7 @@ async fn move_files(
                     "[INGESTER:JOB:{thread_id}] the file is still in use, add it to the skip_list: {}",
                     file.key
                 );
-                SKIPED_LOCK_FILES.write().await.insert(file.key.clone());
+                SKIPPED_LOCK_FILES.write().await.insert(file.key.clone());
                 continue;
             }
 
