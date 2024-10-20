@@ -464,7 +464,7 @@ const getPipelines = async () => {
                 width: 20,  // Increase arrow width
                 height: 20, // Increase arrow height
               },
-              type: 'step',
+              type: 'button',
               
               style:{
                 strokeWidth: 2,

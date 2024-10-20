@@ -420,7 +420,7 @@ const getPipeline = () => {
           ...edge.style, // Preserve existing styles
           strokeWidth: 2,
         };
-        edge.type = 'step';
+        edge.type = 'button';
         edge.animated = true;
       });
 
@@ -652,11 +652,11 @@ const findMissingEdges = () => {
   const edges = pipelineObj.currentSelectedPipeline.edges;
 
   // Collect node IDs that are part of edges (either source or target)
-  const outgoingConnections = new Set(edges.map((edge) => edge.source));
-  const incomingConnections = new Set(edges.map((edge) => edge.target));
+  const outgoingConnections = new Set(edges.map((edge:any) => edge.source));
+  const incomingConnections = new Set(edges.map((edge:any) => edge.target));
 
   // Find nodes that are not connected properly
-  const unconnectedNodes = nodes.filter((node) => {
+  const unconnectedNodes = nodes.filter((node:any) => {
     if (node.type === 'default') {
       // Check for both incoming and outgoing edges
       return !incomingConnections.has(node.id) || !outgoingConnections.has(node.id);

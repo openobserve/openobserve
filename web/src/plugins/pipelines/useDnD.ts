@@ -252,7 +252,7 @@ export default function useDragAndDrop() {
         height: 20, // Increase arrow height
 
       },
-      type: 'step',      
+      type: 'button',      
       style:{
         strokeWidth: 2,
       },
@@ -349,7 +349,7 @@ export default function useDragAndDrop() {
           width: 20,  // Increase arrow width
           height: 20, // Increase arrow height
         },
-        type: 'step',
+        type: 'button',
         
         style:{
           strokeWidth: 2,
@@ -387,7 +387,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
         width: 20,  // Increase arrow width
         height: 20, // Increase arrow height
       },
-    type: 'step',
+    type: 'button',
     
     style:{
       strokeWidth: 2,
