@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -72,7 +72,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 }
                             }
                             Err(e) => {
-                                log::error!("[COMPACTOR:JOB] Error merging files: {}", e);
+                                log::error!(
+                                    "[COMPACTOR:JOB] Error merging files: stream: {}/{}/{}, err: {}",
+                                    msg.org_id,
+                                    msg.stream_type,
+                                    msg.stream_name,
+                                    e
+                                );
                                 if let Err(e) = tx.send(Err(e)).await {
                                     log::error!(
                                         "[COMPACTOR:JOB] Error sending error to merge_job: {}",

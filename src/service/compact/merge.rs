@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -741,7 +741,7 @@ pub async fn merge_files(
     }
 
     let start = std::time::Instant::now();
-    let merge_result = if stream_type == StreamType::Logs {
+    let merge_result = if stream_type.is_basic_type() {
         merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
     } else {
         datafusion::exec::merge_parquet_files(
@@ -793,7 +793,7 @@ pub async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
+            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
                 // generate inverted index RecordBatch
                 if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
                     schema_latest.clone(),
@@ -1060,10 +1060,7 @@ pub fn generate_inverted_idx_recordbatch(
     index_fields: &[String],
 ) -> Result<Option<RecordBatch>, anyhow::Error> {
     let cfg = get_config();
-    if !cfg.common.inverted_index_enabled
-        || batches.is_empty()
-        || !stream_type.create_inverted_index()
-    {
+    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.is_basic_type() {
         return Ok(None);
     }
 

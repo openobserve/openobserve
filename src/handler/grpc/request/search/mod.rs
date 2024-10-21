@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -68,7 +68,9 @@ impl Searcher {
         sender: tokio::sync::oneshot::Sender<()>,
         query_start: bool,
     ) -> Result<(), infra::errors::Error> {
-        self.query_manager.insert_sender(trace_id, sender, query_start).await
+        self.query_manager
+            .insert_sender(trace_id, sender, query_start)
+            .await
     }
 
     // get all task status that is leader

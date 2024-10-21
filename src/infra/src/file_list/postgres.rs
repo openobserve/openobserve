@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1264,7 +1264,7 @@ CREATE TABLE IF NOT EXISTS file_list
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
-    file      VARCHAR(256) not null,
+    file      VARCHAR(1024) not null,
     deleted   BOOLEAN default false not null,
     flattened BOOLEAN default false not null,
     min_ts    BIGINT not null,
@@ -1289,7 +1289,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
-    file      VARCHAR(256) not null,
+    file      VARCHAR(1024) not null,
     deleted   BOOLEAN default false not null,
     flattened BOOLEAN default false not null,
     min_ts    BIGINT not null,
@@ -1314,7 +1314,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
-    file       VARCHAR(256) not null,
+    file       VARCHAR(1024) not null,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );

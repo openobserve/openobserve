@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
+    ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -43,14 +44,13 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
-        SetExpr, VisitMut, VisitorMut,
+        SetExpr, Statement, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
 use super::request::Request;
-use crate::common::meta::ingestion::ORIGINAL_DATA_COL_NAME;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -151,7 +151,8 @@ impl Sql {
         // 5. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
-            used_schemas = generate_select_star_schema(total_schemas);
+            let has_original_column = has_original_column(&column_visitor.columns);
+            used_schemas = generate_select_star_schema(total_schemas, has_original_column);
         } else {
             for (table_name, schema) in total_schemas.iter() {
                 let columns = match column_visitor.columns.get(table_name) {
@@ -180,6 +181,13 @@ impl Sql {
         let mut histogram_interval_visitor =
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
+
+        // NOTE: only this place can modify the sql
+        // 9. add _timestamp is need
+        if !is_complex_query(&mut statement) {
+            let mut add_timestamp_visitor = AddTimestampVisitor::new();
+            statement.visit(&mut add_timestamp_visitor);
+        }
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -230,13 +238,15 @@ impl std::fmt::Display for Sql {
 
 fn generate_select_star_schema(
     schemas: HashMap<String, Arc<SchemaCache>>,
+    has_original_column: HashMap<String, bool>,
 ) -> HashMap<String, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+        let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() {
+        if defined_schema_fields.is_empty() && !has_original_column {
             if schema.contains_field(ORIGINAL_DATA_COL_NAME) {
                 // skip selecting "_original" column if `SELECT * ...`
                 let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
@@ -313,6 +323,19 @@ fn generate_schema_fields(
         }
     }
     fields
+}
+
+// check if has original column in sql
+fn has_original_column(columns: &HashMap<String, HashSet<String>>) -> HashMap<String, bool> {
+    let mut has_original_column = HashMap::with_capacity(columns.len());
+    for (name, column) in columns.iter() {
+        if column.contains(ORIGINAL_DATA_COL_NAME) {
+            has_original_column.insert(name.clone(), true);
+        } else {
+            has_original_column.insert(name.clone(), false);
+        }
+    }
+    has_original_column
 }
 
 /// visit a sql to get all columns
@@ -729,6 +752,135 @@ impl VisitorMut for FieldNameVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Identifier(ident) = expr {
             self.field_names.insert(ident.value.clone());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+// add _timestamp to the query like `SELECT name FROM t` -> `SELECT _timestamp, name FROM t`
+struct AddTimestampVisitor {}
+
+impl AddTimestampVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddTimestampVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_timestamp = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_timestamp = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_timestamp {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
+                        get_config().common.column_timestamp.clone(),
+                    ))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn is_complex_query(statement: &mut Statement) -> bool {
+    let mut visitor = ComplexQueryVisitor::new();
+    statement.visit(&mut visitor);
+    visitor.is_complex
+}
+
+// check if the query is complex query
+// 1. has subquery
+// 2. has join
+// 3. has group by
+// 4. has aggregate
+struct ComplexQueryVisitor {
+    pub is_complex: bool,
+}
+
+impl ComplexQueryVisitor {
+    fn new() -> Self {
+        Self { is_complex: false }
+    }
+}
+
+impl VisitorMut for ComplexQueryVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            // check if has group by
+            match select.group_by {
+                GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
+                _ => self.is_complex = true,
+            }
+            // check if has join
+            if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                self.is_complex = true;
+            }
+            if self.is_complex {
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_complex = true;
+            }
+            // check if has aggregate function or window function
+            Expr::Function(func) => {
+                if AGGREGATE_UDF_LIST
+                    .contains(&trim_quotes(&func.name.to_string().to_lowercase()).as_str())
+                    || func.filter.is_some()
+                    || func.over.is_some()
+                    || !func.within_group.is_empty()
+                {
+                    self.is_complex = true;
+                }
+            }
+            // check select * from table
+            Expr::Wildcard => self.is_complex = true,
+            _ => {}
+        }
+        if self.is_complex {
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }

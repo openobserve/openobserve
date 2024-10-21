@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,8 @@ use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHashe
 use base64::Engine;
 use config::utils::json;
 use futures::future::{ready, Ready};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -105,9 +107,7 @@ pub fn get_role(_role: UserRole) -> UserRole {
 
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
         let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
@@ -143,9 +143,7 @@ pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
         let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 

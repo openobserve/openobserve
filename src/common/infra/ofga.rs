@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::cmp::Ordering;
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
-    common::infra::config::O2_CONFIG,
+    common::infra::config::get_config as get_o2_config,
     openfga::{
         authorizer::authz::{
             get_index_creation_tuples, get_org_creation_tuples, get_user_role_tuple, update_tuples,
@@ -53,7 +53,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
 
     // sync with super cluster
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let meta_in_super = get_model().await?;
         match (meta_in_super, &existing_meta) {
             (None, Some(existing_model)) => {

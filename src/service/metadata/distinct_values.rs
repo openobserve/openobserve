@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -183,11 +183,11 @@ impl Metadata for DistinctValues {
         #[cfg(feature = "enterprise")]
         {
             use o2_enterprise::enterprise::{
-                common::infra::config::O2_CONFIG,
+                common::infra::config::get_config as get_o2_config,
                 openfga::authorizer::authz::set_ownership_if_not_exists,
             };
 
-            if O2_CONFIG.openfga.enabled {
+            if get_o2_config().openfga.enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
@@ -262,7 +262,8 @@ impl Metadata for DistinctValues {
             }
 
             let writer =
-                ingester::get_writer(&org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
+                ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string(), STREAM_NAME)
+                    .await;
             _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
             if let Err(e) = writer.sync().await {
                 log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);

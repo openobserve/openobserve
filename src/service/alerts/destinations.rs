@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,6 +73,14 @@ pub async fn save(
                 return Err((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     anyhow::anyhow!("SMTP not configured"),
+                ));
+            }
+        }
+        DestinationType::Sns => {
+            if destination.sns_topic_arn.is_none() || destination.aws_region.is_none() {
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Topic ARN and Region are required for SNS destinations"),
                 ));
             }
         }

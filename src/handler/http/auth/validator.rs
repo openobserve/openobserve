@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,8 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{get_config, utils::base64};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use crate::{
     common::{
@@ -701,9 +703,7 @@ pub(crate) async fn check_permissions(
     auth_info: AuthExtractor,
     role: Option<UserRole>,
 ) -> bool {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    if !O2_CONFIG.openfga.enabled {
+    if !get_o2_config().openfga.enabled {
         return true;
     }
 
@@ -773,10 +773,8 @@ pub(crate) async fn list_objects_for_user(
     permission: &str,
     object_type: &str,
 ) -> Result<Option<Vec<String>>, Error> {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    if !is_root_user(user_id) && O2_CONFIG.openfga.enabled && O2_CONFIG.openfga.list_only_permitted
-    {
+    let o2cfg = get_o2_config();
+    if !is_root_user(user_id) && o2cfg.openfga.enabled && o2cfg.openfga.list_only_permitted {
         match crate::handler::http::auth::validator::list_objects(
             user_id,
             permission,
