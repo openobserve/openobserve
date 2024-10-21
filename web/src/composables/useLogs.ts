@@ -4265,7 +4265,11 @@ const useLogs = () => {
         fieldType = fieldTypeList[field];
       }
 
-      if (field_value == "null" || field_value == "NULL" || field_value == "") {
+      if (
+        field_value === "null" ||
+        field_value === "" ||
+        field_value === null
+      ) {
         operator = action == "include" ? "is" : "is not";
         field_value = "null";
       }

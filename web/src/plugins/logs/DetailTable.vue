@@ -377,22 +377,19 @@ export default defineComponent({
     },
   },
   methods: {
-
-    toggleIncludeSearchTerm(field: string|number, field_value: string|number|boolean, action: string) {
-      const searchExpression = this.getFilterExpressionByFieldType(
-        field,
-        field_value,
-        action,
-      );
-      this.$emit("add:searchterm", searchExpression);
+    toggleIncludeSearchTerm(
+      field: string | number,
+      field_value: string | number | boolean,
+      action: string,
+    ) {
+      this.$emit("add:searchterm", field, field_value, action);
     },
-    toggleExcludeSearchTerm(field: string|number, field_value: string|number|boolean, action: string) {
-      const searchExpression = this.getFilterExpressionByFieldType(
-        field,
-        field_value,
-        action,
-      );
-      this.$emit("add:searchterm", searchExpression);
+    toggleExcludeSearchTerm(
+      field: string | number,
+      field_value: string | number | boolean,
+      action: string,
+    ) {
+      this.$emit("add:searchterm", field, field_value, action);
     },
     searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
@@ -410,7 +407,7 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj, getFilterExpressionByFieldType } = useLogs();
+    const { searchObj } = useLogs();
     const $q = useQuasar();
     let multiStreamFields: any = ref([]);
 
@@ -489,7 +486,6 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
-      getFilterExpressionByFieldType,
     };
   },
   async created() {
