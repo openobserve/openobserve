@@ -157,9 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="
-                              toggleIncludeSearchTerm(value, key, "include")
-                            "
+                            @click="toggleIncludeSearchTerm(value, key, 'include')"
                             ><q-btn
                               title="Add to search query"
                               size="6px"
@@ -188,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
                             @click="
-                              toggleExcludeSearchTerm(value, key, "exclude")
+                              toggleExcludeSearchTerm(value, key, 'exclude')
                             "
                             ><q-btn
                               title="Add to search query"
@@ -385,7 +383,7 @@ export default defineComponent({
   methods: {
 
     toggleIncludeSearchTerm(field: string|number, field_value: string|number|boolean, action: string) {
-      const searchExpression = getFilterExpressionByFieldType(
+      const searchExpression = this.getFilterExpressionByFieldType(
         field,
         field_value,
         action,
@@ -393,7 +391,7 @@ export default defineComponent({
       this.$emit("add:searchterm", searchExpression);
     },
     toggleExcludeSearchTerm(field: string|number, field_value: string|number|boolean, action: string) {
-      const searchExpression = getFilterExpressionByFieldType(
+      const searchExpression = this.getFilterExpressionByFieldType(
         field,
         field_value,
         action,
@@ -495,6 +493,7 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      getFilterExpressionByFieldType,
     };
   },
   async created() {

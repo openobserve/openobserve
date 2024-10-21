@@ -4234,8 +4234,8 @@ const useLogs = () => {
   };
 
   const getFilterExpressionByFieldType = (
-    field: string,
-    field_value: string|number|boolean,
+    field: string | number,
+    field_value: string | number | boolean,
     action: string,
   ) => {
     let operator = action == "include" ? "=" : "!=";
