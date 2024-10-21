@@ -1026,15 +1026,6 @@ export default defineComponent({
       if (expression) {
         searchObj.data.stream.addToFilter = expression;
       } else {
-        $q.notify({
-          type: "negative",
-          message: "Failed to generate filter expression",
-        });
-      }
-    };
-
-      if (expression) {
-        searchObj.data.stream.addToFilter = expression;
         console.error("Failed to generate filter expression");
       }
     };
