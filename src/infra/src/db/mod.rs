@@ -249,6 +249,24 @@ struct DBIndex {
     table: String,
 }
 
+pub struct IndexStatement<'a> {
+    pub idx_name: &'a str,
+    pub table: &'a str,
+    pub unique: bool,
+    pub fields: &'a [&'a str],
+}
+
+impl<'a> IndexStatement<'a> {
+    pub fn new(idx_name: &'a str, table: &'a str, unique: bool, fields: &'a [&'a str]) -> Self {
+        Self {
+            idx_name,
+            table,
+            unique,
+            fields,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

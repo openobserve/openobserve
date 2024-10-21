@@ -18,12 +18,14 @@ use std::time::Duration;
 use config::{get_config, meta::meta_store::MetaStore, utils::util::zero_or};
 use once_cell::sync::Lazy;
 use sea_orm::{
-    sea_query, ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseConnection,
+    ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection,
     EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
-    TransactionTrait,
 };
 
-use crate::errors::{DbError, Error, Result};
+use crate::{
+    db::{mysql, postgres, sqlite, IndexStatement},
+    errors::{DbError, Error, Result},
+};
 
 pub mod short_urls;
 
@@ -84,33 +86,29 @@ pub async fn create_table() -> Result<()> {
 }
 
 pub async fn create_table_index() -> Result<()> {
-    let builder = CLIENT.get_database_backend();
+    let index1 = IndexStatement::new("short_urls_short_id_idx", "short_urls", true, &["short_id"]);
+    let index2 = IndexStatement::new(
+        "short_urls_created_ts_idx",
+        "short_urls",
+        false,
+        &["created_ts"],
+    );
 
-    let idx = sea_query::Index::create()
-        .name("short_urls_short_id_idx")
-        .table(short_urls::Entity)
-        .col(short_urls::Column::ShortId)
-        .unique()
-        .if_not_exists()
-        .take();
-
-    let res = CLIENT.execute(builder.build(&idx)).await;
-    if let Err(e) = res {
-        return Err(Error::DbError(DbError::SeaORMError(e.to_string())));
+    match CLIENT.get_database_backend() {
+        DatabaseBackend::MySql => {
+            mysql::create_index(index1).await?;
+            mysql::create_index(index2).await?;
+        }
+        DatabaseBackend::Postgres => {
+            postgres::create_index(index1).await?;
+            postgres::create_index(index2).await?;
+        }
+        _ => {
+            sqlite::create_index(index1).await?;
+            sqlite::create_index(index2).await?;
+        }
     }
-
-    let idx = sea_query::Index::create()
-        .name("short_urls_created_ts_idx")
-        .table(short_urls::Entity)
-        .col(short_urls::Column::CreatedTs)
-        .if_not_exists()
-        .take();
-
-    let res = CLIENT.execute(builder.build(&idx)).await;
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(())
 }
 
 pub async fn add(short_id: &str, original_url: &str) -> Result<()> {
@@ -121,17 +119,9 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<()> {
         ..Default::default()
     };
 
-    let txn = CLIENT.begin().await.unwrap();
-
-    let res = short_urls::Entity::insert(record).exec(&txn).await;
-
-    if res.is_ok() {
-        let res = txn.commit().await;
-        return match res {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-        };
-    }
+    let res = short_urls::Entity::insert(record)
+        .exec(&CLIENT.clone())
+        .await;
 
     match res {
         Ok(_) => Ok(()),
