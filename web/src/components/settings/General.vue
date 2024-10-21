@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :counter-label="counterLabelFn"
             style="width: 550px"
             max-file-size="20481"
-            accept=".png, .jpg, .jpeg, .svg, .jpeg2, image/*"
+            accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             @update:model-value="uploadImage"
             class="q-mx-none"
