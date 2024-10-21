@@ -21,7 +21,6 @@ use crate::common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABE
 
 pub mod json;
 pub mod otlp_grpc;
-pub mod otlp_http;
 pub mod prom;
 
 const EXCLUDE_LABELS: [&str; 5] = [
