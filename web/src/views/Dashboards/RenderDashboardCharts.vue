@@ -42,7 +42,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <slot name="before_panels" />
     <div class="displayDiv">
+      <div
+        v-if="
+          store.state.printMode &&
+          panels.length === 1 &&
+          panels[0].type === 'table'
+        "
+        class="rows_value"
+        style="height: 100%; width: 100%"
+      >
+        <PanelContainer
+          @onDeletePanel="onDeletePanel"
+          @onViewPanel="onViewPanel"
+          :viewOnly="viewOnly"
+          :data="panels[0]"
+          :dashboardId="dashboardData.dashboardId"
+          :folderId="folderId"
+          :selectedTimeDate="
+            currentTimeObj[panels[0].id] || currentTimeObj['__global'] || {}
+          "
+          :variablesData="variablesData"
+          :forceLoad="forceLoad"
+          :searchType="searchType"
+          @updated:data-zoom="$emit('updated:data-zoom', $event)"
+          @onMovePanel="onMovePanel"
+          @refreshPanelRequest="refreshPanelRequest"
+          @refresh="refreshDashboard"
+          @update:initial-variable-values="updateInitialVariableValues"
+          @onEditLayout="openEditLayout"
+          style="height: 100%; width: 100%"
+        />
+      </div>
       <grid-layout
+        v-else
         ref="gridLayoutRef"
         v-if="panels.length > 0"
         :layout.sync="getDashboardLayout(panels)"
