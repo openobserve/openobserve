@@ -30,3 +30,4 @@ tokio.workspace = true
 tokio-stream.workspace = true
 zstd.workspace = true
 tracing.workspace = true
+sea-orm.workspace = true
