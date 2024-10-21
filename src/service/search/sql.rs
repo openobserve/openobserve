@@ -183,10 +183,14 @@ impl Sql {
         statement.visit(&mut histogram_interval_visitor);
 
         // NOTE: only this place can modify the sql
-        // 9. add _timestamp is need
+        // 9. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             statement.visit(&mut add_timestamp_visitor);
+            if o2_id_is_needed(&used_schemas) {
+                let mut add_o2_id_visitor = AddO2IdVisitor::new();
+                statement.visit(&mut add_o2_id_visitor);
+            }
         }
 
         Ok(Sql {
@@ -824,6 +828,57 @@ impl VisitorMut for AddTimestampVisitor {
     }
 }
 
+// add _o2_id to the query like `SELECT name FROM t` -> `SELECT _o2_id, name FROM t`
+struct AddO2IdVisitor {}
+
+impl AddO2IdVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddO2IdVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_o2_id = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor.field_names.contains(ID_COL_NAME) {
+                            has_o2_id = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor.field_names.contains(ID_COL_NAME) {
+                            has_o2_id = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_o2_id = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_o2_id {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(ID_COL_NAME.to_string()))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 fn is_complex_query(statement: &mut Statement) -> bool {
     let mut visitor = ComplexQueryVisitor::new();
     statement.visit(&mut visitor);
@@ -1142,4 +1197,11 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
         where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
     }
     Ok(Some(where_str))
+}
+
+fn o2_id_is_needed(schemas: &HashMap<String, Arc<SchemaCache>>) -> bool {
+    schemas.values().any(|schema| {
+        let stream_setting = unwrap_stream_settings(schema.schema());
+        stream_setting.map_or(false, |setting| setting.store_original_data)
+    })
 }
