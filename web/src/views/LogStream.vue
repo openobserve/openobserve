@@ -206,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <AddStream
+        :is-in-pipeline="false"
         @close="addStreamDialog.show = false"
         @streamAdded="getLogStream"
       />
