@@ -1017,13 +1017,17 @@ export default defineComponent({
       field_value: string | number | boolean,
       action: string,
     ) => {
-      // searchObj.meta.showDetailTab = false;
       const expression = getFilterExpressionByFieldType(
         field,
         field_value,
         action,
       );
-      searchObj.data.stream.addToFilter = expression;
+
+      if (expression) {
+        searchObj.data.stream.addToFilter = expression;
+      } else {
+        console.error("Failed to generate filter expression");
+      }
     };
 
     // const onStreamChange = () => {
