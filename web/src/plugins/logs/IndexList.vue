@@ -1025,6 +1025,13 @@ export default defineComponent({
 
       if (expression) {
         searchObj.data.stream.addToFilter = expression;
+      } else {
+        console.error("Failed to generate filter expression");
+      }
+    };
+
+      if (expression) {
+        searchObj.data.stream.addToFilter = expression;
         console.error("Failed to generate filter expression");
       }
     };
