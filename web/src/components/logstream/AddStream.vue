@@ -271,6 +271,7 @@ const getStreamPayload = () => {
       .replace(/-/g, "_");
 
     field.index_type?.forEach((index: string) => {
+      console.log(index,"index ")
       if (index === "fullTextSearchKey") {
         settings.full_text_search_keys.push(field.name);
       }
@@ -283,6 +284,12 @@ const getStreamPayload = () => {
         settings.partition_keys.push({
           field: field.name,
           types: "value",
+        });
+      }
+      if (index === "prefixPartition") {
+        settings.partition_keys.push({
+          field: field.name,
+          types: "prefix",
         });
       }
 
