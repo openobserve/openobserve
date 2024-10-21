@@ -60,7 +60,7 @@ fn encode_response(res: ExportLogsServiceResponse, is_grpc: bool) -> (&'static s
         res.encode(&mut out).expect("Out of memory");
         return (CONTENT_TYPE_PROTO, out);
     }
-    return (CONTENT_TYPE_JSON, serde_json::to_vec(&res).unwrap());
+    (CONTENT_TYPE_JSON, serde_json::to_vec(&res).unwrap())
 }
 
 pub async fn handle_grpc_request(
