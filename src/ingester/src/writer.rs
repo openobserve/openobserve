@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -74,11 +74,17 @@ pub fn check_memtable_size() -> Result<()> {
 }
 
 /// Get a writer for a given org_id and stream_type
-pub async fn get_writer(org_id: &str, stream_type: &str, stream_name: &str) -> Arc<Writer> {
+pub async fn get_writer(
+    thread_id: usize,
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> Arc<Writer> {
     let idx = if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else {
-        let hash_id = gxhash::new().sum64(stream_name);
+        let key = format!("{}_{}", thread_id, stream_name);
+        let hash_id = gxhash::new().sum64(&key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     };
     let key = WriterKey::new(org_id, stream_type);

@@ -59,7 +59,8 @@
     "addGroup":"Add Group",
     "addCondition":"Add Condition",
     "required": "Value is required",
-    "valueMustBeGreaterThanZero": "Value must be greater than zero"
+    "valueMustBeGreaterThanZero": "Value must be greater than zero",
+    "links": "Links"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -112,6 +113,7 @@
     "noRecordFound": "No records found. Please adjust filters and try again.",
     "functionErrorLabel": "Query execution warning: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
+    "functionErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search Saved View",
     "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist.",

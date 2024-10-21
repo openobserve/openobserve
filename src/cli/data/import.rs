@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,6 +43,7 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
         if path.is_file() {
             let content = fs::read(&path)?;
             if let Err(e) = logs::ingest::ingest(
+                0,
                 &c.org,
                 &c.stream_name,
                 IngestionRequest::JSON(&Bytes::from(content)),

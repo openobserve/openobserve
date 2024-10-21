@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -37,7 +38,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
+        ingestion::{IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_PROTO,
@@ -52,6 +53,7 @@ use crate::{
 };
 
 pub async fn handle_grpc_request(
+    thread_id: usize,
     org_id: &str,
     request: ExportLogsServiceRequest,
     is_grpc: bool,
@@ -342,6 +344,7 @@ pub async fn handle_grpc_request(
 
     let mut status = IngestionStatus::Record(stream_status.status);
     let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        thread_id,
         org_id,
         user_email,
         (started_at, &start),
@@ -476,7 +479,7 @@ mod tests {
         };
 
         let result =
-            handle_grpc_request(org_id, request, true, Some("test_stream"), "a@a.com").await;
+            handle_grpc_request(0, org_id, request, true, Some("test_stream"), "a@a.com").await;
         assert!(result.is_ok());
     }
 }

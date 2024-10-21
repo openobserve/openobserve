@@ -16,8 +16,6 @@ export class LogsPage {
     this.filterMessage = page.locator('div:has-text("info Adjust filter parameters and click \'Run query\'")');
 
     this.dateTimeButton = dateTimeButtonLocator;
-   
-    // this.dateTimeButton = process.env["dateTimeButtonLocator"];
 
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
 
@@ -79,14 +77,13 @@ export class LogsPage {
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
+
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.absoluteTab).click();
-    
-
+   await this.page.waitForTimeout(1000);
   }
 
   async fillTimeRange(startTime, endTime) {
-
     await this.page.locator(oneDateMonthLocator).click();
 
     //await this.page.getByRole('button', { name: '1', exact: true }).click();
@@ -98,6 +95,12 @@ export class LogsPage {
 
     await this.page.getByLabel('access_time').nth(1).fill(endTime);
     
+  //  await this.page.getByRole('button', { name: '1', exact: true }).click();
+  //  await this.page.getByLabel('access_time').first().fill(startTime);
+  //  await this.page.getByRole('button', { name: '1', exact: true }).click();
+  //  await this.page.getByLabel('access_time').nth(1).fill(endTime);
+    // await this.page.waitForTimeout(1000);
+
   }
 
   async verifyDateTime(startTime, endTime) {

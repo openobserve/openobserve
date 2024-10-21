@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use infra::{
     scheduler,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::add_init_ofga_tuples;
 #[cfg(feature = "enterprise")]
@@ -349,7 +349,7 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
         log::info!("[Report:Migration]: Done migrating report: {}", key);
     }
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
@@ -394,7 +394,7 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
         log::info!("[Template:Migration]: Done migrating template: {}", key);
     }
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
@@ -459,7 +459,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
@@ -550,7 +550,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "enterprise")]
-    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+    if !write_tuples.is_empty() && get_o2_config().openfga.enabled {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())

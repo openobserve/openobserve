@@ -3,9 +3,8 @@ import { expect } from '@playwright/test';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
 
-
-export
-  class TracesPage {
+export 
+class TracesPage {
   constructor(page) {
     this.page = page;
 
@@ -14,7 +13,6 @@ export
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
-
 
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
     this.signOutButton = page.getByText('Sign Out');
@@ -25,6 +23,13 @@ export
   async navigateToTraces() {
     await this.tracesMenuItem.click({ force: true });
     //await this.page.waitForTimeout(5000);
+
+  
+  }
+
+  async navigateToTraces() {
+    await this.tracesMenuItem.click();
+
   }
 
   async setTimeToPast30Seconds() {
@@ -37,14 +42,11 @@ export
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
-
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.absoluteTab).click();
-
-
   }
   async fillTimeRange(startTime, endTime) {
 
@@ -64,6 +66,11 @@ export
   async verifyDateTime(startTime, endTime) {
     // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
     await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
+
+
+  async verifyDateTime(startTime, endTime) {
+    await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+
   }
 
   async signOut() {

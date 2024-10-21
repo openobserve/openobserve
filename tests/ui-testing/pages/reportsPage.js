@@ -1,7 +1,5 @@
 import { expect } from '@playwright/test';
-
 import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
-
 
 export  class ReportsPage {
   constructor(page) {
@@ -60,10 +58,17 @@ export  class ReportsPage {
 
     
     await this.page.getByLabel('access_time').nth(1).fill(String(endTime));
+
+  //  await this.page.getByRole('button', { name: '1', exact: true }).click();
+ //   await this.page.getByLabel('access_time').first().fill(startTime);
+ //   await this.page.getByRole('button', { name: '1', exact: true }).click();
+ //   await this.page.getByLabel('access_time').nth(1).fill(endTime);
+
     
   }
 
   async verifyDateTime(startTime, endTime) {
+
     // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
      await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
    }
@@ -72,6 +77,15 @@ export  class ReportsPage {
      await this.profileButton.click();
      await this.signOutButton.click();
    }
+
+  //  await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+  }
+
+  async signOut() {
+    await this.profileButton.click();
+    await this.signOutButton.click();
+  }
+
 }
 
 

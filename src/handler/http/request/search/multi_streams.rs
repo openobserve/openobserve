@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,6 +38,7 @@ use crate::{
             functions,
             http::{
                 get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_work_group,
             },
         },
     },
@@ -349,6 +350,7 @@ pub async fn search_multi(
                     } else {
                         None
                     },
+                    work_group: res.work_group,
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
@@ -1108,6 +1110,10 @@ pub async fn around_multi(
                 (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
                 _ => None,
             },
+            work_group: get_work_group(vec![
+                resp_forward.work_group.clone(),
+                resp_backward.work_group.clone(),
+            ]),
             ..Default::default()
         };
         let num_fn = query_fn.is_some() as u16;

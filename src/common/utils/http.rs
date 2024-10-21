@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{Error, ErrorKind},
     net::{AddrParseError, IpAddr, SocketAddr},
 };
@@ -211,6 +211,16 @@ impl<'a> Extractor for RequestHeaderExtractor<'a> {
     fn keys(&self) -> Vec<&str> {
         self.headers.keys().map(|header| header.as_str()).collect()
     }
+}
+
+pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
+    let work_groups = work_group_set.into_iter().flatten().collect::<HashSet<_>>();
+    if work_groups.contains("long") {
+        return Some("long".to_string());
+    } else if work_groups.contains("short") {
+        return Some("short".to_string());
+    }
+    None
 }
 
 #[cfg(test)]

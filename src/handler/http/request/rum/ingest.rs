@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,7 @@ pub async fn data(
     let extend_json = &rum_query_data.data;
     Ok(
         match logs::ingest::ingest(
+            0,
             &org_id,
             RUM_DATA_STREAM,
             IngestionRequest::RUM(&body),
@@ -156,6 +157,7 @@ pub async fn log(
     let extend_json = &rum_query_data.data;
     Ok(
         match logs::ingest::ingest(
+            0,
             &org_id,
             RUM_LOG_STREAM,
             IngestionRequest::RUM(&body),
@@ -214,6 +216,7 @@ pub async fn sessionreplay(
     let extend_json = &rum_query_data.data;
     Ok(
         match logs::ingest::ingest(
+            0,
             &org_id,
             RUM_SESSION_REPLAY_STREAM,
             IngestionRequest::RUM(&body.into()),

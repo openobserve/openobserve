@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -39,6 +39,11 @@ pub struct Destination {
     /// Required when `destination_type` is `Email`
     #[serde(default)]
     pub emails: Vec<String>,
+    // New SNS-specific fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sns_topic_arn: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aws_region: Option<String>,
     #[serde(rename = "type")]
     #[serde(default)]
     pub destination_type: DestinationType,
@@ -51,6 +56,8 @@ pub enum DestinationType {
     Http,
     #[serde(rename = "email")]
     Email,
+    #[serde(rename = "sns")]
+    Sns,
 }
 
 impl Destination {
@@ -64,6 +71,8 @@ impl Destination {
             template,
             emails: self.emails.clone(),
             destination_type: self.destination_type.clone(),
+            sns_topic_arn: self.sns_topic_arn.clone(),
+            aws_region: self.aws_region.clone(),
         }
     }
 }
@@ -80,6 +89,10 @@ pub struct DestinationWithTemplate {
     pub template: Template,
     pub emails: Vec<String>,
     pub destination_type: DestinationType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sns_topic_arn: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aws_region: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

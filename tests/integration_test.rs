@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,10 @@ mod tests {
     use chrono::Utc;
     use config::{get_config, utils::json};
     use openobserve::{
-        common::meta::dashboards::{v1, Dashboard, Dashboards},
+        common::meta::{
+            alerts::destinations::{Destination, DestinationType},
+            dashboards::{v1, Dashboard, Dashboards},
+        },
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::router::*,
@@ -198,6 +201,24 @@ mod tests {
         e2e_delete_alert().await;
         e2e_delete_alert_destination().await;
         e2e_delete_alert_template().await;
+
+        // SNS-specific alert tests
+        // Set up templates
+        e2e_post_alert_template().await;
+        e2e_post_sns_alert_template().await;
+
+        // SNS destination tests
+        e2e_post_sns_alert_destination().await;
+        e2e_get_sns_alert_destination().await;
+        e2e_list_alert_destinations_with_sns().await;
+        e2e_update_sns_alert_destination().await;
+
+        // Create and test alert with SNS destination
+        e2e_post_alert_with_sns_destination().await;
+
+        // Cleanup
+        e2e_delete_alert_with_sns_destination().await;
+        e2e_delete_sns_alert_destination().await;
 
         // syslog
         e2e_post_syslog_route().await;
@@ -1299,6 +1320,249 @@ mod tests {
         .await;
         let req = test::TestRequest::get()
             .uri(&format!("/api/{}/alerts/destinations", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_sns_alert_template() {
+        let auth = setup();
+        let body_str = r#"{
+            "name": "snsTemplate",
+            "body": "{\"default\": \"SNS alert {alert_name} triggered for {stream_name} in {org_name}\"}"
+        }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/alerts/templates", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_sns_alert_destination() {
+        let auth = setup();
+        let body_str = r#"{
+            "name": "sns_alert",
+            "type": "sns",
+            "sns_topic_arn": "arn:aws:sns:us-east-1:123456789012:MyTopic",
+            "aws_region": "us-east-1",
+            "template": "snsTemplate"
+        }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_get_sns_alert_destination() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!(
+                "/api/{}/alerts/destinations/{}",
+                "e2e", "sns_alert"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Optionally, deserialize and check the response body
+        let body = test::read_body(resp).await;
+        let destination: Destination = serde_json::from_slice(&body).unwrap();
+        assert_eq!(destination.destination_type, DestinationType::Sns);
+        assert_eq!(
+            destination.sns_topic_arn,
+            Some("arn:aws:sns:us-east-1:123456789012:MyTopic".to_string())
+        );
+        assert_eq!(destination.aws_region, Some("us-east-1".to_string()));
+    }
+
+    async fn e2e_list_alert_destinations_with_sns() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Optionally, deserialize and check the response body
+        let body = test::read_body(resp).await;
+        let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
+        assert!(
+            destinations
+                .iter()
+                .any(|d| d.destination_type == DestinationType::Sns)
+        );
+    }
+
+    async fn e2e_update_sns_alert_destination() {
+        let auth = setup();
+        let body_str = r#"{
+            "name": "sns_alert",
+            "type": "sns",
+            "sns_topic_arn": "arn:aws:sns:us-west-2:123456789012:UpdatedTopic",
+            "aws_region": "us-west-2",
+            "template": "snsTemplate"
+        }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::put()
+            .uri(&format!(
+                "/api/{}/alerts/destinations/{}",
+                "e2e", "sns_alert"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_delete_sns_alert_destination() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::delete()
+            .uri(&format!(
+                "/api/{}/alerts/destinations/{}",
+                "e2e", "sns_alert"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_alert_with_sns_destination() {
+        let auth = setup();
+        let body_str = r#"{
+            "name": "sns_test_alert",
+            "stream_type": "logs",
+            "stream_name": "olympics_schema",
+            "is_real_time": false,
+            "query_condition": {
+                "conditions": [{
+                    "column": "level",
+                    "operator": "=",
+                    "value": "error"
+                }]
+            },
+            "trigger_condition": {
+                "period": 5,
+                "threshold": 1,
+                "silence": 10
+            },
+            "destinations": ["sns_alert"],
+            "context_attributes": {
+                "app_name": "TestApp"
+            }
+        }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/alerts", "e2e", "test_stream"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_delete_alert_with_sns_destination() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::delete()
+            .uri(&format!(
+                "/api/{}/{}/alerts/{}",
+                "e2e", "test_stream", "sns_test_alert"
+            ))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -456,6 +456,7 @@ pub async fn send_notification(
     match dest.destination_type {
         DestinationType::Http => send_http_notification(dest, msg.clone()).await,
         DestinationType::Email => send_email_notification(&email_subject, dest, msg).await,
+        DestinationType::Sns => send_sns_notification(&alert.name, dest, msg).await,
     }
 }
 
@@ -551,8 +552,44 @@ pub async fn send_email_notification(
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
-        Ok(resp) => Ok(format!("sent response code: {}", resp.code())),
+        Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
+    }
+}
+
+pub async fn send_sns_notification(
+    alert_name: &str,
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    let mut message_attributes = HashMap::new();
+    message_attributes.insert(
+        "AlertName".to_string(),
+        aws_sdk_sns::types::MessageAttributeValue::builder()
+            .data_type("String")
+            .string_value(alert_name)
+            .build()?,
+    );
+
+    let sns_client = config::get_sns_client().await;
+    let ret = sns_client
+        .publish()
+        .topic_arn(
+            dest.sns_topic_arn
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("SNS Topic ARN is missing"))?,
+        )
+        .message(msg)
+        .set_message_attributes(Some(message_attributes))
+        .send()
+        .await;
+    match ret {
+        Ok(resp) => Ok(format!(
+            "sent SNS response message_id: {:?}, sequence_number: {:?}",
+            resp.message_id(),
+            resp.sequence_number()
+        )),
+        Err(e) => Err(anyhow::anyhow!("Error sending SNS notification: {e}")),
     }
 }
 
@@ -804,7 +841,7 @@ async fn process_dest_template(
     };
 
     // Shorten the alert url
-    let alert_url = match short_url::shorten(&alert_url).await {
+    let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
         Ok(short_url) => short_url,
         Err(e) => {
             log::error!("Error shortening alert url: {e}");

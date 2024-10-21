@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,7 +40,7 @@ use crate::{
             functions,
             http::{
                 get_index_type_from_request, get_or_create_trace_id, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
         },
     },
@@ -591,6 +591,10 @@ pub async fn around(
             (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
             _ => None,
         },
+        work_group: get_work_group(vec![
+            resp_forward.work_group.clone(),
+            resp_backward.work_group.clone(),
+        ]),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -974,6 +978,7 @@ async fn values_v1(
 
     let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
+    let mut work_group_set = Vec::with_capacity(query_results.len());
     for (key, ret) in query_results {
         let mut top_hits: HashMap<String, i64> = HashMap::default();
         for row in ret.hits {
@@ -1013,6 +1018,7 @@ async fn values_v1(
         resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
         resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
         resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
+        work_group_set.push(ret.work_group);
     }
     resp.total = fields.len();
     resp.hits = hit_values;
@@ -1040,6 +1046,7 @@ async fn values_v1(
         } else {
             None
         },
+        work_group: get_work_group(work_group_set),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1282,6 +1289,7 @@ async fn values_v2(
         } else {
             None
         },
+        work_group: resp_search.work_group,
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1607,6 +1615,7 @@ pub async fn search_history(
         search_type: Some(SearchEventType::Other),
         trace_id: Some(trace_id),
         took_wait_in_queue,
+        work_group: search_res.work_group.clone(),
         ..Default::default()
     };
     let num_fn = search_query_req.query.query_fn.is_some() as u16;

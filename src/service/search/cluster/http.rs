@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -62,7 +62,7 @@ pub async fn search(
 
     // handle query function
     #[cfg(feature = "enterprise")]
-    let ret = if o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+    let ret = if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
         .enabled
         && !local_cluster_search
@@ -81,7 +81,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req, query).await;
 
-    let (merge_batches, scan_stats, took_wait, is_partial, idx_took) = match ret {
+    let (merge_batches, scan_stats, took_wait, is_partial, idx_took, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
@@ -215,7 +215,7 @@ pub async fn search(
 
     result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
-    result.set_partial(is_partial);
+    result.set_partial(is_partial, partial_err);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);

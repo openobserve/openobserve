@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -198,6 +198,7 @@ pub async fn save_enrichment_data(
 
     // write data to wal
     let writer = ingester::get_writer(
+        0,
         org_id,
         &StreamType::EnrichmentTables.to_string(),
         stream_name,

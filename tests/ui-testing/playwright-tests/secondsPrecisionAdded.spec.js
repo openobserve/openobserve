@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/loginPage.js';
 import { LogsPage } from '../pages/logsPage.js';
+
 import { TracesPage } from '../pages/tracesPage.js';
 import { ReportsPage } from '../pages/reportsPage.js';
 import { DashboardPage } from '../pages/dashboardPage.js';
@@ -12,7 +13,6 @@ import { RumPage } from '../pages/rumPage.js';
 
 import{ startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } from '../pages/CommonLocator.js';
 
-//import {CommomnLocator} from '../pages/CommonLocator'
 
 //console.log ('Login Started')
 
@@ -49,7 +49,6 @@ test('Relative Seconds on Logs page', async ({ page }) => {
 
 });
 
-
 test('Absolute Seconds on Logs page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
@@ -68,20 +67,14 @@ test('Absolute Seconds on Logs page', async ({ page }) => {
   // Step 2: Navigate to Logs Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
- // await logsPage.selectOrganization();
-
   // Navigate to Logs page
 
   await logsPage.navigateToLogs();
 
   // Step 3: Select Index and Stream
   await page.waitForTimeout(3000);  // Wait for logs page to load
-  //await logsPage.selectIndexAndStream();
 
-  // Step 4: Set the time to past 30 seconds and verify
-  //await logsPage.adjustFilterParameters();
-  //await logsPage.enableSQLMode();
-
+ 
   // Set the Date and Time Range
   await logsPage.setDateTime();
   await logsPage.fillTimeRange(startTimeValue, endTimeValue);
@@ -115,6 +108,7 @@ test('Relative second on traces', async ({ page }) => {
 
   await tracesPage.navigateToTraces();
 
+
   await page.waitForTimeout(4000);  // Wait for login process
 
   // Step 4: Set the time to past 30 seconds and verify
@@ -145,6 +139,7 @@ test('Absolute second on traces', async ({ page }) => {
   // Step 2: Navigate to the traces page and perform actions
 
   await tracesPage.navigateToTraces();
+
   await page.waitForTimeout(4000);  // Wait for login process
   // Step 4: // Set the Date and Time Range
 
@@ -180,10 +175,12 @@ test('Relative second on reports', async ({ page }) => {
 
   await reportsPage.navigateToReports();
 
+
   await page.waitForTimeout(4000);  // Wait for login process
 
   await reportsPage.addNewReport();
   await page.waitForTimeout(4000);  // Wait for login process
+
   // Step 4: Set the time to past 30 seconds and verify
 
   await reportsPage.setTimeToPast30Seconds();
@@ -220,6 +217,7 @@ test('Absolute second on report', async ({ page }) => {
   // Step 4: // Set the Date and Time Range
 
   await reportsPage.setDateTime();
+
   await reportsPage.fillTimeRange(startTimeValue, endTimeValue);
 
   // Verify the time range is displayed correctly
@@ -251,7 +249,8 @@ test('Relative second on dashboard', async ({ page }) => {
   await page.waitForTimeout(4000);  // Wait for login process
   await dashboardPage.addDashboard('Relative D');
   await page.waitForTimeout(4000);  // Wait for login process
-  // Step 4: Set the time to past 30 seconds and verify
+
+  // Step 3: Set the time to past 30 seconds and verify
 
   await dashboardPage.setTimeToPast30Seconds();
   await dashboardPage.verifyTimeSetTo30Seconds();
@@ -277,6 +276,7 @@ test('Absolute second on dashboard', async ({ page }) => {
 
   // Step 2: Navigate to the dashboard page and add a new dashboard
   await dashboardPage.navigateToDashboards();
+
   await page.waitForTimeout(4000);  // Wait for login process
   await dashboardPage.addDashboard('Absolute DB');
   await page.waitForTimeout(4000);  // Wait for login process
@@ -284,6 +284,7 @@ test('Absolute second on dashboard', async ({ page }) => {
   // Step 3: // Set the Date and Time Range
 
   await dashboardPage.setDateTime();
+
   await dashboardPage.fillTimeRange(startTimeValue, endTimeValue);
 
   // Verify the time range is displayed correctly
@@ -311,7 +312,9 @@ test('Relative second on alert', async ({ page }) => {
 
   // Navigate to Alerts and Create Alert
   await alertPage.navigateToAlerts();
+
   await page.waitForTimeout(4000);  // Wait for login process
+
   await alertPage.createAlert();
 
 
@@ -389,6 +392,7 @@ test('Absolute conds on Metrics page', async ({ page }) => {
 
 
 });
+
 
 test('Relative Seconds on RUM Performance page', async ({ page }) => {
   // Create page object instances
@@ -544,7 +548,7 @@ test('Relative Seconds on RUM Tracking page', async ({ page }) => {
 
 });
 
-test('Absolute conds on RUM Tracking page', async ({ page }) => {
+test('Absolute seconds on RUM Tracking page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const rumPage = new RumPage(page);

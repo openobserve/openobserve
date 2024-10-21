@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,7 @@ pub async fn work_group_checking(
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender, false)
         .await
         .is_err()
     {
@@ -91,6 +91,7 @@ pub async fn work_group_need_wait(
     work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
     user_id: Option<&str>,
 ) -> Result<()> {
+    let mut log_wait = false;
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
             metrics::QUERY_TIMEOUT_NUMS
@@ -100,15 +101,36 @@ pub async fn work_group_need_wait(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));
         }
-        match work_group.as_ref().unwrap().need_wait(user_id).await {
-            Ok(true) => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
-            Ok(false) => {
-                return Ok(());
-            }
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
+        if let Some(wg) = work_group.as_ref() {
+            match wg.need_wait(user_id).await {
+                Ok((true, cur, max)) => {
+                    if !log_wait {
+                        log::info!(
+                            "[trace_id {trace_id}] user: {:?} is waiting in work_group {:?}[{}/{}]",
+                            user_id,
+                            wg,
+                            cur,
+                            max
+                        );
+                        log_wait = true;
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+                Ok((false, cur, max)) => {
+                    if log_wait {
+                        log::info!(
+                            "[trace_id {trace_id}] user: {:?} get approved in work_group  {:?}[{}/{}]",
+                            user_id,
+                            wg,
+                            cur,
+                            max
+                        );
+                    }
+                    return Ok(());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
             }
         }
     }

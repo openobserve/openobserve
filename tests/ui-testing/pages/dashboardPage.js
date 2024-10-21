@@ -2,6 +2,8 @@ import { expect } from '@playwright/test';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
 
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
+
 
 export class DashboardPage {
   constructor(page) {
@@ -58,7 +60,6 @@ export class DashboardPage {
   }
 
   async fillTimeRange(startTime, endTime) {
-
     await this.page.locator(oneDateMonthLocator).click();
     await this.page.waitForTimeout(3000);
         
@@ -78,6 +79,17 @@ export class DashboardPage {
   async verifyDateTime(startTime, endTime) {
    // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
     await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
+
+    await this.page.getByRole('button', { name: '1', exact: true }).click();
+    await this.page.getByLabel('access_time').first().fill(startTime);
+    await this.page.getByRole('button', { name: '1', exact: true }).click();
+    await this.page.getByLabel('access_time').nth(1).fill(endTime);
+
+  }
+
+  async verifyDateTime(startTime, endTime) {
+    await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+
   }
 
   async signOut() {
