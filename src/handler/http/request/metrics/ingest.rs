@@ -57,6 +57,7 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
 }
 
 /// MetricsIngest
+// json example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",

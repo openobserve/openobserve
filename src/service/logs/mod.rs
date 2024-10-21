@@ -56,7 +56,6 @@ use crate::{
 pub mod bulk;
 pub mod ingest;
 pub mod otlp_grpc;
-pub mod otlp_http;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
