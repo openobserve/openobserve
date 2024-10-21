@@ -620,8 +620,12 @@ const setExpandedRows = () => {
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
   emits("copy", value, copyAsJson);
 };
-const addSearchTerm = (value: string) => {
-  emits("addSearchTerm", value);
+const addSearchTerm = (
+  field: string,
+  field_value: string | number | boolean,
+  action: string,
+) => {
+  emits("addSearchTerm", field, field_value, action);
 };
 const addFieldToTable = (value: string) => {
   emits("addFieldToTable", value);
