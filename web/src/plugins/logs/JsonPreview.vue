@@ -318,7 +318,7 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
-    const { searchObj,searchAggData, getFilterExpressionByFieldType } = useLogs();
+    const { searchObj,searchAggData } = useLogs();
     let multiStreamFields: any = ref([]);
 
     onBeforeMount(() => {
