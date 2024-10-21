@@ -247,8 +247,6 @@ const searchAggData = reactive({
   hasAggregation: false,
 });
 
-const selectedStreamFieldType:any = {};
-
 let histogramResults: any = [];
 let histogramMappedData: any = [];
 const intervalMap: any = {
