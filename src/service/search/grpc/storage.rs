@@ -473,6 +473,11 @@ async fn filter_file_list_by_inverted_index(
     } else {
         false
     };
+    log::info!(
+        "[trace_id {}] search->storage: query using tantivy: {}",
+        query.trace_id,
+        use_tantivy,
+    );
 
     // Cache the corresponding Index files
     let cfg = get_config();
@@ -512,33 +517,35 @@ async fn filter_file_list_by_inverted_index(
         cache_type,
     );
 
-    let full_text_terms = Arc::new(
-        match_terms
-            .iter()
-            .filter_map(|t| {
-                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-                // If tokens empty return None so that full_text_terms will not have empty strings
-                if tokens.is_empty() {
-                    return None;
-                }
-                Some(
-                    tokens
-                        .into_iter()
-                        .max_by_key(|key| key.len())
-                        .unwrap_or_default(),
-                )
-            })
-            .collect_vec(),
-    );
+    let full_text_terms = if !use_tantivy {
+        Arc::new(
+            match_terms
+                .iter()
+                .filter_map(|t| {
+                    let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+                    // If tokens empty return None so that full_text_terms will not have empty
+                    // strings
+                    if tokens.is_empty() {
+                        return None;
+                    }
+                    Some(
+                        tokens
+                            .into_iter()
+                            .max_by_key(|key| key.len())
+                            .unwrap_or_default(),
+                    )
+                })
+                .collect_vec(),
+        )
+    } else {
+        Arc::new(match_terms.to_vec())
+    };
+
     let index_terms = Arc::new(index_terms);
+
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     let mut tasks = Vec::new();
 
-    log::info!(
-        "[trace_id {}] search->storage: query using tantivy: {}",
-        query.trace_id,
-        use_tantivy,
-    );
     for file in file_list_map.keys() {
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
@@ -547,27 +554,31 @@ async fn filter_file_list_by_inverted_index(
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
-        let task = tokio::task::spawn(async move {
-            let res = if use_tantivy {
-                search_tantivy_index(
+        let task = if use_tantivy {
+            tokio::task::spawn(async move {
+                let res = search_tantivy_index(
                     trace_id_clone.as_str(),
                     &file_name,
                     full_text_term_clone,
                     index_terms_clone,
                 )
-                .await
-            } else {
-                inverted_index_search_in_file(
+                .await;
+                drop(permit);
+                res
+            })
+        } else {
+            tokio::task::spawn(async move {
+                let res = inverted_index_search_in_file(
                     trace_id_clone.as_str(),
                     &file_name,
                     full_text_term_clone,
                     index_terms_clone,
                 )
-                .await
-            };
-            drop(permit);
-            res
-        });
+                .await;
+                drop(permit);
+                res
+            })
+        };
 
         tasks.push(task)
     }
@@ -590,8 +601,7 @@ async fn filter_file_list_by_inverted_index(
                         // we expect each file name has atleast 1 file
                         .unwrap();
                     let hits_per_file = res.count_ones();
-                    // Cannot convert to u8 since row number larger than 255
-                    // convert to bitvec
+                    total_hits += hits_per_file;
                     file.segment_ids = Some(res.into_vec());
                     log::info!(
                         "[trace_id {}] search->storage: hits for fts_terms {:?} and index_terms: {:?} found {} in {}",
@@ -601,7 +611,6 @@ async fn filter_file_list_by_inverted_index(
                         hits_per_file,
                         file_name
                     );
-                    total_hits += hits_per_file;
                 } else {
                     // if the bitmap is empty then we remove the file from the list
                     log::info!(
