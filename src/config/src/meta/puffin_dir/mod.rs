@@ -1,28 +1,14 @@
-use std::{
-    io::{self, Write},
-    path::{Path, PathBuf},
-    sync::{Arc, LazyLock, RwLock},
-};
+use std::{io::Write, path::PathBuf, sync::LazyLock};
 
-use ahash::HashSet;
-use anyhow::{Context, Result};
-use futures::{AsyncRead, AsyncSeek};
-use hashbrown::HashMap;
-use itertools::Itertools;
+use anyhow::Result;
 use puffin_dir_writer::PuffinDirWriter;
 use tantivy::{
-    directory::{
-        error::OpenReadError, Directory, FileHandle, RamDirectory, WatchCallback, WatchHandle,
-    },
+    directory::{Directory, OwnedBytes},
     doc,
     schema::Schema,
-    HasLen,
 };
 
-use crate::{
-    get_config,
-    meta::puffin::{reader::PuffinBytesReader, writer::PuffinBytesWriter},
-};
+use crate::get_config;
 
 pub mod puffin_dir_reader;
 pub mod puffin_dir_writer;
@@ -52,6 +38,29 @@ static EMPTY_PUFFIN_DIRECTORY: LazyLock<PuffinDirWriter> = LazyLock::new(|| {
     index_writer.finalize().unwrap();
     puffin_dir
 });
+
+// Lazy loaded global segment id of the empty puffin directory which will be used to construct the
+// path of a file
+static EMPTY_PUFFIN_SEG_ID: LazyLock<String> = LazyLock::new(|| {
+    EMPTY_PUFFIN_DIRECTORY
+        .list_files()
+        .iter()
+        .find(|path| path.extension().is_some_and(|ext| ext != "json"))
+        .unwrap()
+        .file_stem()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned()
+});
+
+pub fn get_file_from_empty_puffin_dir_with_ext(file_ext: &str) -> Result<OwnedBytes> {
+    let empty_puffin_dir = &EMPTY_PUFFIN_DIRECTORY;
+    let seg_id = &EMPTY_PUFFIN_SEG_ID;
+    let file_path = format!("{}.{}", seg_id.as_str(), file_ext);
+    let file_data = empty_puffin_dir.open_read(&PathBuf::from(file_path))?;
+    Ok(file_data.read_bytes()?)
+}
 
 pub fn convert_puffin_dir_to_tantivy_dir(
     mut puffin_dir_path: PathBuf,

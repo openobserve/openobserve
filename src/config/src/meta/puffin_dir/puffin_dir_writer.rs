@@ -1,5 +1,23 @@
-use super::*;
+use std::{
+    io::{self, Write},
+    path::{Path, PathBuf},
+    sync::{Arc, RwLock},
+};
 
+use ahash::HashSet;
+use anyhow::{Context, Result};
+use tantivy::{
+    directory::{error::OpenReadError, Directory, RamDirectory, WatchCallback, WatchHandle},
+    HasLen,
+};
+
+use crate::{
+    get_config,
+    meta::{
+        puffin::writer::PuffinBytesWriter,
+        puffin_dir::{ALLOWED_FILE_EXT, META_JSON, TANTIVY_INDEX_VERSION},
+    },
+};
 /// Puffin directory is a puffin file which contains all the tantivy files.
 /// Each tantivy file is stored as a blob in the puffin file, along with their file name.
 #[derive(Debug)]
@@ -80,7 +98,6 @@ impl PuffinDirWriter {
     pub fn to_puffin_bytes(&self) -> Result<Vec<u8>> {
         let mut puffin_buf: Vec<u8> = Vec::new();
         let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
-        let empty_puffin_dir = &EMPTY_PUFFIN_DIRECTORY;
         let mut segment_id = String::new();
 
         let file_paths = self.file_paths.read().expect("poisoned lock");
@@ -117,47 +134,6 @@ impl PuffinDirWriter {
                         .to_vec(),
                     TANTIVY_INDEX_VERSION.to_string(),
                     path.to_str().unwrap().to_owned(),
-                    false,
-                )
-                .context("Failed to add blob")?;
-        }
-
-        let allowed_file_paths = allowed_file_paths.collect_vec();
-        // find the files which are present in the empty puffin dir instance and write them
-        // to the new puffin directory
-        for file in empty_puffin_dir
-            .list_files()
-            .iter()
-            .filter(|file_name| !file_name.extension().is_some_and(|ext| ext == "json"))
-        {
-            let mut empty_puffin_dir_path = PathBuf::from(&file);
-
-            // convert the empty puffin dir path to match the current dir file names
-            let ext = empty_puffin_dir_path.extension().unwrap().to_str().unwrap();
-            empty_puffin_dir_path.set_file_name(format!("{}.{}", segment_id, ext));
-
-            // we skip the files which are already added
-            if allowed_file_paths.contains(&&empty_puffin_dir_path) {
-                continue;
-            }
-
-            let path = PathBuf::from(&file);
-            let file_data = empty_puffin_dir.open_read(&path)?;
-
-            log::debug!(
-                "Substituting file for puffin dir: len: {}, path: {}",
-                file_data.len(),
-                path.to_str().unwrap()
-            );
-
-            puffin_writer
-                .add_blob(
-                    &file_data
-                        .read_bytes()
-                        .expect("failed to read file")
-                        .to_vec(),
-                    TANTIVY_INDEX_VERSION.to_string(),
-                    empty_puffin_dir_path.to_str().unwrap().to_owned(),
                     false,
                 )
                 .context("Failed to add blob")?;

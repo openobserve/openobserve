@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp, path::PathBuf, sync::Arc};
+use std::{cmp, sync::Arc};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -577,6 +577,7 @@ async fn filter_file_list_by_inverted_index(
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
     {
+        let result: anyhow::Result<(String, Option<BitVec>)> = result;
         // Each result corresponds to a file in the file list
         match result {
             Ok((file_name, bitvec)) => {
@@ -664,13 +665,53 @@ async fn fetch_file(trace_id: &str, file_name: &str) -> anyhow::Result<Vec<u8>> 
     storage::get(file_name).await.map(|bytes| bytes.to_vec())
 }
 
+fn search_tantivy_index_with_field(
+    query_parser: QueryParser,
+    field: tantivy::schema::Field,
+    tantivy_searcher: tantivy::Searcher,
+    fts_terms: &Vec<String>,
+) -> anyhow::Result<(HashSet<tantivy::DocAddress>, u32)> {
+    let cfg = get_config();
+    let mut max_doc_id = 0;
+    let mut matched_docs = HashSet::new();
+
+    // TODO: improve this logic
+    // The issue is joining the full text search terms
+    // Ideally there should be multiple queries for each term
+    // and their result should be intersected
+    let query: Box<dyn Query> = match cfg.common.full_text_search_type.as_str() {
+        "eq" => query_parser.parse_query(&fts_terms.join(" "))?,
+        "contains" => Box::new(RegexQuery::from_pattern(
+            &format!("*{}*", &fts_terms.join(" ")),
+            field,
+        )?),
+        // Default to prefix search
+        _ => Box::new(PhrasePrefixQuery::new(vec![Term::from_field_text(
+            field,
+            // we join all the fields that are full text searchable
+            &fts_terms.join(" "),
+        )])),
+    };
+
+    let docs = tantivy_searcher
+        .search(&query, &tantivy::collector::DocSetCollector)
+        .unwrap();
+
+    for doc in docs {
+        max_doc_id = cmp::max(doc.doc_id, max_doc_id);
+        matched_docs.insert(doc);
+    }
+
+    Ok((matched_docs, max_doc_id))
+}
+
 async fn search_tantivy_index(
     trace_id: &str,
     parquet_file_name: &str,
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
-    let cfg = get_config();
+    let search_index_timer = std::time::Instant::now();
     let Some(tantivy_index_file_name) =
         convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
@@ -680,86 +721,81 @@ async fn search_tantivy_index(
         ));
     };
 
-    let puffin_dir = {
-        let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
-        PuffinDirReader::from_bytes(Cursor::new(index_file_bytes)).await?
-    };
+    let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
+    let fetch_file_tt = search_index_timer.elapsed();
+    log::info!(
+        "[trace_id {}] search->storage: fetch_file took {} s, {} ms",
+        trace_id,
+        fetch_file_tt.as_secs(),
+        fetch_file_tt.as_millis(),
+    );
 
-    // convert_puffin_dir_to_tantivy_dir(PathBuf::from(tantivy_index_file_name),
-    // puffin_dir.clone()); let tantivy_dir_real_path = format!("{}/{}",
-    // &cfg.common.data_stream_dir, tantivy_dir);
+    let puffin_dir = PuffinDirReader::from_bytes(Cursor::new(index_file_bytes)).await?;
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
-    let tantivy_reader = tantivy_index.reader().unwrap();
+    let tantivy_reader = tantivy_index.reader()?;
     let tantivy_searcher = tantivy_reader.searcher();
+    let elapsed_tantivy_searcher = search_index_timer.elapsed() - fetch_file_tt;
+    log::info!(
+        "[trace_id {}] search->storage: Tantivy seracher ready took {} s, {} ms",
+        trace_id,
+        elapsed_tantivy_searcher.as_secs(),
+        elapsed_tantivy_searcher.as_millis(),
+    );
 
     let mut matched_docs = HashSet::new();
 
     let mut max_doc_id = 0u32;
     if !fts_terms.is_empty() {
-        let full_text_field = tantivy_schema.get_field("_all")?;
-        let query_parser = QueryParser::for_index(
-            &tantivy_index,
-            vec![tantivy_schema.get_field("_all").unwrap()],
-        );
-        // TODO(Uddhav): improve this logic
-        // The issue is joining the full text search terms
-        // Ideally there should be multiple queries for each term
-        // and their result should be intersected
-        let query: Box<dyn Query> = match cfg.common.full_text_search_type.as_str() {
-            "eq" => query_parser.parse_query(&fts_terms.join(" "))?,
-            "contains" => Box::new(RegexQuery::from_pattern(
-                &format!("*{}*", &fts_terms.join(" ")),
-                full_text_field,
-            )?),
-            // Default to prefix search
-            _ => Box::new(PhrasePrefixQuery::new(vec![Term::from_field_text(
-                full_text_field,
-                // we join all the fields that are full text searchable
-                &fts_terms.join(" "),
-            )])),
+        let fts_field = tantivy_schema.get_field("_all").unwrap();
+        let query_parser = QueryParser::for_index(&tantivy_index, vec![fts_field]);
+        let tantivy_searcher_clone = tantivy_searcher.clone();
+        if let Ok((docs, max_row)) = tokio::task::spawn_blocking(move || {
+            search_tantivy_index_with_field(
+                query_parser,
+                fts_field,
+                tantivy_searcher_clone,
+                &*fts_terms,
+            )
+        })
+        .await?
+        {
+            matched_docs.extend(docs);
+            max_doc_id = max_row;
+        } else {
+            return Err(anyhow::anyhow!(
+                "[trace_id {}] search->storage: search_full_text_index failed",
+                trace_id
+            ));
         };
-
-        let docs = tantivy_searcher
-            .search(&query, &tantivy::collector::DocSetCollector)
-            .unwrap();
-
-        for doc in docs {
-            max_doc_id = cmp::max(doc.doc_id, max_doc_id);
-            matched_docs.insert(doc);
-        }
     }
-
-    for term in index_terms.iter() {
-        let field = tantivy_schema.get_field(&term.0).unwrap();
-
+    for (field_name, terms) in index_terms.iter() {
+        let field = tantivy_schema.get_field(&field_name).unwrap();
         let query_parser = QueryParser::for_index(&tantivy_index, vec![field]);
-        // TODO(Uddhav): improve this logic
-        // The issue is joining the secondary index terms
-        // Ideally there should be multiple queries for each term
-        // and their result should be intersected
-        let query: Box<dyn Query> = match cfg.common.full_text_search_type.as_str() {
-            "eq" => query_parser.parse_query(&term.1.join(" "))?,
-            "contains" => Box::new(RegexQuery::from_pattern(
-                &format!("*{}*", &term.1.join(" ")),
-                field,
-            )?),
-            // Default to prefix search
-            _ => Box::new(PhrasePrefixQuery::new(vec![Term::from_field_text(
-                field,
-                &term.1.join(" "),
-            )])),
+        let tantivy_searcher_clone = tantivy_searcher.clone();
+        let terms = terms.clone();
+
+        if let Ok((docs, max_row)) = tokio::task::spawn_blocking(move || {
+            search_tantivy_index_with_field(query_parser, field, tantivy_searcher_clone, &terms)
+        })
+        .await?
+        {
+            matched_docs.extend(docs);
+            max_doc_id = max_row;
+        } else {
+            return Err(anyhow::anyhow!(
+                "[trace_id {}] search->storage: search_full_text_index failed",
+                trace_id
+            ));
         };
-
-        let docs = tantivy_searcher
-            .search(&query, &tantivy::collector::DocSetCollector)
-            .unwrap();
-        for doc in docs {
-            max_doc_id = cmp::max(doc.doc_id, max_doc_id);
-            matched_docs.insert(doc);
-        }
     }
-
+    let search_complete_tt = search_index_timer.elapsed();
+    log::info!(
+        "[trace_id {}] search->storage: index_search took {} s, {} ms",
+        trace_id,
+        search_complete_tt.as_secs(),
+        search_complete_tt.as_millis(),
+    );
     // return early if no matches in tantivy
     if matched_docs.is_empty() {
         return Ok((parquet_file_name.to_string(), None));
@@ -778,6 +814,13 @@ async fn search_tantivy_index(
         for doc in matched_docs {
             res.set(doc.doc_id as usize, true);
         }
+
+        log::info!(
+            "[trace_id {}] search->storage: bitvec took {} s, {} ms",
+            trace_id,
+            elapsed_tantivy_searcher.as_secs(),
+            elapsed_tantivy_searcher.as_millis(),
+        );
         return Ok((parquet_file_name.to_string(), Some(res)));
     } else {
         return Err(anyhow::anyhow!(
