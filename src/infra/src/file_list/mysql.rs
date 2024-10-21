@@ -30,7 +30,10 @@ use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::{
-    db::mysql::{create_index, CLIENT},
+    db::{
+        mysql::{create_index, CLIENT},
+        IndexStatement,
+    },
     errors::{DbError, Error, Result},
 };
 
@@ -1450,7 +1453,7 @@ pub async fn create_table_index() -> Result<()> {
         ("stream_stats_org_idx", "stream_stats", &["org"]),
     ];
     for (idx, table, fields) in indices {
-        create_index(idx, table, false, fields).await?;
+        create_index(IndexStatement::new(idx, table, false, fields)).await?;
     }
 
     let unique_indices: Vec<(&str, &str, &[&str])> = vec![
@@ -1467,16 +1470,16 @@ pub async fn create_table_index() -> Result<()> {
         ("stream_stats_stream_idx", "stream_stats", &["stream"]),
     ];
     for (idx, table, fields) in unique_indices {
-        create_index(idx, table, true, fields).await?;
+        create_index(IndexStatement::new(idx, table, true, fields)).await?;
     }
 
     // This is special case where we want to MAKE the index unique if it is not
-    let res = create_index(
+    let res = create_index(IndexStatement::new(
         "file_list_stream_file_idx",
         "file_list",
         true,
         &["stream", "date", "file"],
-    )
+    ))
     .await;
     if let Err(e) = res {
         if !e.to_string().contains("Duplicate entry") {
@@ -1519,12 +1522,12 @@ pub async fn create_table_index() -> Result<()> {
             ret.len()
         );
         // create index again
-        create_index(
+        create_index(IndexStatement::new(
             "file_list_stream_file_idx",
             "file_list",
             true,
             &["stream", "date", "file"],
-        )
+        ))
         .await?;
         log::warn!("[MYSQL] create table index(file_list_stream_file_idx) succeed");
     }

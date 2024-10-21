@@ -24,6 +24,7 @@ use crate::{
     db::{
         self,
         postgres::{create_index, CLIENT},
+        IndexStatement,
     },
     errors::{DbError, Error, Result},
 };
@@ -87,26 +88,26 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        create_index(
+        create_index(IndexStatement::new(
             "scheduled_jobs_key_idx",
             "scheduled_jobs",
             false,
             &["module_key"],
-        )
+        ))
         .await?;
-        create_index(
+        create_index(IndexStatement::new(
             "scheduled_jobs_org_key_idx",
             "scheduled_jobs",
             false,
             &["org", "module_key"],
-        )
+        ))
         .await?;
-        create_index(
+        create_index(IndexStatement::new(
             "scheduled_jobs_org_module_key_idx",
             "scheduled_jobs",
             true,
             &["org", "module", "module_key"],
-        )
+        ))
         .await?;
 
         Ok(())

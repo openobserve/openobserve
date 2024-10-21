@@ -86,6 +86,8 @@ pub enum DbError {
     DBOperError(String, String),
     #[error("Unique constraint violation")]
     UniqueViolation,
+    #[error("SeaORMError# {0}")]
+    SeaORMError(String),
 }
 
 #[derive(ThisError, Debug)]

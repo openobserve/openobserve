@@ -22,7 +22,7 @@ use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
     short_url,
-    short_url::ShortUrlRecord,
+    short_url::short_urls::ShortUrlRecord,
 };
 
 use crate::{common::infra::config::SHORT_URLS, service::db};
