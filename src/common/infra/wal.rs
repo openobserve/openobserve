@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -407,6 +407,7 @@ pub fn clean_lock_files() {
 }
 
 pub fn lock_request(trace_id: &str, files: &[String]) {
+    log::info!("[trace_id {}] lock_request for wal files", trace_id);
     let mut locker = SEARCHING_REQUESTS.write();
     locker.insert(trace_id.to_string(), files.to_vec());
 }
