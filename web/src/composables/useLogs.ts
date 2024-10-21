@@ -4240,32 +4240,26 @@ const useLogs = () => {
   ) => {
     let operator = action == "include" ? "=" : "!=";
     try {
-      let fieldTypeList: any = {};
       let fieldType: string = "utf8";
-      searchObj.data.streamResults.list.forEach((stream: any) => {
-        if (searchObj.data.stream.selectedStream.includes(stream.name)) {
-          if (
-            Object.hasOwn(stream, "schema") &&
-            !Object.hasOwn(selectedStreamFieldType, stream.name)
-          ) {
-            selectedStreamFieldType[stream.name] = {};
-            stream.schema.forEach((schema: any) => {
-              selectedStreamFieldType[stream.name][schema.name] = schema.type;
-            });
-            fieldTypeList = {
-              ...fieldTypeList,
-              ...selectedStreamFieldType[stream.name],
-            };
-          } else {
-            if (Object.hasOwn(selectedStreamFieldType, stream.name)) {
-              fieldTypeList = {
-                ...fieldTypeList,
-                ...selectedStreamFieldType[stream.name],
-              };
-            }
-          }
-        }
-      });
+
+      const getStreamFieldTypes = (stream: any) => {
+        if (!stream.schema) return {};
+        return Object.fromEntries(
+          stream.schema.map((schema: any) => [schema.name, schema.type]),
+        );
+      };
+
+      const fieldTypeList = searchObj.data.streamResults.list
+        .filter((stream: any) =>
+          searchObj.data.stream.selectedStream.includes(stream.name),
+        )
+        .reduce(
+          (acc: any, stream: any) => ({
+            ...acc,
+            ...getStreamFieldTypes(stream),
+          }),
+          {},
+      );
 
       if (Object.hasOwn(fieldTypeList, field)) {
         fieldType = fieldTypeList[field];
@@ -4275,14 +4269,18 @@ const useLogs = () => {
         operator = action == "include" ? "is" : "is not";
         field_value = "null";
       }
-      let expression = field_value == "null" ? `${field} ${operator} ${field_value}` : `${field} ${operator} '${field_value}'`;
+      let expression =
+        field_value == "null"
+          ? `${field} ${operator} ${field_value}`
+          : `${field} ${operator} '${field_value}'`;
 
-      if (
-        fieldType.toLowerCase() == "int64" ||
-        fieldType.toLowerCase() == "float64"
-      ) {
+      const isNumericType = (type: string) =>
+        ["int64", "float64"].includes(type.toLowerCase());
+      const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+
+      if (isNumericType(fieldType)) {
         expression = `${field} ${operator} ${field_value}`;
-      } else if (fieldType.toLowerCase() == "boolean") {
+      } else if (isBooleanType(fieldType)) {
         operator = action == "include" ? "is" : "is not";
         expression = `${field} ${operator} ${field_value}`;
       }
