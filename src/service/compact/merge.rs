@@ -645,13 +645,20 @@ pub async fn merge_files(
     // convert the file to the latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
-    let defined_schema_fields = stream_setting
-        .and_then(|s| s.defined_schema_fields)
-        .unwrap_or_default();
+    let (defined_schema_fields, need_original) = match stream_setting {
+        Some(s) => (
+            s.defined_schema_fields.unwrap_or_default(),
+            s.store_original_data,
+        ),
+        None => (Vec::new(), false),
+    };
     let schema_latest = if !defined_schema_fields.is_empty() {
         let schema_latest = SchemaCache::new(schema_latest);
-        let schema_latest =
-            generate_schema_for_defined_schema_fields(&schema_latest, &defined_schema_fields);
+        let schema_latest = generate_schema_for_defined_schema_fields(
+            &schema_latest,
+            &defined_schema_fields,
+            need_original,
+        );
         schema_latest.schema().clone()
     } else {
         Arc::new(schema_latest)
