@@ -1026,7 +1026,10 @@ export default defineComponent({
       if (expression) {
         searchObj.data.stream.addToFilter = expression;
       } else {
-        console.error("Failed to generate filter expression");
+        $q.notify({
+          type: "negative",
+          message: "Failed to generate filter expression",
+        });
       }
     };
     //   const query = searchObj.meta.sqlMode
