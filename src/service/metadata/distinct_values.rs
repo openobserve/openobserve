@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -262,7 +262,8 @@ impl Metadata for DistinctValues {
             }
 
             let writer =
-                ingester::get_writer(&org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
+                ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string(), STREAM_NAME)
+                    .await;
             _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
             if let Err(e) = writer.sync().await {
                 log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);

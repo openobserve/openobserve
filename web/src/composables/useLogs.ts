@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -213,6 +213,11 @@ const defaultObject = {
     isOperationCancelled: false,
   },
 };
+
+// TODO OK:
+// useStreamManagement for stream-related functions
+// useQueryProcessing for query-related functions
+// useDataVisualization for histogram and data display functions
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 const searchObjDebug = reactive({
@@ -553,7 +558,10 @@ const useLogs = () => {
 
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
-    if(query.hasOwnProperty("type") && query.type == "search_history_re_apply"){
+    if (
+      query.hasOwnProperty("type") &&
+      query.type == "search_history_re_apply"
+    ) {
       delete query.type;
     }
     router.push({ query });
@@ -1256,7 +1264,10 @@ const useLogs = () => {
               searchObj.data.errorMsg =
                 "Error while processing partition request.";
               if (err.response != undefined) {
-                searchObj.data.errorMsg = err.response.data.error;
+                searchObj.data.errorMsg =
+                  err.response?.data?.error ||
+                  err.response?.data?.message ||
+                  "";
                 if (err.response.data.hasOwnProperty("error_detail")) {
                   searchObj.data.errorDetail = err.response.data.error_detail;
                 }
@@ -1274,7 +1285,7 @@ const useLogs = () => {
 
               if (err?.request?.status >= 429) {
                 notificationMsg.value = err?.response?.data?.message;
-                searchObj.data.errorMsg = err?.response?.data?.message;
+                searchObj.data.errorMsg = err?.response?.data?.message || "";
                 searchObj.data.errorDetail = err?.response?.data?.error_detail;
               }
 
@@ -1511,6 +1522,7 @@ const useLogs = () => {
       searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
       if (
         !searchObj.data.stream.streamLists?.length ||
         searchObj.data.stream.selectedStream.length == 0
@@ -1746,18 +1758,9 @@ const useLogs = () => {
           await generateHistogramData();
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {
-              title: getHistogramTitle(),
-              unparsed_x_data: [],
-              timezone: "",
-            },
-            errorCode: 0,
-            errorMsg: "Histogram is not available for limit queries.",
-            errorDetail: "",
-          };
+          resetHistogramWithError(
+            "Histogram is not available for limit queries.",
+          );
         } else {
           let aggFlag = false;
           if (parsedSQL) {
@@ -1805,6 +1808,21 @@ const useLogs = () => {
       notificationMsg.value = "";
     }
   };
+
+  function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {
+        title: getHistogramTitle(),
+        unparsed_x_data: [],
+        timezone: "",
+      },
+      errorCode,
+      errorMsg,
+      errorDetail: "",
+    };
+  }
 
   function isTimestampASC(orderby: any) {
     if (orderby) {
@@ -2113,6 +2131,13 @@ const useLogs = () => {
         .then(async (res) => {
           if (
             res.data.hasOwnProperty("function_error") &&
+            res.data.function_error != ""
+          ) {
+            searchObj.data.functionError = res.data.function_error;
+          }
+
+          if (
+            res.data.hasOwnProperty("function_error") &&
             res.data.function_error != "" &&
             res.data.hasOwnProperty("new_start_time") &&
             res.data.hasOwnProperty("new_end_time")
@@ -2255,26 +2280,26 @@ const useLogs = () => {
             setTimeout(async () => {
               processPostPaginationData();
 
-              searchObj.data.functionError = "";
-              if (
-                res.data.hasOwnProperty("function_error") &&
-                res.data.function_error
-              ) {
-                searchObj.data.functionError = res.data.function_error;
-              }
+              // searchObj.data.functionError = "";
+              // if (
+              //   res.data.hasOwnProperty("function_error") &&
+              //   res.data.function_error
+              // ) {
+              //   searchObj.data.functionError = res.data.function_error;
+              // }
             }, 0);
             await getPaginatedData(queryReq, true);
           }
 
           await processPostPaginationData();
 
-          searchObj.data.functionError = "";
-          if (
-            res.data.hasOwnProperty("function_error") &&
-            res.data.function_error
-          ) {
-            searchObj.data.functionError = res.data.function_error;
-          }
+          // searchObj.data.functionError = "";
+          // if (
+          //   res.data.hasOwnProperty("function_error") &&
+          //   res.data.function_error
+          // ) {
+          //   searchObj.data.functionError = res.data.function_error;
+          // }
 
           searchObj.loading = false;
           searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
@@ -2282,6 +2307,8 @@ const useLogs = () => {
           resolve(true);
         })
         .catch((err) => {
+          // TODO OK : create handleError function, which will handle error and return error message and detail
+
           searchObj.loading = false;
           let trace_id = "";
           searchObj.data.errorMsg =
@@ -2289,22 +2316,26 @@ const useLogs = () => {
               ? err
               : "Error while processing histogram request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg =
+              err.response?.data?.error || err.response?.data?.message || "";
             if (err.response.data.hasOwnProperty("error_detail")) {
-              searchObj.data.errorDetail = err.response.data.error_detail;
+              searchObj.data.errorDetail =
+                err.response?.data?.error_detail || "";
             }
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
-            searchObj.data.errorMsg = err.message;
+            searchObj.data.errorMsg = err?.message || "";
             if (err.hasOwnProperty("trace_id")) {
               trace_id = err?.trace_id;
             }
           }
 
-          const customMessage = logsErrorMessage(err?.response?.data.code);
-          searchObj.data.errorCode = err?.response?.data.code;
+          const customMessage = logsErrorMessage(
+            err?.response?.data?.code || "",
+          );
+          searchObj.data.errorCode = err?.response?.data?.code || "";
 
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage);
@@ -2313,9 +2344,10 @@ const useLogs = () => {
           notificationMsg.value = searchObj.data.errorMsg;
 
           if (err?.request?.status >= 429) {
-            notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg = err?.response?.data?.message;
-            searchObj.data.errorDetail = err?.response?.data?.error_detail;
+            notificationMsg.value = err?.response?.data?.message || "";
+            searchObj.data.errorMsg = err?.response?.data?.message || "";
+            searchObj.data.errorDetail =
+              err?.response?.data?.error_detail || "";
           }
 
           if (trace_id) {
@@ -2473,6 +2505,7 @@ const useLogs = () => {
                 }
               }
             }
+
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
@@ -2508,14 +2541,16 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
 
-            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
             searchObjDebug["histogramEndTime"] = performance.now();
+
             dismiss();
             resolve(true);
           })
@@ -3426,6 +3461,7 @@ const useLogs = () => {
     try {
       searchObj.loading = true;
       searchObj.data.errorCode = 0;
+      searchObj.data.functionError = "";
       const sqlContext: any = [];
       let query_context: any = "";
       const query = searchObj.data.query;
@@ -3706,9 +3742,12 @@ const useLogs = () => {
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
-      if(router.currentRoute.value.query.hasOwnProperty("type") &&  router.currentRoute.value.query.type == "search_history_re_apply"){
-       delete router.currentRoute.value.query.type;
-        }   
+      if (
+        router.currentRoute.value.query.hasOwnProperty("type") &&
+        router.currentRoute.value.query.type == "search_history_re_apply"
+      ) {
+        delete router.currentRoute.value.query.type;
+      }
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -3826,7 +3865,10 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
-    if(queryParams.hasOwnProperty("type") &&  queryParams.type == "search_history_re_apply"){
+    if (
+      queryParams.hasOwnProperty("type") &&
+      queryParams.type == "search_history_re_apply"
+    ) {
       delete queryParams.type;
     }
     // TODO OK : Replace push with replace and test all scenarios
@@ -4215,12 +4257,16 @@ const useLogs = () => {
     refreshPartitionPagination,
     filterHitsColumns,
     getHistogramQueryData,
+    generateHistogramSkeleton,
     fnParsedSQL,
     addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
     reorderSelectedFields,
+    resetHistogramWithError,
+    isNonAggregatedQuery,
+    extractTimestamps,
   };
 };
 
