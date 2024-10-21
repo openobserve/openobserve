@@ -3759,6 +3759,10 @@ const useLogs = () => {
     let fromTimestamp, toTimestamp;
 
     switch (period.slice(-1)) {
+      case "s":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 1000; // 1 second = 1000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
       case "m":
         fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
         toTimestamp = currentTime.getTime();
