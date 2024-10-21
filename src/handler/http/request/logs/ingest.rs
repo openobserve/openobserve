@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
 use crate::{
     common::meta::{
@@ -25,10 +26,7 @@ use crate::{
         },
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{
-        logs,
-        logs::otlp_http::{logs_json_handler, logs_proto_handler},
-    },
+    service::logs::{self, otlp_grpc::handle_grpc_request},
 };
 
 /// _bulk ES compatible ingestion API
@@ -269,6 +267,7 @@ pub async fn handle_gcp_request(
 }
 
 /// LogsIngest
+// json example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -293,42 +292,39 @@ pub async fn otlp_logs_write(
         .headers()
         .get(&config::get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
-    if content_type.eq(CONTENT_TYPE_PROTO) {
-        // log::info!("otlp::logs_proto_handler");
-        match logs_proto_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!(
-                    "Error processing otlp pb logs write request {org_id}/{:?}: {:?}",
-                    in_stream_name,
-                    e
-                );
-                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )))
-            }
-        }
+    let data = if content_type.eq(CONTENT_TYPE_PROTO) {
+        <ExportLogsServiceRequest as prost::Message>::decode(body)?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        // log::info!("otlp::logs_json_handler");
-        match logs_json_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!(
-                    "Error processing otlp json logs write request {org_id}/{:?}: {:?}",
-                    in_stream_name,
-                    e
-                );
-                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )))
-            }
-        }
+        serde_json::from_slice(&body)?
     } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             "Bad Request".to_string(),
-        )))
+        )));
+    };
+    match handle_grpc_request(
+        **thread_id,
+        &org_id,
+        data,
+        false,
+        in_stream_name,
+        user_email,
+    )
+    .await
+    {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            log::error!(
+                "Error processing otlp {content_type} logs write request {org_id}/{:?}: {:?}",
+                in_stream_name,
+                e
+            );
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            )
+        }
     }
 }

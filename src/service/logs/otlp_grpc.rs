@@ -17,7 +17,6 @@ use std::collections::{HashMap, HashSet};
 
 use actix_web::{http, HttpResponse};
 use anyhow::Result;
-use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
@@ -41,7 +40,7 @@ use crate::{
         ingestion::{IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
-    handler::http::request::CONTENT_TYPE_PROTO,
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{
         format_stream_name,
         ingestion::{
@@ -51,6 +50,18 @@ use crate::{
         schema::get_upto_discard_error,
     },
 };
+
+const SERVICE_NAME: &str = "service.name";
+const SERVICE: &str = "service";
+
+fn encode_response(res: ExportLogsServiceResponse, is_grpc: bool) -> (&'static str, Vec<u8>) {
+    if is_grpc {
+        let mut out = Vec::new();
+        res.encode(&mut out).expect("Out of memory");
+        return (CONTENT_TYPE_PROTO, out);
+    }
+    return (CONTENT_TYPE_JSON, serde_json::to_vec(&res).unwrap());
+}
 
 pub async fn handle_grpc_request(
     thread_id: usize,
@@ -132,8 +143,15 @@ pub async fn handle_grpc_request(
                 match &resource_log.resource {
                     Some(res) => {
                         for item in &res.attributes {
-                            rec[item.key.as_str()] =
-                                get_val_with_type_retained(&item.value.as_ref());
+                            if item.key.eq(SERVICE_NAME) {
+                                let service_name = get_val_with_type_retained(&item.value.as_ref());
+                                if service_name.as_str().is_some() {
+                                    rec[item.key.as_str()] = service_name;
+                                }
+                            } else {
+                                let key = format!("{}_{}", SERVICE, item.key);
+                                rec[key] = get_val_with_type_retained(&item.value.as_ref());
+                            }
                         }
                     }
                     None => {}
@@ -162,6 +180,7 @@ pub async fn handle_grpc_request(
 
                 // check ingestion time
                 if timestamp < min_ts {
+                    log::debug!("skipping log record due to old ts");
                     stream_status.status.failed += 1; // to old data, just discard
                     stream_status.status.error = get_upto_discard_error().to_string();
                     continue;
@@ -176,7 +195,9 @@ pub async fn handle_grpc_request(
                 // rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body.as_ref());
                 for item in &log_record.attributes {
-                    rec[item.key.as_str()] = get_val_with_type_retained(&item.value.as_ref());
+                    let mut key = item.key.clone();
+                    flatten::format_key(&mut key);
+                    rec[key] = get_val_with_type_retained(&item.value.as_ref());
                 }
                 rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
                 match TraceId::from_bytes(
@@ -334,16 +355,15 @@ pub async fn handle_grpc_request(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
-        let mut out = BytesMut::with_capacity(res.encoded_len());
-        res.encode(&mut out).expect("Out of memory");
+        let (ctype, body) = encode_response(res, is_grpc);
         return Ok(HttpResponse::Ok()
             .status(http::StatusCode::OK)
-            .content_type(CONTENT_TYPE_PROTO)
-            .body(out)); // just return
+            .content_type(ctype)
+            .body(body)); // just return
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+    let metric_rpt_status_code = match super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
@@ -354,11 +374,7 @@ pub async fn handle_grpc_request(
     )
     .await
     {
-        Ok(()) => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("200", out)
-        }
+        Ok(()) => "200",
         Err(e) => {
             log::error!("Error while writing logs: {}", e);
             stream_status.status = match status {
@@ -369,9 +385,7 @@ pub async fn handle_grpc_request(
                 rejected_log_records: stream_status.status.failed as i64,
                 error_message: stream_status.status.error,
             });
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("500", out)
+            "500"
         }
     };
 
@@ -407,10 +421,11 @@ pub async fn handle_grpc_request(
     drop(stream_routing_map);
     drop(user_defined_schema_map);
 
+    let (ctype, body) = encode_response(res, is_grpc);
     return Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
-        .content_type(CONTENT_TYPE_PROTO)
-        .body(response_body));
+        .content_type(ctype)
+        .body(body));
 }
 
 #[cfg(test)]
