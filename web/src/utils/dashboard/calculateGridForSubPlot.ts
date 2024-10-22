@@ -91,15 +91,15 @@ export function getTrellisGrid(
   const cellHeight =
     (100 - (ySpacingBetween + topPadding + bottomPadding)) / numRows;
 
-  console.log(
-    "cellWidth",
-    width,
-    numCols,
-    numRows,
-    xSpacingBetween + rightPadding + leftPadding,
-    cellWidth,
-  );
-  console.log("cellHeight", height, cellHeight);
+  // console.log(
+  //   "cellWidth",
+  //   width,
+  //   numCols,
+  //   numRows,
+  //   xSpacingBetween + rightPadding + leftPadding,
+  //   cellWidth,
+  // );
+  // console.log("cellHeight", height, cellHeight);
 
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {

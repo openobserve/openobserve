@@ -1910,9 +1910,7 @@ export const convertSQLData = async (
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
         ...new Set(processedData.map((obj: any) => obj[breakDownkey1])),
-      ]
-        .filter((it) => it)
-        .slice(0, 20);
+      ].filter((it) => it);
 
       options.yAxis = [options.yAxis];
 
@@ -1989,27 +1987,34 @@ export const convertSQLData = async (
             seriesObj.yAxisIndex = index;
           }
 
-          console.log(
-            gridData.gridArray[index].top,
-            (8 / chartPanelRef.value.offsetHeight) * 100,
-          );
+          // //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
+          // const width =
+          //   (calculateWidthText(seriesObj.name) /
+          //     chartPanelRef.value.offsetWidth) *
+          //   100;
+          // const titleLeft = parseInt(gridData.gridArray[index].left);
 
-          //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
-          const width = calculateWidthText(seriesObj.name);
-          const titleLeft = parseInt(gridData.gridArray[index].left);
+          // const whiteSpace = parseInt(gridData.gridArray[index].width) - width;
 
-          const whiteSpace =
-            gridData.gridArray[index].left +
-            gridData.gridArray[index].width -
-            width;
-          if (whiteSpace < 0) {
-            titleLeft = titleLeft + whiteSpace / 2;
-          } else {
-          }
+          // if (whiteSpace > 0) {
+          //   titleLeft =
+          //     titleLeft +
+          //     (parseInt(gridData.gridArray[index].width) - width) / 2;
+          // } else {
+          //   titleLeft =
+          //     titleLeft + (10 / chartPanelRef.value.offsetWidth) * 100;
+          // }
+
           options.title.push({
             text: seriesObj.name,
             textStyle: {
               fontSize: 12,
+              width:
+                parseInt(gridData.gridArray[index].width) *
+                  (chartPanelRef.value.offsetWidth / 100) -
+                8,
+              overflow: "truncate",
+              ellipsis: "...",
             },
             top:
               parseInt(gridData.gridArray[index].top) -
@@ -2024,6 +2029,12 @@ export const convertSQLData = async (
 
       options.yAxis.forEach((it: any, index: number) => {
         it.max = maxYValue;
+        it.axisLabel = {
+          formatter: function (value: number) {
+            // Force two decimal places for all charts
+            return value.toFixed(2);
+          },
+        };
         if ((index / gridData.gridNoOfCol) % 1 === 0) {
           it.nameGap = yAxisNameGap;
 
@@ -2802,3 +2813,18 @@ const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
 
   return optimalFontSize; // Return the largest font size that fits
 };
+
+/**
+ *
+ * @param text
+ * @param maxWidth
+ * @param calculateWidthText
+ * @returns
+ */
+function truncateText(text: string, maxWidth: number, calculateWidthText: any) {
+  let truncated = text;
+  while (calculateWidthText(truncated + "...") > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + "...";
+}
