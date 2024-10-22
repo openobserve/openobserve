@@ -213,9 +213,10 @@ test.describe(" visualize UI testcases", () => {
     // await expect(
     //   page.getByText("There are some errors, please fix them and try again")
     // ).toBeVisible();
-    await page.locator('text="There are some errors, please fix them and try again"').waitFor({ state: 'visible' });
+    await page
+      .locator('text="There are some errors, please fix them and try again"')
+      .waitFor({ state: "visible" });
     // await page.waitForSelector("There are some errors, please fix them and try again");
-
 
     await page.locator("#q-notify").getByRole("button").click();
     await expect(page.getByText("Please update Y-Axis")).toBeVisible();
@@ -361,7 +362,7 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRL=1000");
-      await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000);
 
     // Refresh visulize search bar
     await page
@@ -573,6 +574,7 @@ test.describe(" visualize UI testcases", () => {
 
   test("should update the data on the chart when changing the time after applying a VRL field", async ({
     page,
+    
   }) => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
