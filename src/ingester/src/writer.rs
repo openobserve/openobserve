@@ -28,6 +28,7 @@ use config::{
     utils::hash::{gxhash, Sum64},
     MEM_TABLE_INDIVIDUAL_STREAMS,
 };
+use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
@@ -73,6 +74,16 @@ pub fn check_memtable_size() -> Result<()> {
     }
 }
 
+fn get_table_idx(thread_id: usize, stream_name: &str) -> usize {
+    if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
+        *idx
+    } else {
+        let hash_key = format!("{}_{}", thread_id, stream_name);
+        let hash_id = gxhash::new().sum64(&hash_key);
+        hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
+    }
+}
+
 /// Get a writer for a given org_id and stream_type
 pub async fn get_writer(
     thread_id: usize,
@@ -80,14 +91,8 @@ pub async fn get_writer(
     stream_type: &str,
     stream_name: &str,
 ) -> Arc<Writer> {
-    let idx = if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
-        *idx
-    } else {
-        let key = format!("{}_{}", thread_id, stream_name);
-        let hash_id = gxhash::new().sum64(&key);
-        hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
-    };
     let key = WriterKey::new(org_id, stream_type);
+    let idx = get_table_idx(thread_id, stream_name);
     let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())
@@ -100,16 +105,36 @@ pub async fn read_from_memtable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-    _partition_keys: &[(String, String)],
+    partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
+    let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
-    let hash_id = gxhash::new().sum64(stream_name);
-    let idx = hash_id as usize % WRITERS.len();
-    let w = WRITERS[idx].read().await;
-    let Some(r) = w.get(&key) else {
-        return Ok(Vec::new());
-    };
-    r.read(stream_name, time_range).await
+    // fast past
+    if !cfg.common.feature_per_thread_lock {
+        let idx = get_table_idx(0, stream_name);
+        let w = WRITERS[idx].read().await;
+        return match w.get(&key) {
+            Some(r) => r.read(stream_name, time_range, partition_filters).await,
+            None => Ok(Vec::new()),
+        };
+    }
+    // slow path
+    let mut batches = Vec::new();
+    let mut visited = HashSet::with_capacity(cfg.limit.mem_table_bucket_num);
+    for thread_id in 0..cfg.limit.http_worker_num {
+        let idx = get_table_idx(thread_id, stream_name);
+        if visited.contains(&idx) {
+            continue;
+        }
+        visited.insert(idx);
+        let w = WRITERS[idx].read().await;
+        if let Some(r) = w.get(&key) {
+            if let Ok(data) = r.read(stream_name, time_range, partition_filters).await {
+                batches.extend(data);
+            }
+        }
+    }
+    Ok(batches)
 }
 
 pub async fn check_ttl() -> Result<()> {
@@ -287,9 +312,10 @@ impl Writer {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
+        partition_filters: &[(String, Vec<String>)],
     ) -> Result<Vec<ReadRecordBatchEntry>> {
         let memtable = self.memtable.read().await;
-        memtable.read(stream_name, time_range)
+        memtable.read(stream_name, time_range, partition_filters)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old

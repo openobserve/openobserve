@@ -18,7 +18,10 @@ use arrow_schema::DataType;
 use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
-    meta::search::{SearchEventType, SqlQuery},
+    meta::{
+        search::{SearchEventType, SqlQuery},
+        stream::StreamParams,
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -27,9 +30,8 @@ use config::{
 
 use super::promql;
 use crate::{
-    common::meta::{
-        alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
-        stream::StreamParams,
+    common::meta::alerts::{
+        AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
     },
     service::search as SearchService,
 };

@@ -251,11 +251,15 @@ impl FileData {
     async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         log::debug!("[trace_id {trace_id}] File disk cache remove file {}", file);
 
-        let item = self.data.remove_key(file);
-        if item.is_none() {
-            log::error!("[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none");
-        }
-        let (key, data_size) = item.unwrap();
+        let Some((key, data_size)) = self.data.remove_key(file) else {
+            return Ok(());
+        };
+        self.cur_size -= data_size;
+        log::info!(
+            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
+            data_size
+        );
+
         // delete file from local disk
         let file_path = format!(
             "{}{}{}",
@@ -270,6 +274,7 @@ impl FileData {
                 e
             );
         }
+
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
@@ -288,11 +293,6 @@ impl FileData {
                 .sub(data_size as i64);
         }
 
-        self.cur_size -= data_size;
-        log::info!(
-            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
-            data_size
-        );
         Ok(())
     }
 

@@ -16,13 +16,11 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 
-use crate::{
-    common::{
-        meta::{self, pipelines::PipeLine},
-        utils::http::get_stream_type_from_request,
-    },
-    service::format_stream_name,
+use crate::common::{
+    meta::{self, pipelines::PipeLine},
+    utils::http::get_stream_type_from_request,
 };
 
 /// CreatePipeline
@@ -161,7 +159,7 @@ async fn delete_pipeline(
             return Ok(crate::common::meta::http::HttpResponse::bad_request(e));
         }
     };
-    let pipeline_source = meta::stream::StreamParams::new(&org_id, &stream_name, stream_type);
+    let pipeline_source = StreamParams::new(&org_id, &stream_name, stream_type);
     crate::service::pipelines::delete_pipeline(&name, pipeline_source).await
 }
 
