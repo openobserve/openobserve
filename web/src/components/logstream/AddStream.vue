@@ -271,7 +271,6 @@ const getStreamPayload = () => {
       .replace(/-/g, "_");
 
     field.index_type?.forEach((index: string) => {
-      console.log(index,"index ")
       if (index === "fullTextSearchKey") {
         settings.full_text_search_keys.push(field.name);
       }
