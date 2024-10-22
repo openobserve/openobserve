@@ -8,7 +8,7 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
 
-  //await page.getByText('Login as internal user').click();
+  await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -209,10 +209,13 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    await page.waitForTimeout(3000);
-    await expect(
-      page.getByText("There are some errors, please fix them and try again")
-    ).toBeVisible();
+    await page.waitForTimeout(5000);
+    // await expect(
+    //   page.getByText("There are some errors, please fix them and try again")
+    // ).toBeVisible();
+    await page.locator('text="There are some errors, please fix them and try again"').waitFor({ state: 'visible' });
+    // await page.waitForSelector("There are some errors, please fix them and try again");
+
 
     await page.locator("#q-notify").getByRole("button").click();
     await expect(page.getByText("Please update Y-Axis")).toBeVisible();
