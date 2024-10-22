@@ -175,28 +175,26 @@ impl FileData {
             file
         );
 
-        let item = self.data.remove_key(file);
-        if item.is_none() {
-            log::error!("[trace_id {trace_id}] File disk memory is corrupt, it shouldn't be none");
-        }
-        let (key, data_size) = item.unwrap();
+        let Some((key, data_size)) = self.data.remove_key(file) else {
+            return Ok(());
+        };
+        self.cur_size -= data_size;
+        log::info!(
+            "[trace_id {trace_id}] File memory cache remove file done, released {} bytes",
+            data_size
+        );
 
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
+            metrics::QUERY_MEMORY_CACHE_FILES
                 .with_label_values(&[columns[1], columns[2]])
                 .dec();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
+            metrics::QUERY_MEMORY_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
                 .sub(data_size as i64);
         }
 
-        self.cur_size -= data_size;
-        log::info!(
-            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
-            data_size
-        );
         Ok(())
     }
 
