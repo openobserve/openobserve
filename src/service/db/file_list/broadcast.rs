@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::{Node, NodeStatus},
+        cluster::{get_internal_grpc_token, Node, NodeStatus},
         stream::FileKey,
     },
 };
@@ -150,9 +150,9 @@ async fn send_to_node(
         }
         let cfg = get_config();
         // connect to the node
-        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
-            .expect("parse internal grpc token faile");
+            .expect("parse internal grpc token failed");
         let channel = match get_cached_channel(&node.grpc_addr).await {
             Ok(v) => v,
             Err(e) => {
@@ -202,7 +202,8 @@ async fn send_to_node(
                     );
                     break;
                 }
-                let request = tonic::Request::new(req_query.clone());
+                let mut request = tonic::Request::new(req_query.clone());
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
                 match client.send_file_list(request).await {
                     Ok(_) => break,
                     Err(e) => {

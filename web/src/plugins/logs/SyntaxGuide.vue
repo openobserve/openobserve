@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="bg-highlight">stream='stderr'</span>
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
+                  To search and use query function <i>extract_ip</i> on column
                   log use
                   <span class="bg-highlight">extract_ip(log) | code=200</span>
                 </li>
@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
+                    class="hover:tw-underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -138,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
+                  To search and use query function <i>extract_ip</i> on column
                   log use
                   <span class="bg-highlight"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
@@ -150,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
+                    class="hover:tw-underline text-primary"
                     >click here</a
                   >.
                 </li>

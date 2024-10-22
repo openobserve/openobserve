@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -137,7 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="markFormDirty"
               />
             </div>
-          
           </template>
 
           <template
@@ -169,23 +168,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <q-separator class="q-mt-lg q-mb-lg" />
 
-          <div class="title flex tw-justify-between items-center" data-test="schema-log-stream-mapping-title-text">
-           <div>
-            {{ t("logStream.mapping") }}
-            <label
-              v-show="indexData.defaultFts"
-              class="warning-msg"
-              style="font-weight: normal"
-              >- Using default fts keys, as no fts keys are set for
-              stream.</label
-            >
-           </div>
+          <div
+            class="title flex tw-justify-between items-center"
+            data-test="schema-log-stream-mapping-title-text"
+          >
+            <div>
+              {{ t("logStream.mapping") }}
+              <label
+                v-show="indexData.defaultFts"
+                class="warning-msg"
+                style="font-weight: normal"
+                >- Using default fts keys, as no fts keys are set for
+                stream.</label
+              >
+            </div>
             <q-toggle
-                data-test="log-stream-store-original-data-toggle-btn"
-                v-model="storeOriginalData"
-                :label="t('logStream.storeOriginalData')"
-                @click="formDirtyFlag = true"
-        />
+              data-test="log-stream-store-original-data-toggle-btn"
+              v-model="storeOriginalData"
+              :label="t('logStream.storeOriginalData')"
+              @click="formDirtyFlag = true"
+            />
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -477,6 +479,8 @@ export default defineComponent({
       { label: "Secondary index", value: "secondaryIndexKey" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
+      { label: "Prefix partition", value: "prefixPartition" },
+
       { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
       { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
       { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
@@ -505,7 +509,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
-          selectedFields.value.map((field) => field.name),
+          selectedFields.value.map((field) => field.name)
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -521,7 +525,7 @@ export default defineComponent({
               indexData.value.name,
               indexData.value.stream_type,
               true,
-              true,
+              true
             );
             getSchema();
           } else {
@@ -573,16 +577,18 @@ export default defineComponent({
       if (
         settings.partition_keys &&
         Object.values(settings.partition_keys).some(
-          (v) => !v.disabled && v.field === property.name,
+          (v) => !v.disabled && v.field === property.name
         )
       ) {
         const [level, partition] = Object.entries(settings.partition_keys).find(
-          ([, partition]) => partition["field"] === property.name,
+          ([, partition]) => partition["field"] === property.name
         );
 
         property.level = level;
 
         if (partition.types === "value") fieldIndices.push("keyPartition");
+        if (partition.types === "prefix") fieldIndices.push("prefixPartition");
+
 
         if (partition.types?.hash)
           fieldIndices.push(`hashPartition_${partition.types.hash}`);
@@ -598,7 +604,7 @@ export default defineComponent({
       if (streamResponse?.settings) {
         // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
-          JSON.stringify(streamResponse.settings),
+          JSON.stringify(streamResponse.settings)
         );
       }
       if (!streamResponse.schema?.length) {
@@ -627,11 +633,11 @@ export default defineComponent({
 
       indexData.value.stats.doc_time_max = date.formatDate(
         parseInt(streamResponse.stats.doc_time_max) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DDTHH:mm:ss:SSZ"
       );
       indexData.value.stats.doc_time_min = date.formatDate(
         parseInt(streamResponse.stats.doc_time_min) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DDTHH:mm:ss:SSZ"
       );
 
       indexData.value.defined_schema_fields =
@@ -688,7 +694,6 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
-
           setSchema(streamResponse);
           loadingState.value = false;
           dismiss();
@@ -726,12 +731,12 @@ export default defineComponent({
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
-      settings["store_original_data"] = storeOriginalData.value; 
+      settings["store_original_data"] = storeOriginalData.value;
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
-          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
-        ),
+          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
+        )
       );
 
       // Push unique and normalized field names to settings.defined_schema_fields
@@ -757,6 +762,19 @@ export default defineComponent({
             added_part_keys.push({
               field: property.name,
               types: "value",
+            });
+          }
+
+          if( property.level && index === 'prefixPartition'){
+            settings.partition_keys.push({
+              field: property.name,
+              types: "prefix",
+            });
+          }
+          else if(index === 'prefixPartition'){
+            added_part_keys.push({
+              field: property.name,
+              types: "prefix",
             });
           }
 
@@ -796,21 +814,21 @@ export default defineComponent({
 
       let modifiedSettings = getUpdatedSettings(
         previousSchemaVersion,
-        settings,
+        settings
       );
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
           indexData.value.stream_type,
-          modifiedSettings,
+          modifiedSettings
         )
         .then(async (res) => {
           await getStream(
             indexData.value.name,
             indexData.value.stream_type,
             true,
-            true,
+            true
           ).then((streamResponse) => {
             setSchema(streamResponse);
             loadingState.value = false;
@@ -846,13 +864,13 @@ export default defineComponent({
     });
 
     const showFullTextSearchColumn = computed(
-      () => modelValue.stream_type !== "enrichment_tables",
+      () => modelValue.stream_type !== "enrichment_tables"
     );
 
     const showDataRetention = computed(
       () =>
         !!(store.state.zoConfig.data_retention_days || false) &&
-        modelValue.stream_type !== "enrichment_tables",
+        modelValue.stream_type !== "enrichment_tables"
     );
 
     const disableOptions = (schema, option) => {
@@ -867,16 +885,22 @@ export default defineComponent({
         selectedIndices += schema.index_type[i];
       }
 
+      if(selectedIndices.includes('prefixPartition') && option.value.includes('keyPartition')){
+        return true;
+      }
+      if(selectedIndices.includes('keyPartition') && option.value.includes('prefixPartition')){
+        return true;
+      }
       if (
         selectedIndices.includes("hashPartition") &&
         selectedHashPartition !== option.value &&
         (option.value.includes("hashPartition") ||
-          option.value.includes("keyPartition"))
+          option.value.includes("keyPartition") || option.value.includes("prefixPartition"))
+
       )
         return true;
-
       if (
-        selectedIndices.includes("keyPartition") &&
+       ( selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition"))&&
         option.value.includes("hashPartition")
       )
         return true;
@@ -960,7 +984,7 @@ export default defineComponent({
       markFormDirty();
 
       const selectedFieldsSet = new Set(
-        selectedFields.value.map((field) => field.name),
+        selectedFields.value.map((field) => field.name)
       );
 
       if (selectedFieldsSet.has(allFieldsName.value))
@@ -972,7 +996,7 @@ export default defineComponent({
       if (activeTab.value === "schemaFields") {
         indexData.value.defined_schema_fields =
           indexData.value.defined_schema_fields.filter(
-            (field) => !selectedFieldsSet.has(field),
+            (field) => !selectedFieldsSet.has(field)
           );
 
         if (!indexData.value.defined_schema_fields.length) {

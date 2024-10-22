@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,8 +22,9 @@ use config::{
     get_config,
     meta::{
         search::{SearchEventType, SearchHistoryHitResponse},
+        sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
+        usage::{RequestStats, UsageType, USAGE_STREAM},
     },
     metrics,
     utils::{base64, json},
@@ -39,7 +40,7 @@ use crate::{
             functions,
             http::{
                 get_index_type_from_request, get_or_create_trace_id, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
         },
     },
@@ -110,14 +111,16 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
-    let cfg = get_config();
-    let http_span = if cfg.common.tracing_search_enabled {
+    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
         Span::none()
     };
+
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     let user_id = in_req
         .headers()
@@ -155,8 +158,8 @@ pub async fn search(
     };
 
     // get stream name
-    let parsed_sql = match config::meta::sql::Sql::new(&req.query.sql) {
-        Ok(v) => v,
+    let stream_names = match resolve_stream_names(&req.query.sql) {
+        Ok(v) => v.clone(),
         Err(e) => {
             return Ok(
                 HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
@@ -166,63 +169,65 @@ pub async fn search(
             );
         }
     };
-    let stream_name = &parsed_sql.source;
 
     // get stream settings
-    if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
-                > max_query_range
+    for stream_name in stream_names {
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
-            req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
-            range_error = format!(
-                "Query duration is modified due to query range restriction of {} hours",
-                max_query_range
-            );
-        }
-    }
-
-    // Check permissions on stream
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
-        };
-
-        if !is_root_user(&user_id) {
-            let user: meta::user::User =
-                USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
-            let stream_type_str = stream_type.to_string();
-
-            if user.is_external
-                && !crate::handler::http::auth::validator::check_permissions(
-                    &user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
-                            stream_name
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                    },
-                    Some(user.role),
-                )
-                .await
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
-                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                range_error = format!(
+                    "Query duration is modified due to query range restriction of {} hours",
+                    max_query_range
+                );
             }
         }
-        // Check permissions on stream ends
+
+        // Check permissions on stream
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
+            use crate::common::{
+                infra::config::USERS,
+                utils::auth::{is_root_user, AuthExtractor},
+            };
+
+            if !is_root_user(&user_id) {
+                let user: meta::user::User =
+                    USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                let stream_type_str = stream_type.to_string();
+
+                if user.is_external
+                    && !crate::handler::http::auth::validator::check_permissions(
+                        &user_id,
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(stream_type_str.as_str())
+                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                stream_name
+                            ),
+                            org_id: org_id.clone(),
+                            bypass_check: false,
+                            parent_id: "".to_string(),
+                        },
+                        Some(user.role),
+                    )
+                    .await
+                {
+                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                }
+                // Check permissions on stream ends
+            }
+        }
     }
 
     // run search with cache
@@ -332,9 +337,10 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let started_at = Utc::now().timestamp_micros();
     let (org_id, stream_name) = path.into_inner();
-    let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
@@ -585,6 +591,10 @@ pub async fn around(
             (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
             _ => None,
         },
+        work_group: get_work_group(vec![
+            resp_forward.work_group.clone(),
+            resp_backward.work_group.clone(),
+        ]),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -754,6 +764,7 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -769,7 +780,6 @@ async fn values_v1(
         }
     }
 
-    let cfg = get_config();
     let default_sql = format!(
         "SELECT {} FROM \"{stream_name}\"",
         cfg.common.column_timestamp
@@ -968,6 +978,7 @@ async fn values_v1(
 
     let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
+    let mut work_group_set = Vec::with_capacity(query_results.len());
     for (key, ret) in query_results {
         let mut top_hits: HashMap<String, i64> = HashMap::default();
         for row in ret.hits {
@@ -1007,6 +1018,7 @@ async fn values_v1(
         resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
         resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
         resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
+        work_group_set.push(ret.work_group);
     }
     resp.total = fields.len();
     resp.hits = hit_values;
@@ -1034,6 +1046,7 @@ async fn values_v1(
         } else {
             None
         },
+        work_group: get_work_group(work_group_set),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1041,7 +1054,7 @@ async fn values_v1(
         req_stats,
         org_id,
         stream_name,
-        StreamType::Logs,
+        stream_type,
         UsageType::SearchTopNValues,
         num_fn,
         started_at,
@@ -1276,6 +1289,7 @@ async fn values_v2(
         } else {
             None
         },
+        work_group: resp_search.work_group,
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1283,7 +1297,7 @@ async fn values_v2(
         req_stats,
         org_id,
         stream_name,
-        StreamType::Logs,
+        stream_type,
         UsageType::SearchTopNValues,
         num_fn,
         started_at,
@@ -1332,6 +1346,7 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone(),)
     } else {
@@ -1427,7 +1442,7 @@ pub async fn search_partition(
                 "stream_type": "logs",
                 "took": 0.056222333,
                 "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
-                "user_email": "root@example.com"
+                "function": ".",
                 },
             ],
             "total": 3,
@@ -1478,7 +1493,7 @@ pub async fn search_history(
     req.user_email = user_id.clone();
 
     // Search
-    let stream_name = "usage";
+    let stream_name = USAGE_STREAM;
     let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => {
@@ -1514,7 +1529,7 @@ pub async fn search_history(
         .with_label_values(&[&org_id])
         .dec();
 
-    let history_org_id = "_meta";
+    let history_org_id = &cfg.common.usage_org;
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,
@@ -1567,6 +1582,7 @@ pub async fn search_history(
             }
         })
         .collect::<Vec<_>>();
+
     search_res.trace_id = trace_id.clone();
 
     // report http metrics
@@ -1599,12 +1615,13 @@ pub async fn search_history(
         search_type: Some(SearchEventType::Other),
         trace_id: Some(trace_id),
         took_wait_in_queue,
+        work_group: search_res.work_group.clone(),
         ..Default::default()
     };
     let num_fn = search_query_req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
-        &org_id,
+        history_org_id,
         stream_name,
         StreamType::Logs,
         UsageType::SearchHistory,

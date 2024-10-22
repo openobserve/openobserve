@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ use crate::{
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db,
+    service::db::{self, user},
 };
 
 pub async fn save(
@@ -50,10 +50,37 @@ pub async fn save(
                     anyhow::anyhow!("Atleast one alert destination email is required"),
                 ));
             }
+            for email in destination.emails.iter() {
+                // Check if the email is part of the org
+                match user::get(Some(org_id), email).await {
+                    Ok(user) => {
+                        if user.is_none() {
+                            return Err((
+                                http::StatusCode::BAD_REQUEST,
+                                anyhow::anyhow!("Destination email must be part of this org"),
+                            ));
+                        }
+                    }
+                    Err(_) => {
+                        return Err((
+                            http::StatusCode::BAD_REQUEST,
+                            anyhow::anyhow!("Destination email must be part of this org"),
+                        ));
+                    }
+                }
+            }
             if !config::get_config().smtp.smtp_enabled {
                 return Err((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     anyhow::anyhow!("SMTP not configured"),
+                ));
+            }
+        }
+        DestinationType::Sns => {
+            if destination.sns_topic_arn.is_none() || destination.aws_region.is_none() {
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Topic ARN and Region are required for SNS destinations"),
                 ));
             }
         }

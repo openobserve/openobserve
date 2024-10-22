@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -55,7 +55,7 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
         ));
     }
     let args = ColumnarValue::values_to_arrays(args)?;
-    log::debug!("Got the args: {:#?}", args);
+    // log::debug!("Got the args: {:#?}", args);
 
     // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
     //    function panics!

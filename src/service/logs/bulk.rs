@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,22 +24,18 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS,
+    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus, ID_COL_NAME,
-            ORIGINAL_DATA_COL_NAME,
-        },
-        stream::StreamParams,
+        ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     },
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
@@ -51,6 +47,7 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
 pub async fn ingest(
+    thread_id: usize,
     org_id: &str,
     body: web::Bytes,
     user_email: &str,
@@ -371,6 +368,7 @@ pub async fn ingest(
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Bulk(bulk_res);
         let write_result = super::write_logs_by_stream(
+            thread_id,
             org_id,
             user_email,
             (started_at, &start),

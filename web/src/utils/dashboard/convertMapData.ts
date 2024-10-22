@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     return { options: null };
   }
 
-  const filterdMapData = panelSchema.queries.map((query: any, index: any) => {
+  const filteredMapData = panelSchema.queries.map((query: any, index: any) => {
     return mapData[index].filter((item: any) => {
       if (
         item[query.fields.latitude.alias] != null &&
@@ -50,7 +50,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
 
   // validate if response is not at number
   panelSchema.queries.forEach((query: any, index: any) => {
-    const queryResult = filterdMapData[index];
+    const queryResult = filteredMapData[index];
 
     const queryField = queryResult?.forEach((item: any) => {
       if (isNaN(item[query.fields.latitude.alias])) {
@@ -95,7 +95,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
       formatter: function (params: any) {
-        
         let formattedValue = params.value[2];
         if (getUnitValue && formatUnitValue) {
           formattedValue = formatUnitValue(
@@ -169,7 +168,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
           show: true,
         },
       },
-      data: filterdMapData[index]?.map((item: any) => {
+      data: filteredMapData[index]?.map((item: any) => {
         if (query.customQuery) {
           // For custom queries
           return [

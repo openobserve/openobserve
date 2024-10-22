@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -187,12 +187,7 @@ impl DerivedStreamMeta {
             self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition
-                .evaluate_scheduled(
-                    &self.source,
-                    &self.trigger_condition,
-                    &self.query_condition,
-                    start_time,
-                )
+                .evaluate_scheduled(&self.source, &self.trigger_condition, start_time)
                 .await
         }
     }

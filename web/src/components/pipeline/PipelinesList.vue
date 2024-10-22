@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              :data-test="`pipeline-list-${props.row.name}-udpate-pipeline`"
+              :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
               icon="edit"
               class="q-ml-xs"
               padding="sm"
@@ -263,7 +263,7 @@ const getPipelines = () => {
             ...pipeline,
             "#": index + 1,
           };
-        },
+        }
       );
     })
     .catch((error) => {

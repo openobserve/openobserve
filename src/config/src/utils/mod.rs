@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ pub mod flatten;
 pub mod hash;
 pub mod inverted_index;
 pub mod json;
+pub mod md5;
 pub mod parquet;
 pub mod rand;
 pub mod record_batch_ext;
@@ -30,3 +31,4 @@ pub mod schema_ext;
 pub mod sql;
 pub mod str;
 pub mod time;
+pub mod util;

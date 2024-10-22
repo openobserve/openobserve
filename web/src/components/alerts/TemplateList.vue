@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              :data-test="`alert-template-list-${props.row.name}-udpate-template`"
+              :data-test="`alert-template-list-${props.row.name}-update-template`"
               icon="edit"
               class="q-ml-xs"
               padding="sm"
@@ -216,13 +216,21 @@ const getTemplateByName = (name: string) => {
 const editTemplate = (template: any = null) => {
   resetEditingTemplate();
   toggleTemplateEditor();
+
+  const query: { [key: string]: string } = {
+    action: template ? "update" : "add",
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+
+  if (template) query.name = template.name;
+
+  if (router.currentRoute.value.query.type)
+    query.type = router.currentRoute.value.query.type.toString() as string;
+
   if (!template) {
     router.push({
       name: "alertTemplates",
-      query: {
-        action: "add",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
+      query,
     });
   } else {
     editingTemplate.value = { ...template };
@@ -248,12 +256,12 @@ const deleteTemplate = () => {
       })
       .then(() => {
         q.notify({
-            type: "positive",
-            message: `Template ${confirmDelete.value.data.name} deleted successfully`,
-            timeout: 2000,
-          });
-        
-        getTemplates()
+          type: "positive",
+          message: `Template ${confirmDelete.value.data.name} deleted successfully`,
+          timeout: 2000,
+        });
+
+        getTemplates();
       })
       .catch((err) => {
         if (err.response.data.code === 409) {

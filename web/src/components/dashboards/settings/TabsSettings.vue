@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -198,8 +198,11 @@ export default defineComponent({
         route.query.folder ?? "default"
       );
     };
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     onMounted(async () => {
       await getDashboardData();
     });
@@ -231,7 +234,15 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Tab reorder failed");
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Tab reorder failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Tab reorder failed");
+        }
         // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
@@ -271,7 +282,15 @@ export default defineComponent({
           editTabObj.data = {};
         }
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Tab updation failed");
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Tab updation failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Tab updation failed");
+        }
 
         // emit refresh to rerender
         emit("refresh");
@@ -319,9 +338,17 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Tab deletion failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Tab deletion failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Tab deletion failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
 

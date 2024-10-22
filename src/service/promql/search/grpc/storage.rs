@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,8 @@ use std::sync::Arc;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
-        search::{ScanStats, SearchType, Session as SearchSession, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        search::{ScanStats, Session as SearchSession, StorageType},
+        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
 };
 use datafusion::{
@@ -34,12 +34,9 @@ use infra::{
 };
 use tokio::sync::Semaphore;
 
-use crate::{
-    common::meta::stream::StreamParams,
-    service::{
-        db, file_list,
-        search::{datafusion::exec::register_table, match_source},
-    },
+use crate::service::{
+    db, file_list,
+    search::{datafusion::exec::register_table, match_source},
 };
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all, fields(org_id = org_id, stream_name = stream_name))]
@@ -48,7 +45,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &mut [(&str, Vec<String>)],
+    filters: &mut [(String, Vec<String>)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
@@ -76,13 +73,13 @@ pub(crate) async fn create_context(
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // rewrite partition filters
-    let partition_keys: HashMap<&str, &StreamPartition> = stream_settings
+    let partition_keys: HashMap<&String, &StreamPartition> = stream_settings
         .partition_keys
         .iter()
-        .map(|v| (v.field.as_str(), v))
+        .map(|v| (&v.field, v))
         .collect();
     for entry in filters.iter_mut() {
-        if let Some(partition_key) = partition_keys.get(entry.0) {
+        if let Some(partition_key) = partition_keys.get(&entry.0) {
             for val in entry.1.iter_mut() {
                 *val = partition_key.get_partition_value(val);
             }
@@ -153,7 +150,6 @@ pub(crate) async fn create_context(
     let session = SearchSession {
         id: trace_id.to_string(),
         storage_type: StorageType::Memory,
-        search_type: SearchType::Normal,
         work_group: None,
         target_partitions,
     };
@@ -164,9 +160,7 @@ pub(crate) async fn create_context(
         stream_name,
         &files,
         HashMap::default(),
-        false,
         &[],
-        None,
     )
     .await?;
     Ok((ctx, schema, scan_stats))
@@ -183,7 +177,7 @@ async fn get_file_list(
     stream_name: &str,
     time_level: PartitionTimeLevel,
     time_range: (i64, i64),
-    filters: &[(&str, Vec<String>)],
+    filters: &[(String, Vec<String>)],
 ) -> Result<Vec<FileKey>> {
     let (time_min, time_max) = time_range;
     let results = match file_list::query(
@@ -205,18 +199,10 @@ async fn get_file_list(
         }
     };
 
+    let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
     let mut files = Vec::new();
     for file in results {
-        if match_source(
-            StreamParams::new(org_id, stream_name, StreamType::Metrics),
-            Some(time_range),
-            filters,
-            &file,
-            false,
-            false,
-        )
-        .await
-        {
+        if match_source(stream_params.clone(), Some(time_range), filters, &file).await {
             files.push(file.clone());
         }
     }

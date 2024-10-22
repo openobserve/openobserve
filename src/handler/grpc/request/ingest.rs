@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,17 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use async_trait::async_trait;
 use config::utils::json;
 use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
 use tonic::{Request, Response, Status};
 
 use crate::service::ingestion::create_log_ingestion_req;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Ingester;
 
-#[async_trait]
+#[tonic::async_trait]
 impl Ingest for Ingester {
     async fn ingest(
         &self,
@@ -43,6 +42,7 @@ impl Ingest for Ingester {
                 match create_log_ingestion_req(log_ingestion_type, &data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
+                        0,
                         &org_id,
                         &stream_name,
                         ingestion_req,

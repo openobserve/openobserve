@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,17 +15,14 @@
 
 use std::str::FromStr;
 
+pub mod distributed_plan;
 pub mod exec;
 pub mod file_type;
-pub mod physical_plan;
-pub mod plan;
+pub mod optimizer;
 pub mod storage;
 pub mod table_provider;
 pub mod udaf;
 pub mod udf;
-
-/// Extension setting for query limit
-pub(crate) struct ExtLimit(usize);
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {

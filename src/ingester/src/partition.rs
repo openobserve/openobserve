@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ use config::{
     utils::{
         parquet::{generate_filename_with_time_range, new_parquet_writer},
         record_batch_ext::merge_record_batches,
+        schema::filter_source_by_partition_key,
         schema_ext::SchemaExt,
     },
 };
@@ -104,10 +105,19 @@ impl Partition {
         partition.write(batch)
     }
 
-    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<ReadRecordBatchEntry> {
+    pub(crate) fn read(
+        &self,
+        time_range: Option<(i64, i64)>,
+        partition_filters: &[(String, Vec<String>)],
+    ) -> Result<ReadRecordBatchEntry> {
         let mut batches = Vec::with_capacity(self.files.len());
-        for file in self.files.values() {
-            batches.extend(file.read(time_range)?);
+        for (key, file) in self.files.iter() {
+            let key = format!("{}/", key);
+            if filter_source_by_partition_key(&key, partition_filters) {
+                batches.extend(file.read(time_range)?);
+            } else {
+                log::debug!("memtable skip key: {:?}", key);
+            }
         }
         Ok((self.schema.clone(), batches))
     }
@@ -150,16 +160,12 @@ impl Partition {
                 batch_num: data.data.len(),
             };
             // write into parquet buf
-            let (bloom_filter_fields, full_text_search_fields) =
+            let bloom_filter_fields =
                 if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
                     let settings = infra::schema::unwrap_stream_settings(self.schema.as_ref());
-                    let bloom_filter_fields =
-                        infra::schema::get_stream_setting_bloom_filter_fields(&settings);
-                    let full_text_search_fields =
-                        infra::schema::get_stream_setting_fts_fields(&settings);
-                    (bloom_filter_fields, full_text_search_fields)
+                    infra::schema::get_stream_setting_bloom_filter_fields(&settings)
                 } else {
-                    (vec![], vec![])
+                    vec![]
                 };
 
             let batches = data
@@ -175,13 +181,8 @@ impl Partition {
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();
-            let mut writer = new_parquet_writer(
-                &mut buf_parquet,
-                &schema,
-                &bloom_filter_fields,
-                &full_text_search_fields,
-                &file_meta,
-            );
+            let mut writer =
+                new_parquet_writer(&mut buf_parquet, &schema, &bloom_filter_fields, &file_meta);
 
             writer
                 .write(&batches)

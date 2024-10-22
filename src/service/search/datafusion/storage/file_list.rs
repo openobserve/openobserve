@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ pub fn clear(trace_id: &str) {
     drop(w);
 
     // Remove all segment data for the given trace_id
-    // here we can resue the keys, because they are the same
+    // here we can reuse the keys, because they are the same
     let mut w = SEGMENTS.write();
     for key in keys.iter() {
         w.remove(key);

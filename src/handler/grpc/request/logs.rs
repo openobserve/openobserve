@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
@@ -22,7 +21,7 @@ use tonic::{Response, Status};
 #[derive(Default)]
 pub struct LogsServer;
 
-#[async_trait]
+#[tonic::async_trait]
 impl LogsService for LogsServer {
     async fn export(
         &self,
@@ -56,6 +55,7 @@ impl LogsService for LogsServer {
         };
 
         match crate::service::logs::otlp_grpc::handle_grpc_request(
+            0,
             org_id.unwrap().to_str().unwrap(),
             in_req,
             true,

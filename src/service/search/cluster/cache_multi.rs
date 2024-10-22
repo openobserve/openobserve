@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use config::{cluster::LOCAL_NODE, get_config};
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
@@ -86,14 +86,14 @@ pub async fn get_cached_results(
                     is_descending:cache_req.is_descending,
                 };
 
-                let request = tonic::Request::new(req);
-
+                let mut request = tonic::Request::new(req);
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
                 log::info!(
                     "[trace_id {trace_id}] get_cached_results->grpc: request node: {}",
                     &node_addr
                 );
 
-                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
@@ -226,11 +226,11 @@ pub async fn get_cached_results(
         all_results.extend(res);
     }
     let mut results = Vec::new();
-    recursive_process_muliple_metas(&all_results, cache_req.clone(), &mut results);
+    recursive_process_multiple_metas(&all_results, cache_req.clone(), &mut results);
     results
 }
 
-fn recursive_process_muliple_metas(
+fn recursive_process_multiple_metas(
     cache_metas: &[CachedQueryResponse],
     cache_req: CacheQueryRequest,
     results: &mut Vec<CachedQueryResponse>,
@@ -278,7 +278,7 @@ fn recursive_process_muliple_metas(
         if remaining_metas.is_empty() {
             return;
         }
-        recursive_process_muliple_metas(&remaining_metas, cache_req, results);
+        recursive_process_multiple_metas(&remaining_metas, cache_req, results);
     }
 }
 

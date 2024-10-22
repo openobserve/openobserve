@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -137,7 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               no-caps
               icon="share"
-              @click="shareLink"
+              @click="shareLink.execute()"
+              :loading="shareLink.isLoading.value"
               data-test="dashboard-share-btn"
               ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
             >
@@ -203,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <RenderDashboardCharts
         v-if="selectedDate"
+        ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
@@ -215,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         @refreshPanelRequest="refreshPanelRequest"
+        @openEditLayout="openLayoutConfig"
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
@@ -229,6 +232,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
       >
         <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
+
+      <q-dialog
+        v-model="selectedPanelConfig.show"
+        position="right"
+        full-height
+        maximized
+      >
+        <PanelLayoutSettings
+          :layout="selectedPanelConfig.data.layout"
+          @save:layout="savePanelLayout"
+        />
       </q-dialog>
 
       <q-dialog
@@ -286,6 +301,9 @@ import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import PanelLayoutSettings from "./PanelLayoutSettings.vue";
+import { useLoading } from "@/composables/useLoading";
+import shortURLService from "@/services/short_url";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -301,6 +319,7 @@ export default defineComponent({
     DashboardSettings,
     RenderDashboardCharts,
     ScheduledDashboards,
+    PanelLayoutSettings,
   },
   setup() {
     const { t } = useI18n();
@@ -312,8 +331,11 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
 
     let moment: any = () => {};
 
@@ -331,6 +353,8 @@ export default defineComponent({
 
     const tabId = computed(() => route.query.tab);
 
+    const renderDashboardChartsRef = ref(null);
+
     onBeforeMount(async () => {
       await importMoment();
       setTimeString();
@@ -345,8 +369,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-          ? "absolute"
-          : "relative",
+        ? "absolute"
+        : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
@@ -392,6 +416,11 @@ export default defineComponent({
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
+    const selectedPanelConfig = ref({
+      data: null,
+      show: false,
+    });
+
     // selected tab
     const selectedTabId: any = ref(route.query.tab ?? null);
     // provide it to child components
@@ -405,7 +434,7 @@ export default defineComponent({
       data.values.forEach((variable) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
+            (item: any) => item.name && item.operator && item.value
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -413,7 +442,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
+            JSON.stringify(encodedFilters)
           );
         } else {
           variableObj[`var-${variable.name}`] = variable.value;
@@ -452,7 +481,7 @@ export default defineComponent({
     const setTimeString = () => {
       if (!moment()) return;
       timeString.value = ` ${moment(
-        currentTimeObj.value?.start_time?.getTime() / 1000,
+        currentTimeObj.value?.start_time?.getTime() / 1000
       )
         .tz(store.state.timezone)
         .format("YYYY/MM/DD HH:mm")}
@@ -468,12 +497,12 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default",
+        route.query.folder ?? "default"
       );
 
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
-        (tab: any) => tab.tabId === route.query.tab,
+        (tab: any) => tab.tabId === route.query.tab
       );
 
       selectedTabId.value = selectedTab
@@ -491,7 +520,7 @@ export default defineComponent({
         variablesData.values = [];
       }
 
-      // check if route has time realated query params
+      // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
         // if dashboard has relative time settings
@@ -537,6 +566,36 @@ export default defineComponent({
       showDashboardSettingsDialog.value = true;
     };
 
+    const openLayoutConfig = (id: string) => {
+      selectedPanelConfig.value.show = true;
+
+      const panelData = getPanelFromTab(selectedTabId.value, id);
+
+      if (!panelData) {
+        console.log("Panel not found");
+        return;
+      }
+
+      selectedPanelConfig.value.data = JSON.parse(JSON.stringify(panelData));
+    };
+
+    const savePanelLayout = async (layout) => {
+      const panel = getPanelFromTab(
+        selectedTabId.value,
+        selectedPanelConfig.value.data.id
+      );
+      if (panel) panel.layout = layout;
+
+      selectedPanelConfig.value.show = false;
+      selectedPanelConfig.value.data = null;
+
+      await nextTick();
+
+      window.dispatchEvent(new Event("resize"));
+
+      await renderDashboardChartsRef.value?.saveDashboard();
+    };
+
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
       if (selectedDate.value && dateTimePicker.value) {
@@ -557,6 +616,18 @@ export default defineComponent({
         setTimeString();
       }
     });
+
+    const getPanelFromTab = (tabId: string, panelId: string) => {
+      const tab = currentDashboardData.data.tabs.find(
+        (tab) => tab.tabId === tabId
+      );
+
+      if (!tab || !tab.panels) {
+        return null;
+      }
+
+      return tab.panels.find((panel) => panel.id === panelId);
+    };
 
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
@@ -606,8 +677,8 @@ export default defineComponent({
         end: new Date(event.end),
       };
       // Truncate seconds and milliseconds from the dates
-      selectedDateObj.start.setSeconds(0, 0);
-      selectedDateObj.end.setSeconds(0, 0);
+      selectedDateObj.start.setMilliseconds(0);
+      selectedDateObj.end.setMilliseconds(0);
 
       // Compare the truncated dates
       if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
@@ -695,7 +766,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          route.query.tab ?? currentDashboardData.data.tabs[0].tabId
         );
         await loadDashboard();
 
@@ -703,9 +774,17 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Panel deletion failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Panel deletion failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Panel deletion failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
 
@@ -718,7 +797,7 @@ export default defineComponent({
           panelId,
           route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          newTabId,
+          newTabId
         );
         await loadDashboard();
 
@@ -726,13 +805,21 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Panel move failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Panel move failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Panel move failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
 
-    const shareLink = () => {
+    const shareLink = useLoading(async () => {
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
@@ -741,19 +828,28 @@ export default defineComponent({
         urlSearchParams.delete("period");
         urlSearchParams.set(
           "from",
-          currentTimeObj?.value?.start_time?.getTime(),
+          currentTimeObj?.value?.start_time?.getTime()
         );
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
 
-      copyToClipboard(urlObj?.href)
-        .then(() => {
-          showPositiveNotification("Link copied successfully");
-        })
-        .catch(() => {
-          showErrorNotification("Error while copying link");
-        });
-    };
+      try {
+        const res = await shortURLService.create(
+          store.state.selectedOrganization.identifier,
+          urlObj?.href
+        );
+        const shortURL = res?.data?.short_url;
+        copyToClipboard(shortURL)
+          .then(() => {
+            showPositiveNotification("Link copied successfully");
+          })
+          .catch(() => {
+            showErrorNotification("Error while copying link");
+          });
+      } catch (error) {
+        showErrorNotification("Error while sharing link");
+      }
+    });
 
     // Fullscreen
     const fullscreenDiv = ref(null);
@@ -798,7 +894,7 @@ export default defineComponent({
         .list(
           store.state.selectedOrganization.identifier,
           folderId.value,
-          dashboardId.value,
+          dashboardId.value
         )
         .then((response) => {
           scheduledReports.value = response.data;
@@ -892,9 +988,12 @@ export default defineComponent({
       arePanelsLoading,
       cancelQuery,
       traceIdRef,
-      searchRequestTraceIds,
       handleEmittedData,
       config,
+      openLayoutConfig,
+      selectedPanelConfig,
+      savePanelLayout,
+      renderDashboardChartsRef,
     };
   },
 });

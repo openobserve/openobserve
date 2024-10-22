@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,10 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 
+pub mod codec;
 pub mod empty_exec;
+pub mod remote_scan;
+pub mod rewrite;
 
 pub struct NewEmptyExecVisitor {
     data: Option<Arc<dyn ExecutionPlan>>,

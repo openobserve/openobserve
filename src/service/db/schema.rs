@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use {
     infra::{errors::Error, schema::mk_key},
-    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 
 use crate::{
@@ -58,7 +58,7 @@ pub async fn merge(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::schema_merge(
             &key,
@@ -83,7 +83,7 @@ pub async fn update_setting(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::schema_setting(
             &key,
@@ -108,7 +108,7 @@ pub async fn delete_fields(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::schema_delete_fields(
             &key,
@@ -133,7 +133,7 @@ pub async fn delete(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let key = mk_key(org_id, stream_type, stream_name);
         o2_enterprise::enterprise::super_cluster::queue::delete(
             &key,
@@ -177,7 +177,7 @@ async fn list_stream_schemas(
                     stream_name,
                     stream_type,
                     schema: if fetch_schema {
-                        val.schema().clone()
+                        val.schema().as_ref().clone()
                     } else {
                         Schema::empty()
                     },
@@ -273,11 +273,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let key_cloumns = ev.key.split('/').collect::<Vec<&str>>();
-                let (ev_key, ev_start_dt) = if key_cloumns.len() > 5 {
+                let key_columns = ev.key.split('/').collect::<Vec<&str>>();
+                let (ev_key, ev_start_dt) = if key_columns.len() > 5 {
                     (
-                        key_cloumns[..5].join("/"),
-                        key_cloumns[5].parse::<i64>().unwrap_or(0),
+                        key_columns[..5].join("/"),
+                        key_columns[5].parse::<i64>().unwrap_or(0),
                     )
                 } else {
                     (ev.key.to_string(), ev.start_dt.unwrap_or_default())

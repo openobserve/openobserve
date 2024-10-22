@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,9 +23,10 @@ use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
-    meta::stream::{Routing, StreamType},
+    meta::stream::{Routing, StreamParams, StreamType},
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use syslog_loose::{Message, ProcId, Protocol};
 
@@ -36,11 +37,7 @@ use crate::{
         meta::{
             functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
-            ingestion::{
-                IngestionResponse, IngestionStatus, StreamStatus, ID_COL_NAME,
-                ORIGINAL_DATA_COL_NAME,
-            },
-            stream::StreamParams,
+            ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             syslog::SyslogRoute,
         },
     },
@@ -262,6 +259,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs(
+            0,
             org_id,
             &routed_stream_name,
             &mut status,

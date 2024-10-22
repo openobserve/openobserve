@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,50 @@ pub struct Locker(LockerStore);
 enum LockerStore {
     Etcd(etcd::Locker),
     Nats(nats::Locker),
+}
+
+impl Locker {
+    pub fn key(&self) -> String {
+        match self.0 {
+            LockerStore::Etcd(ref locker) => locker.key.clone(),
+            LockerStore::Nats(ref locker) => locker.key.clone(),
+        }
+    }
+}
+
+#[inline(always)]
+pub async fn lock_with_trace_id(
+    trace_id: &str,
+    key: &str,
+    wait_ttl: u64,
+    node_ids: Option<HashSet<String>>,
+) -> Result<Option<Locker>> {
+    let lock = lock(key, wait_ttl, node_ids).await;
+    match lock {
+        Ok(lock) => {
+            log::info!("[trace_id {trace_id}] fetch lock with key: {key}");
+            Ok(lock)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[inline(always)]
+pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Result<()> {
+    if locker.is_none() {
+        return Ok(());
+    }
+    let unlock = unlock(locker).await;
+    match unlock {
+        Ok(_) => {
+            log::info!(
+                "[trace_id {trace_id}] release lock with key: {:?}",
+                locker.as_ref().map(|l| l.key()).unwrap_or_default()
+            );
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// lock key in etcd, wait_ttl is 0 means wait forever

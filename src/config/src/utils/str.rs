@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,26 @@ pub fn find(haystack: &str, needle: &str) -> bool {
 #[cfg(not(target_arch = "x86_64"))]
 pub fn find(haystack: &str, needle: &str) -> bool {
     haystack.contains(needle)
+}
+
+pub trait StringExt {
+    fn find(&self, needle: &str) -> bool;
+    fn optional(&self) -> Option<String>;
+}
+
+impl StringExt for String {
+    #[inline(always)]
+    fn find(&self, needle: &str) -> bool {
+        find(self, needle)
+    }
+
+    fn optional(&self) -> Option<String> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.clone())
+        }
+    }
 }
 
 #[cfg(test)]

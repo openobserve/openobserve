@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refreshPanelRequest="refreshPanelRequest"
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
+              @onEditLayout="openEditLayout"
             >
             </PanelContainer>
           </div>
@@ -219,13 +220,16 @@ export default defineComponent({
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
-        ? (props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === selectedTabId.value,
-          )?.panels ?? [])
+        ? props.dashboardData?.tabs?.find(
+            (it: any) => it.tabId === selectedTabId.value
+          )?.panels ?? []
         : [];
     });
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const refreshDashboard = () => {
       emit("refresh");
     };
@@ -249,17 +253,17 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
+      variablesAndPanelsDataLoadingState
     );
 
     //computed property based on panels and variables loading state
     const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
       // Get values of variablesData and panels
       const variablesDataValues = Object.values(
-        variablesAndPanelsDataLoadingState.variablesData,
+        variablesAndPanelsDataLoadingState.variablesData
       );
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
+        variablesAndPanelsDataLoadingState.panels
       );
 
       // Check if every value in both variablesData and panels is false
@@ -276,7 +280,7 @@ export default defineComponent({
 
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds
       );
 
       if (traceIds.length > 0) {
@@ -330,7 +334,7 @@ export default defineComponent({
                 ...obj,
                 [item.name]: item.isLoading,
               }),
-              {},
+              {}
             );
         }
       } catch (error) {
@@ -353,7 +357,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any,
+        hoveredTime?: any
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -374,14 +378,22 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           props.dashboardData.dashboardId,
           props.dashboardData,
-          route.query.folder ?? "default",
+          route.query.folder ?? "default"
         );
 
         showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard update failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Dashboard update failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Dashboard update failed", {
+            timeout: 2000,
+          });
+        }
 
         // refresh dashboard
         refreshDashboard();
@@ -478,12 +490,16 @@ export default defineComponent({
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
-        ...args,
+        ...args
       );
     };
 
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
+    };
+
+    const openEditLayout = (id: string) => {
+      emit("openEditLayout", id);
     };
 
     return {
@@ -511,6 +527,8 @@ export default defineComponent({
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
+      openEditLayout,
+      saveDashboard,
     };
   },
   methods: {

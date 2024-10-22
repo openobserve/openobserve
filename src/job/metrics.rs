@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,11 +25,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
 use once_cell::sync::Lazy;
-use opentelemetry::{
-    global,
-    metrics::{Histogram, Unit},
-    KeyValue,
-};
+use opentelemetry::{global, metrics::Histogram, KeyValue};
 use opentelemetry_sdk::{
     metrics::{
         new_view,
@@ -75,7 +71,7 @@ pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
     let meter = opentelemetry::global::meter("o2");
     meter
         .f64_histogram(format!("{}_span_duration_milliseconds", NAMESPACE))
-        .with_unit(Unit::new("ms"))
+        .with_unit("ms")
         .with_description("span duration milliseconds")
         .init()
 });

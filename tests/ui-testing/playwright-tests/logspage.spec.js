@@ -7,7 +7,7 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+//  await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -121,7 +121,7 @@ test.describe("Logs UI testcases", () => {
   test("should be able to enter valid text in VRL and run query", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
       .click({
@@ -133,6 +133,9 @@ test.describe("Logs UI testcases", () => {
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
+    const warningElement = page.locator('text=warning Query execution');
+    await expect(warningElement).toBeHidden()
+  
     await page
       .locator('[data-test="table-row-expand-menu"]')
       .first()
@@ -147,7 +150,7 @@ test.describe("Logs UI testcases", () => {
   test("should hide and display again after clicking the arrow", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
       .click({
@@ -174,7 +177,7 @@ test.describe("Logs UI testcases", () => {
   test("should verify if special characters allowed in saved views name", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
       .click({
@@ -269,7 +272,7 @@ test.describe("Logs UI testcases", () => {
   test("should display the details of logs results on graph", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
       .click({ force: true });
@@ -293,7 +296,7 @@ test.describe("Logs UI testcases", () => {
     page,
   }) => {
     await page.route("**/logData.ValueQuery", (route) => route.continue());
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
@@ -335,19 +338,19 @@ test.describe("Logs UI testcases", () => {
   test("should switch from past 6 weeks to past 6 days on date-time UI", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
       .click({ force: true });
-    await expect(page.locator('[data-cy="date-time-button"]')).toContainText(
+    await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
       "Past 6 Weeks"
     );
     await applyQueryButton(page);
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="date-time-relative-6-d-btn"]')
       .click({ force: true });
-    await expect(page.locator('[data-cy="date-time-button"]')).toContainText(
+    await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
       "Past 6 Days"
     );
     await applyQueryButton(page);
@@ -359,7 +362,7 @@ test.describe("Logs UI testcases", () => {
     await page.route("**/logData.ValueQuery", (route) => route.continue());
 
     // Click on the date-time button
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
     // Click on the SQL Mode toggle
     await page.locator('[aria-label="SQL Mode"]').click({ force: true });
@@ -393,7 +396,7 @@ test.describe("Logs UI testcases", () => {
   test("should display ingested logs - search logs, navigate on another tab, revisit logs page", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator(
         '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block'
@@ -417,7 +420,7 @@ test.describe("Logs UI testcases", () => {
   test("should redirect to logs after clicking on stream explorer via stream page", async ({
     page,
   }) => {
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page
       .locator('[data-test="menu-link-/streams-item"]')
       .click({ force: true });
@@ -562,7 +565,7 @@ test.describe("Logs UI testcases", () => {
 
   test("should display results for search around with limit query", async ({ page }) => {
     await page.waitForTimeout(2000);
-    await page.locator('[data-cy="date-time-button"]').click({ force: true });
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code') limit 5");

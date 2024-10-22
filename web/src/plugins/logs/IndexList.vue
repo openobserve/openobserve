@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : ''
               "
             >
-              <!-- TODO OK : Repeated code make seperate component to display field  -->
+              <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="
                   props.row.ftsKey ||
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
-                        props.row.name,
+                        props.row.name
                       )
                     "
                     :name="outlinedVisibility"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
                     v-if="
                       searchObj.data.stream.selectedFields.includes(
-                        props.row.name,
+                        props.row.name
                       )
                     "
                     :name="outlinedVisibilityOff"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       addToInterestingFieldList(
                         props.row,
-                        props.row.isInterestingField,
+                        props.row.isInterestingField
                       )
                     "
                   />
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
-                            props.row.name,
+                            props.row.name
                           )
                         "
                         :name="outlinedVisibility"
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
                         v-if="
                           searchObj.data.stream.selectedFields.includes(
-                            props.row.name,
+                            props.row.name
                           )
                         "
                         :name="outlinedVisibilityOff"
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="
                           addToInterestingFieldList(
                             props.row,
-                            props.row.isInterestingField,
+                            props.row.isInterestingField
                           )
                         "
                       />
@@ -437,7 +437,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 size="6px"
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}='${value.key}'`,
+                                    props.row.name,
+                                    value.key,
+                                    'include',
                                   )
                                 "
                                 title="Include Term"
@@ -452,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 size="6px"
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`,
+                                    props.row.name,value.key, 'exclude',
                                   )
                                 "
                                 title="Exclude Term"
@@ -597,7 +599,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               round
-              data-test="logs-page-fields-list-pagination-messsage-button"
+              data-test="logs-page-fields-list-pagination-message-button"
               dense
               flat
               class="text text-caption text-regular"
@@ -700,6 +702,7 @@ export default defineComponent({
       extractFields,
       validateFilterForMultiStream,
       reorderSelectedFields,
+      getFilterExpressionByFieldType,
     } = useLogs();
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -733,7 +736,7 @@ export default defineComponent({
         streamOptions.value = searchObj.data.stream.streamLists;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
         );
       });
     };
@@ -795,7 +798,7 @@ export default defineComponent({
 
       searchObj.data.stream.selectedFields = selectedFields;
 
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
       filterHitsColumns();
@@ -803,7 +806,7 @@ export default defineComponent({
 
     const openFilterCreator = (
       event: any,
-      { name, ftsKey, isSchemaField, streams }: any,
+      { name, ftsKey, isSchemaField, streams }: any
     ) => {
       if (ftsKey) {
         event.stopPropagation();
@@ -814,27 +817,27 @@ export default defineComponent({
       let timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod,
+              searchObj.data.datetime.relativeTimePeriod
             )
           : cloneDeep(searchObj.data.datetime);
 
       if (searchObj.data.stream.streamType === "enrichment_tables") {
         const stream = searchObj.data.streamResults.list.find((stream: any) =>
-          searchObj.data.stream.selectedStream.includes(stream.name),
+          searchObj.data.stream.selectedStream.includes(stream.name)
         );
         if (stream.stats) {
           timestamps = {
             startTime:
               new Date(
                 convertTimeFromMicroToMilli(
-                  stream.stats.doc_time_min - 300000000,
-                ),
+                  stream.stats.doc_time_min - 300000000
+                )
               ).getTime() * 1000,
             endTime:
               new Date(
                 convertTimeFromMicroToMilli(
-                  stream.stats.doc_time_max + 300000000,
-                ),
+                  stream.stats.doc_time_max + 300000000
+                )
               ).getTime() * 1000,
           };
         }
@@ -898,7 +901,7 @@ export default defineComponent({
 
             query_context = query_context.replace(
               "[WHERE_CLAUSE]",
-              " WHERE " + whereClause,
+              " WHERE " + whereClause
             );
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
@@ -931,8 +934,8 @@ export default defineComponent({
             streams = searchObj.data.stream.selectedStream.filter(
               (streams: any) =>
                 !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-                  streams,
-                ),
+                  streams
+                )
             );
           }
         }
@@ -948,7 +951,7 @@ export default defineComponent({
               size: 10,
               query_context:
                 b64EncodeUnicode(
-                  query_context.replace("[INDEX_NAME]", selectedStream),
+                  query_context.replace("[INDEX_NAME]", selectedStream)
                 ) || "",
               query_fn: query_fn,
               type: searchObj.data.stream.streamType,
@@ -963,7 +966,7 @@ export default defineComponent({
                   item.values.forEach((subItem: any) => {
                     if (fieldValues.value[name]["values"].length) {
                       let index = fieldValues.value[name]["values"].findIndex(
-                        (value: any) => value.key == subItem.zo_sql_key,
+                        (value: any) => value.key == subItem.zo_sql_key
                       );
                       if (index != -1) {
                         fieldValues.value[name]["values"][index].count =
@@ -985,7 +988,7 @@ export default defineComponent({
                 });
                 if (fieldValues.value[name]["values"].length > 10) {
                   fieldValues.value[name]["values"].sort(
-                    (a, b) => b.count - a.count,
+                    (a, b) => b.count - a.count
                   ); // Sort the array based on count in descending order
                   fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
                 }
@@ -1009,13 +1012,26 @@ export default defineComponent({
       }
     };
 
-    const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
-    };
+    const addSearchTerm = (
+      field: string,
+      field_value: string | number | boolean,
+      action: string,
+    ) => {
+      const expression = getFilterExpressionByFieldType(
+        field,
+        field_value,
+        action,
+      );
 
-    // const onStreamChange = () => {
-    //   alert("onStreamChange")
+      if (expression) {
+        searchObj.data.stream.addToFilter = expression;
+      } else {
+        $q.notify({
+          type: "negative",
+          message: "Failed to generate filter expression",
+        });
+      }
+    };
     //   const query = searchObj.meta.sqlMode
     //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
     //     : "";
@@ -1030,16 +1046,16 @@ export default defineComponent({
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
-      isInterestingField: boolean,
+      isInterestingField: boolean
     ) => {
       if (selectedFieldsName.length == 0) {
         selectedFieldsName = searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
+          (item: any) => item.name
         );
       }
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
-          field.name,
+          field.name
         );
         if (index > -1) {
           // only splice array when item is found
@@ -1063,11 +1079,11 @@ export default defineComponent({
             let localFieldIndex = -1;
             for (const selectedStream of field.streams) {
               localFieldIndex = localStreamFields[
-                searchObj.organizationIdetifier + "_" + selectedStream
+                searchObj.organizationIdentifier + "_" + selectedStream
               ].indexOf(field.name);
               if (localFieldIndex > -1) {
                 localStreamFields[
-                  searchObj.organizationIdetifier + "_" + selectedStream
+                  searchObj.organizationIdentifier + "_" + selectedStream
                 ].splice(localFieldIndex, 1);
               }
             }
@@ -1076,7 +1092,7 @@ export default defineComponent({
         }
       } else {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
-          field.name,
+          field.name
         );
         if (index == -1 && field.name != "*") {
           searchObj.data.stream.interestingFieldList.push(field.name);
@@ -1099,21 +1115,21 @@ export default defineComponent({
               if (selectedStream != undefined) {
                 if (
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ] == undefined
                 ) {
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ] = [];
                 }
 
                 if (
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ].indexOf(field.name) == -1
                 ) {
                   localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
+                    searchObj.organizationIdentifier + "_" + selectedStream
                   ].push(field.name);
                 }
               }
@@ -1142,7 +1158,7 @@ export default defineComponent({
 
     const sortedStreamFields = () => {
       return searchObj.data.stream.selectedStreamFields.sort(
-        (a: any, b: any) => a.group - b.group,
+        (a: any, b: any) => a.group - b.group
       );
     };
 
@@ -1173,13 +1189,13 @@ export default defineComponent({
       toggleSchema,
       streamFieldsRows: computed(() => {
         let expandKeys = Object.keys(
-          searchObj.data.stream.expandGroupRows,
+          searchObj.data.stream.expandGroupRows
         ).reverse();
 
         let startIndex = 0;
         // Iterate over the keys in reverse order
         let selectedStreamFields = cloneDeep(
-          searchObj.data.stream.selectedStreamFields,
+          searchObj.data.stream.selectedStreamFields
         );
         let count = 0;
         // console.log(searchObj.data.stream.selectedStreamFields)
@@ -1202,7 +1218,7 @@ export default defineComponent({
               // console.log("========")
               selectedStreamFields.splice(
                 startIndex - count,
-                searchObj.data.stream.expandGroupRowsFieldCount[key],
+                searchObj.data.stream.expandGroupRowsFieldCount[key]
               );
             }
           } else {

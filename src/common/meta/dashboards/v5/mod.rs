@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -219,6 +219,35 @@ pub struct PanelConfig {
     no_value_replacement: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     wrap_table_cells: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_transpose: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_dynamic_columns: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mappings: Option<Vec<Mapping>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Mapping {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    typee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "match")]
+    matchh: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -285,6 +314,15 @@ pub struct QueryConfig {
     min: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_shift: Option<Vec<TimeShift>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeShift {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    off_set: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

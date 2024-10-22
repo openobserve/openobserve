@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
+            <q-btn
+              icon="search"
+              :title="t('logStream.explore')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click="exploreEnrichmentTable(props)"
+            />
             <q-btn
               icon="edit"
               class="q-ml-xs"
@@ -352,6 +363,21 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
+    const exploreEnrichmentTable = (props: any) => {
+      router.push({
+        name: "logs",
+        query: {
+          stream_type: props.row.stream_type,
+          stream: props.row.name,
+          period: "15m",
+          refresh: "0",
+          query: "",
+          type: "stream_explorer",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       qTable,
@@ -391,6 +417,7 @@ export default defineComponent({
       },
       getImageURL,
       verifyOrganizationStatus,
+      exploreEnrichmentTable,
     };
   },
   computed: {

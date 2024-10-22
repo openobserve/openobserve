@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,7 +40,7 @@ use crate::{
     },
     service::{
         db, format_stream_name,
-        ingestion::{get_wal_time_key, write_file},
+        ingestion::{get_write_partition_key, write_file},
         schema::check_for_schema,
         usage::report_request_usage_stats,
     },
@@ -254,10 +254,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             .get(&stream_name)
             .unwrap()
             .schema()
+            .as_ref()
             .clone()
             .with_metadata(HashMap::new());
         let schema_key = schema.hash_key();
-        let hour_key = get_wal_time_key(
+        let hour_key = get_write_partition_key(
             timestamp,
             &partition_keys,
             partition_time_level,
@@ -298,7 +299,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
 
         let writer =
-            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
         // if let Err(e) = writer.sync().await {
         //     log::error!("ingestion error while syncing writer: {}", e);

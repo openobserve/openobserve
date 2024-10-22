@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -695,6 +695,14 @@ impl StreamPartition {
         }
     }
 
+    pub fn new_prefix(field: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            types: StreamPartitionType::Prefix,
+            disabled: false,
+        }
+    }
+
     pub fn get_partition_key(&self, value: &str) -> String {
         format!("{}={}", self.field, self.get_partition_value(value))
     }
@@ -707,6 +715,12 @@ impl StreamPartition {
                 let bucket = h % n;
                 bucket.to_string()
             }
+            StreamPartitionType::Prefix => value
+                .to_ascii_lowercase()
+                .chars()
+                .next()
+                .unwrap_or('_')
+                .to_string(),
         }
     }
 }
@@ -717,6 +731,7 @@ pub enum StreamPartitionType {
     #[default]
     Value, // each value is a partition
     Hash(u64), // partition with fixed bucket size by hash
+    Prefix,    // partition by first letter of term
 }
 
 impl Display for StreamPartitionType {
@@ -724,6 +739,7 @@ impl Display for StreamPartitionType {
         match self {
             StreamPartitionType::Value => write!(f, "value"),
             StreamPartitionType::Hash(_) => write!(f, "hash"),
+            StreamPartitionType::Prefix => write!(f, "prefix"),
         }
     }
 }
@@ -856,6 +872,45 @@ impl std::fmt::Display for Operator {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StreamParams {
+    pub org_id: faststr::FastStr,
+    pub stream_name: faststr::FastStr,
+    pub stream_type: StreamType,
+}
+
+impl PartialEq for StreamParams {
+    fn eq(&self, other: &Self) -> bool {
+        self.org_id == other.org_id
+            && self.stream_name == other.stream_name
+            && self.stream_type == other.stream_type
+    }
+}
+
+impl Default for StreamParams {
+    fn default() -> Self {
+        Self {
+            org_id: String::default().into(),
+            stream_name: String::default().into(),
+            stream_type: StreamType::default(),
+        }
+    }
+}
+
+impl StreamParams {
+    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
+        Self {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type,
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !(self.org_id.is_empty() || self.stream_name.is_empty())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -932,5 +987,13 @@ mod tests {
         assert_eq!(part.get_partition_key("test1"), "field=25");
         assert_eq!(part.get_partition_key("test2"), "field=4");
         assert_eq!(part.get_partition_key("test3"), "field=2");
+    }
+
+    #[test]
+    fn test_stream_params() {
+        let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        assert_eq!(params.org_id, "org_id");
+        assert_eq!(params.stream_name, "stream_name");
+        assert_eq!(params.stream_type, StreamType::Logs);
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
+use config::meta::cluster::get_internal_grpc_token;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
@@ -21,24 +21,21 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster,
-    service::{grpc::get_ingester_channel, search::MetadataMap},
-};
+use crate::service::{grpc::get_ingester_channel, search::MetadataMap};
 
 #[derive(Default)]
 pub struct MetricsServer;
 
-#[async_trait]
+#[tonic::async_trait]
 impl MetricsService for MetricsServer {
     async fn export(
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
         let start = std::time::Instant::now();
+        let cfg = config::get_config();
         let (metadata, extensions, message) = request.into_parts();
 
-        let cfg = config::get_config();
         // basic validation
         if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(format!(
@@ -55,7 +52,7 @@ impl MetricsService for MetricsServer {
                 &mut MetadataMap(request.metadata_mut()),
             )
         });
-        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        let token: MetadataValue<_> = get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
         let (addr, channel) = get_ingester_channel().await?;

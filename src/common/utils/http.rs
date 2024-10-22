@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{Error, ErrorKind},
     net::{AddrParseError, IpAddr, SocketAddr},
 };
@@ -213,6 +213,16 @@ impl<'a> Extractor for RequestHeaderExtractor<'a> {
     }
 }
 
+pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
+    let work_groups = work_group_set.into_iter().flatten().collect::<HashSet<_>>();
+    if work_groups.contains("long") {
+        return Some("long".to_string());
+    } else if work_groups.contains("short") {
+        return Some("short".to_string());
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,7 +253,7 @@ mod tests {
     /// Test logic for IP parsing
     #[test]
     fn test_ip_parsing() {
-        let valid_addressses = vec![
+        let valid_addresses = vec![
             "127.0.0.1",
             "127.0.0.1:8080",
             "::1",
@@ -252,7 +262,7 @@ mod tests {
             "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
         ];
 
-        let parsed_addresses: Vec<IpAddr> = valid_addressses
+        let parsed_addresses: Vec<IpAddr> = valid_addresses
             .iter()
             .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
             .collect();
@@ -260,7 +270,7 @@ mod tests {
         assert!(
             parsed_addresses
                 .iter()
-                .zip(valid_addressses)
+                .zip(valid_addresses)
                 .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
                 .fold(true, |acc, x| { acc | x })
         );

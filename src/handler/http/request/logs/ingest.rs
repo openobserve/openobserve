@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -50,22 +50,25 @@ use crate::{
 )]
 #[post("/{org_id}/_bulk")]
 pub async fn bulk(
+    thread_id: web::Data<usize>,
     org_id: web::Path<String>,
     body: web::Bytes,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(match logs::bulk::ingest(&org_id, body, user_email).await {
-        Ok(v) => MetaHttpResponse::json(v),
-        Err(e) => {
-            log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
-        }
-    })
+    Ok(
+        match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
+            Ok(v) => MetaHttpResponse::json(v),
+            Err(e) => {
+                log::error!("Error processing request {org_id}/_bulk: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
 }
 
 /// _multi ingestion API
@@ -88,6 +91,7 @@ pub async fn bulk(
 )]
 #[post("/{org_id}/{stream_name}/_multi")]
 pub async fn multi(
+    thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     body: web::Bytes,
     in_req: HttpRequest,
@@ -96,6 +100,7 @@ pub async fn multi(
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
         match logs::ingest::ingest(
+            **thread_id,
             &org_id,
             &stream_name,
             IngestionRequest::Multi(&body),
@@ -139,6 +144,7 @@ pub async fn multi(
 )]
 #[post("/{org_id}/{stream_name}/_json")]
 pub async fn json(
+    thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     body: web::Bytes,
     in_req: HttpRequest,
@@ -147,6 +153,7 @@ pub async fn json(
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
         match logs::ingest::ingest(
+            **thread_id,
             &org_id,
             &stream_name,
             IngestionRequest::JSON(&body),
@@ -190,6 +197,7 @@ pub async fn json(
 )]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
 pub async fn handle_kinesis_request(
+    thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     post_data: web::Json<KinesisFHRequest>,
     in_req: HttpRequest,
@@ -202,6 +210,7 @@ pub async fn handle_kinesis_request(
         .unwrap_or(chrono::Utc::now().timestamp_millis());
     Ok(
         match logs::ingest::ingest(
+            **thread_id,
             &org_id,
             &stream_name,
             IngestionRequest::KinesisFH(&post_data.into_inner()),
@@ -229,6 +238,7 @@ pub async fn handle_kinesis_request(
 
 #[post("/{org_id}/{stream_name}/_sub")]
 pub async fn handle_gcp_request(
+    thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     post_data: web::Json<GCPIngestionRequest>,
     in_req: HttpRequest,
@@ -237,6 +247,7 @@ pub async fn handle_gcp_request(
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
         match logs::ingest::ingest(
+            **thread_id,
             &org_id,
             &stream_name,
             IngestionRequest::GCP(&post_data.into_inner()),
@@ -270,6 +281,7 @@ pub async fn handle_gcp_request(
 )]
 #[post("/{org_id}/v1/logs")]
 pub async fn otlp_logs_write(
+    thread_id: web::Data<usize>,
     org_id: web::Path<String>,
     req: HttpRequest,
     body: web::Bytes,
@@ -283,7 +295,7 @@ pub async fn otlp_logs_write(
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");
-        match logs_proto_handler(&org_id, body, in_stream_name, user_email).await {
+        match logs_proto_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
             Ok(v) => Ok(v),
             Err(e) => {
                 log::error!(
@@ -299,7 +311,7 @@ pub async fn otlp_logs_write(
         }
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         // log::info!("otlp::logs_json_handler");
-        match logs_json_handler(&org_id, body, in_stream_name, user_email).await {
+        match logs_json_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
             Ok(v) => Ok(v),
             Err(e) => {
                 log::error!(

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #body-cell-name="props">
           <q-tr :props="props">
             <q-td :props="props" class="field_list">
-              <!-- TODO OK : Repeated code make seperate component to display field  -->
+              <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"

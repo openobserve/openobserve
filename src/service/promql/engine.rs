@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -499,7 +499,7 @@ impl Engine {
             .iter()
             .filter_map(|mat| {
                 if mat.op == MatchOp::Equal {
-                    Some((mat.name.as_str(), vec![mat.value.to_string()]))
+                    Some((mat.name.to_string(), vec![mat.value.to_string()]))
                 } else {
                     None
                 }

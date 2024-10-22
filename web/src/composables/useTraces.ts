@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 
 const defaultObject = {
-  organizationIdetifier: "",
+  organizationIdentifier: "",
   runQuery: false,
   loading: false,
 
@@ -63,7 +63,6 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
-    filterType: "basic",
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -175,7 +174,7 @@ const useTraces = () => {
     searchObj.runQuery = false;
   };
   const updatedLocalLogFilterField = (): void => {
-    const identifier: string = searchObj.organizationIdetifier || "default";
+    const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
       useLocalTraceFilterField()?.value != null
         ? useLocalTraceFilterField()?.value
@@ -201,8 +200,6 @@ const useTraces = () => {
 
     query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
 
-    query["filter_type"] = searchObj.meta.filterType;
-
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
     query["trace_id"] = router.currentRoute.value.query.trace_id;
@@ -214,7 +211,7 @@ const useTraces = () => {
   }
 
   const copyTracesUrl = (
-    customTimeRange: { from: string; to: string } | null = null,
+    customTimeRange: { from: string; to: string } | null = null
   ) => {
     const queryParams = getUrlQueryParams(true);
 
@@ -226,7 +223,7 @@ const useTraces = () => {
     const queryString = Object.entries(queryParams)
       .map(
         ([key, value]: any) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
       )
       .join("&");
 

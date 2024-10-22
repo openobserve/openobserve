@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,7 +38,9 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+        stream::{
+            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
+        },
     },
     metrics,
     utils::{
@@ -59,7 +61,7 @@ use infra::{
     cache::tmpfs,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, SchemaCache,
+        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
     },
     storage,
 };
@@ -85,6 +87,8 @@ use crate::{
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static SKIPPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
@@ -129,8 +133,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn scan_wal_files(
     worker_tx: tokio::sync::mpsc::Sender<(String, Vec<FileKey>)>,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let start = std::time::Instant::now();
+    let cfg = get_config();
+
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
     let pattern = wal_dir.join("files/");
 
@@ -218,6 +223,26 @@ async fn prepare_files(
         };
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
+            // check if the file is still locking
+            if SKIPPED_LOCK_FILES.read().await.contains(&file_key)
+                && !wal::lock_files_exists(&file_key)
+            {
+                log::warn!(
+                    "[INGESTER:JOB] the file was released, delete it: {}",
+                    file_key
+                );
+                if tokio::fs::remove_file(&wal_dir.join(&file_key))
+                    .await
+                    .is_ok()
+                {
+                    // delete metadata from cache
+                    WAL_PARQUET_METADATA.write().await.remove(&file_key);
+                    // need release all the files
+                    PROCESSING_FILES.write().await.remove(&file_key);
+                    // delete from skip list
+                    SKIPPED_LOCK_FILES.write().await.remove(&file_key);
+                }
+            }
             continue;
         }
 
@@ -446,7 +471,9 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            loop {
+            let mut need_skip = true;
+            // wait for 5s
+            for _ in 0..50 {
                 if wal::lock_files_exists(&file.key) {
                     log::warn!(
                         "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
@@ -454,8 +481,17 @@ async fn move_files(
                     );
                     time::sleep(time::Duration::from_millis(100)).await;
                 } else {
+                    need_skip = false;
                     break;
                 }
+            }
+            if need_skip {
+                log::warn!(
+                    "[INGESTER:JOB:{thread_id}] the file is still in use, add it to the skip_list: {}",
+                    file.key
+                );
+                SKIPPED_LOCK_FILES.write().await.insert(file.key.clone());
+                continue;
             }
 
             let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;
@@ -585,15 +621,21 @@ async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_setting);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_setting);
     let index_fields = get_stream_setting_index_fields(&stream_setting);
-    let defined_schema_fields = stream_setting
-        .unwrap_or_default()
-        .defined_schema_fields
-        .unwrap_or_default();
+    let (defined_schema_fields, need_original) = match stream_setting {
+        Some(s) => (
+            s.defined_schema_fields.unwrap_or_default(),
+            s.store_original_data,
+        ),
+        None => (Vec::new(), false),
+    };
     let schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
-        let latest_schema =
-            generate_schema_for_defined_schema_fields(&latest_schema, &defined_schema_fields);
-        Arc::new(latest_schema.schema().clone())
+        let latest_schema = generate_schema_for_defined_schema_fields(
+            &latest_schema,
+            &defined_schema_fields,
+            need_original,
+        );
+        latest_schema.schema().clone()
     } else {
         latest_schema.clone()
     };
@@ -656,7 +698,6 @@ async fn merge_files(
             new_schema.clone(),
             &new_batches,
             &bloom_filter_fields,
-            &full_text_search_fields,
             &new_file_meta,
         )
         .await?;
@@ -772,6 +813,9 @@ pub(crate) async fn generate_index_on_ingester(
         &mut schema_map,
     )
     .await;
+    let mut stream_setting = schema_map
+        .get(&index_stream_name)
+        .and_then(|schema| unwrap_stream_settings(schema.schema()));
 
     if !schema_chk.has_fields {
         // create schema
@@ -790,16 +834,15 @@ pub(crate) async fn generate_index_on_ingester(
         };
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
-            bloom_filter_fields: vec![
-                "field".to_string(),
-                "term".to_string(),
-                "file_name".to_string(),
-            ],
+            bloom_filter_fields: vec!["term".to_string()],
+            partition_keys: vec![StreamPartition::new_prefix("term")],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
+        // update stream setting
+        stream_setting = Some(settings);
 
         crate::common::utils::auth::set_ownership(
             org_id,
@@ -828,29 +871,48 @@ pub(crate) async fn generate_index_on_ingester(
                 ));
             };
         }
+
+        // add prefix partition for index <= v0.12.1
+        if let Some(settings) = stream_setting.as_mut() {
+            let term_partition_exists = settings
+                .partition_keys
+                .iter()
+                .any(|partition| partition.field == "term");
+            if !term_partition_exists {
+                settings
+                    .partition_keys
+                    .push(StreamPartition::new_prefix("term"));
+
+                let mut metadata = schema.schema().metadata().clone();
+                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
+                    .await?;
+            }
+        }
     }
+
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
+    let stream_setting = stream_setting.unwrap_or_default();
 
     let json_rows = record_batches_to_json_rows(&record_batches.iter().collect::<Vec<_>>())?;
     if json_rows.is_empty() {
         return Ok(());
     }
-    let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    for record_val in recs {
-        let timestamp: i64 = record_val
+    for row in json_rows {
+        let timestamp: i64 = row
             .get(&get_config().common.column_timestamp)
             .unwrap()
             .as_i64()
             .unwrap();
 
-        let hour_key = crate::service::ingestion::get_wal_time_key(
+        let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
-            &Vec::new(),
+            &stream_setting.partition_keys,
             PartitionTimeLevel::Hourly,
-            &json::Map::new(),
+            &row,
             Some(schema_key_str),
         );
 
@@ -860,13 +922,18 @@ pub(crate) async fn generate_index_on_ingester(
             records: vec![],
             records_size: 0,
         });
-
+        let record_val: json::Value = json::Value::Object(row);
         let record_size = json::estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-    let writer =
-        ingester::get_writer(org_id, &StreamType::Index.to_string(), &index_stream_name).await;
+    let writer = ingester::get_writer(
+        0,
+        org_id,
+        &StreamType::Index.to_string(),
+        &index_stream_name,
+    )
+    .await;
     let _ = crate::service::ingestion::write_file(&writer, &index_stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
@@ -886,7 +953,7 @@ pub(crate) async fn generate_index_on_compactor(
     stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Result<(String, FileMeta), anyhow::Error> {
+) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -902,7 +969,7 @@ pub(crate) async fn generate_index_on_compactor(
         index_fields,
     )?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
-        return Ok((String::new(), FileMeta::default()));
+        return Ok(vec![(String::new(), FileMeta::default())]);
     }
     let schema = record_batches.first().unwrap().schema();
 
@@ -963,7 +1030,7 @@ pub(crate) async fn generate_index_on_compactor(
     record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
-    let (filename, filemeta, _stream_type) = write_parquet_index_to_disk(
+    let files = write_parquet_index_to_disk(
         record_batches,
         original_file_size,
         org_id,
@@ -974,8 +1041,8 @@ pub(crate) async fn generate_index_on_compactor(
     )
     .await?;
 
-    log::debug!("[COMPACTOR:JOB] Written index file successfully");
-    Ok((filename, filemeta))
+    log::debug!("[COMPACTOR:JOB] Written index files successfully");
+    Ok(files)
 }
 
 fn prepare_index_record_batches(
@@ -1253,17 +1320,6 @@ pub(crate) async fn generate_fst_inverted_index(
             }
         }
     }
-
-    // TODO(taiming): future improvement. write index files into file_list to show total index size
-    // on UI let new_idx_file_name = write_fst_index_to_disk(
-    //         compressed_bytes,
-    //         org_id,
-    //         stream_name,
-    //         StreamType::Index,
-    //         &parquet_file_name,
-    //         "index_creator",
-    //     )
-    //     .await?;
 
     // write fst bytes into disk
     let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {

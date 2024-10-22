@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -42,7 +42,7 @@ use crate::{
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db,
+    service::{db, short_url},
 };
 
 pub async fn save(
@@ -293,19 +293,19 @@ impl Report {
         }
 
         let cfg = get_config();
-        let mut recepients = vec![];
-        for recepient in &self.destinations {
-            match recepient {
-                ReportDestination::Email(email) => recepients.push(email.clone()),
+        let mut recipients = vec![];
+        for recipient in &self.destinations {
+            match recipient {
+                ReportDestination::Email(email) => recipients.push(email.clone()),
             }
         }
-        let no_of_recepients = recepients.len();
+        let no_of_recipients = recipients.len();
         if !cfg.common.report_server_url.is_empty() {
             let report_data = HttpReportPayload {
                 dashboards: self.dashboards.clone(),
                 email_details: ReportEmailDetails {
                     title: self.title.clone(),
-                    recepients,
+                    recipients,
                     name: self.name.clone(),
                     message: self.message.clone(),
                     dashb_url: format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri),
@@ -351,28 +351,28 @@ impl Report {
                 &cfg.common.report_user_name,
                 &cfg.common.report_user_password,
                 &self.timezone,
-                no_of_recepients,
+                no_of_recipients,
             )
             .await?;
             self.send_email(&report.0, report.1).await
         }
     }
 
-    /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
+    /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
     async fn send_email(&self, pdf_data: &[u8], dashb_url: String) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         if !cfg.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
-        let mut recepients = vec![];
-        for recepient in &self.destinations {
-            match recepient {
-                ReportDestination::Email(email) => recepients.push(email),
+        let mut recipients = vec![];
+        for recipient in &self.destinations {
+            match recipient {
+                ReportDestination::Email(email) => recipients.push(email),
             }
         }
 
-        if recepients.is_empty() {
+        if recipients.is_empty() {
             return Ok(());
         }
 
@@ -380,8 +380,8 @@ impl Report {
             .from(cfg.smtp.smtp_from_email.parse()?)
             .subject(format!("Openobserve Report - {}", &self.title));
 
-        for recepient in recepients {
-            email = email.to(recepient.parse()?);
+        for recipient in recipients {
+            email = email.to(recipient.parse()?);
         }
 
         if !cfg.smtp.smtp_reply_to.is_empty() {
@@ -422,7 +422,7 @@ async fn generate_report(
     user_id: &str,
     user_pass: &str,
     timezone: &str,
-    no_of_recepients: usize,
+    no_of_recipients: usize,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
@@ -488,7 +488,7 @@ async fn generate_report(
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
-    let search_type = if no_of_recepients == 0 {
+    let search_type = if no_of_recipients == 0 {
         "ui"
     } else {
         "reports"
@@ -601,7 +601,7 @@ async fn generate_report(
 
     // Last two elements loaded means atleast the metric components have loaded.
     // Convert the page into pdf
-    let pdf_data = if no_of_recepients != 0 {
+    let pdf_data = if no_of_recipients != 0 {
         page.pdf(PrintToPdfParams {
             landscape: Some(true),
             ..Default::default()
@@ -616,6 +616,15 @@ async fn generate_report(
     browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
+
+    // convert to short_url
+    let email_dashb_url = match short_url::shorten(org_id, &email_dashb_url).await {
+        Ok(short_url) => short_url,
+        Err(e) => {
+            log::error!("Error shortening email dashboard url: {e}");
+            email_dashb_url
+        }
+    };
     Ok((pdf_data, email_dashb_url))
 }
 

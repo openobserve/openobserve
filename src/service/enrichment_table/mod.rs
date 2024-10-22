@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -157,7 +157,7 @@ pub async fn save_enrichment_data(
         if records.is_empty() {
             let schema = stream_schema_map.get(stream_name).unwrap();
             let schema_key = schema.hash_key();
-            hour_key = super::ingestion::get_wal_time_key(
+            hour_key = super::ingestion::get_write_partition_key(
                 timestamp,
                 &vec![],
                 PartitionTimeLevel::Unset,
@@ -182,6 +182,7 @@ pub async fn save_enrichment_data(
         .get(stream_name)
         .unwrap()
         .schema()
+        .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let schema_key = schema.hash_key();
@@ -197,6 +198,7 @@ pub async fn save_enrichment_data(
 
     // write data to wal
     let writer = ingester::get_writer(
+        0,
         org_id,
         &StreamType::EnrichmentTables.to_string(),
         stream_name,
@@ -207,7 +209,7 @@ pub async fn save_enrichment_data(
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
-    // notifiy update
+    // notify update
     if stream_schema.has_fields {
         if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
             log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");

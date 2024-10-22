@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,10 +25,13 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{
-        stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
+        stream::{
+            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
+            StreamType,
+        },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::{flatten, json::*},
+    utils::{flatten, json::*, schema::format_partition_key},
     SIZE_IN_MB,
 };
 use futures::future::try_join_all;
@@ -51,11 +54,11 @@ use crate::{
             alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             ingestion::IngestionRequest,
-            stream::{SchemaRecords, StreamParams},
+            stream::SchemaRecords,
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::db,
 };
 
 pub mod grpc;
@@ -100,7 +103,7 @@ pub fn apply_vrl_fn(
     vrl_runtime: &VRLResultResolver,
     row: &Value,
     org_id: &str,
-    stream_name: &str,
+    stream_name: &[String],
 ) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
@@ -119,7 +122,7 @@ pub fn apply_vrl_fn(
             Ok(val) => val,
             Err(err) => {
                 log::error!(
-                    "{}/{} vrl failed at processing result {:?}. Returning original row.",
+                    "{}/{:?} vrl failed at processing result {:?}. Returning original row.",
                     org_id,
                     stream_name,
                     err,
@@ -129,7 +132,7 @@ pub fn apply_vrl_fn(
         },
         Err(err) => {
             log::error!(
-                "{}/{} vrl runtime failed at getting result {:?}. Returning original row.",
+                "{}/{:?} vrl runtime failed at getting result {:?}. Returning original row.",
                 org_id,
                 stream_name,
                 err,
@@ -250,6 +253,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             retries: 0,
             error: None,
             success_response: None,
+            is_partial: None,
         };
         match alert.send_notification(val, now, None).await {
             Err(e) => {
@@ -310,7 +314,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 }
 
-pub fn get_wal_time_key(
+pub fn get_write_partition_key(
     timestamp: i64,
     partition_keys: &Vec<StreamPartition>,
     time_level: PartitionTimeLevel,
@@ -337,14 +341,12 @@ pub fn get_wal_time_key(
         if key.disabled {
             continue;
         }
-        match local_val.get(&key.field) {
-            Some(v) => {
-                let val = get_string_value(v);
-                let val = key.get_partition_key(&val);
-                time_key.push_str(&format!("/{}", format_partition_key(&val)));
-            }
-            None => continue,
+        let val = match local_val.get(&key.field) {
+            Some(v) => get_string_value(v),
+            None => "null".to_string(),
         };
+        let val = key.get_partition_key(&val);
+        time_key.push_str(&format!("/{}", format_partition_key(&val)));
     }
     time_key
 }
@@ -405,7 +407,13 @@ pub fn apply_stream_functions(
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
-            value = apply_vrl_fn(runtime, vrl_runtime, &value, org_id, stream_name);
+            value = apply_vrl_fn(
+                runtime,
+                vrl_runtime,
+                &value,
+                org_id,
+                &[stream_name.to_string()],
+            );
         }
     }
     flatten::flatten_with_level(value, get_config().limit.ingest_flatten_level)
@@ -665,12 +673,12 @@ mod tests {
         assert_eq!(format_partition_key("default/olympics"), "defaultolympics");
     }
     #[test]
-    fn test_get_wal_time_key() {
+    fn test_get_write_partition_key() {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_wal_time_key(
+            get_write_partition_key(
                 1620000000,
                 &vec![
                     StreamPartition::new("country"),
@@ -685,12 +693,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_wal_time_key_no_partition_keys() {
+    fn test_get_write_partition_key_no_partition_keys() {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_wal_time_key(
+            get_write_partition_key(
                 1620000000,
                 &vec![],
                 PartitionTimeLevel::Hourly,
@@ -701,9 +709,9 @@ mod tests {
         );
     }
     #[test]
-    fn test_get_wal_time_key_no_partition_keys_no_local_val() {
+    fn test_get_write_partition_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_wal_time_key(
+            get_write_partition_key(
                 1620000000,
                 &vec![],
                 PartitionTimeLevel::Hourly,

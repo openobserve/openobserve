@@ -1,0 +1,32 @@
+# See https://github.com/crate-ci/typos/blob/master/docs/reference.md to configure typos
+
+[default]
+extend-ignore-re = [
+  # 'recepients' was a typo in the codebase, that has been fixed but is needed inside quotes for backwards compatibility
+  '"recepients"',
+  "flate2",  # dependency name
+  "eni-03c0f5ba79a66ef17",  # Test data
+  "NdJsonFormat",  # Used in .proto files
+  '"author": "[^"]+"',  # Used in web/sbom.json
+  "cohabitatingResource[12]",
+  # The following are typos yet to be fixed
+  "custom_error_handeling",
+]
+
+[default.extend-words]
+childs = "childs"  # Used in the frontend code
+wheres = "wheres"  # typos incorrectly recommends replacing with 'whereas'
+
+[files]
+extend-exclude = [
+  "bom.json",
+  "web/sbom.json",
+  "web/src/locales/languages/",
+  "ua_regex/regexes.yaml",
+  "tests/ui-testing/cypress/fixtures/enrichment_info.csv",
+  "web/src/components/rum/dd_events.js",
+  "web/src/components/rum/h_events.js",
+  "web/src/components/rum/segments.js",
+  "web/src/components/rum/sessions.js",
+  "web/src/test/unit/mockData",
+]

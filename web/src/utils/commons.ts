@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -137,16 +137,30 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       store.state.selectedOrganization.identifier,
       folderId
     );
-    //dashboard version migration
-    res.data.dashboards = res.data.dashboards.map((dashboard: any) =>
-      convertDashboardSchemaVersion(dashboard["v" + dashboard.version])
-    );
+
+    const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
+      dashboard: convertDashboardSchemaVersion(
+        dashboard["v" + dashboard.version]
+      ),
+      hash: dashboard.hash.toString(),
+    }));
+
+    store.dispatch("setAllDashboardListHash", {
+      ...store.state.organizationData.allDashboardListHash,
+      [folderId]: Object.fromEntries(
+        migratedDashboards.map((dashboard: any) => [
+          dashboard.dashboard.dashboardId,
+          dashboard.hash,
+        ])
+      ),
+    });
+
     // save to store
     store.dispatch("setAllDashboardList", {
       ...store.state.organizationData.allDashboardList,
-      [folderId]: res.data.dashboards.sort((a: any, b: any) =>
-        b.created.localeCompare(a.created)
-      ),
+      [folderId]: migratedDashboards
+        .map((dashboard: any) => dashboard.dashboard)
+        .sort((a: any, b: any) => b.created.localeCompare(a.created)),
     });
   } catch (error) {
     // handle error
@@ -472,9 +486,11 @@ export const updateDashboard = async (
       org,
       dashboardId,
       currentDashboardData,
-      folderId
+      folderId,
+      store.state.organizationData.allDashboardListHash[folderId][dashboardId]
     );
     await getAllDashboards(store, folderId);
+
     return res;
   } catch (error) {
     throw error;
@@ -524,6 +540,16 @@ export const deleteDashboardById = async (
     store.dispatch("setAllDashboardList", {
       ...allDashboardList,
       [folderId]: newDashboards,
+    });
+
+    // remove current dashboard hash from allDashboardListHash
+    delete store.state.organizationData.allDashboardListHash[folderId][
+      dashboardId
+    ];
+
+    // update the allDashboardList in the store
+    store.dispatch("setAllDashboardListHash", {
+      ...store.state.organizationData.allDashboardListHash,
     });
   } catch (error) {
     throw error;
@@ -651,7 +677,7 @@ export const addTab = async (
   newTabData: any
 ) => {
   try {
-    // genereate tab id
+    // generate tab id
     newTabData.tabId = getTabId();
 
     const currentDashboardData = findDashboard(dashboardId, store, folderId);
@@ -736,7 +762,7 @@ export const getFoldersList = async (store: any) => {
       defaultFolder = {
         name: "default",
         folderId: "default",
-        decription: "default",
+        description: "default",
       };
     }
 

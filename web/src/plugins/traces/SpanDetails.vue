@@ -462,8 +462,7 @@ import { computed } from "vue";
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
-import { date, useQuasar } from "quasar";
-import { copyToClipboard } from "quasar";
+import { date, useQuasar, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
@@ -543,12 +542,12 @@ const eventColumns = ref([
     field: (row: any) =>
       date.formatDate(
         Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-        "MMM DD, YYYY HH:mm:ss.SSS Z"
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
       ),
     prop: (row: any) =>
       date.formatDate(
         Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-        "MMM DD, YYYY HH:mm:ss.SSS Z"
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
       ),
     label: "Timestamp",
     align: "left",
@@ -570,12 +569,12 @@ const exceptionEventColumns = ref([
     field: (row: any) =>
       date.formatDate(
         Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-        "MMM DD, YYYY HH:mm:ss.SSS Z"
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
       ),
     prop: (row: any) =>
       date.formatDate(
         Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-        "MMM DD, YYYY HH:mm:ss.SSS Z"
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
       ),
     label: "Timestamp",
     align: "left",
@@ -621,7 +620,7 @@ watch(
   {
     deep: true,
     immediate: true,
-  }
+  },
 );
 
 const areTagsExpanded = ref(false);
@@ -879,7 +878,7 @@ const openReferenceTrace = (type: string, link: any) => {
   overflow-x: hidden;
 }
 
-.hearder_bg {
+.header_bg {
   border-top: 1px solid $border-color;
   background-color: color-mix(in srgb, currentColor 5%, transparent);
 }

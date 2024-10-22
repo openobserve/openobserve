@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 150px; max-height: 31px"
           />
           <img
+            v-if="store.state.zoConfig.custom_hide_self_logo == false"
             class="appLogo"
             loading="lazy"
             :src="
@@ -449,7 +450,7 @@ export default defineComponent({
     const isMonacoEditorLoaded = ref(false);
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
-      "org_identifier",
+      "org_identifier"
     )
       ? router.currentRoute.value.query.org_identifier
       : undefined;
@@ -652,13 +653,13 @@ export default defineComponent({
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
-          ?.filter((val: string) => val?.trim()) || [],
+          ?.filter((val: string) => val?.trim()) || []
       );
 
       store.dispatch("setHiddenMenus", disableMenus);
 
       linksList.value = linksList.value.filter(
-        (link: { name: string }) => !disableMenus.has(link.name),
+        (link: { name: string }) => !disableMenus.has(link.name)
       );
     };
 
@@ -756,7 +757,7 @@ export default defineComponent({
       // } else {
       if (
         store.state.zoConfig.hasOwnProperty(
-          "restricted_routes_on_empty_data",
+          "restricted_routes_on_empty_data"
         ) &&
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
@@ -788,7 +789,7 @@ export default defineComponent({
 
     const setSelectedOrganization = async () => {
       customOrganization = router.currentRoute.value.query.hasOwnProperty(
-        "org_identifier",
+        "org_identifier"
       )
         ? router.currentRoute.value.query.org_identifier
         : "";
@@ -862,7 +863,7 @@ export default defineComponent({
             }
 
             return optiondata;
-          },
+          }
         );
       }
 
@@ -891,7 +892,7 @@ export default defineComponent({
       try {
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
-          store.state?.selectedOrganization?.identifier,
+          store.state?.selectedOrganization?.identifier
         );
 
         //set settings in store
@@ -936,26 +937,26 @@ export default defineComponent({
       mainLayoutMixin.setup().getDefaultOrganization(store);
     }
 
-    const redirectToParentRoute = (machedRoutes: any) => {
+    const redirectToParentRoute = (matchedRoutes: any) => {
       if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
         router.push({
           name: "dashboards",
         });
       } else if (
-        machedRoutes?.length > 2 &&
+        matchedRoutes?.length > 2 &&
         !excludeParentRedirect.includes(router.currentRoute.value.name) &&
         router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&
         router.currentRoute.value.path.indexOf("/billings/") == -1
       ) {
-        if (machedRoutes[machedRoutes.length - 2]?.children?.length > 0) {
-          machedRoutes[machedRoutes.length - 2].children.forEach(
+        if (matchedRoutes[matchedRoutes.length - 2]?.children?.length > 0) {
+          matchedRoutes[matchedRoutes.length - 2].children.forEach(
             (route: any) => {
-              if (route.name == machedRoutes[machedRoutes.length - 1].name) {
+              if (route.name == matchedRoutes[matchedRoutes.length - 1].name) {
                 router.push({
-                  path: machedRoutes[machedRoutes.length - 2].path,
+                  path: matchedRoutes[matchedRoutes.length - 2].path,
                 });
               }
-            },
+            }
           );
         }
       } else {
@@ -978,7 +979,7 @@ export default defineComponent({
     const prefetch = () => {
       const href = "/web/assets/editor.api.v1.js";
       const existingLink = document.querySelector(
-        `link[rel="prefetch"][href="${href}"]`,
+        `link[rel="prefetch"][href="${href}"]`
       );
 
       if (!existingLink) {

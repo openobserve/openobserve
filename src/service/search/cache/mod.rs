@@ -18,6 +18,7 @@ use config::{
     get_config,
     meta::{
         search::{self, ResponseTook},
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -34,7 +35,7 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::functions,
+        utils::{functions, http::get_work_group},
     },
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
@@ -55,22 +56,21 @@ pub async fn search(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<search::Response, Error> {
-    let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let parsed_sql = match config::meta::sql::Sql::new(&origin_sql) {
-        Ok(v) => v,
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // TODO: cache don't not support multiple stream names
+        Ok(v) => v[0].clone(),
         Err(e) => {
             return Err(Error::Message(e.to_string()));
         }
     };
-
-    let stream_name = &parsed_sql.source;
 
     let mut req = in_req.clone();
     let mut query_fn = req
@@ -116,7 +116,24 @@ pub async fn search(
         )
         .await
     } else {
-        MultiCachedQueryResponse::default()
+        let query = rpc_req.clone().query.unwrap();
+        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+            Ok(v) => {
+                let (ts_column, is_descending) =
+                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                        .unwrap_or_default();
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    is_descending,
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {:?}", e);
+                MultiCachedQueryResponse::default()
+            }
+        }
     };
 
     // No cache data present, add delta for full query
@@ -140,6 +157,7 @@ pub async fn search(
 
     // Result caching check ends, start search
     let mut results = Vec::new();
+    let mut work_group_set = Vec::new();
     let mut res = if !should_exec_query {
         merge_response(
             trace_id,
@@ -205,32 +223,36 @@ pub async fn search(
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
-            let task = tokio::task::spawn(async move {
-                let trace_id = trace_id.clone();
-                req.query.start_time = delta.delta_start_time;
-                req.query.end_time = delta.delta_end_time;
+            let task = tokio::task::spawn(
+                (async move {
+                    let trace_id = trace_id.clone();
+                    req.query.start_time = delta.delta_start_time;
+                    req.query.end_time = delta.delta_end_time;
 
-                let cfg = get_config();
-                if cfg.common.result_cache_enabled
-                    && cfg.common.print_key_sql
-                    && c_resp.has_cached_data
-                {
-                    log::info!(
-                        "[trace_id {trace_id}] Query new start time: {}, end time : {}",
-                        req.query.start_time,
-                        req.query.end_time
-                    );
-                }
+                    let cfg = get_config();
+                    if cfg.common.result_cache_enabled
+                        && cfg.common.print_key_sql
+                        && c_resp.has_cached_data
+                    {
+                        log::info!(
+                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            req.query.start_time,
+                            req.query.end_time
+                        );
+                    }
 
-                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
-                    .instrument(enter_span)
-                    .await
-            });
+                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
+                })
+                .instrument(enter_span),
+            );
             tasks.push(task);
         }
 
         for task in tasks {
             results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
+        }
+        for res in &results {
+            work_group_set.push(res.work_group.clone());
         }
         if c_resp.has_cached_data {
             merge_response(
@@ -255,15 +277,22 @@ pub async fn search(
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 
-    if is_aggregate && c_resp.histogram_interval > -1 {
+    if is_aggregate
+        && res.histogram_interval.is_none()
+        && !c_resp.ts_column.is_empty()
+        && c_resp.histogram_interval > -1
+    {
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
+    let work_group = get_work_group(work_group_set);
+    let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
         response_time: time,
         size: res.scan_size as f64,
         request_body: Some(req.query.sql),
+        function: req.query.query_fn,
         user_email: user_id,
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
@@ -277,15 +306,15 @@ pub async fn search(
         } else {
             None
         },
+        work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };
-    let num_fn = req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
-        StreamType::Logs,
+        &stream_name,
+        stream_type,
         UsageType::Search,
         num_fn,
         started_at,
@@ -401,6 +430,9 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
+        // TODO: here we can't plus cluster_total, it is query in parallel
+        // TODO: and, use this value also is wrong, the cluster_total should be the total time of
+        // TODO: the query, here only calculate the time of the delta query
         if let Some(mut took_details) = res.took_detail {
             res_took.cluster_total += took_details.cluster_total;
             res_took.cluster_wait_queue += took_details.cluster_wait_queue;
@@ -467,15 +499,21 @@ async fn write_results(
     is_descending: bool,
 ) {
     let mut local_resp = res.clone();
-    let remove_index = if is_descending {
-        local_resp.hits.len() - 1
+    let remove_hit = if is_descending {
+        local_resp.hits.last()
     } else {
-        0
+        local_resp.hits.first()
     };
 
-    if !local_resp.hits.is_empty() {
-        local_resp.hits.remove(remove_index);
-    };
+    if !local_resp.hits.is_empty() && remove_hit.is_some() {
+        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+
+        if let Some(ts_value) = ts_value_to_remove {
+            local_resp
+                .hits
+                .retain(|hit| hit.get(ts_column) != Some(&ts_value));
+        }
+    }
 
     if local_resp.hits.is_empty() || local_resp.hits.len() < 2 {
         return;

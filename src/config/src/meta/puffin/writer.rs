@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -62,7 +62,7 @@ impl<W> PuffinBytesWriter<W> {
             .offset(self.written_bytes as _)
             .length(size as _)
             .build()
-            .expect("Missing required fileds")
+            .expect("Missing required fields")
     }
 }
 

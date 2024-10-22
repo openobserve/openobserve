@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -66,6 +66,13 @@ pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i32 = -999;
+
+pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
+
+// Columns added to ingested records for _INTERNAL_ use only.
+// Used for storing and querying unflattened original data
+pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
+pub const ID_COL_NAME: &str = "_o2_id";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -288,6 +295,29 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
+static SNS_CLIENT: tokio::sync::OnceCell<aws_sdk_sns::Client> = tokio::sync::OnceCell::const_new();
+
+async fn init_sns_client() -> aws_sdk_sns::Client {
+    let cfg = get_config();
+    let shared_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+
+    let sns_config = aws_sdk_sns::config::Builder::from(&shared_config)
+        .endpoint_url(cfg.sns.endpoint.clone())
+        .timeout_config(
+            aws_config::timeout::TimeoutConfig::builder()
+                .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
+                .operation_timeout(std::time::Duration::from_secs(cfg.sns.operation_timeout))
+                .build(),
+        )
+        .build();
+
+    aws_sdk_sns::Client::from_conf(sns_config)
+}
+
+pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
+    SNS_CLIENT.get_or_init(init_sns_client).await
+}
+
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
     let blocked_streams = get_config()
         .common
@@ -314,6 +344,7 @@ pub struct Config {
     pub etcd: Etcd,
     pub nats: Nats,
     pub s3: S3,
+    pub sns: Sns,
     pub tcp: TCP,
     pub prom: Prometheus,
     pub profiling: Pyroscope,
@@ -468,6 +499,8 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name = "ZO_ROUTE_CONNECTION_POOL_DISABLED", default = false)]
+    pub connection_pool_disabled: bool,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
@@ -529,6 +562,8 @@ pub struct Common {
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
+    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
+    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
@@ -692,7 +727,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "parquet",
-        help = "InvertedIndex store format, parquet(default), fst, or both."
+        help = "InvertedIndex store format, parquet(default), or both."
     )]
     pub inverted_index_store_format: String,
     #[env_config(
@@ -763,7 +798,7 @@ pub struct Common {
     pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = true,
+        default = false,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
@@ -905,6 +940,8 @@ pub struct Limit {
     pub derived_stream_schedule_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
     pub scheduler_max_retries: i32,
+    #[env_config(name = "ZO_SCHEDULER_PAUSE_ALERT_AFTER_RETRIES", default = false)]
+    pub pause_alerts_on_retries: bool,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
     pub scheduler_clean_interval: u64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
@@ -921,14 +958,22 @@ pub struct Limit {
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
     pub quick_mode_strategy: String, // first, last, both
-    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_ENABLED", default = false)]
-    pub quick_mode_file_list_enabled: bool,
-    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
-    pub quick_mode_file_list_interval: i64,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
     pub sql_db_connections_min: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_db_connections_max: u32,
+    #[env_config(
+        name = "ZO_META_CONNECTION_POOL_ACQUIRE_TIMEOUT",
+        default = 0,
+        help = "Seconds, Maximum acquire timeout of individual connections."
+    )]
+    pub sql_db_connections_acquire_timeout: u64,
+    #[env_config(
+        name = "ZO_META_CONNECTION_POOL_IDLE_TIMEOUT",
+        default = 0,
+        help = "Seconds, Maximum idle timeout of individual connections."
+    )]
+    pub sql_db_connections_idle_timeout: u64,
     #[env_config(
         name = "ZO_META_CONNECTION_POOL_MAX_LIFETIME",
         default = 0,
@@ -947,6 +992,18 @@ pub struct Limit {
         help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_ID_BATCH_SIZE",
+        default = 5000,
+        help = "batch size of file list query"
+    )]
+    pub file_list_id_batch_size: usize,
+    #[env_config(
+        name = "ZO_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -955,6 +1012,8 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(name = "ZO_DATAFUSION_MIN_PARTITION_NUM", default = 2)]
+    pub datafusion_min_partition_num: usize,
     #[env_config(
         name = "ZO_ENRICHMENT_TABLE_LIMIT",
         default = 256,
@@ -973,6 +1032,8 @@ pub struct Limit {
         help = "buffer for upper bound in mins"
     )]
     pub upper_bound_for_max_ts: i64,
+    #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
+    pub short_url_retention_days: i64,
 }
 
 #[derive(EnvConfig)]
@@ -989,7 +1050,7 @@ pub struct Compact {
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
-    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
+    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
@@ -1001,7 +1062,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 100,
+        default = 500,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -1179,6 +1240,8 @@ pub struct Nats {
     pub command_timeout: u64,
     #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
+    #[env_config(name = "ZO_NATS_SUB_CAPACITY", default = 65535)]
+    pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
 }
@@ -1219,6 +1282,18 @@ pub struct S3 {
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
     pub max_retries: usize,
+    #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
+    pub max_idle_per_host: usize,
+}
+
+#[derive(Debug, EnvConfig)]
+pub struct Sns {
+    #[env_config(name = "ZO_SNS_ENDPOINT", default = "")]
+    pub endpoint: String,
+    #[env_config(name = "ZO_SNS_CONNECT_TIMEOUT", default = 10)] // seconds
+    pub connect_timeout: u64,
+    #[env_config(name = "ZO_SNS_OPERATION_TIMEOUT", default = 30)] // seconds
+    pub operation_timeout: u64,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1328,6 +1403,12 @@ pub fn init() -> Config {
     if cfg.limit.sql_db_connections_max == 0 {
         cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
     }
+    cfg.limit.sql_db_connections_max =
+        max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
+
+    if cfg.limit.file_list_id_batch_size == 0 {
+        cfg.limit.file_list_id_batch_size = 5000;
+    }
 
     if cfg.limit.consistent_hash_vnodes == 0 {
         cfg.limit.consistent_hash_vnodes = 100;
@@ -1361,6 +1442,11 @@ pub fn init() -> Config {
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
+    }
+
+    // check sns config
+    if let Err(e) = check_sns_config(&mut cfg) {
+        panic!("sns config error: {e}");
     }
 
     cfg
@@ -1427,7 +1513,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
     if cfg.common.local_mode
-        || (cfg.common.meta_store != "sqlite" && cfg.common.meta_store != "etcd")
+        || cfg.common.meta_store.starts_with("mysql")
+        || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.meta_store_external = true;
     }
@@ -1487,9 +1574,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.inverted_index_store_format.is_empty() {
         cfg.common.inverted_index_search_format = "parquet".to_string();
     }
-    if !["both", "parquet", "fst"].contains(&cfg.common.inverted_index_store_format.as_str()) {
+    if !["both", "parquet"].contains(&cfg.common.inverted_index_store_format.as_str()) {
         return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet, fst."
+            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet."
         ));
     }
     if cfg.common.inverted_index_store_format != "both" {
@@ -1751,6 +1838,30 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // Validate endpoint URL if provided
+    if !cfg.sns.endpoint.is_empty()
+        && !cfg.sns.endpoint.starts_with("http://")
+        && !cfg.sns.endpoint.starts_with("https://")
+    {
+        return Err(anyhow::anyhow!(
+            "Invalid SNS endpoint URL. It must start with http:// or https://"
+        ));
+    }
+
+    // Validate timeouts
+    if cfg.sns.connect_timeout == 0 {
+        cfg.sns.connect_timeout = 10; // Default to 10 seconds if not set
+        log::warn!("SNS connect timeout not specified, defaulting to 10 seconds");
+    }
+    if cfg.sns.operation_timeout == 0 {
+        cfg.sns.operation_timeout = 30; // Default to 30 seconds if not set
+        log::warn!("SNS operation timeout not specified, defaulting to 30 seconds");
+    }
+
+    Ok(())
+}
+
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.s3.bucket_prefix.is_empty() && !cfg.s3.bucket_prefix.ends_with('/') {
         cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
@@ -1818,6 +1929,40 @@ mod tests {
         cfg.s3.provider = "".to_string();
         check_s3_config(&mut cfg).unwrap();
         assert_eq!(cfg.s3.provider, "aws");
+
+        // SNS configuration tests
+        // Test default values
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.connect_timeout, 10);
+        assert_eq!(cfg.sns.operation_timeout, 30);
+        assert!(cfg.sns.endpoint.is_empty());
+
+        // Test custom endpoint
+        cfg.sns.endpoint = "https://sns.us-west-2.amazonaws.com".to_string();
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
+
+        // Test invalid endpoint
+        cfg.sns.endpoint = "invalid-url".to_string();
+        assert!(check_sns_config(&mut cfg).is_err());
+
+        // Test custom timeouts
+        cfg.sns.connect_timeout = 15;
+        cfg.sns.operation_timeout = 45;
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.connect_timeout, 15);
+        assert_eq!(cfg.sns.operation_timeout, 45);
+
+        // Test zero values (should set to defaults)
+        cfg.sns.connect_timeout = 0;
+        cfg.sns.operation_timeout = 0;
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.connect_timeout, 10);
+        assert_eq!(cfg.sns.operation_timeout, 30);
+
+        // Test endpoint URL validation
+        cfg.sns.endpoint = "invalid-url".to_string();
+        assert!(check_sns_config(&mut cfg).is_err());
 
         cfg.memory_cache.max_size = 1024;
         cfg.memory_cache.release_size = 1024;

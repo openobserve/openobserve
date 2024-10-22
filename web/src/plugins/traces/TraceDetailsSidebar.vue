@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center q-px-sm hearder_bg border border-bottom border-top"
+    class="flex justify-start items-center q-px-sm header_bg border border-bottom border-top"
     :style="{ height: '30px' }"
   >
-    <div :style="{ width: 'calc(100% - 22px)' }" class="q-pb-none ellipsis">
-      Span Details
+    <div
+      :title="span.operation_name"
+      :style="{ width: 'calc(100% - 22px)' }"
+      class="q-pb-none ellipsis flex justify-between"
+    >
+      {{ span.operation_name }}
     </div>
+
     <q-btn
       dense
       icon="close"
@@ -30,42 +35,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="closeSidebar"
     ></q-btn>
   </div>
-  <div class="q-pb-sm q-pt-xs flex flex-wrap trace-details-toolbar-container">
-    <div
-      :title="span.operation_name"
-      class="q-px-sm q-pb-none ellipsis non-selectable"
-      style="font-size: 14px"
-    >
-      <span class="text-grey-7">Operation Name: </span>{{ span.operation_name }}
-    </div>
-    <div
-      class="q-px-sm ellipsis non-selectable"
-      :title="span.service_name"
-      style="font-size: 14px"
-    >
-      <span class="text-grey-7">Service Name: </span> {{ span.service_name }}
-    </div>
-    <div
-      class="q-px-sm ellipsis non-selectable"
-      :title="getDuration"
-      style="font-size: 14px"
-    >
-      <span class="text-grey-7">Duration: </span>
-      <span>{{ getDuration }}</span>
+  <div
+    class="q-pb-sm q-pt-xs flex flex-wrap justify-between trace-details-toolbar-container"
+  >
+    <div class="flex flex-wrap">
+      <div
+        class="q-px-sm ellipsis non-selectable"
+        :title="span.service_name"
+        style="border-right: 1px solid #cccccc; font-size: 14px"
+      >
+        <span class="text-grey-7">Service: </span> {{ span.service_name }}
+      </div>
+      <div
+        class="q-px-sm ellipsis non-selectable"
+        :title="getDuration"
+        style="border-right: 1px solid #cccccc; font-size: 14px"
+      >
+        <span class="text-grey-7">Duration: </span>
+        <span>{{ getDuration }}</span>
+      </div>
+
+      <div
+        class="q-px-sm ellipsis non-selectable"
+        :title="getStartTime"
+        style="font-size: 14px"
+      >
+        <span class="text-grey-7">Start Time: </span>
+        <span>{{ getStartTime }}</span>
+      </div>
     </div>
 
-    <q-btn
-      class="q-mx-xs view-span-logs-btn"
-      size="10px"
-      icon="search"
-      dense
-      padding="xs sm"
-      no-caps
-      :title="t('traces.viewLogs')"
-      @click.stop="viewSpanLogs"
-    >
-      View Logs</q-btn
-    >
+    <div class="flex">
+      <div class="text-right flex items-center justify-end q-mr-sm">
+        <span class="text-grey-7 q-mr-xs">Span Id: </span
+        ><span class="">{{ span.span_id }}</span>
+        <q-icon
+          class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
+          size="12px"
+          name="content_copy"
+          title="Copy"
+          @click="copySpanId"
+        />
+      </div>
+
+      <q-btn
+        class="q-mx-xs view-span-logs-btn"
+        size="10px"
+        icon="search"
+        dense
+        padding="xs sm"
+        no-caps
+        :title="t('traces.viewLogs')"
+        @click.stop="viewSpanLogs"
+      >
+        View Logs</q-btn
+      >
+    </div>
   </div>
   <q-tabs
     v-model="activeTab"
@@ -91,6 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-tab
       name="exceptions"
       :label="t('common.exceptions')"
+      style="text-transform: capitalize"
+    />
+    <q-tab
+      name="links"
+      :label="t('common.links')"
       style="text-transform: capitalize"
     />
     <q-tab
@@ -321,18 +351,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         No events present for this span
       </div>
     </q-tab-panel>
+
+    <q-tab-panel name="links">
+      <div v-if="spanLinks.length">
+        <q-virtual-scroll
+          type="table"
+          ref="searchTableRef"
+          style="max-height: 100%"
+          :items="spanLinks"
+        >
+          <template v-slot:before>
+            <thead class="thead-sticky text-left">
+              <tr>
+                <th
+                  v-for="(col, index) in linkColumns"
+                  :key="'result_' + index"
+                  class="table-header"
+                  :data-test="`trace-events-table-th-${col.label}`"
+                >
+                  {{ col.label }}
+                </th>
+              </tr>
+            </thead>
+          </template>
+
+          <template v-slot="{ item: row, index }">
+            <q-tr
+              :data-test="`trace-event-detail-${row['traceId']}`"
+              :key="'expand_' + index"
+              @click="openReferenceTrace('span', row)"
+              style="cursor: pointer"
+              class="pointer"
+            >
+              <q-td
+                v-for="column in linkColumns"
+                :key="index + '-' + column.name"
+                class="field_list"
+                style="cursor: pointer"
+              >
+                <div class="flex row items-center no-wrap">
+                  {{ column.prop(row) }}
+                </div>
+              </q-td>
+            </q-tr>
+          </template>
+        </q-virtual-scroll>
+      </div>
+      <div v-else class="full-width text-center q-pt-lg text-bold">
+        No links present for this span
+      </div>
+    </q-tab-panel>
   </q-tab-panels>
 </template>
 
 <script lang="ts">
 import { cloneDeep } from "lodash-es";
-import { date, type QTableProps } from "quasar";
+import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
-import { formatTimeWithSuffix } from "@/utils/zincutils";
+import { formatTimeWithSuffix, convertTimeFromNsToMs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -341,8 +422,12 @@ export default defineComponent({
       type: Object,
       default: () => null,
     },
+    baseTracePosition: {
+      type: Object,
+      default: () => null,
+    },
   },
-  emits: ["close", "view-logs"],
+  emits: ["close", "view-logs", "select-span", "open-trace"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
@@ -358,7 +443,10 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 0,
     });
+    const q = useQuasar();
     const { buildQueryDetails, navigateToLogs } = useTraces();
+    const isLinksExpanded = ref(false);
+    const router = useRouter();
 
     watch(
       () => props.span,
@@ -369,11 +457,11 @@ export default defineComponent({
       },
       {
         deep: true,
-      },
+      }
     );
 
     const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration),
+      formatTimeWithSuffix(props.span.duration)
     );
 
     onBeforeMount(() => {
@@ -388,12 +476,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         label: "Timestamp",
         align: "left",
@@ -415,12 +503,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         label: "Timestamp",
         align: "left",
@@ -436,9 +524,28 @@ export default defineComponent({
       },
     ]);
 
+    const linkColumns = ref([
+      {
+        name: "traceId",
+        field: (row: any) => (row.context ? row.context.traceId : ""),
+        prop: (row: any) => (row.context ? row.context.traceId : ""),
+        label: "TraceId",
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "spanId",
+        field: (row: any) => (row.context ? row.context.spanId : ""),
+        prop: (row: any) => (row.context ? row.context.spanId : ""),
+        label: "spanId",
+        align: "left",
+        sortable: true,
+      },
+    ]);
+
     const getExceptionEvents = computed(() => {
       return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception",
+        (event: any) => event.name === "exception"
       );
     });
 
@@ -473,14 +580,14 @@ export default defineComponent({
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
+            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000
           ),
-          "MMM DD, YYYY HH:mm:ss.SSS Z",
+          "MMM DD, YYYY HH:mm:ss.SSS Z"
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       spanDetails.events = JSON.parse(props.span.events || "[]").map(
-        (event: any) => event,
+        (event: any) => event
       );
 
       return spanDetails;
@@ -519,7 +626,7 @@ export default defineComponent({
       {
         deep: true,
         immediate: true,
-      },
+      }
     );
     function formatStackTrace(trace: any) {
       // Split the trace into lines
@@ -544,6 +651,81 @@ export default defineComponent({
       navigateToLogs(queryDetails);
     };
 
+    const getStartTime = computed(() => {
+      return (
+        convertTimeFromNsToMs(props.span.start_time) -
+        (props.baseTracePosition?.startTimeMs || 0) +
+        "ms"
+      );
+    });
+
+    const copySpanId = () => {
+      try {
+        copyToClipboard(props.span.span_id);
+        q.notify({
+          type: "positive",
+          message: "Span ID copied to clipboard",
+          timeout: 2000,
+        });
+      } catch (e) {
+        q.notify({
+          type: "negative",
+          message: "Failed to copy Span ID to clipboard",
+          timeout: 2000,
+        });
+        console.error("Error copying to clipboard:", e);
+      }
+    };
+
+    const toggleLinks = () => {
+      isLinksExpanded.value = !isLinksExpanded.value;
+    };
+
+    const openReferenceTrace = (type: string, link: any) => {
+      if (!link || !link.context) {
+        console.error("Link or link context is undefined");
+        return;
+      }
+
+      const query = {
+        stream: router.currentRoute.value.query.stream,
+        trace_id: link.context.traceId,
+        span_id: link.context.spanId,
+        from: convertTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
+        to: convertTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
+        org_identifier: store.state.selectedOrganization.identifier,
+      };
+
+      if (type !== "span") {
+        delete query.span_id;
+      }
+
+      if (query.trace_id === props.span.trace_id) {
+        emit("select-span", link.context.spanId);
+        return;
+      }
+
+      router.push({
+        name: "traceDetails",
+        query,
+      });
+
+      emit("open-trace");
+    };
+
+    const spanLinks = computed(() => {
+      try {
+        if (typeof props.span.links === "string") {
+          return JSON.parse(props.span.links);
+        } else {
+          return props.span.links;
+        }
+      } catch (e) {
+        console.log("Error parsing span links:", e);
+        return [];
+      }
+    });
+
     return {
       t,
       activeTab,
@@ -561,6 +743,13 @@ export default defineComponent({
       exceptionEventColumns,
       getDuration,
       viewSpanLogs,
+      getStartTime,
+      copySpanId,
+      toggleLinks,
+      isLinksExpanded,
+      openReferenceTrace,
+      spanLinks,
+      linkColumns,
     };
   },
 });
@@ -743,7 +932,7 @@ export default defineComponent({
   overflow-x: hidden;
 }
 
-.hearder_bg {
+.header_bg {
   border-top: 1px solid $border-color;
   background-color: color-mix(in srgb, currentColor 5%, transparent);
 }

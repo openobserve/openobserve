@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -49,7 +49,7 @@ pub trait TableProvider: Sync + Send + 'static {
         org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
-        filters: &mut [(&str, Vec<String>)],
+        filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }
 

@@ -117,7 +117,7 @@ test.describe("dashboard UI testcases", () => {
     await orgNavigation;
   });
 
-  test("should create a new dashboar", async ({ page }) => {
+  test("should create a new dashboard", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -1078,7 +1078,7 @@ test.describe("dashboard UI testcases", () => {
 
     await page.getByRole("option", { name: "=", exact: true }).click();
     await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("kubernetes_docker_Id");
+    await page.getByLabel("Value").fill("kubernetes_docker_id");
     await page.locator('[data-test="dashboard-apply"]').click();
 
     // Apply "Is Not Null" filter

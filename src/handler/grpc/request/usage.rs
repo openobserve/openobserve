@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use proto::cluster_rpc::{usage_server::Usage, UsageRequest, UsageResponse};
 use tonic::{Request, Response, Status};
 
 use crate::common::meta::ingestion::IngestionRequest;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct UsageServerImpl;
 
-#[async_trait]
+#[tonic::async_trait]
 impl Usage for UsageServerImpl {
     async fn report_usage(
         &self,
@@ -34,6 +33,7 @@ impl Usage for UsageServerImpl {
         let report_to_org_id = metadata.get(&config::get_config().grpc.org_header_key);
         let in_data = req.data.unwrap_or_default();
         let resp = crate::service::logs::ingest::ingest(
+            0,
             report_to_org_id.unwrap().to_str().unwrap(),
             &report_to_stream,
             IngestionRequest::Usage(&in_data.data.into()),

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -185,7 +185,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .expect("file list remote calculate stats failed");
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                    return Err(anyhow::anyhow!(
+                        "unsupported reset component: {}",
+                        component
+                    ));
                 }
             }
         }
@@ -204,7 +207,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     }
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {component}"));
+                    return Err(anyhow::anyhow!("unsupported reset component: {component}"));
                 }
             }
         }
@@ -265,7 +268,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::schema::run().await?
         }
         _ => {
-            return Err(anyhow::anyhow!("unsupport sub command: {name}"));
+            return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }
     }
 

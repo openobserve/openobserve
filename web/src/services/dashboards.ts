@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -50,12 +50,13 @@ const dashboards = {
     organization: string,
     dashboardID: string,
     data: any,
-    folderId?: string
+    folderId?: string,
+    hash?: any
   ) => {
     return http().put(
       `/api/${organization}/dashboards/${dashboardID}?folder=${
         folderId ?? "default"
-      }`,
+      }&hash=${hash}`,
       data,
       { headers: { "Content-Type": "application/json; charset=UTF-8" } }
     );

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -223,7 +223,7 @@ fn vector_and(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) 
     Ok(Value::Vector(output))
 }
 
-fn vector_arithmatic_operators(
+fn vector_arithmetic_operators(
     expr: &BinaryExpr,
     left: &[InstantValue],
     right: &[InstantValue],
@@ -352,6 +352,6 @@ pub fn vector_bin_op(
         token::T_LAND => vector_and(expr, left, right),
         token::T_LOR => vector_or(expr, left, right),
         token::T_LUNLESS => vector_unless(expr, left, right),
-        _ => vector_arithmatic_operators(expr, left, right),
+        _ => vector_arithmetic_operators(expr, left, right),
     }
 }

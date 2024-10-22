@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-else-if="col.name === 'actions'">
                     <q-btn
-                      :data-test="`alert-list-${props.row.name}-udpate-alert`"
+                      :data-test="`alert-list-${props.row.name}-update-alert`"
                       icon="save"
                       class="q-ml-xs"
                       padding="sm"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ col.value }}
                   <template v-if="col.name === 'actions'">
                     <q-btn
-                      :data-test="`alert-list-${props.row.name}-udpate-alert`"
+                      :data-test="`alert-list-${props.row.name}-update-alert`"
                       icon="edit"
                       class="q-ml-xs"
                       padding="sm"

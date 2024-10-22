@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,12 +51,16 @@ pub async fn read_from_immutable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
+    partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());
     for (_, i) in r.iter() {
         if org_id == i.key.org_id.as_ref() && stream_type == i.key.stream_type.as_ref() {
-            batches.extend(i.memtable.read(stream_name, time_range)?);
+            batches.extend(
+                i.memtable
+                    .read(stream_name, time_range, partition_filters)?,
+            );
         }
     }
     Ok(batches)

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use crate::{
     common::{
@@ -77,7 +77,7 @@ pub async fn post_user(
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
-                if O2_CONFIG.openfga.enabled {
+                if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(
                         &usr_req.role.to_string(),
@@ -294,7 +294,7 @@ pub async fn update_user(
                             {
                                 use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
 
-                                if O2_CONFIG.openfga.enabled
+                                if get_o2_config().openfga.enabled
                                     && old_role.is_some()
                                     && new_role.is_some()
                                 {
@@ -325,7 +325,7 @@ pub async fn update_user(
                             }
 
                             #[cfg(not(feature = "enterprise"))]
-                            log::debug!("Role chnaged from {:?} to {:?}", old_role, new_role);
+                            log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
                             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                                 http::StatusCode::OK.into(),
                                 "User updated successfully".to_string(),
@@ -425,7 +425,7 @@ pub async fn add_user_to_org(
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
-                if O2_CONFIG.openfga.enabled {
+                if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
                     get_org_creation_tuples(
@@ -581,7 +581,7 @@ pub async fn remove_user_from_org(
                             } else {
                                 user_role.to_string()
                             };
-                            if O2_CONFIG.openfga.enabled {
+                            if get_o2_config().openfga.enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
                                 delete_user_from_org(org_id, email_id, &user_fga_role).await;
                             }
@@ -614,7 +614,7 @@ pub async fn remove_user_from_org(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
-                                if O2_CONFIG.openfga.enabled && _user_fga_role.is_some() {
+                                if get_o2_config().openfga.enabled && _user_fga_role.is_some() {
                                     delete_user_from_org(
                                         org_id,
                                         email_id,

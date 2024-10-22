@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
-      <span class="full-width">
+      <span class="full-width flex justify-center">
         <img
           v-if="
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
       <img
+        v-if="store.state.zoConfig.custom_hide_self_logo == false"
         class="appLogo"
         style="height: auto"
         :style="
@@ -92,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="loginWithSSo"
       >
         <div
-          class="flex items-center justify-center full-width text-center realtive"
+          class="flex items-center justify-center full-width text-center relative"
         >
           <img
             class="absolute"

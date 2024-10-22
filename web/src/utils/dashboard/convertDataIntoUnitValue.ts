@@ -280,3 +280,76 @@ export const isTimeStamp = (sample: any) => {
     microsecondsPattern.test(value?.toString()),
   );
 };
+
+export function convertOffsetToSeconds(offset: string) {
+  const value = parseInt(offset.slice(0, -1)); // Extract the numeric part
+  const unit = offset.slice(-1); // Extract the last character (unit)
+
+  switch (unit) {
+    case "m": // Minutes
+      return value * 60 * 1000;
+    case "h": // Hours
+      return value * 60 * 60 * 1000;
+    case "d": // Days
+      return value * 24 * 60 * 60 * 1000;
+    case "w": // Weeks
+      return value * 7 * 24 * 60 * 60 * 1000;
+    case "M": // Months (approximate, using 30.44 days per month)
+      return value * 30.44 * 24 * 60 * 60 * 1000;
+    default:
+      return 0; // Return 0 if the unit is not recognized
+  }
+}
+
+export function convertSecondsToOffset(seconds: number): string {
+  const units = [
+    { unit: "Months", factor: 30.44 * 24 * 60 * 60 * 1000 }, // Months (approximate)
+    { unit: "Weeks", factor: 7 * 24 * 60 * 60 * 1000 }, // Weeks
+    { unit: "Days", factor: 24 * 60 * 60 * 1000 }, // Days
+    { unit: "Hours", factor: 60 * 60 * 1000 }, // Hours
+    { unit: "Minutes", factor: 60 * 1000 }, // Minutes
+  ];
+
+  for (const { unit, factor } of units) {
+    const value = Math.floor(seconds / factor);
+    if (value > 0) {
+      return `${value} ${unit}`;
+    }
+  }
+
+  return "0 Minutes"; // Return "0m" if seconds is 0 or less
+}
+
+// will find first valid mapped value based on given fieldToCheck
+export const findFirstValidMappedValue = (
+  value: any,
+  mappings: any[],
+  fieldToCheck: string,
+) => {
+  return mappings?.find((v: any) => {
+    let isMatch = false;
+
+    // Check based on type
+    if (v?.type == "value") {
+      isMatch = v?.value == value;
+    } else if (v?.type == "range") {
+      if (
+        v?.from &&
+        v?.to &&
+        !Number.isNaN(+v?.from) &&
+        !Number.isNaN(+v?.to)
+      ) {
+        isMatch = +v?.from <= +value && +v?.to >= +value;
+      }
+    } else if (v?.type == "regex") {
+      isMatch = new RegExp(v?.pattern ?? "").test(value);
+    }
+
+    // If a match is found, check if the required field (color or text) is valid
+    if (isMatch && v[fieldToCheck]) {
+      return true;
+    }
+
+    return false;
+  });
+};

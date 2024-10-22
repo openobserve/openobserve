@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,11 +24,6 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::stream::SchemaRecords;
-
-// Columns added to ingested records for _INTERNAL_ use only.
-// Used for storing and querying unflattened original data
-pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
-pub const ID_COL_NAME: &str = "_o2_id";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {

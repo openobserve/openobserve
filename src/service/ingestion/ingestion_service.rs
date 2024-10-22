@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::Error;
+use config::meta::cluster::get_internal_grpc_token;
 use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
@@ -21,7 +22,7 @@ use tonic::{
     Request,
 };
 
-use crate::{common::infra::cluster, service::grpc::get_ingester_channel};
+use crate::service::grpc::get_ingester_channel;
 
 pub async fn ingest(
     dest_org_id: &str,
@@ -33,7 +34,7 @@ pub async fn ingest(
         .org_header_key
         .parse()
         .map_err(|_| Error::msg("invalid org_header_key".to_string()))?;
-    let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+    let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::msg("invalid token".to_string()))?;
     let (addr, channel) = get_ingester_channel().await?;

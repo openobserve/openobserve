@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,11 +22,12 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -37,8 +38,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
-        stream::StreamParams,
+        ingestion::{IngestionStatus, StreamStatus},
     },
     handler::http::request::CONTENT_TYPE_PROTO,
     service::{
@@ -52,6 +52,7 @@ use crate::{
 };
 
 pub async fn handle_grpc_request(
+    thread_id: usize,
     org_id: &str,
     request: ExportLogsServiceRequest,
     is_grpc: bool,
@@ -60,6 +61,7 @@ pub async fn handle_grpc_request(
 ) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
 
     // check stream
     let stream_name = match in_stream_name {
@@ -68,7 +70,6 @@ pub async fn handle_grpc_request(
     };
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
-    let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
@@ -342,6 +343,7 @@ pub async fn handle_grpc_request(
 
     let mut status = IngestionStatus::Record(stream_status.status);
     let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        thread_id,
         org_id,
         user_email,
         (started_at, &start),
@@ -476,7 +478,7 @@ mod tests {
         };
 
         let result =
-            handle_grpc_request(org_id, request, true, Some("test_stream"), "a@a.com").await;
+            handle_grpc_request(0, org_id, request, true, Some("test_stream"), "a@a.com").await;
         assert!(result.is_ok());
     }
 }

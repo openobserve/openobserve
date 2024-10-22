@@ -10,7 +10,7 @@ const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+// await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -491,7 +491,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator(
-        '[data-test="add-alert-detination-sanitydestinations-select-item"]'
+        '[data-test="add-alert-destination-sanitydestinations-select-item"]'
       )
       .click();
     await page.locator('[data-test="add-alert-submit-btn"]').click();
@@ -917,4 +917,54 @@ test.describe("Sanity testcases", () => {
       .click();
     await page.locator('[data-test="confirm-button"]').click();
   });
+  test('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
+    // Step 1: Click on the "Share Link" button
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByRole('button', { name: 'Search History' }).click();
+    await page.locator('[data-test="search-history-date-time"]').click();
+    await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    await page.getByRole('button', { name: 'Get History' }).click();
+    await page.waitForTimeout(6000);
+    await page.getByRole('cell', { name: 'Trace ID' }).click();
+    // Locate the row using a known static value like the SQL query
+    const row = page.locator('tr:has-text("select histogram")');
+    // Click the button inside the located row
+  await row.locator('button.q-btn').nth(0).click();
+    await page.getByRole('button', { name: 'Logs' }).click();
+    await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click()
+    await expect(page).toHaveURL(/stream_type=logs/)
+  });
+
+  test('should verify logs page displayed on click back button on search history page', async ({ page, context }) => {
+    // Step 1: Click on the "Share Link" button
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByRole('button', { name: 'Search History' }).click();
+    await page.locator('[data-test="search-history-date-time"]').click();
+    await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    await page.locator('[data-test="search-history-alert-back-btn"]').click();
+    await page.locator('[data-test="logs-search-index-list"] div').filter({ hasText: 'e2e_automate' }).nth(4).click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
+  });
+
+  test('should verify user redirected to logs page when clicking stream explorer and on clicking get history, logs history displayed', async ({ page, context }) => {
+    // Step 1: Click on the "Share Link" button
+    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    await page.getByPlaceholder('Search Stream').click();
+    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByRole('button', { name: 'Explore' }).first().click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByRole('button', { name: 'Search History' }).click();
+    await page.locator('[data-test="add-alert-title"]').click();
+    await page.getByText('arrow_back_ios_new').click();
+    await page.waitForTimeout(1000);
+
+    // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element
+    await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click();
+});
+  
+
 });

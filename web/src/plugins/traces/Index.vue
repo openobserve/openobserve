@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -89,7 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                  :htmlContent="
+                    searchObj.data.errorMsg +
+                    '<h6 style=\'font-size: 14px; margin: 0;\'>' +
+                    searchObj.data.errorDetail +
+                    '</h6>'
+                  "
+                />
                 <div
                   data-test="logs-search-error-20003"
                   v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -270,11 +276,11 @@ export default defineComponent({
     const indexListRef = ref(null);
     const { getStreams, getStream } = useStreams();
 
-    searchObj.organizationIdetifier =
+    searchObj.organizationIdentifier =
       store.state.selectedOrganization.identifier;
 
     const selectedStreamName = computed(
-      () => searchObj.data.stream.selectedStream.value,
+      () => searchObj.data.stream.selectedStream.value
     );
 
     const importSqlParser = async () => {
@@ -292,7 +298,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier,
+          store.state.selectedOrganization.identifier
         )
           .then((res) => {
             res.data.list.map((data: any) => {
@@ -450,7 +456,7 @@ export default defineComponent({
 
           const startTimeStamp = date.subtractFromDate(
             endTimeStamp,
-            JSON.parse(subtractObject),
+            JSON.parse(subtractObject)
           );
 
           return {
@@ -468,7 +474,7 @@ export default defineComponent({
             start = new Date(
               searchObj.data.datetime.absolute.date.from +
                 " " +
-                searchObj.data.datetime.absolute.startTime,
+                searchObj.data.datetime.absolute.startTime
             );
           }
           if (
@@ -480,7 +486,7 @@ export default defineComponent({
             end = new Date(
               searchObj.data.datetime.absolute.date.to +
                 " " +
-                searchObj.data.datetime.absolute.endTime,
+                searchObj.data.datetime.absolute.endTime
             );
           }
           const rVal = {
@@ -520,7 +526,7 @@ export default defineComponent({
         let timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod,
+                searchObj.data.datetime.relativeTimePeriod
               )
             : cloneDeep(searchObj.data.datetime);
 
@@ -554,7 +560,7 @@ export default defineComponent({
 
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
+            " WHERE " + whereClause
           );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
@@ -562,12 +568,12 @@ export default defineComponent({
 
         req.query.sql = req.query.sql.replace(
           "[QUERY_FUNCTIONS]",
-          queryFunctions,
+          queryFunctions
         );
 
         req.query.sql = req.query.sql.replace(
           "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.value,
+          searchObj.data.stream.selectedStream.value
         );
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
@@ -583,7 +589,7 @@ export default defineComponent({
         console.log(e);
         searchObj.loading = false;
         showErrorNotification(
-          "An error occurred while constructing the search query.",
+          "An error occurred while constructing the search query."
         );
       }
     }
@@ -600,7 +606,7 @@ export default defineComponent({
 
       searchService
         .get_traces({
-          org_identifier: searchObj.organizationIdetifier,
+          org_identifier: searchObj.organizationIdentifier,
           start_time: queryReq.query.start_time,
           end_time: queryReq.query.end_time,
           filter: filter || "",
@@ -627,7 +633,7 @@ export default defineComponent({
 
     const showTraceDetailsError = () => {
       showErrorNotification(
-        `Trace ${router.currentRoute.value.query.trace_id} not found`,
+        `Trace ${router.currentRoute.value.query.trace_id} not found`
       );
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
@@ -648,7 +654,7 @@ export default defineComponent({
       req.query.end_time = trace.trace_end_time + 30000000;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
+        `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
       );
 
       return req;
@@ -659,7 +665,7 @@ export default defineComponent({
       searchObj.data.traceDetails.loading = true;
       searchObj.data.traceDetails.spanList = [];
       const req = buildTraceSearchQuery(
-        searchObj.data.traceDetails.selectedTrace,
+        searchObj.data.traceDetails.selectedTrace
       );
 
       delete req.aggs;
@@ -667,11 +673,11 @@ export default defineComponent({
       searchService
         .search(
           {
-            org_identifier: searchObj.organizationIdetifier,
+            org_identifier: searchObj.organizationIdentifier,
             query: req,
             page_type: "traces",
           },
-          "UI",
+          "UI"
         )
         .then((res) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
@@ -763,26 +769,11 @@ export default defineComponent({
           });
         }
 
-        const durationFilter = indexListRef.value.duration.input;
-
         let filter = searchObj.data.editorValue.trim();
-
-        if (
-          searchObj.meta.filterType === "basic" &&
-          durationFilter.max !== undefined &&
-          durationFilter.min !== undefined
-        ) {
-          const minDuration = durationFilter.min * 1000;
-          const maxDuration = durationFilter.max * 1000;
-
-          const duration = `duration >= ${minDuration} AND duration <= ${maxDuration}`;
-
-          filter = filter ? `${filter} AND ${duration}` : duration;
-        }
 
         searchService
           .get_traces({
-            org_identifier: searchObj.organizationIdetifier,
+            org_identifier: searchObj.organizationIdentifier,
             start_time: queryReq.query.start_time,
             end_time: queryReq.query.end_time,
             filter: filter || "",
@@ -893,7 +884,7 @@ export default defineComponent({
           const stream = await getStream(
             searchObj.data.stream.selectedStream.value,
             "traces",
-            true,
+            true
           );
 
           schema.push(...stream.schema);
@@ -971,13 +962,13 @@ export default defineComponent({
             timestampToTimezoneDate(
               row["trace_start_time"],
               store.state.timezone,
-              "yyyy-MM-dd HH:mm:ss.SSS",
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
               row["trace_start_time"],
               store.state.timezone,
-              "yyyy-MM-dd HH:mm:ss.SSS",
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           label: "Start Time",
           align: "left",
@@ -1072,7 +1063,7 @@ export default defineComponent({
             let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
             xData.push(Math.floor(histDate.getTime()));
             yData.push(Number((bucket.duration / 1000).toFixed(2)));
-          },
+          }
         );
       }
 
@@ -1116,7 +1107,7 @@ export default defineComponent({
       searchObj.data.resultGrid.currentPage = 0;
 
       resetSearchObj();
-      searchObj.organizationIdetifier =
+      searchObj.organizationIdentifier =
         store.state.selectedOrganization.identifier;
 
       //get stream list
@@ -1127,7 +1118,7 @@ export default defineComponent({
       // searchObj.loading = true;
       // this.searchObj.data.resultGrid.currentPage = 0;
       // resetSearchObj();
-      // searchObj.organizationIdetifier =
+      // searchObj.organizationIdentifier =
       //   store.state.selectedOrganization.identifier;
       // //get stream list
       // getStreamList();
@@ -1153,7 +1144,7 @@ export default defineComponent({
         loadPageData();
       }
       if (
-        searchObj.organizationIdetifier !=
+        searchObj.organizationIdentifier !=
         store.state.selectedOrganization.identifier
       ) {
         loadPageData();
@@ -1196,10 +1187,6 @@ export default defineComponent({
         searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       }
 
-      if (queryParams.filter_type) {
-        searchObj.meta.filterType = queryParams.filter_type;
-      }
-
       if (
         queryParams.stream &&
         searchObj.data.stream.selectedStream.value !== queryParams.stream
@@ -1228,7 +1215,7 @@ export default defineComponent({
           let values = [];
           if (node.operator === "IN") {
             values = node.right.value.map(
-              (_value: { value: string }) => _value.value,
+              (_value: { value: string }) => _value.value
             );
           }
           searchObj.data.stream.fieldValues[node.left.column].selectedValues =

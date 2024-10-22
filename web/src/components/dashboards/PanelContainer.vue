@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="1px"
           @click="
             PanleSchemaRendererRef?.tableRendererRef?.downloadTableAsCSV(
-              props.data.title,
+              props.data.title
             )
           "
           title="Download as a CSV"
@@ -158,6 +158,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item-section>
                 <q-item-label data-test="dashboard-edit-panel" class="q-pa-sm"
                   >Edit Panel</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
+              @click="onPanelModifyClick('EditLayout')"
+            >
+              <q-item-section>
+                <q-item-label data-test="dashboard-edit-layout" class="q-pa-sm"
+                  >Edit Layout</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -299,6 +310,7 @@ export default defineComponent({
     "refreshPanelRequest",
     "refresh",
     "update:initial-variable-values",
+    "onEditLayout",
   ],
   props: [
     "data",
@@ -329,8 +341,11 @@ export default defineComponent({
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -349,12 +364,15 @@ export default defineComponent({
             query.function_error,
             query.new_start_time,
             query.new_end_time,
-            store.state.timezone,
+            store.state.timezone
           );
           combinedWarnings.push(combinedMessage);
         }
       });
-      maxQueryRange.value = combinedWarnings;
+
+      // NOTE: for multi query, just show the first query warning
+      maxQueryRange.value =
+        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
     };
 
     // to store and show when the panel was last loaded
@@ -366,7 +384,7 @@ export default defineComponent({
     // to store and show warning if the cached data is different with current time range
     const isCachedDataDifferWithCurrentTimeRange: any = ref(false);
     const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
-      isDiffer: boolean,
+      isDiffer: boolean
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = isDiffer;
     };
@@ -388,7 +406,7 @@ export default defineComponent({
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
         const vars = it?.variables?.filter(
-          (it: any) => it.type === "dynamicVariable",
+          (it: any) => it.type === "dynamicVariable"
         );
         return vars?.length == adhocVariables?.length;
       });
@@ -435,7 +453,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? data.panels[0]?.tabId,
+          route.query.tab ?? data.panels[0]?.tabId
         );
 
         // Show a success notification.
@@ -453,9 +471,18 @@ export default defineComponent({
           },
         });
         return;
-      } catch (err: any) {
+      } catch (error: any) {
         // Show an error notification.
-        showErrorNotification(err?.message ?? "Panel duplication failed");
+
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Panel duplication failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Panel duplication failed");
+        }
       }
       // Hide the loading spinner notification.
       dismiss();
@@ -512,6 +539,8 @@ export default defineComponent({
         this.onDuplicatePanel(this.props.data);
       } else if (evt == "MovePanel") {
         this.confirmMovePanelDialog = true;
+      } else if (evt == "EditLayout") {
+        this.$emit("onEditLayout", this.props.data.id);
       } else {
       }
     },

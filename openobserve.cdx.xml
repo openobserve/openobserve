@@ -5974,7 +5974,7 @@
     <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#http-auth-basic@0.3.3">
       <name>http-auth-basic</name>
       <version>0.3.3</version>
-      <description>HTTP Basic Authentication Scheme (RFC 7617 and RFC 2617 compilant, base64-encoded credentials) for Rust applications</description>
+      <description>HTTP Basic Authentication Scheme (RFC 7617 and RFC 2617 compliant, base64-encoded credentials) for Rust applications</description>
       <scope>required</scope>
       <hashes>
         <hash alg="SHA-256">dd2e17aacf7f4a2428def798e2ff4f4f883c0987bdaf47dd5c8bc027bc9f1ebc</hash>

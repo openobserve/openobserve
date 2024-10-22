@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::cmp::Ordering;
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
-    common::infra::config::O2_CONFIG,
+    common::infra::config::get_config as get_o2_config,
     openfga::{
         authorizer::authz::{
             get_index_creation_tuples, get_org_creation_tuples, get_user_role_tuple, update_tuples,
@@ -53,7 +53,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
 
     // sync with super cluster
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let meta_in_super = get_model().await?;
         match (meta_in_super, &existing_meta) {
             (None, Some(existing_model)) => {
@@ -134,15 +134,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if !key.contains('/') {
                     continue;
                 }
-                let key_splitted = key.split('/').collect::<Vec<&str>>();
-                let org_name = key_splitted[0];
+                let split_key = key.split('/').collect::<Vec<&str>>();
+                let org_name = split_key[0];
                 orgs.insert(org_name);
                 if need_migrate_index_streams
-                    && key_splitted.len() > 2
-                    && key_splitted[1] == "index"
+                    && split_key.len() > 2
+                    && split_key[1] == "index"
                     && !migrate_native_objects
                 {
-                    get_tuple_for_new_index(org_name, key_splitted[2], &mut tuples);
+                    get_tuple_for_new_index(org_name, split_key[2], &mut tuples);
                 }
             }
             if migrate_native_objects {

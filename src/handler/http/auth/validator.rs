@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,8 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{get_config, utils::base64};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use crate::{
     common::{
@@ -31,7 +33,10 @@ use crate::{
                 UserRole,
             },
         },
-        utils::auth::{get_hash, is_root_user, AuthExtractor},
+        utils::{
+            auth::{get_hash, is_root_user, AuthExtractor},
+            redirect_response::RedirectResponseBuilder,
+        },
     },
     service::{db, users},
 };
@@ -641,10 +646,34 @@ fn get_user_details(decoded: String) -> Option<(String, String)> {
 /// If the authentication is invalid, it returns an `ErrorUnauthorized` error.
 pub async fn oo_validator(
     req: ServiceRequest,
-    auth_info: AuthExtractor,
+    auth_result: Result<AuthExtractor, Error>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/api/";
-    oo_validator_internal(req, auth_info, path_prefix).await
+    let path = extract_relative_path(req.request().path(), path_prefix);
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+    let is_short_url = is_short_url_path(&path_columns);
+
+    let auth_info = match auth_result {
+        Ok(info) => info,
+        Err(e) => {
+            return if is_short_url {
+                Err(handle_auth_failure_for_redirect(req, &e))
+            } else {
+                Err((e, req))
+            };
+        }
+    };
+
+    match oo_validator_internal(req, auth_info, path_prefix).await {
+        Ok(service_req) => Ok(service_req),
+        Err((err, err_req)) => {
+            if is_short_url {
+                Err(handle_auth_failure_for_redirect(err_req, &err))
+            } else {
+                Err((err, err_req))
+            }
+        }
+    }
 }
 
 /// Validates the authentication information in the request and returns the request if valid, or an
@@ -674,9 +703,7 @@ pub(crate) async fn check_permissions(
     auth_info: AuthExtractor,
     role: Option<UserRole>,
 ) -> bool {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    if !O2_CONFIG.openfga.enabled {
+    if !get_o2_config().openfga.enabled {
         return true;
     }
 
@@ -746,10 +773,8 @@ pub(crate) async fn list_objects_for_user(
     permission: &str,
     object_type: &str,
 ) -> Result<Option<Vec<String>>, Error> {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    if !is_root_user(user_id) && O2_CONFIG.openfga.enabled && O2_CONFIG.openfga.list_only_permitted
-    {
+    let o2cfg = get_o2_config();
+    if !is_root_user(user_id) && o2cfg.openfga.enabled && o2cfg.openfga.list_only_permitted {
         match crate::handler::http::auth::validator::list_objects(
             user_id,
             permission,
@@ -770,6 +795,57 @@ pub(crate) async fn list_objects_for_user(
     } else {
         Ok(None)
     }
+}
+
+/// Helper function to extract the relative path after the base URI and path prefix
+fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
+    let base_uri = config::get_config().common.base_uri.clone();
+    let full_prefix = format!("{}{}", base_uri, path_prefix);
+    full_path
+        .strip_prefix(&full_prefix)
+        .unwrap_or(full_path)
+        .to_string()
+}
+
+/// Helper function to check if the path corresponds to a short URL
+fn is_short_url_path(path_columns: &[&str]) -> bool {
+    path_columns
+        .get(1)
+        .map_or(false, |&segment| segment.to_lowercase() == "short")
+}
+
+/// Handles authentication failure by logging the error and returning a redirect response.
+///
+/// This function is responsible for logging the authentication failure and returning a redirect
+/// response. It takes in the request and the error message, and returns a tuple containing the
+/// redirect response and the service request.
+fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
+    let full_url = extract_full_url(&req);
+    let redirect_http = RedirectResponseBuilder::default()
+        .with_query_param("short_url", &full_url)
+        .build();
+    log::warn!(
+        "Authentication failed for path: {}, err: {}, {}",
+        req.path(),
+        error,
+        &redirect_http,
+    );
+    (redirect_http.into(), req)
+}
+
+/// Extracts the full URL from the request.
+fn extract_full_url(req: &ServiceRequest) -> String {
+    let connection_info = req.connection_info();
+    let scheme = connection_info.scheme();
+    let host = connection_info.host();
+    let path = req
+        .request()
+        .uri()
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or("");
+
+    format!("{}://{}{}", scheme, host, path)
 }
 
 #[cfg(test)]

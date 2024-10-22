@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use regex::Regex;
 
 use crate::{
@@ -101,6 +101,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { usage::run().await });
 
+    // cache short_urls
+    tokio::task::spawn(async move { db::short_url::watch().await });
+    db::short_url::cache()
+        .await
+        .expect("short url cache failed");
+
     // initialize metadata watcher
     tokio::task::spawn(async move { db::schema::watch().await });
     tokio::task::spawn(async move { db::functions::watch().await });
@@ -179,6 +185,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             infra_file_list::create_table_index()
                 .await
                 .expect("file list create table index failed");
+            infra_file_list::LOCAL_CACHE
+                .create_table_index()
+                .await
+                .expect("file list create table index failed");
             update_stats_from_file_list()
                 .await
                 .expect("file list remote calculate stats failed");
@@ -186,6 +196,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     infra_file_list::create_table_index().await?;
+    infra_file_list::LOCAL_CACHE.create_table_index().await?;
     tokio::task::spawn(async move { db::file_list::remote::cache_stats().await });
 
     #[cfg(feature = "enterprise")]
@@ -220,7 +231,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // RBAC model
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         if let Err(e) = crate::common::infra::ofga::init().await {
             log::error!("OFGA init failed: {}", e);
         }

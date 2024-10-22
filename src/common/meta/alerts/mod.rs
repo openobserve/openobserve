@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -41,6 +41,12 @@ pub struct TriggerCondition {
     pub timezone: Option<String>,
 }
 
+#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CompareHistoricData {
+    #[serde(rename = "offSet")]
+    pub offset: String,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum FrequencyType {
     #[serde(rename = "cron")]
@@ -64,6 +70,8 @@ pub struct QueryCondition {
     pub vrl_function: Option<String>,
     #[serde(default)]
     pub search_event_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

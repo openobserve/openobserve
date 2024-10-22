@@ -57,7 +57,10 @@
     "cancelChanges": "Cancel Changes",
     "logs": "Logs",
     "addGroup":"Add Group",
-    "addCondition":"Add Condition"
+    "addCondition":"Add Condition",
+    "required": "Value is required",
+    "valueMustBeGreaterThanZero": "Value must be greater than zero",
+    "links": "Links"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -110,6 +113,7 @@
     "noRecordFound": "No records found. Please adjust filters and try again.",
     "functionErrorLabel": "Query execution warning: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
+    "functionErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search Saved View",
     "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist.",
@@ -141,7 +145,7 @@
     "tickets": "Ticket",
     "organizations": "Organizations",
     "function": "Functions",
-    "ingestion": "Ingestion",
+    "ingestion": "Data sources",
     "metrics": "Metrics",
     "slack": "Slack",
     "help": "Help",
@@ -354,7 +358,7 @@
     "header": "Streams",
     "search": "Search Stream",
     "name": "Name",
-    "docNum": "Doc Num",
+    "docNum": "Records",
     "storageSize": "Ingested Data",
     "compressedSize": "Compressed Size",
     "time": "Time",
@@ -457,7 +461,7 @@
     "loading": "Loading..."
   },
   "ingestion": {
-    "header": "Ingestion",
+    "header": "Data sources",
     "passwordLabel": "Reset Token",
     "resetTokenBtnLabel": "Reset Token",
     "resetRUMTokenLabel": "Reset RUM Token",
@@ -572,6 +576,8 @@
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
     "wraptext": "Wrap Table Cells",
+    "tableTranspose": "Transpose",
+    "tableDynamicColumns": "Allow Dynamic Columns",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
@@ -649,7 +655,8 @@
     "updateFolder": "Update Folder",
     "scheduledReports": "Scheduled Reports",
     "newReport": "New Report",
-    "scheduledDashboards": "Scheduled Dashboards"
+    "scheduledDashboards": "Scheduled Dashboards",
+    "panelHeight": "Panel Height"
   },
   "panel": {
     "header": "Panel",
@@ -804,7 +811,8 @@
     "crontitle": "Enable Cron",
     "lastTriggered":"Last Triggered At",
     "lastSatisfied":"Last Satisfied At",
-    "owner": "Owner"
+    "owner": "Owner",
+    "title": "Title"
   },
   "alert_templates": {
     "header": "Templates",

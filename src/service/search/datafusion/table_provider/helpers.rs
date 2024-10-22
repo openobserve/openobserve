@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,7 +115,6 @@ pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
             // - Can `Wildcard` be considered as a `Literal`?
             // - ScalarVariable could be `applicable`, but that would require access to the context
             Expr::AggregateFunction { .. }
-            | Expr::Sort { .. }
             | Expr::WindowFunction { .. }
             | Expr::Wildcard { .. }
             | Expr::Unnest { .. }
@@ -289,7 +288,7 @@ mod tests {
                 .otherwise(lit(false))
                 .expect("valid case expr"))
         ));
-        // static expression not relvant in this context but we
+        // static expression not relevant in this context but we
         // test it as an edge case anyway in case we want to generalize
         // this helper function
         assert!(expr_applicable_for_cols(&[], &lit(true)));

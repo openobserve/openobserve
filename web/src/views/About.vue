@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -32,24 +32,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="separator" />
 
     <div class="about_data">
-      <div class="row head">
-        <div class="col-1">{{ t("about.version") }}</div>
-        <div class="col-6 col-md-5 col-lg-4">{{ t("about.commitHash") }}</div>
-        <div class="col-3 col-md-3 col-lg-2">{{ t("about.buildDate") }}</div>
+      <div>
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.version") }}:</span
+        >
+        {{ store.state.zoConfig.version }}
       </div>
-      <div class="row body">
-        <div class="col-1">{{ store.state.zoConfig.version }}</div>
-        <div class="col-6 col-md-5 col-lg-4">
-          {{ store.state.zoConfig.commit_hash }}
-        </div>
-        <div class="col-3 col-md-3 col-lg-2">
-          {{ store.state.zoConfig.build_date }}
-        </div>
+      <div>
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.commitHash") }}:</span
+        >
+        {{ store.state.zoConfig.commit_hash }}
+      </div>
+      <div>
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.buildDate") }}:</span
+        >
+        {{ store.state.zoConfig.build_date }}
       </div>
     </div>
     <div class="about_data q-mt-lg">
       <p>Open source libraries used in OpenObserve</p>
-      <p>OpenObserve depends on many awesome open source libraries. You can find the list <a href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml" target="_blank">here</a> and <a href="https://github.com/openobserve/openobserve/blob/main/web/package.json" target="_blank">here</a>. <br />You can find the packages and links to sources of the libraries at <a href="https://npmjs.com" target="_blank">npmjs.com</a> and <a href="https://crates.io" target="_blank">crates.io</a> along with their respective licenses.</p>
+      <p>
+        OpenObserve depends on many awesome open source libraries. You can find
+        the list
+        <a
+          href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
+          target="_blank"
+          class="hover:tw-underline text-primary"
+          >here</a
+        >
+        and
+        <a
+          href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
+          target="_blank"
+          class="hover:tw-underline text-primary"
+          >here</a
+        >. <br />You can find the packages and links to sources of the libraries
+        at
+        <a
+          href="https://npmjs.com"
+          target="_blank"
+          class="hover:tw-underline text-primary"
+          >npmjs.com</a
+        >
+        and
+        <a
+          href="https://crates.io"
+          target="_blank"
+          class="hover:tw-underline text-primary"
+          >crates.io</a
+        >
+        along with their respective licenses.
+      </p>
     </div>
   </q-page>
 </template>

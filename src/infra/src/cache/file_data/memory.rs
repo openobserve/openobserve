@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,11 +40,11 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
 });
 static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
     let cfg = get_config();
-    let mut datas = Vec::with_capacity(cfg.memory_cache.bucket_num);
+    let mut data = Vec::with_capacity(cfg.memory_cache.bucket_num);
     for _ in 0..cfg.memory_cache.bucket_num {
-        datas.push(Default::default());
+        data.push(Default::default());
     }
-    datas
+    data
 });
 
 pub struct FileData {
@@ -175,28 +175,30 @@ impl FileData {
             file
         );
 
-        let item = self.data.remove_key(file);
-        if item.is_none() {
-            log::error!("[trace_id {trace_id}] File disk memory is corrupt, it shouldn't be none");
-        }
-        let (key, data_size) = item.unwrap();
+        let Some((key, data_size)) = self.data.remove_key(file) else {
+            return Ok(());
+        };
+        self.cur_size -= data_size;
+        log::info!(
+            "[trace_id {trace_id}] File memory cache remove file done, released {} bytes",
+            data_size
+        );
+
+        // remove file from data cache
+        let idx = get_bucket_idx(&key);
+        DATA[idx].remove(&key);
 
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
+            metrics::QUERY_MEMORY_CACHE_FILES
                 .with_label_values(&[columns[1], columns[2]])
                 .dec();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
+            metrics::QUERY_MEMORY_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
                 .sub(data_size as i64);
         }
 
-        self.cur_size -= data_size;
-        log::info!(
-            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
-            data_size
-        );
         Ok(())
     }
 

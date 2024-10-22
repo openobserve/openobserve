@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,12 @@ use config::{
 use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
-use {crate::service::usage::audit, o2_enterprise::enterprise::common::auditor::AuditMessage};
+use {
+    crate::service::usage::audit,
+    o2_enterprise::enterprise::common::{
+        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+    },
+};
 
 use crate::{
     common::{
@@ -245,9 +250,7 @@ pub async fn authentication(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-    #[cfg(feature = "enterprise")]
-    let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
+    let native_login_enabled = get_o2_config().dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 

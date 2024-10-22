@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,15 +21,19 @@ pub mod file_list;
 pub mod queue;
 pub mod scheduler;
 pub mod schema;
+pub mod short_url;
 pub mod storage;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     db::init().await?;
     cache::init().await?;
     file_list::create_table().await?;
+    file_list::LOCAL_CACHE.create_table().await?;
+    file_list::local_cache_gc().await?;
     queue::init().await?;
     scheduler::init().await?;
     schema::init().await?;
+    short_url::init().await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())

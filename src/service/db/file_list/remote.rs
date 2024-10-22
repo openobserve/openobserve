@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -103,6 +103,7 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
 
     // create table index
     infra_file_list::create_table_index().await?;
+    infra_file_list::LOCAL_CACHE.create_table_index().await?;
     log::info!("Load file_list create table index done");
 
     // delete files

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,10 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::{search::SearchEventType, stream::StreamType};
+use config::meta::{
+    search::SearchEventType,
+    stream::{StreamParams, StreamType},
+};
 
 use super::db;
 use crate::common::{
@@ -27,7 +30,6 @@ use crate::common::{
     meta::{
         http::HttpResponse as MetaHttpResponse,
         pipelines::{PipeLine, PipeLineList},
-        stream::StreamParams,
     },
 };
 

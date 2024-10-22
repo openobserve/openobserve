@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,61 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-my-xs">
       <div class="float-right col flex items-center">
         <syntax-guide
-          class="q-mr-lg"
+          class="q-mr-sm"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         />
-        <div class="flex items-center">
-          <div class="q-mr-xs text-bold">Filters:</div>
-          <app-tabs
-            style="
-              border: 1px solid #8a8a8a;
-              border-radius: 4px;
-              overflow: hidden;
-            "
-            :tabs="[
-              {
-                label: 'Basic',
-                value: 'basic',
-                style: {
-                  width: 'fit-content',
-                  padding: '0px 8px',
-                  background:
-                    searchObj.meta.filterType === 'basic' ? '#5960B2' : '',
-                  border: 'none !important',
-                  color:
-                    searchObj.meta.filterType === 'basic'
-                      ? '#ffffff !important'
-                      : '',
-                },
-              },
-              {
-                label: 'Advanced',
-                value: 'advance',
-                style: {
-                  width: 'fit-content',
-                  padding: '0px 8px',
-                  background:
-                    searchObj.meta.filterType === 'advance' ? '#5960B2' : '',
-                  border: 'none !important',
-                  color:
-                    searchObj.meta.filterType === 'advance'
-                      ? '#ffffff !important'
-                      : '',
-                },
-              },
-            ]"
-            :active-tab="searchObj.meta.filterType"
-            @update:active-tab="updateFilterType"
-          />
-        </div>
         <q-btn
-          v-if="searchObj.meta.filterType === 'basic'"
           label="Reset Filters"
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-md"
+          class="q-pr-sm q-pl-xs reset-filters"
           @click="resetFilters"
         />
       </div>
@@ -137,21 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:query="searchObj.data.editorValue"
           :keywords="autoCompleteKeywords"
           v-model:functions="searchObj.data.stream.functions"
-          :read-only="searchObj.meta.filterType === 'basic'"
           @update:query="updateQueryValue"
           @run-query="searchData"
         />
       </div>
     </div>
-    <template>
-      <confirm-dialog
-        title="Change Filter Type"
-        message="Query will be wiped off and reset to default."
-        @update:ok="changeToggle()"
-        @update:cancel="showWarningDialog = false"
-        v-model="showWarningDialog"
-      />
-    </template>
   </div>
 </template>
 
@@ -222,8 +167,6 @@ export default defineComponent({
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
-
-    const showWarningDialog = ref(false);
 
     let parser: any;
     let streamName = "";
@@ -363,7 +306,7 @@ export default defineComponent({
       if (value.valueType === "relative") emit("searchdata");
     };
 
-    const udpateQuery = () => {
+    const updateQuery = () => {
       // alert(searchObj.data.query);
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(searchObj.data.query);
@@ -409,20 +352,6 @@ export default defineComponent({
       emit("onChangeTimezone");
     };
 
-    const updateFilterType = (value) => {
-      if (value === "basic") {
-        searchObj.meta.filterType = "basic";
-        searchObj.data.editorValue = searchObj.data.advanceFiltersQuery;
-      } else {
-        searchObj.meta.filterType = value;
-      }
-    };
-
-    const changeToggle = () => {
-      showWarningDialog.value = false;
-      searchObj.meta.filterType = "basic";
-    };
-
     const resetFilters = () => {
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
@@ -446,15 +375,12 @@ export default defineComponent({
       refreshTimeChange,
       updateQueryValue,
       updateDateTime,
-      udpateQuery,
+      updateQuery,
       downloadLogs,
       setEditorValue,
       autoCompleteKeywords,
       updateTimezone,
       dateTimeRef,
-      updateFilterType,
-      showWarningDialog,
-      changeToggle,
       resetFilters,
       shareLink,
     };
@@ -632,18 +558,18 @@ export default defineComponent({
   .download-logs-btn {
     height: 30px;
   }
-}
-</style>
 
-<style lang="scss">
-.reset-filters {
-  font-size: 22px;
+  .reset-filters {
+    font-size: 22px;
+    height: 29px;
 
-  .block {
-    font-size: 12px;
-  }
-  .q-icon {
-    margin-right: 4px;
+    ::v-deep .block {
+      font-size: 12px;
+    }
+
+    ::v-deep .q-icon {
+      margin-right: 4px;
+    }
   }
 }
 </style>

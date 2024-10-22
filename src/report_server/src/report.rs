@@ -369,26 +369,27 @@ pub async fn generate_report(
     browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
+
     Ok((pdf_data, email_dashb_url))
 }
 
-/// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
+/// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
 pub async fn send_email(
     pdf_data: &[u8],
     email_details: models::EmailDetails,
     config: models::SmtpConfig,
 ) -> Result<(), anyhow::Error> {
-    let mut recepients = vec![];
-    for recepient in &email_details.recepients {
-        recepients.push(recepient);
+    let mut recipients = vec![];
+    for recipient in &email_details.recipients {
+        recipients.push(recipient);
     }
 
     let mut email = Message::builder()
         .from(config.from_email.parse()?)
         .subject(format!("Openobserve Report - {}", &email_details.title));
 
-    for recepient in recepients {
-        email = email.to(recepient.parse()?);
+    for recipient in recipients {
+        email = email.to(recipient.parse()?);
     }
 
     if !config.reply_to.is_empty() {

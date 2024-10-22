@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,8 @@ use crate::{common::meta, handler::http::request};
         request::syslog::list_routes,
         request::syslog::delete_route,
         request::clusters::list_clusters,
+        request::short_url::shorten,
+        request::short_url::retrieve,
     ),
     components(
         schemas(
@@ -236,6 +238,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Traces", description = "Traces data ingestion operations"),
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
+        (name = "Short Url", description = "Short Url Service"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",

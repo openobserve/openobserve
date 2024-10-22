@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -551,7 +551,7 @@ impl super::Db for NatsDb {
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        let (tx, rx) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(65535);
         let prefix = prefix.to_string();
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
@@ -580,6 +580,7 @@ impl super::Db for NatsDb {
                     }
                 };
                 let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self_prefix);
+                log::debug!("[NATS:watch] bucket: {}, prefix: {}", bucket_name, prefix);
                 let mut entries = match bucket.watch_all().await {
                     Ok(v) => v,
                     Err(e) => {
@@ -595,7 +596,7 @@ impl super::Db for NatsDb {
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("watching prefix: {}, get message error", new_key);
+                            log::error!("watching prefix: {}, get message error", prefix);
                             break;
                         }
                         Some(entry) => {
@@ -604,7 +605,7 @@ impl super::Db for NatsDb {
                                 Err(e) => {
                                     log::error!(
                                         "watching prefix: {}, get message error: {}",
-                                        new_key,
+                                        prefix,
                                         e
                                     );
                                     break;
@@ -614,24 +615,31 @@ impl super::Db for NatsDb {
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
-                            match entry.operation {
-                                jetstream::kv::Operation::Put => tx
-                                    .send(Event::Put(EventData {
-                                        key: bucket_prefix.to_string() + &item_key,
+                            let new_key = bucket_prefix.to_string() + &item_key;
+                            let ret = match entry.operation {
+                                jetstream::kv::Operation::Put => {
+                                    tx.try_send(Event::Put(EventData {
+                                        key: new_key.clone(),
                                         value: Some(entry.value),
                                         start_dt: None,
                                     }))
-                                    .await
-                                    .unwrap(),
+                                }
                                 jetstream::kv::Operation::Delete
-                                | jetstream::kv::Operation::Purge => tx
-                                    .send(Event::Delete(EventData {
-                                        key: bucket_prefix.to_string() + &item_key,
+                                | jetstream::kv::Operation::Purge => {
+                                    tx.try_send(Event::Delete(EventData {
+                                        key: new_key.clone(),
                                         value: None,
                                         start_dt: None,
                                     }))
-                                    .await
-                                    .unwrap(),
+                                }
+                            };
+                            if let Err(e) = ret {
+                                log::warn!(
+                                    "[NATS:watch] prefix: {}, key: {}, send error: {}",
+                                    prefix,
+                                    new_key,
+                                    e
+                                );
                             }
                         }
                     }
@@ -662,6 +670,9 @@ pub async fn connect() -> async_nats::Client {
 
     let mut opts = async_nats::ConnectOptions::new()
         .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout));
+    if cfg.nats.subscription_capacity > 0 {
+        opts = opts.subscription_capacity(cfg.nats.subscription_capacity);
+    }
     if !cfg.nats.user.is_empty() {
         opts = opts.user_and_password(cfg.nats.user.to_string(), cfg.nats.password.to_string());
     }
@@ -689,7 +700,7 @@ static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub(crate) struct Locker {
-    key: String,
+    pub key: String,
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
 }
@@ -774,7 +785,7 @@ impl Locker {
         if let Some(err) = last_err {
             if err.contains("key already exists") {
                 Err(Error::Message(format!(
-                    "nats lock for key: {}, accquire timeout in {timeout}s",
+                    "nats lock for key: {}, acquire timeout in {timeout}s",
                     self.key
                 )))
             } else {
