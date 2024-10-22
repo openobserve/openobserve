@@ -14,29 +14,75 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, Order, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
+    FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
 
 use crate::{
     db::{mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
-    errors::{DbError, Error, Result},
+    errors::{self, DbError, Error},
 };
 
-pub mod short_urls;
+// define the short_urls table
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[sea_orm(table_name = "short_urls")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = true)]
+    pub id: i64,
+    #[sea_orm(column_type = "String(StringLen::N(32))")]
+    pub short_id: String,
+    #[sea_orm(column_type = "Text")]
+    pub original_url: String,
+    pub created_ts: i64,
+}
 
-pub async fn init() -> Result<()> {
+#[derive(Copy, Clone, Debug, EnumIter)]
+pub enum Relation {}
+
+impl RelationTrait for Relation {
+    fn def(&self) -> RelationDef {
+        panic!("No relations defined")
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+#[allow(dead_code)]
+#[derive(FromQueryResult, Debug)]
+pub struct ShortUrlRecord {
+    #[allow(dead_code)]
+    pub short_id: String,
+    pub original_url: String,
+}
+
+impl ShortUrlRecord {
+    pub fn new(short_id: &str, original_url: &str) -> Self {
+        Self {
+            short_id: short_id.to_string(),
+            original_url: original_url.to_string(),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(FromQueryResult, Debug)]
+pub struct ShortId {
+    #[allow(dead_code)]
+    pub short_id: String,
+}
+
+pub async fn init() -> Result<(), errors::Error> {
     create_table().await?;
     create_table_index().await?;
     Ok(())
 }
 
-pub async fn create_table() -> Result<()> {
+pub async fn create_table() -> Result<(), errors::Error> {
     let builder = ORM_CLIENT.get_database_backend();
 
     let schema = Schema::new(builder);
     let create_table_stmt = schema
-        .create_table_from_entity(short_urls::Entity)
+        .create_table_from_entity(Entity)
         .if_not_exists()
         .take();
 
@@ -48,7 +94,7 @@ pub async fn create_table() -> Result<()> {
     }
 }
 
-pub async fn create_table_index() -> Result<()> {
+pub async fn create_table_index() -> Result<(), errors::Error> {
     let index1 = IndexStatement::new("short_urls_short_id_idx", "short_urls", true, &["short_id"]);
     let index2 = IndexStatement::new(
         "short_urls_created_ts_idx",
@@ -74,15 +120,25 @@ pub async fn create_table_index() -> Result<()> {
     Ok(())
 }
 
-pub async fn add(short_id: &str, original_url: &str) -> Result<()> {
-    let record = short_urls::ActiveModel {
+pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error> {
+    let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
         created_ts: Set(chrono::Utc::now().timestamp_micros()),
         ..Default::default()
     };
 
-    let res = short_urls::Entity::insert(record)
+    let res = Entity::insert(record).exec(&ORM_CLIENT.clone()).await;
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+    }
+}
+
+pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::ShortId.eq(short_id))
         .exec(&ORM_CLIENT.clone())
         .await;
 
@@ -92,25 +148,13 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<()> {
     }
 }
 
-pub async fn remove(short_id: &str) -> Result<()> {
-    let res = short_urls::Entity::delete_many()
-        .filter(short_urls::Column::ShortId.eq(short_id))
-        .exec(&ORM_CLIENT.clone())
-        .await;
-
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
-}
-
-pub async fn get(short_id: &str) -> Result<short_urls::ShortUrlRecord> {
-    let res = short_urls::Entity::find()
+pub async fn get(short_id: &str) -> Result<ShortUrlRecord, errors::Error> {
+    let res = Entity::find()
         .select_only()
-        .column(short_urls::Column::ShortId)
-        .column(short_urls::Column::OriginalUrl)
-        .filter(short_urls::Column::ShortId.eq(short_id))
-        .into_model::<short_urls::ShortUrlRecord>()
+        .column(Column::ShortId)
+        .column(Column::OriginalUrl)
+        .filter(Column::ShortId.eq(short_id))
+        .into_model::<ShortUrlRecord>()
         .one(&ORM_CLIENT.clone())
         .await;
 
@@ -128,18 +172,18 @@ pub async fn get(short_id: &str) -> Result<short_urls::ShortUrlRecord> {
     }
 }
 
-pub async fn list(limit: Option<i64>) -> Result<Vec<short_urls::ShortUrlRecord>> {
-    let mut res = short_urls::Entity::find()
+pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Error> {
+    let mut res = Entity::find()
         .select_only()
-        .column(short_urls::Column::ShortId)
-        .column(short_urls::Column::OriginalUrl)
-        .filter(short_urls::Column::ShortId.contains("google"))
-        .order_by(short_urls::Column::Id, Order::Desc);
+        .column(Column::ShortId)
+        .column(Column::OriginalUrl)
+        .filter(Column::ShortId.contains("google"))
+        .order_by(Column::Id, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
     let res = res
-        .into_model::<short_urls::ShortUrlRecord>()
+        .into_model::<ShortUrlRecord>()
         .all(&ORM_CLIENT.clone())
         .await;
 
@@ -149,10 +193,10 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<short_urls::ShortUrlRecord>>
     }
 }
 
-pub async fn contains(short_id: &str) -> Result<bool> {
-    let res = short_urls::Entity::find()
-        .filter(short_urls::Column::ShortId.eq(short_id))
-        .into_model::<short_urls::ShortUrlRecord>()
+pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
+    let res = Entity::find()
+        .filter(Column::ShortId.eq(short_id))
+        .into_model::<ShortUrlRecord>()
         .one(&ORM_CLIENT.clone())
         .await;
 
@@ -163,7 +207,7 @@ pub async fn contains(short_id: &str) -> Result<bool> {
 }
 
 pub async fn len() -> usize {
-    let len = short_urls::Entity::find().count(&ORM_CLIENT.clone()).await;
+    let len = Entity::find().count(&ORM_CLIENT.clone()).await;
 
     match len {
         Ok(len) => len as usize,
@@ -174,10 +218,8 @@ pub async fn len() -> usize {
     }
 }
 
-pub async fn clear() -> Result<()> {
-    let res = short_urls::Entity::delete_many()
-        .exec(&ORM_CLIENT.clone())
-        .await;
+pub async fn clear() -> Result<(), errors::Error> {
+    let res = Entity::delete_many().exec(&ORM_CLIENT.clone()).await;
 
     match res {
         Ok(_) => Ok(()),
@@ -189,18 +231,18 @@ pub async fn is_empty() -> bool {
     len().await == 0
 }
 
-pub async fn get_expired(expired_before: i64, limit: Option<i64>) -> Result<Vec<String>> {
-    let mut res = short_urls::Entity::find()
+pub async fn get_expired(
+    expired_before: i64,
+    limit: Option<i64>,
+) -> Result<Vec<String>, errors::Error> {
+    let mut res = Entity::find()
         .select_only()
-        .column(short_urls::Column::ShortId)
-        .filter(short_urls::Column::CreatedTs.lt(expired_before));
+        .column(Column::ShortId)
+        .filter(Column::CreatedTs.lt(expired_before));
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
-    let res = res
-        .into_model::<short_urls::ShortId>()
-        .all(&ORM_CLIENT.clone())
-        .await;
+    let res = res.into_model::<ShortId>().all(&ORM_CLIENT.clone()).await;
 
     match res {
         Ok(records) => Ok(records.iter().map(|r| r.short_id.clone()).collect()),
@@ -208,9 +250,9 @@ pub async fn get_expired(expired_before: i64, limit: Option<i64>) -> Result<Vec<
     }
 }
 
-pub async fn batch_remove(short_ids: Vec<String>) -> Result<()> {
-    let res = short_urls::Entity::delete_many()
-        .filter(short_urls::Column::ShortId.is_in(short_ids))
+pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::ShortId.is_in(short_ids))
         .exec(&ORM_CLIENT.clone())
         .await;
 
