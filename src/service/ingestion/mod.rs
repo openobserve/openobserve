@@ -97,13 +97,13 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
 pub fn apply_vrl_fn(
     runtime: &mut Runtime,
     vrl_runtime: &VRLResultResolver,
-    row: &Value,
+    row: Value,
     org_id: &str,
     stream_name: &[String],
 ) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut vrl::value::Value::from(row),
+        value: &mut vrl::value::Value::from(&row),
         metadata: &mut metadata,
         secrets: &mut vrl::value::Secrets::new(),
     };
@@ -123,7 +123,7 @@ pub fn apply_vrl_fn(
                     stream_name,
                     err,
                 );
-                row.clone()
+                row
             }
         },
         Err(err) => {
@@ -133,7 +133,7 @@ pub fn apply_vrl_fn(
                 stream_name,
                 err,
             );
-            row.clone()
+            row
         }
     }
 }

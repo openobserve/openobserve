@@ -132,7 +132,7 @@ pub async fn search(
                                 program: program.program.clone(),
                                 fields: program.fields.clone(),
                             },
-                            &json::Value::Array(
+                            json::Value::Array(
                                 json_rows
                                     .into_iter()
                                     .filter(|v| !v.is_empty())
@@ -161,7 +161,7 @@ pub async fn search(
                                         program: program.program.clone(),
                                         fields: program.fields.clone(),
                                     },
-                                    &json::Value::Object(hit),
+                                    json::Value::Object(hit),
                                     &sql.org_id,
                                     &sql.stream_names,
                                 );

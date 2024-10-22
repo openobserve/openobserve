@@ -213,9 +213,12 @@ async fn process_node(
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
-                while let Some((idx, mut record, _)) = receiver.recv().await {
-                    record = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
-                        .map_err(|e| anyhow!("LeafNode error with flattening: {}", e))?;
+                while let Some((idx, mut record, flattened)) = receiver.recv().await {
+                    if !flattened {
+                        record =
+                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
+                                .map_err(|e| anyhow!("LeafNode error with flattening: {}", e))?;
+                    }
                     if let Err(send_err) = result_sender
                         .send((idx, stream_params.clone(), record))
                         .await
@@ -275,15 +278,15 @@ async fn process_node(
                                 .map_err(|e| {
                                     anyhow!("FunctionNode error with flattening: {}", e)
                                 })?;
-                        flattened = true;
                     }
                     record = apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
-                        &record,
+                        record,
                         &org_id,
                         &["pipeline".to_string()],
                     );
+                    flattened = false; // since apply_vrl_fn can produce unflattened data
                 }
                 send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
                     .await;

@@ -473,7 +473,7 @@ pub async fn search_multi(
                             program: program.program.clone(),
                             fields: program.fields.clone(),
                         },
-                        &json::Value::Array(multi_res.hits),
+                        json::Value::Array(multi_res.hits),
                         &org_id,
                         &[vrl_stream_name.clone()],
                     );
@@ -509,7 +509,7 @@ pub async fn search_multi(
                                     program: program.program.clone(),
                                     fields: program.fields.clone(),
                                 },
-                                &hit,
+                                hit,
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );

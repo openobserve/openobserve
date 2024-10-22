@@ -25,7 +25,7 @@ pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
 /// Flattens the provided JSON object (`current`).
 ///
 /// It will return an error if flattening the object would make two keys to be
-/// the same, overwriting a value. It will alre return an error if the JSON
+/// the same, overwriting a value. It will also return an error if the JSON
 /// value passed it's not an object.
 ///
 /// # Errors

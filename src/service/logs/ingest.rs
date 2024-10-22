@@ -91,6 +91,7 @@ pub async fn ingest(
         )
         .await;
     let mut pipeline_inputs = Vec::new();
+    let mut original_ops = Vec::new();
     // End pipeline params construction
 
     if let Some(pl_exec_plan) = &pipeline_execution_plan {
@@ -185,7 +186,8 @@ pub async fn ingest(
         };
 
         if pipeline_execution_plan.is_some() {
-            pipeline_inputs.push((item, original_data));
+            pipeline_inputs.push(item);
+            original_ops.push(original_data);
         } else {
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
@@ -237,7 +239,7 @@ pub async fn ingest(
     if let Some(pl_exec_plan) = &mut pipeline_execution_plan {
         match pl_exec_plan {
             PipelineExecutionPlan::DFS((pl, node_map, graph, vrl_map)) => {
-                for (item, original_data) in pipeline_inputs {
+                for (item, original_data) in pipeline_inputs.into_iter().zip(original_ops) {
                     match pl.execute(item, node_map, graph, vrl_map, &mut runtime) {
                         Err(e) => {
                             log::error!(
@@ -317,10 +319,8 @@ pub async fn ingest(
                 }
             }
             PipelineExecutionPlan::Batch(pl_exec_batch) => {
-                let (records, original_data): (Vec<_>, Vec<_>) =
-                    pipeline_inputs.into_iter().unzip();
-                let records_count = records.len();
-                match pl_exec_batch.process_batch(org_id, records).await {
+                let records_count = pipeline_inputs.len();
+                match pl_exec_batch.process_batch(org_id, pipeline_inputs).await {
                     Err(e) => {
                         log::error!(
                             "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -355,11 +355,11 @@ pub async fn ingest(
                                 // add `_original` and '_record_id` if required by StreamSettings
                                 if streams_need_original_set
                                     .contains(stream_params.stream_name.as_str())
-                                    && original_data[idx].is_some()
+                                    && original_ops[idx].is_some()
                                 {
                                     local_val.insert(
                                         ORIGINAL_DATA_COL_NAME.to_string(),
-                                        original_data[idx].clone().unwrap().into(),
+                                        original_ops[idx].clone().unwrap().into(),
                                     );
                                     let record_id = crate::service::ingestion::generate_record_id(
                                         org_id,
