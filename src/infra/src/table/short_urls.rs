@@ -47,10 +47,8 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[allow(dead_code)]
 #[derive(FromQueryResult, Debug)]
 pub struct ShortUrlRecord {
-    #[allow(dead_code)]
     pub short_id: String,
     pub original_url: String,
 }
@@ -64,10 +62,8 @@ impl ShortUrlRecord {
     }
 }
 
-#[allow(dead_code)]
 #[derive(FromQueryResult, Debug)]
 pub struct ShortId {
-    #[allow(dead_code)]
     pub short_id: String,
 }
 
