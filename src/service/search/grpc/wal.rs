@@ -20,7 +20,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamPartition},
+        stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
         file::scan_files,
@@ -33,10 +33,7 @@ use datafusion::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use infra::{
-    errors::{Error, ErrorCodes},
-    schema::unwrap_partition_time_level,
-};
+use infra::errors::{Error, ErrorCodes};
 use ingester::WAL_PARQUET_METADATA;
 
 use crate::{
@@ -45,7 +42,7 @@ use crate::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_search_schema_diff, match_file,
+            generate_filter_from_equal_items, generate_search_schema_diff, match_source,
         },
     },
 };
@@ -59,17 +56,13 @@ pub async fn search_parquet(
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
+    // get file list
     let stream_settings =
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
-
-    // get file list
     let files = get_file_list(
         query.clone(),
-        &partition_time_level,
         &stream_settings.partition_keys,
         query.time_range,
         search_partition_keys,
@@ -302,12 +295,29 @@ pub async fn search_memtable(
 ) -> super::SearchTable {
     let mut scan_stats = ScanStats::new();
 
+    // format partition keys
+    let stream_settings =
+        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
+            .await
+            .unwrap_or_default();
+    let partition_keys = &stream_settings.partition_keys;
+    let mut filters = generate_filter_from_equal_items(search_partition_keys);
+    let partition_keys: HashMap<&String, &StreamPartition> =
+        partition_keys.iter().map(|v| (&v.field, v)).collect();
+    for (key, value) in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(key) {
+            for val in value.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
+
     let mut batches = ingester::read_from_memtable(
         &query.org_id,
         &query.stream_type.to_string(),
         &query.stream_name,
         query.time_range,
-        search_partition_keys,
+        &filters,
     )
     .await
     .unwrap_or_default();
@@ -317,7 +327,7 @@ pub async fn search_memtable(
             &query.stream_type.to_string(),
             &query.stream_name,
             query.time_range,
-            search_partition_keys,
+            &filters,
         )
         .await
         .unwrap_or_default(),
@@ -392,7 +402,6 @@ pub async fn search_memtable(
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
 async fn get_file_list_inner(
     query: Arc<super::QueryParams>,
-    _partition_time_level: &PartitionTimeLevel,
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
@@ -438,6 +447,22 @@ async fn get_file_list_inner(
         .collect::<Vec<_>>();
     wal::lock_files(&files);
 
+    let stream_params = Arc::new(StreamParams::new(
+        &query.org_id,
+        &query.stream_name,
+        query.stream_type,
+    ));
+    let mut filters = generate_filter_from_equal_items(search_partition_keys);
+    let partition_keys: HashMap<&String, &StreamPartition> =
+        partition_keys.iter().map(|v| (&v.field, v)).collect();
+    for (key, value) in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(key) {
+            for val in value.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
+
     let mut result = Vec::with_capacity(files.len());
     let (min_ts, max_ts) = query.time_range.unwrap_or((0, 0));
     for file in files.iter() {
@@ -458,18 +483,7 @@ async fn get_file_list_inner(
                 continue;
             }
         }
-        if match_file(
-            &query.org_id,
-            query.stream_type,
-            &query.stream_name,
-            time_range,
-            &file_key,
-            false,
-            partition_keys,
-            search_partition_keys,
-        )
-        .await
-        {
+        if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
             wal::release_files(&[file.clone()]);
@@ -483,14 +497,12 @@ async fn get_file_list_inner(
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
 async fn get_file_list(
     query: Arc<super::QueryParams>,
-    partition_time_level: &PartitionTimeLevel,
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
 ) -> Result<Vec<FileKey>, Error> {
     get_file_list_inner(
         query,
-        partition_time_level,
         partition_keys,
         time_range,
         search_partition_keys,

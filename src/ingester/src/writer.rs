@@ -105,7 +105,7 @@ pub async fn read_from_memtable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-    _partition_keys: &[(String, String)],
+    partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
     let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
@@ -114,7 +114,7 @@ pub async fn read_from_memtable(
         let idx = get_table_idx(0, stream_name);
         let w = WRITERS[idx].read().await;
         return match w.get(&key) {
-            Some(r) => r.read(stream_name, time_range).await,
+            Some(r) => r.read(stream_name, time_range, partition_filters).await,
             None => Ok(Vec::new()),
         };
     }
@@ -129,7 +129,7 @@ pub async fn read_from_memtable(
         visited.insert(idx);
         let w = WRITERS[idx].read().await;
         if let Some(r) = w.get(&key) {
-            if let Ok(data) = r.read(stream_name, time_range).await {
+            if let Ok(data) = r.read(stream_name, time_range, partition_filters).await {
                 batches.extend(data);
             }
         }
@@ -312,9 +312,10 @@ impl Writer {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
+        partition_filters: &[(String, Vec<String>)],
     ) -> Result<Vec<ReadRecordBatchEntry>> {
         let memtable = self.memtable.read().await;
-        memtable.read(stream_name, time_range)
+        memtable.read(stream_name, time_range, partition_filters)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
