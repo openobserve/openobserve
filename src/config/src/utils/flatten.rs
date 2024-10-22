@@ -139,17 +139,37 @@ pub fn format_key(key: &mut String) {
     if check_key(key) {
         return;
     }
-    let mut key_chars = key.chars().collect::<Vec<_>>();
-    for c in key_chars.iter_mut() {
-        if c.is_lowercase() || c.is_numeric() {
-            continue;
-        } else if c.is_uppercase() {
-            *c = c.to_lowercase().next().unwrap();
+
+    let bytes = unsafe { key.as_bytes_mut() };
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i].is_ascii() {
+            if bytes[i].is_ascii_uppercase() {
+                bytes[i] = bytes[i].to_ascii_lowercase();
+            } else if !bytes[i].is_ascii_lowercase()
+                && !bytes[i].is_ascii_digit()
+                && bytes[i] != b'_'
+            {
+                bytes[i] = b'_';
+            }
         } else {
-            *c = '_';
+            *key = key
+                .chars()
+                .map(|c| {
+                    if c.is_lowercase() || c.is_numeric() {
+                        c
+                    } else if c.is_uppercase() {
+                        c.to_lowercase().next().unwrap()
+                    } else {
+                        '_'
+                    }
+                })
+                .collect();
+            return;
         }
+        i += 1;
     }
-    *key = key_chars.into_iter().collect::<String>();
 }
 
 fn check_key(key: &str) -> bool {
@@ -494,5 +514,52 @@ mod tests {
         assert_eq!(output, expected_output_level4);
         let output = flatten_with_level(input, 5).unwrap();
         assert_eq!(output, expected_output_level4);
+    }
+
+    #[test]
+    fn test_form_keys() {
+        let test_cases = [
+            "already_formatted_key_123",
+            "simple",
+            "HelloWorld",
+            "UPPERCASE",
+            "hello!world@123#",
+            "test.key-here",
+            "Mixed_Case_123!@#",
+            "camelCaseTest",
+            "hello世界",
+            "café_là",
+            "",
+            "!@#$%^",
+            "____",
+            "Hello世界World",
+            "test!!!test",
+            "test123test456",
+            "123test",
+        ];
+        let expected = [
+            "already_formatted_key_123",
+            "simple",
+            "helloworld",
+            "uppercase",
+            "hello_world_123_",
+            "test_key_here",
+            "mixed_case_123___",
+            "camelcasetest",
+            "hello__",
+            "café_là",
+            "",
+            "______",
+            "____",
+            "hello__world",
+            "test___test",
+            "test123test456",
+            "123test",
+        ];
+        for (input, expected) in test_cases.iter().zip(expected) {
+            let mut key = input.to_string();
+            format_key(&mut key);
+            assert_eq!(key, expected);
+        }
     }
 }
