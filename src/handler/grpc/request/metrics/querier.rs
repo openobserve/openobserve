@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow::ipc::writer::StreamWriter;
 use config::{
     ider,
-    meta::stream::{FileKey, FileMeta, StreamParams, StreamType},
+    meta::stream::{FileKey, FileMeta, StreamParams, StreamPartition, StreamType},
     metrics,
     utils::{
         file::{get_file_contents, scan_files},

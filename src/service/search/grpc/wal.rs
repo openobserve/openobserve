@@ -20,7 +20,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition},
+        stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
         file::scan_files,

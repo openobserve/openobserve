@@ -926,45 +926,6 @@ impl std::fmt::Display for Operator {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StreamParams {
-    pub org_id: faststr::FastStr,
-    pub stream_name: faststr::FastStr,
-    pub stream_type: StreamType,
-}
-
-impl PartialEq for StreamParams {
-    fn eq(&self, other: &Self) -> bool {
-        self.org_id == other.org_id
-            && self.stream_name == other.stream_name
-            && self.stream_type == other.stream_type
-    }
-}
-
-impl Default for StreamParams {
-    fn default() -> Self {
-        Self {
-            org_id: String::default().into(),
-            stream_name: String::default().into(),
-            stream_type: StreamType::default(),
-        }
-    }
-}
-
-impl StreamParams {
-    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
-        Self {
-            org_id: org_id.to_string().into(),
-            stream_name: stream_name.to_string().into(),
-            stream_type,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        !(self.org_id.is_empty() || self.stream_name.is_empty())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -372,6 +372,9 @@ pub async fn handle_trace_request(
                                         v
                                     }
                                     _ => {
+                                        log::error!(
+                                            "[TRACE] stream pipeline did not return valid json object"
+                                        );
                                         return Ok(HttpResponse::InternalServerError().json(
                                             MetaHttpResponse::error(
                                                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -425,10 +428,11 @@ pub async fn handle_trace_request(
                             v
                         }
                         _ => {
+                            log::error!("[TRACE] stream did not receive a valid json object");
                             return Ok(HttpResponse::InternalServerError().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    "stream functions did not return valid json object".into(),
+                                    "stream did not receive a valid json object".into(),
                                 ),
                             ));
                         }
@@ -453,9 +457,18 @@ pub async fn handle_trace_request(
         return format_response(partial_success, req_type);
     }
 
-    write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await;
-    let time = start.elapsed().as_secs_f64();
+    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    {
+        log::error!("Error while writing traces: {}", e);
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("error while writing trace data: {e}",),
+            )),
+        );
+    }
 
+    let time = start.elapsed().as_secs_f64();
     let ep = match req_type {
         RequestType::Grpc => "/grpc/otlp/traces",
         _ => "/api/otlp/v1/traces",
@@ -553,9 +566,14 @@ async fn write_traces_by_stream(
     org_id: &str,
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
-) {
+) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        let mut req_stats = write_traces(org_id, &traces_stream_name, json_data).await;
+        let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(e);
+            }
+        };
         let time = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time;
         // metric + data usage
@@ -570,13 +588,14 @@ async fn write_traces_by_stream(
         )
         .await;
     }
+    Ok(())
 }
 
 async fn write_traces(
     org_id: &str,
     stream_name: &str,
     json_data: Vec<(i64, json::Map<String, json::Value>)>,
-) -> RequestStats {
+) -> Result<RequestStats, Error> {
     let cfg = get_config();
     // get schema and stream settings
     let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -762,7 +781,7 @@ async fn write_traces(
     // only one trigger per request
     evaluate_trigger(triggers).await;
 
-    req_stats
+    Ok(req_stats)
 }
 
 #[cfg(test)]

@@ -25,7 +25,6 @@ use config::{
         search,
         sql::{OrderBy, SqlOperator},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
-        stream::{FileKey, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,

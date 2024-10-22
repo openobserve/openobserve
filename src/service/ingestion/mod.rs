@@ -54,7 +54,7 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{alerts::alert::AlertExt, db, format_partition_key},
+    service::{alerts::alert::AlertExt, db},
 };
 
 pub mod grpc;
