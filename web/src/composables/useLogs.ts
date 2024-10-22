@@ -1836,7 +1836,7 @@ const useLogs = () => {
     try {
       return parser.sqlify(parsedObj);
     } catch (e: any) {
-      return "";
+      throw new Error(`Error while unparsing SQL : ${e.message}`);
     }
   };
 

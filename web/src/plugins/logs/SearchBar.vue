@@ -1210,10 +1210,10 @@ export default defineComponent({
         if (item.expr.type === "column_ref") {
           columnNames.push(item.expr.column?.expr?.value);
         } else if (item.expr.type === "aggr_func") {
-          if (item.expr.args.expr.hasOwnProperty("column")) {
+          if (item.expr.args?.expr?.hasOwnProperty("column")) {
             columnNames.push(item.expr.args?.expr?.column?.value);
-          } else if (item.expr.args.expr.value) {
-            columnNames.push(item.expr.args.expr.value);
+          } else if (item.expr.args?.expr?.value) {
+            columnNames.push(item.expr.args?.expr?.value);
           }
         } else if (item.expr.type === "function") {
           item.expr.args.value.map((val) => {

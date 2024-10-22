@@ -887,7 +887,7 @@ export default defineComponent({
           }
           if (
             item.expr.type === "aggr_func" &&
-            item.expr?.args?.expr?.column?.value == fieldName
+            item.expr?.args?.expr?.column?.value === fieldName
           ) {
             return false;
           }
