@@ -35,17 +35,17 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::unwrap_partition_time_level,
 };
 use ingester::WAL_PARQUET_METADATA;
 
 use crate::{
-    common::{infra::wal, meta::stream::StreamParams},
+    common::infra::wal,
     service::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_filter_from_equal_items, generate_search_schema_diff, match_source,
+            generate_search_schema_diff, match_file,
         },
     },
 };
@@ -59,7 +59,10 @@ pub async fn search_parquet(
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    let stream_settings =
+        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
+            .await
+            .unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
 
@@ -390,7 +393,7 @@ pub async fn search_memtable(
 async fn get_file_list_inner(
     query: Arc<super::QueryParams>,
     _partition_time_level: &PartitionTimeLevel,
-    _partition_keys: &[StreamPartition],
+    partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
     wal_dir: &str,
@@ -435,9 +438,6 @@ async fn get_file_list_inner(
         .collect::<Vec<_>>();
     wal::lock_files(&files);
 
-    let stream_params = StreamParams::new(&query.org_id, &query.stream_name, query.stream_type);
-    let search_partition_keys = generate_filter_from_equal_items(search_partition_keys);
-
     let mut result = Vec::with_capacity(files.len());
     let (min_ts, max_ts) = query.time_range.unwrap_or((0, 0));
     for file in files.iter() {
@@ -455,22 +455,23 @@ async fn get_file_list_inner(
                     file_max_ts
                 );
                 wal::release_files(&[file.clone()]);
-                wal::release_files(&[file.clone()]);
                 continue;
             }
         }
-        if match_source(
-            stream_params.clone(),
+        if match_file(
+            &query.org_id,
+            query.stream_type,
+            &query.stream_name,
             time_range,
-            &search_partition_keys,
             &file_key,
             false,
+            partition_keys,
+            search_partition_keys,
         )
         .await
         {
             result.push(file_key);
         } else {
-            wal::release_files(&[file.clone()]);
             wal::release_files(&[file.clone()]);
         }
     }
