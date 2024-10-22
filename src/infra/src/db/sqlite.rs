@@ -70,8 +70,8 @@ fn connect_rw() -> Pool<Sqlite> {
         .create_if_missing(true);
 
     SqlitePoolOptions::new()
-        .min_connections(1)
-        .max_connections(1)
+        .min_connections(cfg.limit.sql_db_connections_min)
+        .max_connections(cfg.limit.sql_db_connections_max)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .idle_timeout(Some(Duration::from_secs(idle_timeout)))
         .max_lifetime(Some(Duration::from_secs(max_lifetime)))

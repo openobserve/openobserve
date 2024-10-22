@@ -13,54 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
-
-use config::{get_config, meta::meta_store::MetaStore, utils::util::zero_or};
-use once_cell::sync::Lazy;
 use sea_orm::{
-    ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection,
-    EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, Order, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Schema, Set,
 };
 
 use crate::{
-    db::{mysql, postgres, sqlite, IndexStatement},
+    db::{mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
     errors::{DbError, Error, Result},
 };
 
 pub mod short_urls;
-
-static CLIENT: Lazy<DatabaseConnection> = Lazy::new(|| {
-    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(connect_default()))
-});
-
-pub async fn connect_default() -> DatabaseConnection {
-    let cfg = get_config();
-    let url = match cfg.common.meta_store.as_str().into() {
-        MetaStore::MySQL => cfg.common.meta_mysql_dsn.clone(),
-        MetaStore::PostgreSQL => cfg.common.meta_postgres_dsn.clone(),
-        _ => {
-            format!("sqlite://{}{}?", cfg.common.data_db_dir, "metadata.sqlite")
-        }
-    };
-
-    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
-    let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
-    let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
-
-    let mut opt = ConnectOptions::new(url);
-
-    opt.min_connections(cfg.limit.sql_db_connections_min)
-        .max_connections(cfg.limit.sql_db_connections_max)
-        .acquire_timeout(Duration::from_secs(acquire_timeout))
-        .idle_timeout(Duration::from_secs(idle_timeout))
-        .max_lifetime(Duration::from_secs(max_lifetime))
-        .sqlx_logging(false)
-        .connect_lazy(true);
-
-    Database::connect(opt)
-        .await
-        .expect("Failed to connect to database")
-}
 
 pub async fn init() -> Result<()> {
     create_table().await?;
@@ -69,7 +32,7 @@ pub async fn init() -> Result<()> {
 }
 
 pub async fn create_table() -> Result<()> {
-    let builder = CLIENT.get_database_backend();
+    let builder = ORM_CLIENT.get_database_backend();
 
     let schema = Schema::new(builder);
     let create_table_stmt = schema
@@ -77,7 +40,7 @@ pub async fn create_table() -> Result<()> {
         .if_not_exists()
         .take();
 
-    let res = CLIENT.execute(builder.build(&create_table_stmt)).await;
+    let res = ORM_CLIENT.execute(builder.build(&create_table_stmt)).await;
 
     match res {
         Ok(_) => Ok(()),
@@ -94,7 +57,7 @@ pub async fn create_table_index() -> Result<()> {
         &["created_ts"],
     );
 
-    match CLIENT.get_database_backend() {
+    match ORM_CLIENT.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
             mysql::create_index(index2).await?;
@@ -120,7 +83,7 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<()> {
     };
 
     let res = short_urls::Entity::insert(record)
-        .exec(&CLIENT.clone())
+        .exec(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -132,7 +95,7 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<()> {
 pub async fn remove(short_id: &str) -> Result<()> {
     let res = short_urls::Entity::delete_many()
         .filter(short_urls::Column::ShortId.eq(short_id))
-        .exec(&CLIENT.clone())
+        .exec(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -148,7 +111,7 @@ pub async fn get(short_id: &str) -> Result<short_urls::ShortUrlRecord> {
         .column(short_urls::Column::OriginalUrl)
         .filter(short_urls::Column::ShortId.eq(short_id))
         .into_model::<short_urls::ShortUrlRecord>()
-        .one(&CLIENT.clone())
+        .one(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -177,7 +140,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<short_urls::ShortUrlRecord>>
     }
     let res = res
         .into_model::<short_urls::ShortUrlRecord>()
-        .all(&CLIENT.clone())
+        .all(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -190,7 +153,7 @@ pub async fn contains(short_id: &str) -> Result<bool> {
     let res = short_urls::Entity::find()
         .filter(short_urls::Column::ShortId.eq(short_id))
         .into_model::<short_urls::ShortUrlRecord>()
-        .one(&CLIENT.clone())
+        .one(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -200,7 +163,7 @@ pub async fn contains(short_id: &str) -> Result<bool> {
 }
 
 pub async fn len() -> usize {
-    let len = short_urls::Entity::find().count(&CLIENT.clone()).await;
+    let len = short_urls::Entity::find().count(&ORM_CLIENT.clone()).await;
 
     match len {
         Ok(len) => len as usize,
@@ -213,7 +176,7 @@ pub async fn len() -> usize {
 
 pub async fn clear() -> Result<()> {
     let res = short_urls::Entity::delete_many()
-        .exec(&CLIENT.clone())
+        .exec(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -236,7 +199,7 @@ pub async fn get_expired(expired_before: i64, limit: Option<i64>) -> Result<Vec<
     }
     let res = res
         .into_model::<short_urls::ShortId>()
-        .all(&CLIENT.clone())
+        .all(&ORM_CLIENT.clone())
         .await;
 
     match res {
@@ -248,7 +211,7 @@ pub async fn get_expired(expired_before: i64, limit: Option<i64>) -> Result<Vec<
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<()> {
     let res = short_urls::Entity::delete_many()
         .filter(short_urls::Column::ShortId.is_in(short_ids))
-        .exec(&CLIENT.clone())
+        .exec(&ORM_CLIENT.clone())
         .await;
 
     match res {
