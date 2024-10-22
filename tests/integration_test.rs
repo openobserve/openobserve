@@ -22,12 +22,13 @@ mod tests {
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
-    use config::{get_config, utils::json};
+    use config::{
+        get_config,
+        meta::alerts::destinations::{Destination, DestinationType},
+        utils::json,
+    };
     use openobserve::{
-        common::meta::{
-            alerts::destinations::{Destination, DestinationType},
-            dashboards::{v1, Dashboard, Dashboards},
-        },
+        common::meta::dashboards::{v1, Dashboard, Dashboards},
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::router::*,
