@@ -206,6 +206,7 @@ impl Metrics for MetricsQuerier {
             .collect::<Vec<_>>();
         wal::lock_files(&files);
 
+        let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
         for file in files.iter() {
             // check time range by filename
             let (file_min_ts, file_max_ts) = parse_time_range_from_filename(file);
@@ -233,7 +234,7 @@ impl Metrics for MetricsQuerier {
                 false,
             );
             if !match_source(
-                Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics)),
+                stream_params.clone(),
                 Some((start_time, end_time)),
                 &filters,
                 &file_key,
