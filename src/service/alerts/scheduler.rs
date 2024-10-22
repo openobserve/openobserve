@@ -759,11 +759,9 @@ async fn handle_derived_stream_triggers(
     };
     let trigger_data: Option<ScheduledTriggerData> = json::from_str(&trigger.data).ok();
     let start_time = if let Some(trigger_data) = trigger_data {
-        if let Some(period_end_time) = trigger_data.period_end_time {
-            Some(period_end_time + 1)
-        } else {
-            None
-        }
+        trigger_data
+            .period_end_time
+            .map(|period_end_time| period_end_time + 1)
     } else {
         None
     };
