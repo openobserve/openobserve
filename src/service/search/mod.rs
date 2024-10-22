@@ -25,13 +25,13 @@ use config::{
         search,
         sql::{OrderBy, SqlOperator},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
+        stream::{FileKey, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{
-        base64, json,
-        sql::is_aggregate_query,
-        str::{find, StringExt},
+        base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query,
+        str::StringExt,
     },
 };
 use hashbrown::HashMap;
@@ -64,7 +64,6 @@ use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, utils},
     handler::grpc::request::search::Searcher,
-    service::format_partition_key,
 };
 
 pub(crate) mod cache;
@@ -974,7 +973,6 @@ pub async fn match_file(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
     source: &FileKey,
-    is_wal: bool,
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
@@ -995,11 +993,10 @@ pub async fn match_file(
         }
     }
     match_source(
-        StreamParams::new(org_id, stream_name, stream_type),
+        Arc::new(StreamParams::new(org_id, stream_name, stream_type)),
         time_range,
-        filters.as_slice(),
+        &filters,
         source,
-        is_wal,
     )
     .await
 }
@@ -1021,11 +1018,10 @@ pub fn generate_filter_from_equal_items(
 
 /// match a source is a valid file or not
 pub async fn match_source(
-    stream: StreamParams,
+    stream: Arc<StreamParams>,
     time_range: Option<(i64, i64)>,
     filters: &[(String, Vec<String>)],
     source: &FileKey,
-    is_wal: bool,
 ) -> bool {
     // match org_id & table
     if !source.key.starts_with(
@@ -1041,10 +1037,6 @@ pub async fn match_source(
     // check partition key
     if !filter_source_by_partition_key(&source.key, filters) {
         return false;
-    }
-
-    if is_wal {
-        return true;
     }
 
     // check time range
@@ -1069,18 +1061,6 @@ pub async fn match_source(
         }
     }
     true
-}
-
-/// match a source is a needed file or not, return true if needed
-fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
-    !filters.iter().any(|(k, v)| {
-        let field = format_partition_key(&format!("{k}="));
-        find(source, &format!("/{field}"))
-            && !v.iter().any(|v| {
-                let value = format_partition_key(&format!("{k}={v}"));
-                find(source, &format!("/{value}/"))
-            })
-    })
 }
 
 pub fn server_internal_error(error: impl ToString) -> Error {
@@ -1222,112 +1202,6 @@ pub fn generate_filter_from_quick_text(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_matches_by_partition_key_with_str() {
-        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
-        let filters = vec![
-            (vec![], true),
-            (
-                vec![("kuberneteshost".to_string(), vec!["gke-dev1".to_string()])],
-                true,
-            ),
-            (
-                vec![("kuberneteshost".to_string(), vec!["gke-dev2".to_string()])],
-                false,
-            ),
-            (
-                vec![(
-                    "kuberneteshost".to_string(),
-                    vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                )],
-                true,
-            ),
-            (
-                vec![("some_other_key".to_string(), vec!["no-matter".to_string()])],
-                true,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["ziox-dev".to_string()],
-                    ),
-                ],
-                true,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["abcdefg".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["ziox-dev".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["abcdefg".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    (
-                        "kuberneteshost".to_string(),
-                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                    ),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["ziox-dev".to_string()],
-                    ),
-                ],
-                true,
-            ),
-            (
-                vec![
-                    (
-                        "kuberneteshost".to_string(),
-                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                    ),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["abcdefg".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    (
-                        "kuberneteshost".to_string(),
-                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                    ),
-                    ("some_other_key".to_string(), vec!["no-matter".to_string()]),
-                ],
-                true,
-            ),
-        ];
-        for (filter, expected) in filters {
-            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
-        }
-    }
 
     #[test]
     fn test_matches_by_partition_key_with_sql() {

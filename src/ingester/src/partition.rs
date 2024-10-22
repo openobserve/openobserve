@@ -22,6 +22,7 @@ use config::{
     utils::{
         parquet::{generate_filename_with_time_range, new_parquet_writer},
         record_batch_ext::merge_record_batches,
+        schema::filter_source_by_partition_key,
         schema_ext::SchemaExt,
     },
 };
@@ -104,10 +105,19 @@ impl Partition {
         partition.write(batch)
     }
 
-    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<ReadRecordBatchEntry> {
+    pub(crate) fn read(
+        &self,
+        time_range: Option<(i64, i64)>,
+        partition_filters: &[(String, Vec<String>)],
+    ) -> Result<ReadRecordBatchEntry> {
         let mut batches = Vec::with_capacity(self.files.len());
-        for file in self.files.values() {
-            batches.extend(file.read(time_range)?);
+        for (key, file) in self.files.iter() {
+            let key = format!("{}/", key);
+            if filter_source_by_partition_key(&key, partition_filters) {
+                batches.extend(file.read(time_range)?);
+            } else {
+                log::debug!("memtable skip key: {:?}", key);
+            }
         }
         Ok((self.schema.clone(), batches))
     }

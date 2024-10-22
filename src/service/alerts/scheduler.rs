@@ -216,7 +216,9 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             trigger.retries + 1,
         )
         .await?;
-        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries
+            && get_config().limit.pause_alerts_on_retries
+        {
             // It has been tried the maximum time, just disable the alert
             // and show the error.
             if let Some(mut alert) =

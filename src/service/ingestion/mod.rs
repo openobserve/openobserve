@@ -33,7 +33,7 @@ use config::{
         },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::{flatten, json::*},
+    utils::{flatten, json::*, schema::format_partition_key},
     SIZE_IN_MB,
 };
 use futures::future::try_join_all;
