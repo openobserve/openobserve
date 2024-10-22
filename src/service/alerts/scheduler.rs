@@ -22,7 +22,7 @@ use config::{
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::json,
+    utils::{json, rand::get_rand_num_within},
 };
 use cron::Schedule;
 use futures::future::try_join_all;
@@ -30,10 +30,9 @@ use proto::cluster_rpc;
 
 use crate::{
     common::meta::{alerts::FrequencyType, dashboards::reports::ReportFrequencyType},
-    handler::http::request::kv::get,
     service::{
         alerts::alert::{get_alert_start_end_time, get_row_column_map},
-        db::{self, scheduler::DerivedTriggerData},
+        db::{self, scheduler::ScheduledTriggerData},
         ingestion::ingestion_service,
         usage::publish_triggers_usage,
     },
@@ -203,25 +202,31 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         }
     };
 
+    let trigger_data: Result<ScheduledTriggerData, json::Error> = json::from_str(&trigger.data);
+    let mut trigger_data = if let Ok(trigger_data) = trigger_data {
+        trigger_data
+    } else {
+        ScheduledTriggerData {
+            period_end_time: None,
+            tolerance: 0,
+        }
+    };
+
     // This is the end time of the last trigger timerange  + 1.
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
-    let start_time = if trigger.data.is_empty() || use_period {
+    let start_time = if trigger_data.period_end_time.is_none() || use_period {
         // approximate the start time involving the alert manager delay
         Some(
             now - Duration::try_minutes(alert.trigger_condition.period)
                 .unwrap()
                 .num_microseconds()
                 .unwrap()
+                - trigger_data.tolerance
                 - processing_delay,
         )
     } else {
-        let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
-        if let Ok(last_data) = last_data {
-            Some(last_data.period_end_time + 1)
-        } else {
-            None
-        }
+        Some(trigger_data.period_end_time.unwrap() + 1)
     };
 
     let mut should_store_last_end_time =
@@ -304,6 +309,18 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             &new_trigger.module_key
         );
     }
+    let tolerance = match alert.trigger_condition.tolerance_in_secs {
+        Some(tolerance) if tolerance > 0 => {
+            let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
+                .num_microseconds()
+                .unwrap();
+            if tolerance > 0 {
+                trigger_data.tolerance = tolerance;
+            }
+            tolerance
+        }
+        _ => 0,
+    };
     if ret.is_some() && alert.trigger_condition.silence > 0 {
         if alert.trigger_condition.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
@@ -315,7 +332,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     .unwrap(),
             );
             // Check for the cron timestamp after the silence period
-            new_trigger.next_run_at = schedule.after(&silence).next().unwrap().timestamp_micros();
+            new_trigger.next_run_at =
+                schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance;
         } else {
             // When the silence period is less than the frequency, the alert runs after the silence
             // period completely ignoring the frequency. So, if frequency is 60 mins and
@@ -330,7 +348,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             new_trigger.next_run_at += Duration::try_seconds(next_run_in_seconds)
                 .unwrap()
                 .num_microseconds()
-                .unwrap();
+                .unwrap()
+                + tolerance;
         }
         new_trigger.is_silenced = true;
         // For silence period, no need to store last end time
@@ -343,12 +362,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             .upcoming(tz_offset)
             .next()
             .unwrap()
-            .timestamp_micros();
+            .timestamp_micros()
+            + tolerance;
     } else {
         new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
             .unwrap()
             .num_microseconds()
-            .unwrap();
+            .unwrap()
+            + tolerance;
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
@@ -398,14 +419,12 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 }
                 trigger_data_stream.success_response = Some(success_msg);
                 // Notification was sent successfully, store the last used end_time in the triggers
-                new_trigger.data = if should_store_last_end_time {
-                    json::to_string(&DerivedTriggerData {
-                        period_end_time: alert_end_time,
-                    })
-                    .unwrap()
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(alert_end_time)
                 } else {
-                    "".to_string()
+                    None
                 };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
                 // Notification is already sent to some destinations,
                 // hence in case of partial errors, no need to retry
                 db::scheduler::update_trigger(new_trigger).await?;
@@ -433,7 +452,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     // still not changed) to 11:31am. This may create issues if the data is huge.
                     // To avoid that, we need to empty the data. So, in the next run, the period
                     // will be used to evaluate the alert.
-                    new_trigger.data = "".to_string();
+                    trigger_data.period_end_time = None;
+                    new_trigger.data = json::to_string(&trigger_data).unwrap();
                     db::scheduler::update_trigger(new_trigger).await?;
                 } else {
                     // Otherwise update its status only
@@ -460,14 +480,12 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         );
         // Condition did not match, store the last used end_time in the triggers
         // In the next run, the alert will be checked from the last end_time
-        new_trigger.data = if should_store_last_end_time {
-            json::to_string(&DerivedTriggerData {
-                period_end_time: end_time,
-            })
-            .unwrap()
+        trigger_data.period_end_time = if should_store_last_end_time {
+            Some(end_time)
         } else {
-            "".to_string()
+            None
         };
+        new_trigger.data = json::to_string(&trigger_data).unwrap();
         db::scheduler::update_trigger(new_trigger).await?;
         trigger_data_stream.start_time = match start_time {
             Some(start_time) => start_time,
@@ -739,15 +757,15 @@ async fn handle_derived_stream_triggers(
             name,
         ));
     };
-    let start_time = if trigger.data.is_empty() {
-        None
-    } else {
-        let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
-        if let Ok(last_data) = last_data {
-            Some(last_data.period_end_time + 1)
+    let trigger_data: Option<ScheduledTriggerData> = json::from_str(&trigger.data).ok();
+    let start_time = if let Some(trigger_data) = trigger_data {
+        if let Some(period_end_time) = trigger_data.period_end_time {
+            Some(period_end_time + 1)
         } else {
             None
         }
+    } else {
+        None
     };
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
@@ -767,8 +785,9 @@ async fn handle_derived_stream_triggers(
         );
     }
     // Store the last used derived stream period end time
-    new_trigger.data = json::to_string(&DerivedTriggerData {
-        period_end_time: end_time,
+    new_trigger.data = json::to_string(&ScheduledTriggerData {
+        period_end_time: Some(end_time),
+        tolerance: 0,
     })
     .unwrap();
     if ret.is_some() && derived_stream.trigger_condition.silence > 0 {
