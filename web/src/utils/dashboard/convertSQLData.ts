@@ -31,13 +31,19 @@ import {
   isTimeSeries,
   isTimeStamp,
 } from "./convertDataIntoUnitValue";
-import { calculateGridPositions } from "./calculateGridForSubPlot";
+import {
+  calculateGridPositions,
+  getTrellisGrid,
+} from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
 import {
   ColorModeWithoutMinMax,
   getSeriesColor,
   getSQLMinMaxValue,
 } from "./colorPalette";
+
+// TODO: Remove if unused
+import { AnySoaRecord } from "dns";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -1888,6 +1894,182 @@ export const convertSQLData = async (
       });
       break;
     }
+    case "trellis": {
+      // console.log(processedData, breakDownKeys, options);
+      options.xAxis[0].data = Array.from(
+        new Set(getAxisDataFromKey(xAxisKeys[0])),
+      );
+
+      options.xAxis = options.xAxis.slice(0, 1);
+
+      // stacked with xAxis's second value
+      // allow 2 xAxis and 1 yAxis value for stack chart
+      // get second x axis key
+      const breakDownkey1 = breakDownKeys[0];
+
+      // get the unique value of the second xAxis's key
+      const stackedXAxisUniqueValue = [
+        ...new Set(processedData.map((obj: any) => obj[breakDownkey1])),
+      ]
+        .filter((it) => it)
+        .slice(0, 20);
+
+      options.yAxis = [options.yAxis];
+
+      const yAxisNameGap =
+        calculateWidthText(
+          formatUnitValue(
+            getUnitValue(
+              largestLabel(getAxisDataFromKey(yAxisKeys[0])),
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            ),
+          ),
+        ) + 8;
+
+      const maxYValue = formatUnitValue(
+        getUnitValue(
+          Math.max(...getAxisDataFromKey(yAxisKeys[0])),
+          panelSchema.config?.unit,
+          panelSchema.config?.unit_custom,
+          panelSchema.config?.decimals,
+        ),
+      );
+
+      const gridData = getTrellisGrid(
+        chartPanelRef.value.offsetWidth,
+        chartPanelRef.value.offsetHeight,
+        stackedXAxisUniqueValue.length,
+        yAxisNameGap,
+      );
+
+      options.grid = gridData.gridArray;
+
+      options.title = [];
+
+      options.series = stackedXAxisUniqueValue?.map(
+        (key: any, index: number) => {
+          // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+          const data = processedData.filter(
+            (it: any) => it[breakDownkey1] == key,
+          );
+
+          const seriesObj: any = {
+            name: key,
+            ...defaultSeriesProps,
+            // markLine if exist
+            markLine: {
+              silent: true,
+              animation: false,
+              data: getMarkLineData(panelSchema),
+            },
+            data: options.xAxis[0].data.map((it: any) => {
+              return (
+                data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
+                  yAxisKeys[0]
+                ] ?? null
+              );
+            }),
+            barMinHeight: 1,
+            type: "line",
+          };
+
+          if (index > 0) {
+            options.xAxis.push({
+              ...JSON.parse(JSON.stringify(options.xAxis[0])),
+              gridIndex: index,
+            });
+            options.yAxis.push({
+              ...JSON.parse(JSON.stringify(options.yAxis[0])),
+              gridIndex: index,
+            });
+
+            seriesObj.xAxisIndex = index;
+            seriesObj.yAxisIndex = index;
+          }
+
+          console.log(
+            gridData.gridArray[index].top,
+            (8 / chartPanelRef.value.offsetHeight) * 100,
+          );
+
+          //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
+          const width = calculateWidthText(seriesObj.name);
+          const titleLeft = parseInt(gridData.gridArray[index].left);
+
+          const whiteSpace =
+            gridData.gridArray[index].left +
+            gridData.gridArray[index].width -
+            width;
+          if (whiteSpace < 0) {
+            titleLeft = titleLeft + whiteSpace / 2;
+          } else {
+          }
+          options.title.push({
+            text: seriesObj.name,
+            textStyle: {
+              fontSize: 12,
+            },
+            top:
+              parseInt(gridData.gridArray[index].top) -
+              (18 / chartPanelRef.value.offsetHeight) * 100 +
+              "%",
+            left: gridData.gridArray[index].left,
+          });
+
+          return seriesObj;
+        },
+      );
+
+      options.yAxis.forEach((it: any, index: number) => {
+        it.max = maxYValue;
+        if ((index / gridData.gridNoOfCol) % 1 === 0) {
+          it.nameGap = yAxisNameGap;
+
+          it.axisLabel.margin = 5;
+          it.axisLabel.fontSize = 12;
+          it.nameTextStyle.fontSize = 12;
+          it.axisLabel.show = true;
+          return;
+        }
+        it.nameGap = 0;
+        it.axisLabel.margin = 0;
+        it.axisLabel.fontSize = 10;
+        it.nameTextStyle.fontSize = 12;
+        it.axisLabel.show = false;
+        it.name = "";
+      });
+
+      options.xAxis.forEach((it: any, index: number) => {
+        if (
+          index >=
+          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol
+        ) {
+          it.axisTick.length = 5;
+          it.nameGap = 25;
+          it.axisLabel.margin = 8;
+          it.axisLabel.fontSize = 12;
+          it.nameTextStyle.fontSize = 12;
+          it.axisLabel.show = true;
+        } else {
+          it.axisTick.length = 0;
+          it.nameGap = 0;
+          it.axisLabel.margin = 0;
+          it.axisLabel.fontSize = 10;
+          it.nameTextStyle.fontSize = 12;
+          it.axisLabel.show = false;
+          it.name = "";
+        }
+      });
+
+      options.legend.show = false;
+
+      console.log("options", JSON.parse(JSON.stringify(options)));
+      console.log("options", options);
+    }
+
+    // eslint-disable-next-line no-fallthrough
     default: {
       break;
     }
@@ -1969,7 +2151,8 @@ export const convertSQLData = async (
         }
       });
 
-      options.xAxis[0].type = "time";
+      options.xAxis.forEach((it: any) => (it.type = "time"));
+
       options.xAxis[0].data = [];
 
       options.tooltip.formatter = function (name: any) {
@@ -2577,6 +2760,15 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         axisLabel: {
           show: false,
         },
+      };
+    case "trellis":
+      return {
+        type: "line",
+        emphasis: { focus: "series" },
+        smooth: true,
+        showSymbol: false,
+        areaStyle: null,
+        lineStyle: { width: 1.5 },
       };
     default:
       return {

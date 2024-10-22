@@ -471,6 +471,7 @@ export default defineComponent({
         case "gauge":
         case "table":
         case "pie":
+        case "trellis":
         case "donut": {
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (

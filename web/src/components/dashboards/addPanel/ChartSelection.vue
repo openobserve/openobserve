@@ -39,7 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             item.id != 'metric' &&
             item.id != 'gauge' &&
             item.id != 'html' &&
-            item.id != 'markdown'
+            item.id != 'markdown' &&
+            item.id != 'trellis'
           "
           :key="index"
           clickable
@@ -191,14 +192,20 @@ export default defineComponent({
         title: "Sankey",
         id: "sankey",
       },
+      {
+        image:
+          "img:" + getImageURL("images/dashboard/charts/trellis-chart.png"),
+        title: "Trellis",
+        id: "trellis",
+      },
     ]);
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { promqlMode, dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
     return {
       t,
