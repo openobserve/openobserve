@@ -30,6 +30,7 @@ use proto::cluster_rpc;
 
 use crate::{
     common::meta::{alerts::FrequencyType, dashboards::reports::ReportFrequencyType},
+    handler::http::request::kv::get,
     service::{
         alerts::alert::{get_alert_start_end_time, get_row_column_map},
         db::{self, scheduler::DerivedTriggerData},
@@ -90,7 +91,9 @@ fn get_max_considerable_delay(frequency: i64) -> i64 {
         .num_microseconds()
         .unwrap();
     let max_delay = Duration::try_hours(1).unwrap().num_microseconds().unwrap();
-    let max_considerable_delay = (frequency as f64 * 0.2) as i64;
+    // limit.alert_considerable_delay is in percentage, convert into float
+    let considerable_delay = get_config().limit.alert_considerable_delay as f64 * 0.01;
+    let max_considerable_delay = (frequency as f64 * considerable_delay) as i64;
     std::cmp::min(max_delay, max_considerable_delay)
 }
 
