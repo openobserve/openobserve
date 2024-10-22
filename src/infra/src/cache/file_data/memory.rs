@@ -184,6 +184,10 @@ impl FileData {
             data_size
         );
 
+        // remove file from data cache
+        let idx = get_bucket_idx(&key);
+        DATA[idx].remove(&key);
+
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
