@@ -209,7 +209,7 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(500);
     // await expect(
     //   page.getByText("There are some errors, please fix them and try again")
     // ).toBeVisible();
