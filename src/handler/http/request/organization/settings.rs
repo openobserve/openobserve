@@ -66,8 +66,7 @@ async fn create(
         }
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
-                let data = OrganizationSetting::default();
-                data
+                OrganizationSetting::default();
             } else {
                 return Ok(MetaHttpResponse::bad_request(&err));
             }
