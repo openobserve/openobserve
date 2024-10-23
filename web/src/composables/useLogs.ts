@@ -531,7 +531,9 @@ const useLogs = () => {
 
     if (searchObj.data.query) {
       query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(searchObj.data.query);
+      query["query"] = b64EncodeUnicode(
+        searchObj.data.query.trimStart().trimEnd(),
+      );
     }
 
     if (
@@ -539,7 +541,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent != ""
     ) {
       query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent,
+        searchObj.data.tempFunctionContent.trimStart().trimEnd(),
       );
     }
 
@@ -645,7 +647,7 @@ const useLogs = () => {
 
   function buildSearch() {
     try {
-      let query = searchObj.data.editorValue;
+      let query = searchObj.data.editorValue.trimStart().trimEnd();
       searchObj.data.filterErrMsg = "";
       searchObj.data.missingStreamMessage = "";
       searchObj.data.stream.missingStreamMultiStreamFilter = [];
@@ -890,7 +892,7 @@ const useLogs = () => {
 
         req.query.sql = req.query.sql.replace(
           "[QUERY_FUNCTIONS]",
-          queryFunctions,
+          queryFunctions.trimStart().trimEnd(),
         );
 
         // in the case of multi stream, we need to pass query for each selected stream in the form of array
