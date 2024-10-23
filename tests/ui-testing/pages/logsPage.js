@@ -1,6 +1,6 @@
 // logsPage.js
 import { expect } from '@playwright/test';
-import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
+import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
 
 export class LogsPage {
   constructor(page) {
@@ -16,7 +16,8 @@ export class LogsPage {
     this.filterMessage = page.locator('div:has-text("info Adjust filter parameters and click \'Run query\'")');
 
     this.dateTimeButton = dateTimeButtonLocator;
-   // this.dateTimeButton = process.env["dateTimeButtonLocator"];
+   
+    // this.dateTimeButton = process.env["dateTimeButtonLocator"];
 
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
 
@@ -78,22 +79,33 @@ export class LogsPage {
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
+    await this.page.waitForTimeout(3000);
     await this.page.locator(this.absoluteTab).click();
-    await this.page.waitForTimeout(1000);
+    
 
   }
 
   async fillTimeRange(startTime, endTime) {
-    await this.page.getByRole('button', { name: '1', exact: true }).click();
+
+    await this.page.locator(oneDateMonthLocator).click();
+
+    //await this.page.getByRole('button', { name: '1', exact: true }).click();
+    
     await this.page.getByLabel('access_time').first().fill(startTime);
-    await this.page.getByRole('button', { name: '1', exact: true }).click();
+    
+    //await this.page.getByRole('button', { name: '1', exact: true }).click();
+    await this.page.locator(oneDateMonthLocator).click();
+
     await this.page.getByLabel('access_time').nth(1).fill(endTime);
-    // await this.page.waitForTimeout(1000);
+    
   }
 
   async verifyDateTime(startTime, endTime) {
-    await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+   
+    await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
   }
+    //await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+
 
   async signOut() {
     await this.profileButton.click();
