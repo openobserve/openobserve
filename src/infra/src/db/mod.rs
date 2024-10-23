@@ -55,7 +55,7 @@ pub async fn connect_default() -> DatabaseConnection {
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
         }
         _ => {
-            let pool = sqlite::CLIENT_RO.clone();
+            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
             SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
         }
     }

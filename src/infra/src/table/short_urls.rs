@@ -19,7 +19,11 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{
+        mysql, postgres,
+        sqlite::{self, CLIENT_RW},
+        IndexStatement, ORM_CLIENT,
+    },
     errors::{self, DbError, Error},
 };
 
@@ -124,6 +128,9 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
         ..Default::default()
     };
 
+    // make sure only one client is writing to the database
+    let _client = CLIENT_RW.lock().await;
+
     let res = Entity::insert(record).exec(&ORM_CLIENT.clone()).await;
 
     match res {
@@ -133,6 +140,9 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
 }
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database
+    let _client = CLIENT_RW.lock().await;
+
     let res = Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
         .exec(&ORM_CLIENT.clone())
@@ -173,8 +183,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
         .select_only()
         .column(Column::ShortId)
         .column(Column::OriginalUrl)
-        .filter(Column::ShortId.contains("google"))
-        .order_by(Column::Id, Order::Desc);
+        .order_by(Column::CreatedTs, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
@@ -215,6 +224,9 @@ pub async fn len() -> usize {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database
+    let _client = CLIENT_RW.lock().await;
+
     let res = Entity::delete_many().exec(&ORM_CLIENT.clone()).await;
 
     match res {
@@ -247,6 +259,9 @@ pub async fn get_expired(
 }
 
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database
+    let _client = CLIENT_RW.lock().await;
+
     let res = Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))
         .exec(&ORM_CLIENT.clone())
