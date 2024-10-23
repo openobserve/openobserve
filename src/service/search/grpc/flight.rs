@@ -310,7 +310,6 @@ async fn get_file_list_by_ids(
             stream_name,
             time_range,
             &file,
-            false,
             partition_keys,
             equal_items,
         )

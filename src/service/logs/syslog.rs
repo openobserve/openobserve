@@ -23,7 +23,7 @@ use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
-    meta::stream::{Routing, StreamType},
+    meta::stream::{Routing, StreamParams, StreamType},
     metrics,
     utils::{flatten, json},
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
@@ -38,7 +38,6 @@ use crate::{
             functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
             ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
-            stream::StreamParams,
             syslog::SyslogRoute,
         },
     },

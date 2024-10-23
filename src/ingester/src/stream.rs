@@ -56,10 +56,14 @@ impl Stream {
         Ok(arrow_size)
     }
 
-    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<Vec<ReadRecordBatchEntry>> {
+    pub(crate) fn read(
+        &self,
+        time_range: Option<(i64, i64)>,
+        partition_filters: &[(String, Vec<String>)],
+    ) -> Result<Vec<ReadRecordBatchEntry>> {
         let mut batches = Vec::with_capacity(self.partitions.len());
         for partition in self.partitions.values() {
-            batches.push(partition.read(time_range)?);
+            batches.push(partition.read(time_range, partition_filters)?);
         }
         Ok(batches)
     }
