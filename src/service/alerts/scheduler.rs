@@ -268,34 +268,51 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         }
         trigger_data_stream.error = Some(err_string);
         // update its status and retries
-        db::scheduler::update_status(
-            &new_trigger.org,
-            new_trigger.module,
-            &new_trigger.module_key,
-            db::scheduler::TriggerStatus::Waiting,
-            trigger.retries + 1,
-        )
-        .await?;
-        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries
-            && get_config().limit.pause_alerts_on_retries
-        {
-            // It has been tried the maximum time, just disable the alert
-            // and show the error.
-            if let Some(mut alert) =
-                super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
-            {
-                alert.enabled = false;
-                if let Err(e) = db::alerts::alert::set_without_updating_trigger(
-                    &org_id,
-                    stream_type,
-                    stream_name,
-                    &alert,
-                )
-                .await
+        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+            if !get_config().limit.pause_alerts_on_retries {
+                new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+                db::scheduler::update_trigger(new_trigger).await?;
+            } else {
+                // It has been tried the maximum time, just disable the alert
+                // and show the error.
+                if let Some(mut alert) =
+                    super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
                 {
-                    log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+                    alert.enabled = false;
+                    if let Err(e) = db::alerts::alert::set_without_updating_trigger(
+                        &org_id,
+                        stream_type,
+                        stream_name,
+                        &alert,
+                    )
+                    .await
+                    {
+                        log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+                    }
                 }
+                // update its status and retries
+                db::scheduler::update_status(
+                    &new_trigger.org,
+                    new_trigger.module,
+                    &new_trigger.module_key,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                )
+                .await?;
             }
+        } else {
+            // update its status and retries
+            db::scheduler::update_status(
+                &new_trigger.org,
+                new_trigger.module,
+                &new_trigger.module_key,
+                db::scheduler::TriggerStatus::Waiting,
+                trigger.retries + 1,
+            )
+            .await?;
         }
         publish_triggers_usage(trigger_data_stream).await;
         return Err(err);
