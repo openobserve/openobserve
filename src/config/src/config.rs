@@ -536,6 +536,8 @@ pub struct Common {
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
+    #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
+    pub parquet_compression: String,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1839,6 +1841,18 @@ pub fn get_cluster_name() -> String {
         cfg.common.cluster_name.to_string()
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
+    }
+}
+
+#[inline]
+pub fn get_parquet_compression(algorithm: &str) -> parquet::basic::Compression {
+    match algorithm.to_lowercase().as_str() {
+        "snappy" => parquet::basic::Compression::SNAPPY,
+        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
+        "lz4" => parquet::basic::Compression::LZ4_RAW,
+        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
+        _ => parquet::basic::Compression::ZSTD(Default::default()),
     }
 }
 
