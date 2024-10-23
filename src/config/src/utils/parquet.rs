@@ -25,7 +25,7 @@ use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
     arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
-    basic::{Compression, Encoding},
+    basic::Encoding,
     file::{metadata::KeyValue, properties::WriterProperties},
 };
 
@@ -40,10 +40,10 @@ pub fn new_parquet_writer<'a>(
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
     let mut writer_props = WriterProperties::builder()
+        .set_compression(get_parquet_compression(&cfg.common.parquet_compression))
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
         .set_column_dictionary_enabled(
             cfg.common.column_timestamp.as_str().into(),
             false,
