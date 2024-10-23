@@ -818,9 +818,9 @@ export default defineComponent({
       if (getSelectedTab.value === "custom")
         previewQuery.value = generateSqlQuery();
       else if (getSelectedTab.value === "sql")
-        previewQuery.value = formData.value.query_condition.sql.trimStart().trimEnd();
+        previewQuery.value = formData.value.query_condition.sql.trim();
       else if (getSelectedTab.value === "promql")
-        previewQuery.value = formData.value.query_condition.promql.trimStart().trimEnd();
+        previewQuery.value = formData.value.query_condition.promql.trim();
 
       if (formData.value.is_real_time === "true") {
         previewQuery.value = generateSqlQuery();
@@ -1034,7 +1034,7 @@ export default defineComponent({
 
       if (formData.value.query_condition.vrl_function) {
         payload.query_condition.vrl_function = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function.trimStart().trimEnd(),
+          formData.value.query_condition.vrl_function.trim(),
         );
       }
 
