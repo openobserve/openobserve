@@ -18,12 +18,9 @@ use sea_orm::{
     FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
 
+use super::get_lock;
 use crate::{
-    db::{
-        mysql, postgres,
-        sqlite::{self, CLIENT_RW},
-        IndexStatement, ORM_CLIENT,
-    },
+    db::{mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
     errors::{self, DbError, Error},
 };
 
@@ -128,8 +125,8 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database
-    let _client = CLIENT_RW.lock().await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _client = get_lock().await;
 
     let res = Entity::insert(record).exec(&ORM_CLIENT.clone()).await;
 
@@ -140,8 +137,8 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
 }
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database
-    let _client = CLIENT_RW.lock().await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _client = get_lock().await;
 
     let res = Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
@@ -224,8 +221,8 @@ pub async fn len() -> usize {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database
-    let _client = CLIENT_RW.lock().await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _client = get_lock().await;
 
     let res = Entity::delete_many().exec(&ORM_CLIENT.clone()).await;
 
@@ -259,8 +256,8 @@ pub async fn get_expired(
 }
 
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database
-    let _client = CLIENT_RW.lock().await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _client = get_lock().await;
 
     let res = Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))

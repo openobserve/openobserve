@@ -13,9 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::get_config;
+
+use crate::db::sqlite::CLIENT_RW;
+
 pub mod short_urls;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     short_urls::init().await?;
     Ok(())
+}
+
+// get the lock for the sqlite client
+pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sqlx::Sqlite>>> {
+    if get_config().common.meta_store.to_lowercase().as_str() == "sqlite" {
+        Some(CLIENT_RW.lock().await)
+    } else {
+        None
+    }
 }
