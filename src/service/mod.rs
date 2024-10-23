@@ -13,11 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 use infra::errors::Result;
-use once_cell::sync::Lazy;
-use regex::Regex;
-
-use crate::common::meta::stream::StreamParams;
 
 pub mod alerts;
 pub mod compact;
@@ -47,24 +44,6 @@ pub mod traces;
 pub mod usage;
 pub mod users;
 
-const MAX_KEY_LENGTH: usize = 100;
-
-static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
-
-// format partition key
-pub fn format_partition_key(input: &str) -> String {
-    let mut output = String::with_capacity(std::cmp::min(input.len(), MAX_KEY_LENGTH));
-    for c in input.chars() {
-        if output.len() > MAX_KEY_LENGTH {
-            break;
-        }
-        if c.is_alphanumeric() || c == '=' || c == '-' || c == '_' {
-            output.push(c);
-        }
-    }
-    output
-}
-
 // format stream name
 pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
     let stream_name = params.stream_name.to_string();
@@ -74,11 +53,4 @@ pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
     } else {
         stream_name
     })
-}
-
-// format stream name
-pub fn format_stream_name(stream_name: &str) -> String {
-    RE_CORRECT_STREAM_NAME
-        .replace_all(stream_name, "_")
-        .to_string()
 }
