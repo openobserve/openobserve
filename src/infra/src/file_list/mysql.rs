@@ -66,6 +66,7 @@ impl super::FileList for MysqlFileList {
         self.inner_add("file_list_history", file, meta).await
     }
 
+    #[tracing::instrument(name = "file_list::db::remove", skip(self))]
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
@@ -90,6 +91,7 @@ impl super::FileList for MysqlFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_remove", skip_all,field(file_count=files.len()))]
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -149,6 +151,7 @@ impl super::FileList for MysqlFileList {
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_add_deleted", skip(self,files),field(file_count=files.len()))]
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -193,6 +196,7 @@ impl super::FileList for MysqlFileList {
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_remove_deleted", skip_all,field(file_count=file.len()))]
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -246,6 +250,7 @@ impl super::FileList for MysqlFileList {
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::get", skip(self))]
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
@@ -297,6 +302,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(!ret.unwrap().is_empty())
     }
 
+    #[tracing::instrument(name = "file_list::db::update_flattened", skip(self))]
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
@@ -320,6 +326,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         return Ok(vec![]); // disallow list all data
     }
 
+    #[tracing::instrument(name = "file_list::db::query", skip(self, _time_level))]
     async fn query(
         &self,
         org_id: &str,
@@ -406,6 +413,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::query_parallel", skip(self))]
     async fn query_parallel(
         &self,
         org_id: &str,
@@ -528,6 +536,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         Ok(files)
     }
 
+    #[tracing::instrument(name = "file_list::db::query_deleted", skip(self))]
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -560,6 +569,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_min_ts", skip(self))]
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -581,6 +591,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         Ok(ret.unwrap_or_default())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_max_pk_value", skip(self))]
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -592,6 +603,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         Ok(ret.unwrap_or_default())
     }
 
+    #[tracing::instrument(name = "file_list::db::stats", skip(self))]
     async fn stats(
         &self,
         org_id: &str,
@@ -640,6 +652,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_stream_stats", skip(self))]
     async fn get_stream_stats(
         &self,
         org_id: &str,
@@ -669,6 +682,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::del_stream_stats", skip(self))]
     async fn del_stream_stats(
         &self,
         org_id: &str,
@@ -687,6 +701,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::set_stream_stats", skip(self,streams),field(stream_count=streams.len()))]
     async fn set_stream_stats(
         &self,
         org_id: &str,
@@ -774,6 +789,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::reset_stream_stats", skip(self))]
     async fn reset_stream_stats(&self) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -785,6 +801,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::reset_stream_stats_min_ts", skip(self, _org_id))]
     async fn reset_stream_stats_min_ts(
         &self,
         _org_id: &str,
@@ -812,6 +829,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::len", skip(self))]
     async fn len(&self) -> usize {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -841,6 +859,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::add_job", skip(self))]
     async fn add_job(
         &self,
         org_id: &str,
@@ -873,6 +892,7 @@ UPDATE stream_stats
         }
     }
 
+    #[tracing::instrument(name = "file_list::db::get_pending_jobs", skip(self))]
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
         let lock_pool = CLIENT.clone();
         let lock_key = "file_list_jobs:get_pending_jobs";
@@ -1029,6 +1049,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(ret)
     }
 
+    #[tracing::instrument(name = "file_list::db::set_job_pending", skip_all, field(id_count=ids.len()))]
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -1048,6 +1069,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::set_job_done", skip(self))]
     async fn set_job_done(&self, id: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -1062,6 +1084,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::update_job_running", skip(self))]
     async fn update_running_jobs(&self, id: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -1075,6 +1098,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::check_running_jobs", skip(self))]
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -1094,6 +1118,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::clean_done_jobs", skip(self))]
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -1110,6 +1135,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_pending_jobs_count", skip(self))]
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
         let pool = CLIENT.clone();
 
@@ -1148,6 +1174,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
 }
 
 impl MysqlFileList {
+    #[tracing::instrument(name = "file_list::db::add", skip(self))]
     async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
@@ -1183,6 +1210,7 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
         }
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_add", skip(self, files))]
     async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
