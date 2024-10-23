@@ -190,7 +190,7 @@ const getSession = () => {
           query: req,
           page_type: "logs",
         },
-        "RUM"
+        "RUM",
       )
       .then((res) => {
         if (res.data.hits.length === 0) {
@@ -243,7 +243,7 @@ const getSessionSegments = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       // const segmentsCopy = [];
@@ -296,7 +296,7 @@ const getSessionEvents = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       const events = ["action", "view", "error"];
@@ -347,7 +347,7 @@ const getSessionErrorLogs = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       const events = res.data.hits.filter((hit: any) => {
@@ -374,7 +374,7 @@ const getDefaultEvent = (event: any) => {
   _event.timestamp = event.date;
   const relativeTime = formatTimeDifference(
     _event.timestamp,
-    Number(sessionState.data.selectedSession.start_time)
+    Number(sessionState.data.selectedSession.start_time),
   );
   _event.relativeTime = relativeTime[0] as number;
   _event.displayTime = relativeTime[1] as string;
@@ -428,10 +428,10 @@ function formatTimeDifference(start_time: number, end_time: number) {
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
   let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60)
+    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
   );
   let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000
+    (milliSeconds % (1000 * 60)) / 1000,
   );
 
   // Add leading zeros if needed
@@ -456,7 +456,7 @@ const getFormattedDate = (timestamp: number) =>
 const handleSidebarEvent = (event: string, payload: any) => {
   videoPlayerRef.value.goto(
     payload.relativeTime,
-    !!videoPlayerRef.value.playerState?.isPlaying
+    !!videoPlayerRef.value.playerState?.isPlaying,
   );
 };
 </script>
