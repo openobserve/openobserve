@@ -19,7 +19,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         search::{ScanStats, Session as SearchSession, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
 };
 use datafusion::{
@@ -34,12 +34,9 @@ use infra::{
 };
 use tokio::sync::Semaphore;
 
-use crate::{
-    common::meta::stream::StreamParams,
-    service::{
-        db, file_list,
-        search::{datafusion::exec::register_table, match_source},
-    },
+use crate::service::{
+    db, file_list,
+    search::{datafusion::exec::register_table, match_source},
 };
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all, fields(org_id = org_id, stream_name = stream_name))]
@@ -202,17 +199,10 @@ async fn get_file_list(
         }
     };
 
+    let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
     let mut files = Vec::new();
     for file in results {
-        if match_source(
-            StreamParams::new(org_id, stream_name, StreamType::Metrics),
-            Some(time_range),
-            filters,
-            &file,
-            false,
-        )
-        .await
-        {
+        if match_source(stream_params.clone(), Some(time_range), filters, &file).await {
             files.push(file.clone());
         }
     }

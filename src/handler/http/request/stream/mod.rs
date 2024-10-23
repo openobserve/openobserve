@@ -19,7 +19,10 @@ use std::{
 };
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{StreamSettings, StreamType, UpdateStreamSettings};
+use config::{
+    meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
+    utils::schema::format_stream_name,
+};
 
 use crate::{
     common::{
@@ -30,7 +33,7 @@ use crate::{
         },
         utils::http::get_stream_type_from_request,
     },
-    service::{format_stream_name, stream},
+    service::stream,
 };
 
 /// GetSchema
