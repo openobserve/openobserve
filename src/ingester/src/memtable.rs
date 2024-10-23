@@ -74,11 +74,12 @@ impl MemTable {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
+        partition_filters: &[(String, Vec<String>)],
     ) -> Result<Vec<ReadRecordBatchEntry>> {
         let Some(stream) = self.streams.get(stream_name) else {
             return Ok(vec![]);
         };
-        stream.read(time_range)
+        stream.read(time_range, partition_filters)
     }
 
     pub(crate) async fn persist(
