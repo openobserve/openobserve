@@ -9,7 +9,7 @@ const streamName = `stream${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText("Login as internal user").click();
+ await page.getByText("Login as internal user").click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -116,57 +116,104 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
   });
 
-  test("stream to toggle store original data toggle and display o2 id", async ({
-    page,
-  }) => {
+  test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {
     const unflattenedPage = new UnflattenedPage(page);
-
+  
+    // Navigate to Streams Menu
+    await unflattenedPage.streamsMenu.waitFor(); // Wait for the streams menu to be visible
     await unflattenedPage.streamsMenu.click();
+  
+    // Search for Stream and access details
+    await unflattenedPage.searchStreamInput.waitFor(); // Wait for the search input to be ready
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+  
+    await unflattenedPage.streamDetailButton.waitFor(); // Ensure the stream detail button is visible
     await unflattenedPage.streamDetailButton.click();
+  
+    // Toggle 'Store Original Data' and update schema
+    await unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
     await unflattenedPage.storeOriginalDataToggle.click();
+  
+    await unflattenedPage.schemaUpdateButton.waitFor(); // Wait for the schema update button to be clickable
     await unflattenedPage.schemaUpdateButton.click();
-    await page.waitForTimeout(1000);
-    await ingestion(page);
-    await page.waitForTimeout(2000);
+  
+    await page.waitForTimeout(1000); // Ensure the schema update is processed
+    await ingestion(page); // Custom ingestion function
+    await page.waitForTimeout(2000); // Allow time for ingestion
+  
+    // Close the dialog and explore the stream
+    await unflattenedPage.closeButton.waitFor(); // Wait for the close button to be visible
     await unflattenedPage.closeButton.click();
+  
+    await unflattenedPage.exploreButton.waitFor(); // Wait for the explore button to be clickable
     await unflattenedPage.exploreButton.click();
-    await page.waitForTimeout(1000);
+  
+    await page.waitForTimeout(1000); // Small delay to ensure page readiness
+  
+    // Select date and time
+    await unflattenedPage.dateTimeButton.waitFor(); // Wait for the date-time button
     await unflattenedPage.dateTimeButton.click();
+  
+    await unflattenedPage.relativeTab.waitFor(); // Wait for the relative tab to be visible
     await unflattenedPage.relativeTab.click();
-    await page.waitForTimeout(2000);
+  
+    await page.waitForTimeout(2000); // Wait for the relative tab to load
+  
+    // Expand log table row and verify details
+    await unflattenedPage.logTableRowExpandMenu.waitFor(); // Wait for the expand menu to appear
     await unflattenedPage.logTableRowExpandMenu.click();
+  
+    await unflattenedPage.logSourceColumn.waitFor(); // Ensure the source column is ready
     await unflattenedPage.logSourceColumn.click();
-    await page.waitForTimeout(1000);
+  
+    await page.waitForTimeout(1000); // Small delay to ensure UI updates
+  
+    await unflattenedPage.o2IdText.waitFor(); // Wait for the o2 ID text to be visible
     await unflattenedPage.o2IdText.click();
+  
+    await unflattenedPage.unflattenedTab.waitFor(); // Wait for the unflattened tab to be visible
     await unflattenedPage.unflattenedTab.click();
-    await page.waitForTimeout(1000);
+  
+    await page.waitForTimeout(1000); // Small delay before closing
+  
+    // Close the dialog
+    await unflattenedPage.closeDialog.waitFor(); // Wait for the close button in the dialog
     await unflattenedPage.closeDialog.click();
   });
 
-  test("stream to display o2 id when quick mode is on and select * query is added", async ({
-    page,
-  }) => {
+
+  test("stream to display o2 id when quick mode is on and select * query is added", async ({ page }) => {
     const unflattenedPage = new UnflattenedPage(page); // Instantiate the Page Object
 
     // Navigate to Streams Menu
+    await unflattenedPage.streamsMenu.waitFor();
     await unflattenedPage.streamsMenu.click();
 
     // Search for Stream and access details
+    await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    
+    await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
 
     // Toggle 'Store Original Data' and update schema
+    await unflattenedPage.storeOriginalDataToggle.waitFor();
     await unflattenedPage.storeOriginalDataToggle.click();
+    
+    await unflattenedPage.schemaUpdateButton.waitFor();
     await unflattenedPage.schemaUpdateButton.click();
-    await page.waitForTimeout(1000);
+    
+    await page.waitForTimeout(1000); // Timeout to ensure process completes
     await ingestion(page);
     await page.waitForTimeout(2000);
 
     // Close the dialog and explore the stream
+    await unflattenedPage.closeButton.waitFor();
     await unflattenedPage.closeButton.click();
+    
+    await unflattenedPage.exploreButton.waitFor();
     await unflattenedPage.exploreButton.click();
     await page.waitForTimeout(2000);
 
@@ -175,22 +222,31 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(1000);
 
     // Select date and time
+    await unflattenedPage.dateTimeButton.waitFor();
     await unflattenedPage.dateTimeButton.click();
+    
+    await unflattenedPage.relativeTab.waitFor();
     await unflattenedPage.relativeTab.click();
     await page.waitForTimeout(2000);
 
     // Search for 'kubernetes_pod_id' field
+    await unflattenedPage.indexFieldSearchInput.waitFor();
     await unflattenedPage.indexFieldSearchInput.fill("kubernetes_pod_id");
+    
     await page.waitForTimeout(2000);
     await page
-      .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
-      )
+      .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
+      .first()
+      .waitFor(); // Wait for the specific button to be visible
+    await page
+      .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
       .first()
       .click();
 
     // Switch to SQL mode and validate query editor content
+    await unflattenedPage.sqlModeToggle.waitFor();
     await unflattenedPage.sqlModeToggle.click();
+    
     await page.waitForTimeout(2000);
     await expect(
       unflattenedPage.logsSearchBarQueryEditor
@@ -199,6 +255,7 @@ test.describe("Unflattened testcases", () => {
     ).toBeVisible();
 
     // Update the query editor with 'SELECT * FROM "e2e_automate"'
+    await unflattenedPage.logsSearchBarQueryEditor.waitFor();
     await unflattenedPage.logsSearchBarQueryEditor.click();
     await page.keyboard.press("Control+A");
     await page.keyboard.press("Delete");
@@ -206,36 +263,68 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(2000);
 
     // Interact with log table rows and verify details
+    await unflattenedPage.logTableRowExpandMenu.waitFor();
     await unflattenedPage.logTableRowExpandMenu.click();
+    
+    await unflattenedPage.logSourceColumn.waitFor();
     await unflattenedPage.logSourceColumn.click();
+    
     await page.waitForTimeout(1000);
+    await unflattenedPage.o2IdText.waitFor();
     await unflattenedPage.o2IdText.click();
+    
+    await page.waitForTimeout(1000);
+    await unflattenedPage.unflattenedTab.waitFor();
     await unflattenedPage.unflattenedTab.click();
     await page.waitForTimeout(1000);
 
     // Close the dialog
+    await unflattenedPage.closeDialog.waitFor();
     await unflattenedPage.closeDialog.click();
 
     // Repeat the process: Navigate back to Streams Menu, search, toggle, etc.
+    await unflattenedPage.streamsMenu.waitFor();
     await unflattenedPage.streamsMenu.click();
+    
+    await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    
+    await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    
+    await unflattenedPage.storeOriginalDataToggle.waitFor();
     await unflattenedPage.storeOriginalDataToggle.click();
+    
+    await unflattenedPage.schemaUpdateButton.waitFor();
     await unflattenedPage.schemaUpdateButton.click();
+    
+    await unflattenedPage.closeButton.waitFor();
     await unflattenedPage.closeButton.click();
+    
     await page.waitForTimeout(1000);
     await ingestion(page);
+    
     await page.waitForTimeout(2000);
+    await unflattenedPage.exploreButton.waitFor();
     await unflattenedPage.exploreButton.click();
+    
     await page.waitForTimeout(3000);
+    await unflattenedPage.dateTimeButton.waitFor();
     await unflattenedPage.dateTimeButton.click();
+    
+    await unflattenedPage.relativeTab.waitFor();
     await unflattenedPage.relativeTab.click();
     await page.waitForTimeout(2000);
 
     // Final log row interaction
+    await unflattenedPage.logTableRowExpandMenu.waitFor();
     await unflattenedPage.logTableRowExpandMenu.click();
+    
     await page.waitForTimeout(2000);
+    await page.getByText("arrow_drop_down_timestamp:").waitFor();
     await page.getByText("arrow_drop_down_timestamp:").click();
-  });
 });
+
+
+})
