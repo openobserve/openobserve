@@ -251,10 +251,14 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
         )
         .await
         {
+            let err_msg = format!(
+                "Failed to delete due to error deleting associated DerivedStream: {}",
+                error
+            );
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    error.to_string(),
+                    err_msg,
                 )),
             );
         }

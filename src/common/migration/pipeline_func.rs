@@ -130,7 +130,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     .collect::<Vec<_>>();
                 let pl_id = ider::uuid();
                 let name = format!("Migrated-{pl_id}");
-                let description = "This pipeline was generated from previous found prior to OpenObserve v0.12.2. Please check and confirm before enabling it manually".to_string();
+                let description = "This pipeline was generated from previous found prior to OpenObserve v0.13.1. Please check and confirm before enabling it manually".to_string();
                 let pipeline = Pipeline {
                     id: pl_id,
                     version: 0,
@@ -190,8 +190,8 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 let dest_node = Node::new(
                     ider::uuid(),
                     NodeData::Stream(source_params.clone()),
-                    pos_x + (pos_offset * (func_params.len() + 1) as f32),
-                    pos_y,
+                    pos_x,
+                    pos_y + (pos_offset * (func_params.len() + 1) as f32),
                     "output".to_string(),
                 );
 
@@ -201,8 +201,8 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     let func_node = Node::new(
                         ider::uuid(),
                         func_node_data,
-                        pos_x + (pos_offset * (idx + 1) as f32),
-                        pos_y,
+                        pos_x,
+                        pos_y + (pos_offset * (idx + 1) as f32),
                         "default".to_string(),
                     );
                     let new_edge = Edge::new(
@@ -221,9 +221,9 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             }
 
             if let Some(routings) = old_pipe.routing {
-                pos_y += pos_offset;
+                pos_x += pos_offset;
                 for (dest_stream, routing_conditions) in routings {
-                    pos_x += pos_offset;
+                    pos_y += pos_offset;
                     let condition_node = Node::new(
                         ider::uuid(),
                         NodeData::Condition(ConditionParams {
@@ -233,7 +233,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                         pos_y,
                         "default".to_string(),
                     );
-                    pos_x += pos_offset;
+                    pos_y += pos_offset;
                     let dest_node = Node::new(
                         ider::uuid(),
                         NodeData::Stream(StreamParams::new(
@@ -294,8 +294,8 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
         let dest_node = Node::new(
             ider::uuid(),
             NodeData::Stream(stream_params.clone()),
-            pos_x + (pos_offset * (func_params.len() + 1) as f32),
-            pos_y,
+            pos_x,
+            pos_y + (pos_offset * (func_params.len() + 1) as f32),
             "output".to_string(),
         );
         for (idx, (_, func_param)) in func_params.into_iter().enumerate() {
@@ -303,8 +303,8 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             let func_node = Node::new(
                 ider::uuid(),
                 func_node_data,
-                pos_x + (pos_offset * (idx + 1) as f32),
-                pos_y,
+                pos_x,
+                pos_y + (pos_offset * (idx + 1) as f32),
                 "default".to_string(),
             );
             let new_edge = Edge::new(

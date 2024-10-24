@@ -47,9 +47,9 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         upgrade_092_093().await?;
     }
 
-    let v122 = Version::from("v0.12.2").unwrap();
-    if old_ver < v122 {
-        upgrade_121_122().await?;
+    let v131 = Version::from("v0.13.1").unwrap();
+    if old_ver < v131 {
+        upgrade_130_131().await?;
     }
 
     Ok(())
@@ -72,8 +72,8 @@ async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn upgrade_121_122() -> Result<(), anyhow::Error> {
-    // migrate both functions and pipelines
+async fn upgrade_130_131() -> Result<(), anyhow::Error> {
+    // migrate pipelines and function associations
     pipeline_func::run().await?;
 
     Ok(())
