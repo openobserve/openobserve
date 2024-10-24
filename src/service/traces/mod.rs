@@ -68,6 +68,8 @@ const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_ti
 // ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
 const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
+const ATTR_STATUS_CODE: &str = "status_code";
+const ATTR_STATUS_MESSAGE: &str = "status_message";
 
 pub enum RequestType {
     Grpc,
@@ -244,6 +246,15 @@ pub async fn handle_trace_request(
                         key = format!("attr_{}", key);
                     }
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
+                }
+
+                // special addition for https://github.com/openobserve/openobserve/issues/4851
+                // we set the status (error/non-error) properly, but skip the message
+                // however, that can be useful when debugging with traces, so we
+                // extract that as an attribute here.
+                if let Some(ref status) = span.status {
+                    span_att_map.insert(ATTR_STATUS_CODE.into(), status.code.into());
+                    span_att_map.insert(ATTR_STATUS_MESSAGE.into(), status.message.clone().into());
                 }
 
                 let mut events = vec![];
