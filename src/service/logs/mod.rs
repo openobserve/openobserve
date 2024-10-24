@@ -216,6 +216,23 @@ async fn write_logs_by_stream(
         } else {
             Some(user_email.to_string())
         };
+        req_stats.dropped_records = match status {
+            IngestionStatus::Record(s) => s.failed.into(),
+            IngestionStatus::Bulk(s) => {
+                if s.errors {
+                    s.items
+                        .iter()
+                        .map(|i| {
+                            i.iter()
+                                .map(|(_, res)| if res.error.is_some() { 1 } else { 0 })
+                                .sum::<i64>()
+                        })
+                        .sum()
+                } else {
+                    0
+                }
+            }
+        };
 
         if let Some(fns_length) = fn_num {
             report_request_usage_stats(
@@ -521,9 +538,13 @@ pub fn refactor_map(
 }
 
 async fn ingestion_log_enabled(org_id: &str) -> bool {
-    let org_settings = get_org_setting(org_id).await.unwrap();
-    let org_settings: OrganizationSetting = json::from_slice(&org_settings).unwrap();
-    org_settings.toggle_ingestion_logs
+    match get_org_setting(org_id).await {
+        Ok(b) => {
+            let org_settings: OrganizationSetting = json::from_slice(&b).unwrap();
+            org_settings.toggle_ingestion_logs
+        }
+        Err(_) => false,
+    }
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {
