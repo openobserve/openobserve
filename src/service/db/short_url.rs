@@ -21,7 +21,7 @@ use chrono::Utc;
 use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
-    table::{short_urls, short_urls::ShortUrlRecord},
+    table::short_urls,
 };
 
 use crate::{common::infra::config::SHORT_URLS, service::db};
@@ -45,7 +45,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
     Ok(original_url)
 }
 
-pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Error> {
+pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
     if let Err(e) = short_urls::add(short_id, &entry.original_url).await {
         return Err(e).context("Failed to add short URL to DB");
     }
