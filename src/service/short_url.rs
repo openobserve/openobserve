@@ -17,7 +17,7 @@ use chrono::Utc;
 use config::{get_config, utils::md5};
 use infra::{
     errors::{DbError, Error},
-    short_url::ShortUrlRecord,
+    table::short_urls::ShortUrlRecord,
 };
 
 use crate::service::db;

@@ -25,7 +25,7 @@ use config::{
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
-use infra::short_url::ShortUrlRecord;
+use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use vector_enrichment::TableRegistry;

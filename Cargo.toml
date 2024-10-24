@@ -284,6 +284,11 @@ reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls-native-roots",
   "stream",
 ] }
+sea-orm = { version = "1.1.0", features = [
+  "sqlx-all",
+  "runtime-tokio-rustls",
+  "macros",
+] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
