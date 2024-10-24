@@ -65,7 +65,7 @@ pub struct Node {
 
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.data == other.data
+        self.id == other.id && self.data == other.data && self.position == other.position
     }
 }
 
@@ -133,7 +133,7 @@ pub struct ConditionParams {
     pub conditions: Vec<RoutingCondition>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct Position {
     x: f32,
     y: f32,
