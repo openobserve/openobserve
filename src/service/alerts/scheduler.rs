@@ -20,10 +20,10 @@ use config::{
     get_config,
     meta::{
         alerts::FrequencyType,
-        stream::StreamType,
+        stream::{StreamParams, StreamType},
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::{flatten, json, rand::get_rand_num_within},
+    utils::{json, rand::get_rand_num_within},
 };
 use cron::Schedule;
 use futures::future::try_join_all;
@@ -38,7 +38,7 @@ use crate::{
         },
         db::{self, scheduler::ScheduledTriggerData},
         ingestion::ingestion_service,
-        pipeline::execution::PipelineExt,
+        pipeline::batch_execution::ExecutablePipeline,
         usage::publish_triggers_usage,
     },
 };
@@ -899,50 +899,39 @@ async fn handle_derived_stream_triggers(
             trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
         } else {
             // pass search results to pipeline to get modified results before ingesting
-            let mut json_data_by_stream = HashMap::new();
+            let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> = HashMap::new();
             let mut ingestion_error_msg = None;
 
-            let pl_node_map = pipeline.get_node_map();
-            if let (Ok(pl_graph), Ok(vrl_map)) = (
-                pipeline.build_adjacency_list(&pl_node_map),
-                pipeline.register_functions().await,
-            ) {
-                let mut runtime = crate::service::ingestion::init_functions_runtime();
-                for record in local_val {
-                    match pipeline.execute(record, &pl_node_map, &pl_graph, &vrl_map, &mut runtime)
-                    {
-                        Err(e) => {
-                            let err_msg = format!(
-                                "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
-                                org_id, pipeline_name, e
-                            );
-                            log::error!("{err_msg}");
-                            ingestion_error_msg = Some(err_msg);
-                            break;
-                        }
-                        Ok(pl_results) => {
-                            for (stream_params, mut record) in pl_results {
-                                // JSON Flattening
-                                record = flatten::flatten_with_level(
-                                    record,
-                                    cfg.limit.ingest_flatten_level,
-                                )?;
-                                json_data_by_stream
-                                    .entry(stream_params)
-                                    .or_insert_with(Vec::new)
-                                    .push(record);
-                            }
+            match ExecutablePipeline::new(&pipeline).await {
+                Err(e) => {
+                    let err_msg = format!(
+                        "Pipeline: {}/{} associated with the DerivedStream failed to initialize ExecutablePipeline. Caused by: {}",
+                        org_id, pipeline_name, e
+                    );
+                    log::error!("{err_msg}");
+                    ingestion_error_msg = Some(err_msg);
+                }
+                Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val).await {
+                    Err(e) => {
+                        let err_msg = format!(
+                            "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
+                            org_id, pipeline_name, e
+                        );
+                        log::error!("{err_msg}");
+                        ingestion_error_msg = Some(err_msg);
+                    }
+                    Ok(pl_results) => {
+                        for (stream_params, stream_pl_results) in pl_results {
+                            let (_, results): (Vec<_>, Vec<_>) =
+                                stream_pl_results.into_iter().unzip();
+                            json_data_by_stream
+                                .entry(stream_params)
+                                .or_default()
+                                .extend(results);
                         }
                     }
-                }
-            } else {
-                let err_msg = format!(
-                    "[DerivedStream] associated pipeline failed to construct graph representation: {}/{}.",
-                    org_id, pipeline_name
-                );
-                log::error!("{err_msg}");
-                ingestion_error_msg = Some(err_msg);
-            }
+                },
+            };
 
             // Ingest result into destination stream
             if ingestion_error_msg.is_none() {

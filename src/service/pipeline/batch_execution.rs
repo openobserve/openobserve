@@ -16,22 +16,60 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use config::{
     meta::{
-        function::VRLResultResolver,
+        function::{Transform, VRLResultResolver},
         pipeline::{components::NodeData, Pipeline},
-        stream::StreamParams,
+        stream::{StreamParams, StreamType},
     },
     utils::{flatten, json::Value},
 };
 use futures::future::try_join_all;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-use super::execution::PipelineExt;
-use crate::service::ingestion::apply_vrl_fn;
+use crate::{
+    common::infra::config::QUERY_FUNCTIONS,
+    service::ingestion::{apply_vrl_fn, compile_vrl_function},
+};
+
+#[async_trait]
+pub trait PipelineExt: Sync + Send + 'static {
+    /// Registers the function of all the FunctionNode of this pipeline once for execution.
+    /// Returns a map of node_id -> VRLResultResolver for quick lookup
+    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>>;
+}
+
+#[async_trait]
+impl PipelineExt for Pipeline {
+    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>> {
+        let mut vrl_map = HashMap::new();
+        for node in &self.nodes {
+            if let NodeData::Function(func_params) = &node.data {
+                let transform = get_transforms(&self.org, &func_params.name).await?;
+                if let Ok(vrl_runtime_config) = compile_vrl_function(&transform.function, &self.org)
+                {
+                    let registry = vrl_runtime_config
+                        .config
+                        .get_custom::<vector_enrichment::TableRegistry>()
+                        .unwrap();
+                    registry.finish_load();
+                    vrl_map.insert(
+                        node.get_node_id(),
+                        VRLResultResolver {
+                            program: vrl_runtime_config.program,
+                            fields: vrl_runtime_config.fields,
+                        },
+                    );
+                }
+            }
+        }
+        Ok(vrl_map)
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct PipelineExecBatch {
+pub struct ExecutablePipeline {
     source_node_id: String,
     sorted_nodes: Vec<String>,
     vrl_map: HashMap<String, VRLResultResolver>,
@@ -44,7 +82,25 @@ pub struct ExecutableNode {
     children: Vec<String>,
 }
 
-impl PipelineExecBatch {
+#[derive(Debug)]
+pub struct ExecutablePipelineBulkInputs {
+    records: Vec<Value>,
+    doc_ids: Vec<Option<String>>,
+    originals: Vec<Option<String>>,
+}
+
+#[derive(Debug)]
+pub struct ExecutablePipelineTraceInputs {
+    records: Vec<Value>,
+    timestamps: Vec<i64>,
+    services: Vec<String>,
+    span_names: Vec<String>,
+    span_status_for_spanmetrics: Vec<String>,
+    span_kinds: Vec<String>,
+    span_durations: Vec<f64>,
+}
+
+impl ExecutablePipeline {
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
         let node_map = pipeline
             .nodes
@@ -78,7 +134,7 @@ impl PipelineExecBatch {
     }
 
     pub async fn process_batch(
-        &mut self,
+        &self,
         org_id: &str,
         records: Vec<Value>,
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
@@ -143,9 +199,13 @@ impl PipelineExecBatch {
         });
 
         // Send records to the source node to begin processing
+        let flattened = {
+            let source_node = self.node_map.get(&self.source_node_id).unwrap();
+            matches!(&source_node.node_data, NodeData::Stream(stream_params) if stream_params.stream_type == StreamType::Metrics)
+        };
         let source_sender = node_senders.remove(&self.source_node_id).unwrap();
         for (idx, record) in records.into_iter().enumerate() {
-            if let Err(send_err) = source_sender.send((idx, record, false)).await {
+            if let Err(send_err) = source_sender.send((idx, record, flattened)).await {
                 log::error!(
                     "[Pipeline]: Error sending original records into source Node for {send_err}"
                 );
@@ -192,6 +252,101 @@ impl PipelineExecBatch {
             .values()
             .filter(|exec_node| matches!(exec_node.node_data, NodeData::Function(_)))
             .count()
+    }
+}
+
+impl ExecutablePipelineBulkInputs {
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            doc_ids: Vec::new(),
+            originals: Vec::new(),
+        }
+    }
+
+    pub fn add_input(
+        &mut self,
+        record: Value,
+        doc_id: Option<String>,
+        original_data: Option<String>,
+    ) {
+        self.records.push(record);
+        self.doc_ids.push(doc_id);
+        self.originals.push(original_data);
+    }
+
+    pub fn into_parts(self) -> (Vec<Value>, Vec<Option<String>>, Vec<Option<String>>) {
+        (self.records, self.doc_ids, self.originals)
+    }
+}
+
+impl Default for ExecutablePipelineBulkInputs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ExecutablePipelineTraceInputs {
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            timestamps: Vec::new(),
+            services: Vec::new(),
+            span_names: Vec::new(),
+            span_status_for_spanmetrics: Vec::new(),
+            span_kinds: Vec::new(),
+            span_durations: Vec::new(),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_input(
+        &mut self,
+        record: Value,
+        ts: i64,
+        service: String,
+        span_name: String,
+        span_status_for_spanmetric: String,
+        span_kind: String,
+        duration: f64,
+    ) {
+        self.records.push(record);
+        self.timestamps.push(ts);
+        self.services.push(service);
+        self.span_names.push(span_name);
+        self.span_status_for_spanmetrics
+            .push(span_status_for_spanmetric);
+        self.span_kinds.push(span_kind);
+        self.span_durations.push(duration);
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn into_parts(
+        self,
+    ) -> (
+        Vec<Value>,
+        Vec<i64>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<f64>,
+    ) {
+        (
+            self.records,
+            self.timestamps,
+            self.services,
+            self.span_names,
+            self.span_status_for_spanmetrics,
+            self.span_kinds,
+            self.span_durations,
+        )
+    }
+}
+
+impl Default for ExecutablePipelineTraceInputs {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -380,4 +535,13 @@ fn dfs(
     visited.insert(current_node_id.to_string());
     result.push(current_node_id.to_string());
     Ok(())
+}
+
+async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
+    let func_key = format!("{org_id}/{fn_name}");
+    if let Some(trans) = QUERY_FUNCTIONS.get(&func_key) {
+        return Ok(trans.value().clone());
+    }
+    // get from database
+    crate::service::db::functions::get(org_id, fn_name).await
 }

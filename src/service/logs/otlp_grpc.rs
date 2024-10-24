@@ -44,7 +44,6 @@ use crate::{
             check_ingestion_allowed,
             grpc::{get_val, get_val_with_type_retained},
         },
-        pipeline::execution::PipelineExt,
         schema::get_upto_discard_error,
     },
 };
@@ -74,17 +73,19 @@ pub async fn handle_grpc_request(
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
     // Start retrieve associated pipeline and construct pipeline components
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let pipeline_params = crate::service::ingestion::get_stream_pipeline_params(
+    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
         org_id,
         &stream_name,
         &StreamType::Logs,
     )
     .await;
+    let mut pipeline_inputs = Vec::new();
+    let mut original_options = Vec::new();
+    let mut timestamps = Vec::new();
     // End pipeline construction
 
-    if let Some((pl, node_map, graph, _)) = &pipeline_params {
-        let pl_destinations = pl.get_all_destination_streams(node_map, graph);
+    if let Some(exec_pl) = &executable_pipeline {
+        let pl_destinations = exec_pl.get_all_destination_streams();
         stream_params.extend(pl_destinations);
     }
 
@@ -189,90 +190,30 @@ pub async fn handle_grpc_request(
                     }
                 };
 
-                // store a copy of original data before it's being transformed and/or flattened,
-                // unless
-                // 1. original data is not an object -> won't be flattened.
-                // 2. no routing and current StreamName not in streams_need_original_set
+                // store a copy of original data before it's modified, when
+                // 1. original data is an object
                 let original_data = if rec.is_object() {
-                    if pipeline_params.is_none()
-                        && !streams_need_original_set.contains(&stream_name)
-                    {
-                        None
+                    // 2. current stream does not have pipeline
+                    if executable_pipeline.is_none() {
+                        // current stream requires original
+                        streams_need_original_set
+                            .contains(&stream_name)
+                            .then_some(rec.to_string())
                     } else {
-                        // otherwise, make a copy in case the routed stream needs original data
-                        Some(rec.to_string())
+                        // 3. with pipeline, storing original as long as streams_need_original_set
+                        //    is not empty
+                        // because not sure the pipeline destinations
+                        (!streams_need_original_set.is_empty()).then_some(rec.to_string())
                     }
                 } else {
                     None // `item` won't be flattened, no need to store original
                 };
 
-                if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) = pipeline_params.as_ref() {
-                    match pipeline.execute(rec, pl_node_map, pl_graph, vrl_map, &mut runtime) {
-                        Err(e) => {
-                            log::error!(
-                                "[Pipeline] {}/{}/{}: Execution error: {}.",
-                                pipeline.org,
-                                pipeline.name,
-                                pipeline.id,
-                                e
-                            );
-                            stream_status.status.failed += 1; // pipeline failed or dropped
-                            stream_status.status.error = format!("Pipeline execution error: {}", e);
-                            continue;
-                        }
-                        Ok(pl_results) => {
-                            for (stream_params, mut rec) in pl_results {
-                                if stream_params.stream_type != StreamType::Logs {
-                                    continue;
-                                }
-                                // flattening
-                                rec = flatten::flatten_with_level(
-                                    rec,
-                                    cfg.limit.ingest_flatten_level,
-                                )?;
-
-                                // get json object
-                                let mut local_val = match rec.take() {
-                                    json::Value::Object(v) => v,
-                                    _ => unreachable!(),
-                                };
-
-                                if let Some(fields) =
-                                    user_defined_schema_map.get(stream_params.stream_name.as_str())
-                                {
-                                    local_val =
-                                        crate::service::logs::refactor_map(local_val, fields);
-                                }
-
-                                // add `_original` and '_record_id` if required by StreamSettings
-                                if streams_need_original_set
-                                    .contains(stream_params.stream_name.as_str())
-                                    && original_data.is_some()
-                                {
-                                    local_val.insert(
-                                        ORIGINAL_DATA_COL_NAME.to_string(),
-                                        original_data.clone().unwrap().into(),
-                                    );
-                                    let record_id = crate::service::ingestion::generate_record_id(
-                                        org_id,
-                                        &stream_name,
-                                        &StreamType::Logs,
-                                    );
-                                    local_val.insert(
-                                        ID_COL_NAME.to_string(),
-                                        json::Value::String(record_id.to_string()),
-                                    );
-                                }
-
-                                let function_no = pipeline.num_of_func();
-                                let (ts_data, fn_num) = json_data_by_stream
-                                    .entry(stream_params.stream_name.to_string())
-                                    .or_insert((Vec::new(), None));
-                                ts_data.push((timestamp, local_val));
-                                *fn_num = Some(function_no);
-                            }
-                        }
-                    }
+                if executable_pipeline.is_some() {
+                    // buffer the records and originals for pipeline batch processing
+                    pipeline_inputs.push(rec);
+                    original_options.push(original_data);
+                    timestamps.push(timestamp);
                 } else {
                     // flattening
                     rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
@@ -313,6 +254,76 @@ pub async fn handle_grpc_request(
             }
         }
     }
+
+    // batch process records through pipeline
+    if let Some(exec_pl) = &executable_pipeline {
+        let records_count = pipeline_inputs.len();
+        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+            Err(e) => {
+                log::error!(
+                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
+                    org_id,
+                    stream_name,
+                    e
+                );
+                stream_status.status.failed += records_count as u32;
+                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+            }
+            Ok(pl_results) => {
+                let function_no = exec_pl.num_of_func();
+                for (stream_params, stream_pl_results) in pl_results {
+                    if stream_params.stream_type != StreamType::Logs {
+                        continue;
+                    }
+
+                    for (idx, mut res) in stream_pl_results {
+                        // get json object
+                        let mut local_val = match res.take() {
+                            json::Value::Object(v) => v,
+                            _ => unreachable!(),
+                        };
+
+                        if let Some(fields) =
+                            user_defined_schema_map.get(stream_params.stream_name.as_str())
+                        {
+                            local_val = crate::service::logs::refactor_map(local_val, fields);
+                        }
+
+                        // add `_original` and '_record_id` if required by StreamSettings
+                        if streams_need_original_set.contains(stream_params.stream_name.as_str())
+                            && original_options[idx].is_some()
+                        {
+                            local_val.insert(
+                                ORIGINAL_DATA_COL_NAME.to_string(),
+                                original_options[idx].clone().unwrap().into(),
+                            );
+                            let record_id = crate::service::ingestion::generate_record_id(
+                                org_id,
+                                &stream_params.stream_name,
+                                &StreamType::Logs,
+                            );
+                            local_val.insert(
+                                ID_COL_NAME.to_string(),
+                                json::Value::String(record_id.to_string()),
+                            );
+                        }
+
+                        let (ts_data, fn_num) = json_data_by_stream
+                            .entry(stream_name.clone())
+                            .or_insert((Vec::new(), None));
+                        ts_data.push((timestamps[idx], local_val));
+                        *fn_num = Some(function_no); // no pl -> no func
+                    }
+                }
+            }
+        }
+    }
+
+    // drop variables
+    drop(executable_pipeline);
+    drop(original_options);
+    drop(timestamps);
+    drop(user_defined_schema_map);
 
     // Update partial success
     if stream_status.status.failed > 0 {
@@ -390,10 +401,6 @@ pub async fn handle_grpc_request(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-
-    // drop variables
-    drop(pipeline_params);
-    drop(user_defined_schema_map);
 
     return Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)

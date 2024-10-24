@@ -42,7 +42,7 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
-        pipeline::execution::PipelineExt,
+        pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         usage::report_request_usage_stats,
     },
@@ -80,12 +80,16 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
     // associated pipeline
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_pipeline_params = HashMap::new();
+    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
+        HashMap::new();
+    let mut stream_pipeline_inputs: HashMap<String, Vec<(json::Value, String)>> = HashMap::new();
 
     // realtime alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+
+    // records buffer
+    let mut json_data_by_stream: HashMap<String, Vec<(json::Value, String)>> = HashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
@@ -106,16 +110,17 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             }
         };
 
-        // get stream pipeline
-        if !stream_pipeline_params.contains_key(&stream_name) {
-            let pipeline_params = crate::service::ingestion::get_stream_pipeline_params(
+        // Start retrieve associated pipeline and initialize ExecutablePipeline
+        if !stream_executable_pipelines.contains_key(&stream_name) {
+            let exec_pl_option = crate::service::ingestion::get_stream_executable_pipeline(
                 org_id,
                 &stream_name,
                 &StreamType::Metrics,
             )
             .await;
-            stream_pipeline_params.insert(stream_name.clone(), pipeline_params);
+            stream_executable_pipelines.insert(stream_name.clone(), exec_pl_option);
         }
+        // End pipeline params construction
 
         // check metrics type for Histogram & Summary
         if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
@@ -150,42 +155,97 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             continue;
         }
 
-        // apply pipeline
         let record = json::Value::Object(record.to_owned());
-        let json_data_by_stream = if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) =
-            stream_pipeline_params.get(&stream_name).unwrap()
+
+        // ready to be buffered for downstream processing
+        if stream_executable_pipelines
+            .get(&stream_name)
+            .unwrap()
+            .is_some()
         {
-            let mut json_data_by_stream = vec![];
-            match pipeline.execute(record, pl_node_map, pl_graph, vrl_map, &mut runtime) {
+            // buffer to pipeline for batch processing
+            stream_pipeline_inputs
+                .entry(stream_name.to_owned())
+                .or_default()
+                .push((record, metrics_type));
+        } else {
+            // buffer to downstream processing directly
+            json_data_by_stream
+                .entry(stream_name.clone())
+                .or_default()
+                .push((record, metrics_type));
+        }
+    }
+
+    // process records buffered for pipeline processing
+    for (stream_name, exec_pl_option) in &stream_executable_pipelines {
+        if let Some(exec_pl) = exec_pl_option {
+            let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
+                log::error!(
+                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
+                    stream_name
+                );
+                continue;
+            };
+            let (records, metric_types): (Vec<json::Value>, Vec<String>) =
+                pipeline_inputs.into_iter().unzip();
+            let count = records.len();
+            match exec_pl.process_batch(org_id, records).await {
                 Err(e) => {
-                    log::error!(
-                        "[Pipeline] {}/{}/{}: Execution error: {}. Skip this record",
-                        pipeline.org,
-                        pipeline.name,
-                        pipeline.id,
-                        e
+                    let err_msg = format!(
+                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
+                        stream_name, e,
                     );
-                    // update stats
+                    log::error!("{err_msg}");
+                    // update status
                     let stream_status = stream_status_map
                         .entry(stream_name.clone())
-                        .or_insert_with(|| StreamStatus::new(&stream_name));
-                    stream_status.status.failed += 1;
+                        .or_insert_with(|| StreamStatus::new(stream_name));
+                    stream_status.status.failed += count as u32;
+                    stream_status.status.error = err_msg;
+                    continue;
                 }
                 Ok(pl_results) => {
-                    for (stream_params, res) in pl_results {
+                    for (stream_params, stream_pl_results) in pl_results {
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
-                        json_data_by_stream.push((stream_params.stream_name.to_string(), res));
+                        // add partition keys
+                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
+                        {
+                            let partition_det =
+                                crate::service::ingestion::get_stream_partition_keys(
+                                    org_id,
+                                    &StreamType::Metrics,
+                                    &stream_params.stream_name,
+                                )
+                                .await;
+                            stream_partitioning_map.insert(
+                                stream_params.stream_name.to_string(),
+                                partition_det.clone(),
+                            );
+                        }
+                        for (idx, res) in stream_pl_results {
+                            // buffer to downstream processing directly
+                            json_data_by_stream
+                                .entry(stream_params.stream_name.to_string())
+                                .or_default()
+                                .push((res, metric_types[idx].to_owned()));
+                        }
                     }
                 }
             }
-            json_data_by_stream
-        } else {
-            vec![(stream_name, record)]
-        };
+        }
+    }
 
-        for (stream_name, mut record) in json_data_by_stream {
+    for (stream_name, json_data) in json_data_by_stream {
+        // get partition key
+        let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
+        let partition_keys = partition_det.partition_keys.clone();
+        let partition_time_level =
+            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
+
+        for (mut record, metric_type) in json_data {
             // Start get stream alerts
             if !stream_alerts_map.contains_key(&stream_name) {
                 crate::service::ingestion::get_stream_alerts(
@@ -262,7 +322,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                         infer_json_schema(&mut schema_reader, None, StreamType::Metrics).unwrap();
                     let metadata = Metadata {
                         metric_family_name: stream_name.clone(),
-                        metric_type: metrics_type.as_str().into(),
+                        metric_type: metric_type.as_str().into(),
                         help: stream_name.clone().replace('_', " "),
                         unit: "".to_string(),
                     };
@@ -312,13 +372,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 stream_partitioning_map.insert(stream_name.to_string(), partition_det);
             }
 
-            let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
-            let partition_keys = partition_det.partition_keys.clone();
-            let partition_time_level = unwrap_partition_time_level(
-                partition_det.partition_time_level,
-                StreamType::Metrics,
-            );
-
             let schema = stream_schema_map
                 .get(&stream_name)
                 .unwrap()
@@ -367,6 +420,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
                 }
             }
+            // End check for alert trigger
         }
     }
 
@@ -388,11 +442,14 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         req_stats.response_time = start.elapsed().as_secs_f64();
-        let fns_length: usize = stream_pipeline_params
-            .get(&stream_name)
-            .map_or(0, |params| {
-                params.as_ref().map_or(0, |(inner, ..)| inner.num_of_func())
-            });
+        let fns_length: usize =
+            stream_executable_pipelines
+                .get(&stream_name)
+                .map_or(0, |exec_pl_option| {
+                    exec_pl_option
+                        .as_ref()
+                        .map_or(0, |exec_pl| exec_pl.num_of_func())
+                });
         report_request_usage_stats(
             req_stats,
             org_id,

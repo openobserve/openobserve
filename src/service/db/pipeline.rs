@@ -16,21 +16,15 @@
 // use std::sync::Arc;
 
 use anyhow::Result;
-use config::{
-    get_config,
-    meta::{
-        pipeline::{components::PipelineSource, Pipeline, PipelineExecDFS},
-        stream::StreamParams,
-    },
+use config::meta::{
+    pipeline::{components::PipelineSource, Pipeline},
+    stream::StreamParams,
 };
 use infra::pipeline::{self as infra_pipeline};
 
 use crate::{
-    common::infra::config::{STREAM_EXECUTABLE_PIPELINES, STREAM_PIPELINES},
-    service::pipeline::{
-        batch_execution::PipelineExecBatch,
-        execution::{PipelineExecutionPlan, PipelineExt},
-    },
+    common::infra::config::STREAM_EXECUTABLE_PIPELINES,
+    service::pipeline::batch_execution::ExecutablePipeline,
 };
 
 /// Stores a new pipeline to database.
@@ -84,81 +78,26 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> 
         })
 }
 
-/// Returns the pipeline_params by stream..
+/// Transform the initialized and enabled pipeline into ExecutablePipeline struct that's ready for
+/// batch processing records.
 ///
 /// Used for pipeline execution.
-pub async fn get_by_stream(stream_params: &StreamParams) -> Option<PipelineExecDFS> {
-    if let Some(pl_params) = STREAM_PIPELINES.read().await.get(stream_params) {
-        return Some(pl_params.clone());
+pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
+    if let Some(exec_pl) = STREAM_EXECUTABLE_PIPELINES.read().await.get(stream_params) {
+        return Some(exec_pl.clone());
     }
     let pipeline = infra_pipeline::get_by_stream(stream_params).await.ok();
     match pipeline {
-        Some(pl) if pl.enabled => {
-            let node_map = pl.get_node_map();
-            match (
-                pl.build_adjacency_list(&node_map),
-                pl.register_functions().await,
-            ) {
-                (Ok(graph), Ok(vrl_map)) => Some((pl, node_map, graph, vrl_map)),
-                _ => {
-                    log::error!(
-                        "[Pipeline] {}/{}/{}: Error prep pipeline execution parameters.",
-                        pl.org,
-                        pl.name,
-                        pl.id,
-                    );
-                    None
-                }
+        Some(pl) if pl.enabled => match ExecutablePipeline::new(&pl).await {
+            Ok(exec_pl) => Some(exec_pl),
+            Err(e) => {
+                log::error!(
+                    "[Pipeline]: failed to initialize ExecutablePipeline from Pipeline read from database, {}",
+                    e
+                );
+                None
             }
-        }
-        _ => None,
-    }
-}
-
-/// Returns the pipeline execution plan by stream..
-///
-/// Used for pipeline execution.
-pub async fn get_pipeline_execution_plan(
-    stream_params: &StreamParams,
-) -> Option<PipelineExecutionPlan> {
-    if let Some(pl_exec) = STREAM_EXECUTABLE_PIPELINES.read().await.get(stream_params) {
-        return Some(pl_exec.clone());
-    }
-    let pipeline = infra_pipeline::get_by_stream(stream_params).await.ok();
-    match pipeline {
-        Some(pl) if pl.enabled => {
-            if get_config().common.pipeline_execution_plan == "dfs" {
-                let node_map = pl.get_node_map();
-                match (
-                    pl.build_adjacency_list(&node_map),
-                    pl.register_functions().await,
-                ) {
-                    (Ok(graph), Ok(vrl_map)) => {
-                        Some(PipelineExecutionPlan::DFS((pl, node_map, graph, vrl_map)))
-                    }
-                    _ => {
-                        log::error!(
-                            "[Pipeline] {}/{}/{}: Error prep pipeline execution parameters.",
-                            pl.org,
-                            pl.name,
-                            pl.id,
-                        );
-                        None
-                    }
-                }
-            } else {
-                match PipelineExecBatch::new(&pl).await {
-                    Ok(pl_exec) => Some(PipelineExecutionPlan::Batch(pl_exec)),
-                    Err(e) => {
-                        log::error!(
-                            "[Pipeline]: failed to initialize PipelineExecBatch from Pipeline read from database, {}",
-                            e
-                        );
-                        None
-                    }
-                }
-            }
-        }
+        },
         _ => None,
     }
 }
@@ -222,40 +161,16 @@ pub async fn delete(pipeline_id: &str) -> Result<()> {
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
     let pipelines = list().await?;
-    let cfg = get_config();
-    let mut stream_pls = STREAM_PIPELINES.write().await;
-    let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
+    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
             if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                let node_map = pipeline.get_node_map();
-                if let (Ok(graph), Ok(vrl_map)) = (
-                    pipeline.build_adjacency_list(&node_map),
-                    pipeline.register_functions().await,
-                ) {
-                    if cfg.common.pipeline_execution_plan == "dfs" {
-                        stream_pl_exec.insert(
-                            stream_params.clone(),
-                            PipelineExecutionPlan::DFS((
-                                pipeline.clone(),
-                                node_map.clone(),
-                                graph.clone(),
-                                vrl_map.clone(),
-                            )),
-                        );
-                    } else {
-                        let pl_exec_batch = PipelineExecBatch::new(&pipeline).await?;
-                        stream_pl_exec.insert(
-                            stream_params.clone(),
-                            PipelineExecutionPlan::Batch(pl_exec_batch),
-                        );
-                    }
-                    stream_pls.insert(stream_params.clone(), (pipeline, node_map, graph, vrl_map));
-                }
+                let exec_pl = ExecutablePipeline::new(&pipeline).await?;
+                stream_exec_pl.insert(stream_params.clone(), exec_pl);
             }
         }
     }
-    log::info!("[Pipeline] Cached with len: {}", stream_pls.len());
+    log::info!("[Pipeline] Cached with len: {}", stream_exec_pl.len());
     Ok(())
 }
 
@@ -268,71 +183,28 @@ async fn update_cache(
     match event {
         PipelineTableEvent::Remove => {
             log::info!("[Pipeline]: pipeline {} removed from cache.", &pipeline.id);
-            STREAM_PIPELINES.write().await.remove(stream_params);
             STREAM_EXECUTABLE_PIPELINES
                 .write()
                 .await
                 .remove(stream_params);
         }
         PipelineTableEvent::Add => {
-            let node_map = pipeline.get_node_map();
-            match (
-                pipeline.build_adjacency_list(&node_map),
-                pipeline.register_functions().await,
-            ) {
-                (Ok(graph), Ok(vrl_map)) => {
-                    let mut stream_pls = STREAM_PIPELINES.write().await;
-                    stream_pls.insert(
-                        stream_params.clone(),
-                        (
-                            pipeline.clone(),
-                            node_map.clone(),
-                            graph.clone(),
-                            vrl_map.clone(),
-                        ),
-                    );
-
-                    let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
-                    if get_config().common.pipeline_execution_plan == "dfs" {
-                        stream_pl_exec.insert(
-                            stream_params.clone(),
-                            PipelineExecutionPlan::DFS((
-                                pipeline.clone(),
-                                node_map,
-                                graph,
-                                vrl_map,
-                            )),
-                        );
-                    } else {
-                        match PipelineExecBatch::new(pipeline).await {
-                            Err(e) => {
-                                log::error!(
-                                    "[Pipeline] {}/{}/{}: Error converting to PipelineExecBatch: {}",
-                                    pipeline.org,
-                                    pipeline.name,
-                                    pipeline.id,
-                                    e
-                                );
-                            }
-                            Ok(pl_exec_batch) => {
-                                stream_pl_exec.insert(
-                                    stream_params.clone(),
-                                    PipelineExecutionPlan::Batch(pl_exec_batch),
-                                );
-                            }
-                        };
-                    }
-                    log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
-                }
-                _ => {
+            let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
+            match ExecutablePipeline::new(pipeline).await {
+                Err(e) => {
                     log::error!(
-                        "[Pipeline] {}/{}/{}: Error adding to cache for failing to prepare for its params",
+                        "[Pipeline] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
                         pipeline.org,
                         pipeline.name,
                         pipeline.id,
+                        e
                     );
                 }
-            }
+                Ok(exec_pl) => {
+                    stream_pl_exec.insert(stream_params.clone(), exec_pl);
+                }
+            };
+            log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
         }
     }
 }
