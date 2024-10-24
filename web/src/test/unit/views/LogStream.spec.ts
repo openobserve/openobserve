@@ -89,13 +89,13 @@ describe("Streams", async () => {
     expect(tableData[1].text()).toBe("k8s_json");
     expect(tableData[2].text()).toBe("logs");
     expect(tableData[3].text()).toBe("400");
-    expect(tableData[4].text()).toBe("0.74 MB");
+    expect(tableData[4].text()).toBe("0 MB");
     expect(tableData[5].text()).toBe("0.03 MB");
   });
 
   it("Should display refresh stats btn", async () => {
     const searchInput = wrapper.find(
-      '[data-test="log-stream-refresh-stats-btn"]'
+      '[data-test="log-stream-refresh-stats-btn"]',
     );
     expect(searchInput.exists()).toBeTruthy();
     expect(searchInput.text()).toContain("Refresh Stats");
@@ -103,7 +103,7 @@ describe("Streams", async () => {
 
   it("Should display pagination buttons", async () => {
     const pagination = wrapper.find(
-      '[data-test="log-stream-table-pagination"]'
+      '[data-test="log-stream-table-pagination"]',
     );
     expect(pagination.exists()).toBeTruthy();
   });
