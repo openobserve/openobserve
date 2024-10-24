@@ -75,7 +75,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         let current_ts = chrono::Utc::now().timestamp_micros();
 
         let sql = format!(
-            "SELECT sum(num_records) as records, sum(size) as original_size, org_id, stream_type, stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by org_id, stream_type, stream_name",
+            "SELECT sum(num_records) as records, sum(dropped_records) as dropped, sum(size) as original_size, org_id, stream_type, stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by org_id, stream_type, stream_name",
             UsageEvent::Ingestion,
             org_id
         );
