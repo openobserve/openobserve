@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "license": "AGPL-3.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
