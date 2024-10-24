@@ -111,7 +111,7 @@ export default defineConfig({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
     istanbul({
-      include: "src/*",
+      include: "src/**/*",
       exclude: ["node_modules", "test/"],
       extension: [".js", ".ts", ".vue"],
       requireEnv: false,
