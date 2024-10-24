@@ -34,6 +34,7 @@ use config::{
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
+use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
@@ -62,6 +63,7 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let mut need_usage_report = true;
+    let log_ingestion_errors = ingestion_log_enabled(org_id).await;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {
@@ -209,7 +211,7 @@ pub async fn ingest(
         if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
             if !transforms.is_empty() {
                 item = match apply_functions(
-                    item,
+                    item.clone(),
                     transforms,
                     &stream_vrl_map,
                     org_id,
@@ -220,6 +222,7 @@ pub async fn ingest(
                     Err(e) => {
                         stream_status.status.failed += 1;
                         stream_status.status.error = e.to_string();
+                        log_failed_record(log_ingestion_errors, &item, &e.to_string());
                         continue;
                     }
                 }
@@ -255,7 +258,7 @@ pub async fn ingest(
         // Start row based transform
         let mut res = if let Some(transforms) = stream_after_functions_map.get(&key) {
             match apply_functions(
-                item,
+                item.clone(),
                 transforms,
                 &stream_vrl_map,
                 org_id,
@@ -266,6 +269,7 @@ pub async fn ingest(
                 Err(e) => {
                     stream_status.status.failed += 1;
                     stream_status.status.error = e.to_string();
+                    log_failed_record(log_ingestion_errors, &item, &e.to_string());
                     continue;
                 }
             }
@@ -307,6 +311,7 @@ pub async fn ingest(
             Err(e) => {
                 stream_status.status.failed += 1;
                 stream_status.status.error = e.to_string();
+                log_failed_record(log_ingestion_errors, &local_val, &e.to_string());
                 continue;
             }
         };

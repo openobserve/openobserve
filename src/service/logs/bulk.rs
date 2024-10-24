@@ -32,6 +32,7 @@ use config::{
     BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
+use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
@@ -69,6 +70,8 @@ pub async fn ingest(
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
+
+    let log_ingestion_errors = ingestion_log_enabled(org_id).await;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
@@ -200,6 +203,7 @@ pub async fn ingest(
 
                     if ret_value.is_null() || !ret_value.is_object() {
                         bulk_res.errors = true;
+                        log_failed_record(log_ingestion_errors, &value, TRANSFORM_FAILED);
                         add_record_status(
                             stream_name.clone(),
                             &doc_id,
@@ -259,6 +263,7 @@ pub async fn ingest(
 
                     if ret_value.is_null() || !ret_value.is_object() {
                         bulk_res.errors = true;
+                        log_failed_record(log_ingestion_errors, &value, TRANSFORM_FAILED);
                         add_record_status(
                             routed_stream_name.clone(),
                             &doc_id,
@@ -314,6 +319,7 @@ pub async fn ingest(
                     Ok(t) => t,
                     Err(_e) => {
                         bulk_res.errors = true;
+                        log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
                         add_record_status(
                             routed_stream_name.clone(),
                             &doc_id,
@@ -332,7 +338,9 @@ pub async fn ingest(
             // check ingestion time
             if timestamp < min_ts {
                 bulk_res.errors = true;
-                let failure_reason = Some(get_upto_discard_error().to_string());
+                let error = get_upto_discard_error().to_string();
+                log_failed_record(log_ingestion_errors, &value, &error);
+                let failure_reason = Some(error);
                 add_record_status(
                     routed_stream_name.clone(),
                     &doc_id,

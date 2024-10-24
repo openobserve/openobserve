@@ -29,7 +29,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{self, estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
         schema_ext::SchemaExt,
     },
     DISTINCT_FIELDS,
@@ -37,6 +37,7 @@ use config::{
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{
+    db::organization::get_org_setting,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
     metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
     schema::stream_schema_exists,
@@ -45,6 +46,7 @@ use crate::{
     common::meta::{
         alerts::alert::Alert,
         ingestion::IngestionStatus,
+        organization::OrganizationSetting,
         stream::{SchemaRecords, StreamParams},
     },
     service::{
@@ -239,6 +241,7 @@ async fn write_logs(
     json_data: Vec<(i64, Map<String, Value>)>,
 ) -> Result<RequestStats> {
     let cfg = get_config();
+    let log_ingest_errors = ingestion_log_enabled(org_id).await;
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
@@ -346,9 +349,15 @@ async fn write_logs(
                     IngestionStatus::Record(status) => {
                         status.failed += 1;
                         status.error = e.to_string();
+                        log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                     }
                     IngestionStatus::Bulk(bulk_res) => {
                         bulk_res.errors = true;
+                        log_failed_record(
+                            log_ingest_errors,
+                            &Value::Object(record_val.clone()),
+                            &e.to_string(),
+                        );
                         bulk::add_record_status(
                             stream_name.to_string(),
                             &doc_id,
@@ -511,6 +520,22 @@ pub fn refactor_map(
     new_map
 }
 
+async fn ingestion_log_enabled(org_id: &str) -> bool {
+    let org_settings = get_org_setting(org_id).await.unwrap();
+    let org_settings: OrganizationSetting = json::from_slice(&org_settings).unwrap();
+    org_settings.toggle_ingestion_logs
+}
+
+fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {
+    if !enabled {
+        return;
+    }
+    log::warn!(
+        "failed to process record with error {} : {:?} ",
+        error,
+        record
+    );
+}
 #[cfg(test)]
 mod tests {
     use super::*;

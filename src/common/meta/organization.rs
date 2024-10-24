@@ -109,6 +109,10 @@ fn default_span_id_field_name() -> String {
     "spanId".to_string()
 }
 
+fn default_toggle_ingestion_logs() -> bool {
+    false
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSetting {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -119,6 +123,8 @@ pub struct OrganizationSetting {
     pub trace_id_field_name: String,
     #[serde(default = "default_span_id_field_name")]
     pub span_id_field_name: String,
+    #[serde(default = "default_toggle_ingestion_logs")]
+    pub toggle_ingestion_logs: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -127,6 +133,7 @@ impl Default for OrganizationSetting {
             scrape_interval: default_scrape_interval(),
             trace_id_field_name: default_trace_id_field_name(),
             span_id_field_name: default_span_id_field_name(),
+            toggle_ingestion_logs: default_toggle_ingestion_logs(),
         }
     }
 }
