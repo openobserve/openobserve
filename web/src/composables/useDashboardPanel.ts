@@ -2848,7 +2848,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           );
         }
         if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10");
+          currentQuery = currentQuery.replaceAll(
+            /\$(\w+|\{\w+\})/g,
+            "Dummy_value_replaced",
+          );
         }
 
         dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
@@ -2899,20 +2902,27 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
 
       // now check if the correct stream is selected
+      function isDummyStreamName(tableName: any) {
+        return tableName?.includes("Dummy_value_replaced");
+      }
+
       if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
         const streamFound = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
-            it.name == dashboardPanelData.meta.parsedQuery.from[0].table
+            it.name == dashboardPanelData.meta.parsedQuery.from[0].table,
         );
-        if (streamFound) {
-          if (
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream != streamFound.name
-          ) {
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream = streamFound.name;
+
+        const currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ];
+
+        if (
+          streamFound ||
+          isDummyStreamName(dashboardPanelData.meta.parsedQuery.from[0].table)
+        ) {
+          if (streamFound && currentQuery.fields.stream !== streamFound.name) {
+            currentQuery.fields.stream = streamFound.name;
           }
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
