@@ -50,6 +50,8 @@ jobs:
             node-version: 18
         
         - name: Build frontend code
+          env:
+            VITE_COVERAGE: "true"
           run: cd web && npm install && npm run build
         
         - name: Print rustc cfg
@@ -137,6 +139,8 @@ jobs:
             node-version: 18
         
         - name: Build frontend code
+          env:
+            VITE_COVERAGE: "true"
           run: cd web && npm install && npm run build
         
         - name: Print rustc cfg
