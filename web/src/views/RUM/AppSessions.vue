@@ -426,7 +426,7 @@ const getSessions = () => {
     store.state.zoConfig.timestamp_column
   }) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, session_id from "_sessionreplay" ${
     sessionState.data.editorValue.length
-      ? " where " + sessionState.data.editorValue
+      ? " where " + sessionState.data.editorValue.trim()
       : ""
   } group by session_id order by zo_sql_timestamp DESC`;
   req.query.sql_mode = "full";

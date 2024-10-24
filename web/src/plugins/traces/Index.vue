@@ -516,7 +516,7 @@ export default defineComponent({
 
     function buildSearch() {
       try {
-        let query = searchObj.data.editorValue;
+        let query = searchObj.data.editorValue.trim();
         var req = getDefaultRequest();
         req.query.from =
           searchObj.data.resultGrid.currentPage *

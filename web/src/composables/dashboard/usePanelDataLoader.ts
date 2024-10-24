@@ -519,7 +519,7 @@ export const usePanelDataLoader = (
                             query: {
                               sql: searchQueries,
                               query_fn: it.vrlFunctionQuery
-                                ? b64EncodeUnicode(it.vrlFunctionQuery)
+                                ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                 : null,
                               sql_mode: "full",
                               start_time: startISOTimestamp,
@@ -643,7 +643,7 @@ export const usePanelDataLoader = (
                       query: {
                         sql: query,
                         query_fn: it.vrlFunctionQuery
-                          ? b64EncodeUnicode(it.vrlFunctionQuery)
+                          ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                           : null,
                         sql_mode: "full",
                         start_time: startISOTimestamp,
@@ -720,7 +720,7 @@ export const usePanelDataLoader = (
                                   histogramInterval
                                 ),
                                 query_fn: it.vrlFunctionQuery
-                                  ? b64EncodeUnicode(it.vrlFunctionQuery)
+                                  ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                   : null,
                                 sql_mode: "full",
                                 // if i == 0 ? then do gap of 7 days

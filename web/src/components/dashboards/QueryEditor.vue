@@ -294,7 +294,7 @@ export default defineComponent({
       registerAutoCompleteProvider();
 
       editorObj = monaco.editor.create(editorRef.value, {
-        value: props.query,
+        value: props.query?.trim(),
         language: "sql",
         theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         showFoldingControls: "never",
@@ -322,8 +322,12 @@ export default defineComponent({
       });
 
       editorObj.onDidChangeModelContent((e: any) => {
-        emit("update-query", e, editorObj.getValue());
-        emit("update:query", editorObj.getValue());
+        emit("update-query", e, editorObj.getValue()?.trim());
+        emit("update:query", editorObj.getValue()?.trim());
+      });
+
+      editorObj.onDidBlurEditorWidget(() => {
+        setValue(editorObj.getValue()?.trim());
       });
 
       editorObj.createContextKey("ctrlenter", true);
