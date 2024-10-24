@@ -238,7 +238,17 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
     }
 
+    let cfg = config::get_config();
     for (stream_name, json_data) in json_data_by_stream {
+        if !stream_partitioning_map.contains_key(&stream_name) {
+            let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                org_id,
+                &StreamType::Metrics,
+                &stream_name,
+            )
+            .await;
+            stream_partitioning_map.insert(stream_name.to_string(), partition_det);
+        }
         // get partition key
         let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
         let partition_keys = partition_det.partition_keys.clone();
@@ -262,7 +272,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
             let record = record.as_object_mut().unwrap();
 
-            let cfg = config::get_config();
             // check timestamp & value
             let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
                 None => chrono::Utc::now().timestamp_micros(),
@@ -362,16 +371,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             .await;
 
             // write into buffer
-            if !stream_partitioning_map.contains_key(&stream_name) {
-                let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                    org_id,
-                    &StreamType::Metrics,
-                    &stream_name,
-                )
-                .await;
-                stream_partitioning_map.insert(stream_name.to_string(), partition_det);
-            }
-
             let schema = stream_schema_map
                 .get(&stream_name)
                 .unwrap()
