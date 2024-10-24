@@ -238,6 +238,11 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
 
 /// Migrate alerts, reports, templates, destination names with ofga compatible format
 pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
+    // fast path
+    if let Ok(false) = need_meta_resource_name_migration().await {
+        return Ok(()); // Resource name migration already done
+    }
+    // slow path
     let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
     match need_meta_resource_name_migration().await {
         Ok(true) => {
