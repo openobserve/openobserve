@@ -13,28 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cache;
-pub mod db;
-pub mod dist_lock;
-pub mod errors;
-pub mod file_list;
-pub mod queue;
-pub mod scheduler;
-pub mod schema;
-pub mod storage;
-pub mod table;
+use config::get_config;
+
+use crate::db::{sqlite::CLIENT_RW, SQLITE_STORE};
+
+pub mod short_urls;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    db::init().await?;
-    cache::init().await?;
-    file_list::create_table().await?;
-    file_list::LOCAL_CACHE.create_table().await?;
-    file_list::local_cache_gc().await?;
-    queue::init().await?;
-    scheduler::init().await?;
-    schema::init().await?;
-    table::init().await?;
-    // because of asynchronous, we need to wait for a while
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    short_urls::init().await?;
     Ok(())
+}
+
+/// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
+///
+/// # Returns
+/// - `Some(MutexGuard)` if SQLite is configured
+/// - `None` if a different store is configured
+pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sqlx::Sqlite>>> {
+    if get_config()
+        .common
+        .meta_store
+        .eq_ignore_ascii_case(SQLITE_STORE)
+    {
+        Some(CLIENT_RW.lock().await)
+    } else {
+        None
+    }
 }
