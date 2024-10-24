@@ -190,6 +190,10 @@ pub async fn handle_trace_request(
     let mut json_data = Vec::with_capacity(res_spans.len());
     let mut span_metrics = Vec::with_capacity(res_spans.len());
     let mut partial_success = ExportTracePartialSuccess::default();
+
+    // TODO: need remove for debug
+    let mut trace_ids = HashSet::new();
+
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         if let Some(resource) = res_span.resource {
@@ -219,6 +223,10 @@ pub async fn handle_trace_request(
                 }
                 let trace_id: String =
                     TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
+                if !trace_ids.contains(&trace_id) {
+                    trace_ids.insert(trace_id.clone());
+                    log::debug!("[TRACE] found new trace_id: {}", trace_id);
+                }
                 if span.span_id.len() != SPAN_ID_BYTES_COUNT {
                     log::error!(
                         "[TRACE] skipping span with invalid span id, trace_id: {}",
