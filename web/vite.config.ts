@@ -110,14 +110,6 @@ export default defineConfig({
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
-    istanbul({
-      include: "src/**/*",
-      exclude: ["node_modules", "test/"],
-      extension: [".js", ".ts", ".vue"],
-      requireEnv: false,
-      cypress: true,
-      forceBuildInstrument: true,
-    }),
     enterpriseResolverPlugin,
     vueJsx(),
     monacoEditorPlugin.default({
