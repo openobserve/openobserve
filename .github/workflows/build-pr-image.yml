@@ -52,7 +52,7 @@ jobs:
         - name: Build frontend code
           env:
             VITE_COVERAGE: "true"
-            COVERAGE: "true"
+            CYPRESS_COVERAGE: "true"
           run: cd web && npm install && npm run build
         
         - name: Print rustc cfg
@@ -142,7 +142,7 @@ jobs:
         - name: Build frontend code
           env:
             VITE_COVERAGE: "true"
-            COVERAGE: "true"
+            CYPRESS_COVERAGE: "true"
           run: cd web && npm install && npm run build
         
         - name: Print rustc cfg
