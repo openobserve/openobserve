@@ -22,6 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::alert,
         stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
@@ -32,16 +33,17 @@ use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
-    collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
+    collector::metrics::v1::{
+        ExportMetricsPartialSuccess, ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    },
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
 
 use crate::{
-    common::meta::{
-        alerts::alert, http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords,
-    },
+    common::meta::{http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords},
     service::{
+        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
             evaluate_trigger,
@@ -49,6 +51,7 @@ use crate::{
             write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels},
+        pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },
@@ -89,15 +92,29 @@ pub async fn handle_grpc_request(
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
+
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
-    let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
+    // associated pipeline
+    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
+        HashMap::new();
+    let mut stream_pipeline_inputs: HashMap<String, Vec<json::Value>> = HashMap::new();
+
+    // realtime alerts
+    let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+
     let cfg = get_config();
+    let mut response = ExportMetricsServiceResponse {
+        partial_success: None,
+    };
+
+    // records buffer
+    let mut json_data_by_stream: HashMap<String, Vec<json::Value>> = HashMap::new();
+
     for resource_metric in &request.resource_metrics {
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
@@ -122,12 +139,6 @@ pub async fn handle_grpc_request(
                     stream_partitioning_map
                         .insert(metric_name.clone().to_owned(), partition_det.clone());
                 }
-                let mut partition_det = stream_partitioning_map.get(metric_name).unwrap();
-                let mut partition_keys = partition_det.partition_keys.clone();
-                let mut partition_time_level = unwrap_partition_time_level(
-                    partition_det.partition_time_level,
-                    StreamType::Metrics,
-                );
 
                 // Start get stream alerts
                 crate::service::ingestion::get_stream_alerts(
@@ -141,14 +152,17 @@ pub async fn handle_grpc_request(
                 .await;
                 // End get stream alert
 
-                // Start Register Transforms for stream
-                let (_, mut local_trans, mut stream_vrl_map) =
-                    crate::service::ingestion::register_stream_functions(
-                        org_id,
-                        &StreamType::Metrics,
-                        metric_name,
-                    );
-                // End Register Transforms for stream
+                // get stream pipeline
+                if !stream_executable_pipelines.contains_key(metric_name) {
+                    let pipeline_params =
+                        crate::service::ingestion::get_stream_executable_pipeline(
+                            org_id,
+                            metric_name,
+                            &StreamType::Metrics,
+                        )
+                        .await;
+                    stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
+                }
 
                 let mut rec = json::json!({});
                 match &resource_metric.resource {
@@ -243,12 +257,6 @@ pub async fn handle_grpc_request(
                             stream_partitioning_map
                                 .insert(local_metric_name.to_owned(), partition_det.clone());
                         }
-                        partition_det = stream_partitioning_map.get(local_metric_name).unwrap();
-                        partition_keys = partition_det.partition_keys.clone();
-                        partition_time_level = unwrap_partition_time_level(
-                            partition_det.partition_time_level,
-                            StreamType::Metrics,
-                        );
 
                         // Start get stream alerts
                         crate::service::ingestion::get_stream_alerts(
@@ -262,132 +270,221 @@ pub async fn handle_grpc_request(
                         .await;
                         // End get stream alert
 
-                        // Start Register Transforms for stream
-                        (_, local_trans, stream_vrl_map) =
-                            crate::service::ingestion::register_stream_functions(
-                                org_id,
-                                &StreamType::Metrics,
-                                local_metric_name,
-                            );
-                        // End Register Transforms for stream
-                    }
-
-                    if !local_trans.is_empty() {
-                        rec = crate::service::ingestion::apply_stream_functions(
-                            &local_trans,
-                            rec,
-                            &stream_vrl_map,
-                            org_id,
-                            local_metric_name,
-                            &mut runtime,
-                        )?;
-                    }
-
-                    // get json object
-                    let val_map: &mut serde_json::Map<String, serde_json::Value> =
-                        rec.as_object_mut().unwrap();
-
-                    let timestamp = val_map
-                        .get(&cfg.common.column_timestamp)
-                        .unwrap()
-                        .as_i64()
-                        .unwrap_or(Utc::now().timestamp_micros());
-
-                    let value_str = json::to_string(&val_map).unwrap();
-
-                    // check for schema evolution
-                    let schema_fields = match metric_schema_map.get(local_metric_name) {
-                        Some(schema) => schema
-                            .schema()
-                            .fields()
-                            .iter()
-                            .map(|f| f.name())
-                            .collect::<HashSet<_>>(),
-                        None => HashSet::default(),
-                    };
-                    let mut need_schema_check = !schema_evolved.contains_key(local_metric_name);
-                    for key in val_map.keys() {
-                        if !schema_fields.contains(&key) {
-                            need_schema_check = true;
-                            break;
+                        // get stream pipeline
+                        if !stream_executable_pipelines.contains_key(local_metric_name) {
+                            let pipeline_params =
+                                crate::service::ingestion::get_stream_executable_pipeline(
+                                    org_id,
+                                    local_metric_name,
+                                    &StreamType::Metrics,
+                                )
+                                .await;
+                            stream_executable_pipelines
+                                .insert(local_metric_name.clone(), pipeline_params);
                         }
                     }
-                    drop(schema_fields);
-                    if need_schema_check
-                        && check_for_schema(
-                            org_id,
-                            local_metric_name,
-                            StreamType::Metrics,
-                            &mut metric_schema_map,
-                            vec![val_map],
-                            timestamp,
-                        )
-                        .await
-                        .is_ok()
-                    {
-                        schema_evolved.insert(local_metric_name.to_owned(), true);
-                    }
 
-                    let buf = metric_data_map
-                        .entry(local_metric_name.to_owned())
-                        .or_default();
-                    let schema = metric_schema_map
+                    // ready to be buffered for downstream processing
+                    if stream_executable_pipelines
                         .get(local_metric_name)
                         .unwrap()
-                        .schema()
-                        .as_ref()
-                        .clone()
-                        .with_metadata(HashMap::new());
-                    let schema_key = schema.hash_key();
-                    // get hour key
-                    let hour_key = crate::service::ingestion::get_write_partition_key(
-                        timestamp,
-                        &partition_keys,
-                        partition_time_level,
-                        val_map,
-                        Some(&schema_key),
-                    );
-                    let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                        schema_key,
-                        schema: Arc::new(schema),
-                        records: vec![],
-                        records_size: 0,
-                    });
-                    hour_buf
-                        .records
-                        .push(Arc::new(json::Value::Object(val_map.to_owned())));
-                    hour_buf.records_size += value_str.len();
-
-                    // real time alert
-                    let need_trigger = !stream_trigger_map.contains_key(local_metric_name);
-                    if need_trigger && !stream_alerts_map.is_empty() {
-                        // Start check for alert trigger
-                        let key = format!(
-                            "{}/{}/{}",
-                            &org_id,
-                            StreamType::Metrics,
-                            local_metric_name.clone()
-                        );
-                        if let Some(alerts) = stream_alerts_map.get(&key) {
-                            let mut trigger_alerts: TriggerAlertData = Vec::new();
-                            for alert in alerts {
-                                if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await
-                                {
-                                    trigger_alerts.push((alert.clone(), v));
-                                }
-                            }
-                            stream_trigger_map
-                                .insert(local_metric_name.clone(), Some(trigger_alerts));
-                        }
-                        // End check for alert trigger
+                        .is_some()
+                    {
+                        stream_pipeline_inputs
+                            .entry(local_metric_name.to_string())
+                            .or_default()
+                            .push(rec);
+                    } else {
+                        json_data_by_stream
+                            .entry(local_metric_name.to_string())
+                            .or_default()
+                            .push(rec);
                     }
                 }
             }
         }
     }
 
+    // process records buffered for pipeline processing
+    for (stream_name, exec_pl_option) in &stream_executable_pipelines {
+        if let Some(exec_pl) = exec_pl_option {
+            let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
+                let err_msg = format!(
+                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
+                    stream_name
+                );
+                log::error!("{err_msg}");
+                let partial_resp =
+                    response
+                        .partial_success
+                        .get_or_insert(ExportMetricsPartialSuccess {
+                            rejected_data_points: 0,
+                            error_message: String::new(),
+                        });
+                partial_resp.error_message = err_msg;
+                continue;
+            };
+            let count = pipeline_inputs.len();
+            match exec_pl.process_batch(org_id, pipeline_inputs).await {
+                Err(e) => {
+                    let err_msg = format!(
+                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
+                        stream_name, e,
+                    );
+                    log::error!("{err_msg}");
+                    // update status
+                    let partial_resp =
+                        response
+                            .partial_success
+                            .get_or_insert(ExportMetricsPartialSuccess {
+                                rejected_data_points: 0,
+                                error_message: String::new(),
+                            });
+                    partial_resp.rejected_data_points += count as i64;
+                    partial_resp.error_message = err_msg;
+                    continue;
+                }
+                Ok(pl_results) => {
+                    for (stream_params, stream_pl_results) in pl_results {
+                        if stream_params.stream_type != StreamType::Metrics {
+                            continue;
+                        }
+                        // add partition keys
+                        if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
+                        {
+                            let partition_det =
+                                crate::service::ingestion::get_stream_partition_keys(
+                                    org_id,
+                                    &StreamType::Metrics,
+                                    &stream_params.stream_name,
+                                )
+                                .await;
+                            stream_partitioning_map.insert(
+                                stream_params.stream_name.to_string(),
+                                partition_det.clone(),
+                            );
+                        }
+                        for (_, res) in stream_pl_results {
+                            // buffer to downstream processing directly
+                            json_data_by_stream
+                                .entry(stream_params.stream_name.to_string())
+                                .or_default()
+                                .push(res);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (local_metric_name, json_data) in json_data_by_stream {
+        // get partition keys
+        let partition_det = stream_partitioning_map.get(&local_metric_name).unwrap();
+        let partition_keys = partition_det.partition_keys.clone();
+        let partition_time_level =
+            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
+
+        for mut rec in json_data {
+            // get json object
+            let val_map: &mut serde_json::Map<String, serde_json::Value> =
+                rec.as_object_mut().unwrap();
+
+            let timestamp = val_map
+                .get(&cfg.common.column_timestamp)
+                .unwrap()
+                .as_i64()
+                .unwrap_or(Utc::now().timestamp_micros());
+
+            let value_str = json::to_string(&val_map).unwrap();
+
+            // check for schema evolution
+            let schema_fields = match metric_schema_map.get(&local_metric_name) {
+                Some(schema) => schema
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name())
+                    .collect::<HashSet<_>>(),
+                None => HashSet::default(),
+            };
+            let mut need_schema_check = !schema_evolved.contains_key(&local_metric_name);
+            for key in val_map.keys() {
+                if !schema_fields.contains(&key) {
+                    need_schema_check = true;
+                    break;
+                }
+            }
+            drop(schema_fields);
+            if need_schema_check
+                && check_for_schema(
+                    org_id,
+                    &local_metric_name,
+                    StreamType::Metrics,
+                    &mut metric_schema_map,
+                    vec![val_map],
+                    timestamp,
+                )
+                .await
+                .is_ok()
+            {
+                schema_evolved.insert(local_metric_name.to_owned(), true);
+            }
+
+            let buf = metric_data_map
+                .entry(local_metric_name.to_owned())
+                .or_default();
+            let schema = metric_schema_map
+                .get(&local_metric_name)
+                .unwrap()
+                .schema()
+                .as_ref()
+                .clone()
+                .with_metadata(HashMap::new());
+            let schema_key = schema.hash_key();
+            // get hour key
+            let hour_key = crate::service::ingestion::get_write_partition_key(
+                timestamp,
+                &partition_keys,
+                partition_time_level,
+                val_map,
+                Some(&schema_key),
+            );
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                schema_key,
+                schema: Arc::new(schema),
+                records: vec![],
+                records_size: 0,
+            });
+            hour_buf
+                .records
+                .push(Arc::new(json::Value::Object(val_map.to_owned())));
+            hour_buf.records_size += value_str.len();
+
+            // real time alert
+            let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
+            if need_trigger && !stream_alerts_map.is_empty() {
+                // Start check for alert trigger
+                let key = format!(
+                    "{}/{}/{}",
+                    &org_id,
+                    StreamType::Metrics,
+                    local_metric_name.clone()
+                );
+                if let Some(alerts) = stream_alerts_map.get(&key) {
+                    let mut trigger_alerts: TriggerAlertData = Vec::new();
+                    for alert in alerts {
+                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await {
+                            trigger_alerts.push((alert.clone(), v));
+                        }
+                    }
+                    stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
+                }
+            }
+            // End check for alert trigger
+        }
+    }
+
     // write data to wal
-    let time = start.elapsed().as_secs_f64();
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -409,48 +506,52 @@ pub async fn handle_grpc_request(
         let writer =
             ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
-        // if let Err(e) = writer.sync().await {
-        //     log::error!("ingestion error while syncing writer: {}", e);
-        // }
 
-        req_stats.response_time += time;
+        let fns_length: usize =
+            stream_executable_pipelines
+                .get(&stream_name)
+                .map_or(0, |exec_pl_option| {
+                    exec_pl_option
+                        .as_ref()
+                        .map_or(0, |exec_pl| exec_pl.num_of_func())
+                });
+        req_stats.response_time = start.elapsed().as_secs_f64();
         report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,
             StreamType::Metrics,
             UsageType::Metrics,
-            0,
+            fns_length as _,
             started_at,
         )
         .await;
-
-        let ep = if is_grpc {
-            "/grpc/otlp/metrics"
-        } else {
-            "/api/otlp/v1/metrics"
-        };
-
-        let time = start.elapsed().as_secs_f64();
-        metrics::HTTP_RESPONSE_TIME
-            .with_label_values(&[
-                ep,
-                "200",
-                org_id,
-                &stream_name,
-                StreamType::Metrics.to_string().as_str(),
-            ])
-            .observe(time);
-        metrics::HTTP_INCOMING_REQUESTS
-            .with_label_values(&[
-                ep,
-                "200",
-                org_id,
-                &stream_name,
-                StreamType::Metrics.to_string().as_str(),
-            ])
-            .inc();
     }
+
+    let ep = if is_grpc {
+        "/grpc/otlp/metrics"
+    } else {
+        "/api/otlp/v1/metrics"
+    };
+    let time_took = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            "",
+            StreamType::Metrics.to_string().as_str(),
+        ])
+        .observe(time_took);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            "",
+            StreamType::Metrics.to_string().as_str(),
+        ])
+        .inc();
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in stream_trigger_map {

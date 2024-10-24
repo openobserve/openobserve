@@ -22,12 +22,13 @@ mod tests {
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
-    use config::{get_config, utils::json};
+    use config::{
+        get_config,
+        meta::alerts::destinations::{Destination, DestinationType},
+        utils::json,
+    };
     use openobserve::{
-        common::meta::{
-            alerts::destinations::{Destination, DestinationType},
-            dashboards::{v1, Dashboard, Dashboards},
-        },
+        common::meta::dashboards::{v1, Dashboard, Dashboards},
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::router::*,
@@ -144,10 +145,7 @@ mod tests {
 
         // functions
         e2e_post_function().await;
-        e2e_add_stream_function().await;
         e2e_list_functions().await;
-        e2e_list_stream_functions().await;
-        e2e_remove_stream_function().await;
         e2e_delete_function().await;
 
         // search
@@ -454,34 +452,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    async fn e2e_add_stream_function() {
-        let auth = setup();
-        let body_str = r#"{
-                                "order":1
-                            }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::put()
-            .uri(&format!(
-                "/api/{}/streams/{}/functions/{}",
-                "e2e", "olympics_schema", "e2etestfn"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
     async fn e2e_list_functions() {
         let auth = setup();
         let app = test::init_service(
@@ -503,30 +473,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    async fn e2e_list_stream_functions() {
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/streams/{}/functions",
-                "e2e", "olympics_schema"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
     async fn e2e_delete_function() {
         let auth = setup();
         let app = test::init_service(
@@ -541,30 +487,6 @@ mod tests {
         .await;
         let req = test::TestRequest::delete()
             .uri(&format!("/api/{}/functions/{}", "e2e", "e2etestfn"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_remove_stream_function() {
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/streams/{}/functions/{}",
-                "e2e", "olympics_schema", "e2etestfn"
-            ))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();

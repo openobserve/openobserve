@@ -25,6 +25,7 @@ use arrow_schema::{DataType, Field};
 use config::{
     get_config,
     meta::{
+        alerts::alert::Alert,
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -42,9 +43,9 @@ use super::{
     schema::stream_schema_exists,
 };
 use crate::{
-    common::meta::{alerts::alert::Alert, ingestion::IngestionStatus, stream::SchemaRecords},
+    common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
-        db, ingestion::get_write_partition_key, schema::check_for_schema,
+        alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
         usage::report_request_usage_stats,
     },
 };
@@ -57,7 +58,7 @@ pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
-type LogJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     let local_val = v.as_object().unwrap();
@@ -190,7 +191,7 @@ async fn write_logs_by_stream(
     time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
-    json_data_by_stream: HashMap<String, LogJsonData>,
+    json_data_by_stream: HashMap<String, O2IngestJsonData>,
 ) -> Result<()> {
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest

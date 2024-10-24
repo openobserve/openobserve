@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
-    meta::search,
+    meta::{function::VRLResultResolver, search},
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -28,10 +28,7 @@ use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::{
-    common::meta::functions::VRLResultResolver,
-    service::search::{cluster::flight, request::Request, sql::Sql},
-};
+use crate::service::search::{cluster::flight, request::Request, sql::Sql};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
@@ -135,7 +132,7 @@ pub async fn search(
                                 program: program.program.clone(),
                                 fields: program.fields.clone(),
                             },
-                            &json::Value::Array(
+                            json::Value::Array(
                                 json_rows
                                     .into_iter()
                                     .filter(|v| !v.is_empty())
@@ -164,7 +161,7 @@ pub async fn search(
                                         program: program.program.clone(),
                                         fields: program.fields.clone(),
                                     },
-                                    &json::Value::Object(hit),
+                                    json::Value::Object(hit),
                                     &sql.org_id,
                                     &sql.stream_names,
                                 );

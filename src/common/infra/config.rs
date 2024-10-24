@@ -15,7 +15,14 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, RwHashMap};
+use config::{
+    meta::{
+        alerts::{alert::Alert, destinations::Destination, templates::Template},
+        function::Transform,
+        stream::StreamParams,
+    },
+    RwAHashMap, RwHashMap,
+};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
@@ -25,18 +32,12 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        alerts::{alert::Alert, destinations::Destination, templates::Template},
-        dashboards::reports,
-        functions::{StreamFunctionsList, Transform},
-        maxmind::MaxmindClient,
-        organization::OrganizationSetting,
-        pipelines::PipeLine,
-        prom::ClusterLeader,
-        syslog::SyslogRoute,
-        user::User,
+        dashboards::reports, maxmind::MaxmindClient, organization::OrganizationSetting,
+        prom::ClusterLeader, syslog::SyslogRoute, user::User,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
+        pipeline::batch_execution::ExecutablePipeline,
     },
 };
 
@@ -47,8 +48,6 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
-pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
-    Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
 pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
@@ -83,6 +82,7 @@ pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
+pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, ExecutablePipeline>> =
+    Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
-pub static STREAM_PIPELINES: Lazy<RwHashMap<String, PipeLine>> = Lazy::new(DashMap::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);

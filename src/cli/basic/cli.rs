@@ -99,6 +99,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .help("migrate to: sqlite, etcd, mysql, postgresql"),
                 ]),
             clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
+            clap::Command::new("migrate-pipeline").about("migrate pipelines"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
                 .arg(
@@ -245,6 +246,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "migrate-dashboards" => {
             println!("Running migration dashboard");
             migration::dashboards::run().await?
+        }
+        "migrate-pipeline" => {
+            println!("Running migration pipeline");
+            migration::pipeline_func::run().await?;
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();
