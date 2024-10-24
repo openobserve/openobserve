@@ -19,7 +19,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use sea_orm::{DatabaseConnection, SqlxMySqlConnector, SqlxPostgresConnector, SqlxSqliteConnector};
 use tokio::sync::{mpsc, OnceCell};
 
@@ -41,11 +40,9 @@ static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 
 pub const SQLITE_STORE: &str = "sqlite";
 
-pub static ORM_CLIENT: Lazy<DatabaseConnection> = Lazy::new(|| {
-    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(connect_default()))
-});
+pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
-pub async fn connect_default() -> DatabaseConnection {
+pub async fn connect_to_orm() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::MySQL => {
             let pool = mysql::CLIENT.clone();

@@ -20,7 +20,7 @@ use sea_orm::{
 
 use super::get_lock;
 use crate::{
-    db::{mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
     errors::{self, DbError, Error},
 };
 
@@ -75,7 +75,8 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let builder = ORM_CLIENT.get_database_backend();
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
     let create_table_stmt = schema
@@ -83,7 +84,7 @@ pub async fn create_table() -> Result<(), errors::Error> {
         .if_not_exists()
         .take();
 
-    ORM_CLIENT
+    client
         .execute(builder.build(&create_table_stmt))
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -100,7 +101,8 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["created_ts"],
     );
 
-    match ORM_CLIENT.get_database_backend() {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match client.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
             mysql::create_index(index2).await?;
@@ -126,10 +128,11 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     };
 
     // make sure only one client is writing to the database(only for sqlite)
-    let _client = get_lock().await;
+    let _lock = get_lock().await;
 
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::insert(record)
-        .exec(&ORM_CLIENT.clone())
+        .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
@@ -138,11 +141,12 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
-    let _client = get_lock().await;
+    let _lock = get_lock().await;
 
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
-        .exec(&ORM_CLIENT.clone())
+        .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
@@ -150,13 +154,14 @@ pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(short_id: &str) -> Result<ShortUrlRecord, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .select_only()
         .column(Column::ShortId)
         .column(Column::OriginalUrl)
         .filter(Column::ShortId.eq(short_id))
         .into_model::<ShortUrlRecord>()
-        .one(&ORM_CLIENT.clone())
+        .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Short URL not found".to_string())))?;
@@ -165,6 +170,7 @@ pub async fn get(short_id: &str) -> Result<ShortUrlRecord, errors::Error> {
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -175,7 +181,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
     }
     let records = res
         .into_model::<ShortUrlRecord>()
-        .all(&ORM_CLIENT.clone())
+        .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
@@ -183,10 +189,11 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
 }
 
 pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::ShortId.eq(short_id))
         .into_model::<ShortUrlRecord>()
-        .one(&ORM_CLIENT.clone())
+        .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
@@ -194,7 +201,8 @@ pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
 }
 
 pub async fn len() -> usize {
-    let len = Entity::find().count(&ORM_CLIENT.clone()).await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let len = Entity::find().count(client).await;
 
     match len {
         Ok(len) => len as usize,
@@ -207,10 +215,11 @@ pub async fn len() -> usize {
 
 pub async fn clear() -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
-    let _client = get_lock().await;
+    let _lock = get_lock().await;
 
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
-        .exec(&ORM_CLIENT.clone())
+        .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
@@ -225,6 +234,7 @@ pub async fn get_expired(
     expired_before: i64,
     limit: Option<i64>,
 ) -> Result<Vec<String>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -232,7 +242,7 @@ pub async fn get_expired(
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
-    let res = res.into_model::<ShortId>().all(&ORM_CLIENT.clone()).await;
+    let res = res.into_model::<ShortId>().all(client).await;
 
     match res {
         Ok(records) => Ok(records.iter().map(|r| r.short_id.clone()).collect()),
@@ -242,11 +252,12 @@ pub async fn get_expired(
 
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
-    let _client = get_lock().await;
+    let _lock = get_lock().await;
 
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))
-        .exec(&ORM_CLIENT.clone())
+        .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
