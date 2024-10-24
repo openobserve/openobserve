@@ -203,6 +203,14 @@ pub async fn ingest(
 
                     if ret_value.is_null() || !ret_value.is_object() {
                         bulk_res.errors = true;
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                &stream_name,
+                                TRANSFORM_FAILED,
+                            ])
+                            .inc();
                         log_failed_record(log_ingestion_errors, &value, TRANSFORM_FAILED);
                         add_record_status(
                             stream_name.clone(),
@@ -263,6 +271,14 @@ pub async fn ingest(
 
                     if ret_value.is_null() || !ret_value.is_object() {
                         bulk_res.errors = true;
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                &stream_name,
+                                TRANSFORM_FAILED,
+                            ])
+                            .inc();
                         log_failed_record(log_ingestion_errors, &value, TRANSFORM_FAILED);
                         add_record_status(
                             routed_stream_name.clone(),
@@ -319,6 +335,14 @@ pub async fn ingest(
                     Ok(t) => t,
                     Err(_e) => {
                         bulk_res.errors = true;
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                &stream_name,
+                                TS_PARSE_FAILED,
+                            ])
+                            .inc();
                         log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
                         add_record_status(
                             routed_stream_name.clone(),
@@ -339,6 +363,14 @@ pub async fn ingest(
             if timestamp < min_ts {
                 bulk_res.errors = true;
                 let error = get_upto_discard_error().to_string();
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TS_PARSE_FAILED,
+                    ])
+                    .inc();
                 log_failed_record(log_ingestion_errors, &value, &error);
                 let failure_reason = Some(error);
                 add_record_status(

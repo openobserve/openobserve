@@ -30,7 +30,9 @@ use config::{
 };
 use syslog_loose::{Message, ProcId, Protocol};
 
-use super::{ingest::handle_timestamp, ingestion_log_enabled, log_failed_record};
+use super::{
+    bulk::TS_PARSE_FAILED, ingest::handle_timestamp, ingestion_log_enabled, log_failed_record,
+};
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
@@ -251,6 +253,14 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         Err(e) => {
             stream_status.status.failed += 1;
             stream_status.status.error = e.to_string();
+            metrics::INGEST_ERRORS
+                .with_label_values(&[
+                    org_id,
+                    StreamType::Logs.to_string().as_str(),
+                    &stream_name,
+                    TS_PARSE_FAILED,
+                ])
+                .inc();
             log_failed_record(
                 log_ingestion_errors,
                 &local_val,

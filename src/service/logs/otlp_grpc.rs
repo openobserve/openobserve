@@ -35,7 +35,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use super::{ingestion_log_enabled, log_failed_record};
+use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
@@ -165,6 +165,14 @@ pub async fn handle_grpc_request(
                 // check ingestion time
                 if timestamp < min_ts {
                     stream_status.status.failed += 1; // to old data, just discard
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
                     stream_status.status.error = get_upto_discard_error().to_string();
                     log_failed_record(
                         log_ingestion_errors,

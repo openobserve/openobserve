@@ -34,7 +34,10 @@ use config::{
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
-use super::{ingestion_log_enabled, log_failed_record};
+use super::{
+    bulk::{TRANSFORM_FAILED, TS_PARSE_FAILED},
+    ingestion_log_enabled, log_failed_record,
+};
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
@@ -222,6 +225,14 @@ pub async fn ingest(
                     Err(e) => {
                         stream_status.status.failed += 1;
                         stream_status.status.error = e.to_string();
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                &stream_name,
+                                TRANSFORM_FAILED,
+                            ])
+                            .inc();
                         log_failed_record(log_ingestion_errors, &item, &e.to_string());
                         continue;
                     }
@@ -269,6 +280,14 @@ pub async fn ingest(
                 Err(e) => {
                     stream_status.status.failed += 1;
                     stream_status.status.error = e.to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TRANSFORM_FAILED,
+                        ])
+                        .inc();
                     log_failed_record(log_ingestion_errors, &item, &e.to_string());
                     continue;
                 }
@@ -311,6 +330,14 @@ pub async fn ingest(
             Err(e) => {
                 stream_status.status.failed += 1;
                 stream_status.status.error = e.to_string();
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TS_PARSE_FAILED,
+                    ])
+                    .inc();
                 log_failed_record(log_ingestion_errors, &local_val, &e.to_string());
                 continue;
             }

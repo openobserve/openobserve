@@ -22,12 +22,14 @@ use std::{
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field};
+use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
     get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
+    metrics,
     utils::{
         json::{self, estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
         schema_ext::SchemaExt,
@@ -366,15 +368,27 @@ async fn write_logs(
                     IngestionStatus::Record(status) => {
                         status.failed += 1;
                         status.error = e.to_string();
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                &stream_name,
+                                SCHEMA_CONFORMANCE_FAILED,
+                            ])
+                            .inc();
                         log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                     }
                     IngestionStatus::Bulk(bulk_res) => {
                         bulk_res.errors = true;
-                        log_failed_record(
-                            log_ingest_errors,
-                            &Value::Object(record_val.clone()),
-                            &e.to_string(),
-                        );
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                &stream_name,
+                                SCHEMA_CONFORMANCE_FAILED,
+                            ])
+                            .inc();
+                        log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                         bulk::add_record_status(
                             stream_name.to_string(),
                             &doc_id,
