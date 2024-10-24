@@ -83,12 +83,12 @@ pub async fn create_table() -> Result<(), errors::Error> {
         .if_not_exists()
         .take();
 
-    let res = ORM_CLIENT.execute(builder.build(&create_table_stmt)).await;
+    ORM_CLIENT
+        .execute(builder.build(&create_table_stmt))
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(())
 }
 
 pub async fn create_table_index() -> Result<(), errors::Error> {
@@ -128,51 +128,40 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     // make sure only one client is writing to the database(only for sqlite)
     let _client = get_lock().await;
 
-    let res = Entity::insert(record).exec(&ORM_CLIENT.clone()).await;
+    Entity::insert(record)
+        .exec(&ORM_CLIENT.clone())
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(())
 }
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _client = get_lock().await;
 
-    let res = Entity::delete_many()
+    Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
         .exec(&ORM_CLIENT.clone())
-        .await;
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(())
 }
 
 pub async fn get(short_id: &str) -> Result<ShortUrlRecord, errors::Error> {
-    let res = Entity::find()
+    let record = Entity::find()
         .select_only()
         .column(Column::ShortId)
         .column(Column::OriginalUrl)
         .filter(Column::ShortId.eq(short_id))
         .into_model::<ShortUrlRecord>()
         .one(&ORM_CLIENT.clone())
-        .await;
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Short URL not found".to_string())))?;
 
-    match res {
-        Ok(record) => {
-            if let Some(record) = record {
-                Ok(record)
-            } else {
-                Err(Error::DbError(DbError::SeaORMError(
-                    "Short URL not found".to_string(),
-                )))
-            }
-        }
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(record)
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Error> {
@@ -184,28 +173,24 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
-    let res = res
+    let records = res
         .into_model::<ShortUrlRecord>()
         .all(&ORM_CLIENT.clone())
-        .await;
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(records) => Ok(records),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(records)
 }
 
 pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
-    let res = Entity::find()
+    let record = Entity::find()
         .filter(Column::ShortId.eq(short_id))
         .into_model::<ShortUrlRecord>()
         .one(&ORM_CLIENT.clone())
-        .await;
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(record) => Ok(record.is_some()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(record.is_some())
 }
 
 pub async fn len() -> usize {
@@ -224,12 +209,12 @@ pub async fn clear() -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _client = get_lock().await;
 
-    let res = Entity::delete_many().exec(&ORM_CLIENT.clone()).await;
+    Entity::delete_many()
+        .exec(&ORM_CLIENT.clone())
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(())
 }
 
 pub async fn is_empty() -> bool {
@@ -259,13 +244,11 @@ pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _client = get_lock().await;
 
-    let res = Entity::delete_many()
+    Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))
         .exec(&ORM_CLIENT.clone())
-        .await;
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    Ok(())
 }

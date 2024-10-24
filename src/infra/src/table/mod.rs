@@ -15,7 +15,7 @@
 
 use config::get_config;
 
-use crate::db::sqlite::CLIENT_RW;
+use crate::db::{sqlite::CLIENT_RW, SQLITE_STORE};
 
 pub mod short_urls;
 
@@ -24,9 +24,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-// get the lock for the sqlite client
+/// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
+///
+/// # Returns
+/// - `Some(MutexGuard)` if SQLite is configured
+/// - `None` if a different store is configured
 pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sqlx::Sqlite>>> {
-    if get_config().common.meta_store.to_lowercase().as_str() == "sqlite" {
+    if get_config()
+        .common
+        .meta_store
+        .eq_ignore_ascii_case(SQLITE_STORE)
+    {
         Some(CLIENT_RW.lock().await)
     } else {
         None

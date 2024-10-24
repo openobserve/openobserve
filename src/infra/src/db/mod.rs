@@ -39,7 +39,8 @@ static LOCAL_CACHE: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 
-// move to db
+pub const SQLITE_STORE: &str = "sqlite";
+
 pub static ORM_CLIENT: Lazy<DatabaseConnection> = Lazy::new(|| {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(connect_default()))
 });
