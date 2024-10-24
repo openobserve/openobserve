@@ -55,12 +55,11 @@ test('Absolute Seconds on Logs page', async ({ page }) => {
   const logsPage = new LogsPage(page);
 
   // Step 1: Navigate to the application and login
-  //await page.goto('https://alpha1.dev.zinclabs.dev/web/');
+  
   await page.goto(process.env["ZO_BASE_URL"]);
 
   await loginPage.gotoLoginPage();
 
-  //await loginPage.login('testing@alpha1.com', 'SecTest@500');
 
   await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
 
