@@ -543,8 +543,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
+
+    <div class="row query-editor-container" v-show="searchObj.meta.showQuery"  >
+
+      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%;" :class="{ 'expand-on-focus': isFocused }" :style="backgroundColorStyle"
+      >
         <q-splitter
           class="logs-search-splitter"
           no-scroll
@@ -553,6 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
+
             <query-editor
               data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
@@ -1121,6 +1125,8 @@ export default defineComponent({
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
 
+    const isFocused = ref(false);
+
     // confirm dialog for logs visualization toggle
     const confirmLogsVisualizeModeChangeDialog = ref(false);
 
@@ -1176,6 +1182,20 @@ export default defineComponent({
       { immediate: true, deep: true }
     );
 
+    watch(
+     [ () => searchObj.meta.functionEditorPlaceholderFlag, () => searchObj.meta.queryEditorPlaceholderFlag],
+      (values) => {
+        if(values[0] == true && values[1] == true){
+          //this is for non focus mode
+          isFocused.value = false;
+          console.log(values)
+        }
+        else{
+          //this for focus mode
+          isFocused.value = true;
+        }
+      }
+    );
     watch(
       () => searchObj.data.stream.functions,
       (funs) => {
@@ -2566,6 +2586,11 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
+    const backgroundColorStyle = computed(() => {
+      return {
+        backgroundColor: (searchObj.meta.toggleFunction == true && isFocused.value == true) ? '#575A5A' : '' // Yellow if true, white if false
+      };
+    });
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
     const cancelVisualizeQueries = () => {
@@ -2665,6 +2690,8 @@ export default defineComponent({
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,
+      isFocused,
+      backgroundColorStyle,
     };
   },
   computed: {
@@ -3205,5 +3232,14 @@ export default defineComponent({
     background-color: var(--q-primary) !important;
     color: white;
   }
+}
+
+
+</style>
+<style scoped>
+.expand-on-focus{
+  height: 700px !important;
+  z-index: 20 !important;
+  border-bottom: 2px solid #575A5A;
 }
 </style>
