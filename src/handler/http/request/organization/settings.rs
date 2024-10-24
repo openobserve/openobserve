@@ -28,7 +28,9 @@ use {
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
-        organization::{OrganizationSetting, OrganizationSettingResponse},
+        organization::{
+            OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse,
+        },
     },
     service::db::organization::{get_org_setting, set_org_setting},
 };
@@ -44,7 +46,7 @@ use crate::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = OrganizationSetting, description = "Organization settings", content_type = "application/json"),
+    request_body(content = OrganizationSettingPayload, description = "Organization settings", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
@@ -53,16 +55,48 @@ use crate::{
 #[post("/{org_id}/settings")]
 async fn create(
     path: web::Path<String>,
-    settings: web::Json<OrganizationSetting>,
+    settings: web::Json<OrganizationSettingPayload>,
 ) -> Result<HttpResponse, StdErr> {
-    if settings.scrape_interval == 0 {
-        return Ok(MetaHttpResponse::bad_request(
-            "scrape_interval should be a positive value",
-        ));
+    let org_id = path.into_inner();
+    let settings = settings.into_inner();
+    let mut data = match get_org_setting(&org_id).await {
+        Ok(s) => {
+            let data: OrganizationSetting = json::from_slice(&s).unwrap();
+            data
+        }
+        Err(err) => {
+            if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
+                OrganizationSetting::default()
+            } else {
+                return Ok(MetaHttpResponse::bad_request(&err));
+            }
+        }
+    };
+
+    let mut field_found = false;
+    if let Some(scrape_interval) = settings.scrape_interval {
+        if scrape_interval == 0 {
+            return Ok(MetaHttpResponse::bad_request(
+                "scrape_interval should be a positive value",
+            ));
+        }
+        field_found = true;
+        data.scrape_interval = scrape_interval;
+    }
+    if let Some(trace_id_field_name) = settings.trace_id_field_name {
+        field_found = true;
+        data.trace_id_field_name = trace_id_field_name;
+    }
+    if let Some(span_id_field_name) = settings.span_id_field_name {
+        field_found = true;
+        data.span_id_field_name = span_id_field_name;
     }
 
-    let org_id = path.into_inner();
-    match set_org_setting(&org_id, &settings).await {
+    if !field_found {
+        return Ok(MetaHttpResponse::bad_request("No valid field found"));
+    }
+
+    match set_org_setting(&org_id, &data).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
     }
