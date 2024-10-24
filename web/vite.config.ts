@@ -26,6 +26,7 @@ import dotenv from "dotenv";
 import fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
 import visualizer from "rollup-plugin-visualizer";
+import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
 
@@ -116,7 +117,6 @@ export default defineConfig({
         exclude: ["node_modules", "test/"],
         extension: [".js", ".ts", ".vue"],
         requireEnv: true,
-        cypress: true,
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
