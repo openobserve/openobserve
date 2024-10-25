@@ -147,9 +147,12 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+    const search = page.waitForResponse(logData.applyQuery);
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
+    await expect.poll(async () => (await search).status()).toBe(200);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
+    
     await page.locator('[data-test="chart-renderer"] canvas').click({
         position: {
           x: 470,
