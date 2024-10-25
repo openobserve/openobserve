@@ -1524,6 +1524,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.meta_store_external = true;
     }
+    if !cfg.common.local_mode
+        && !cfg.common.meta_store.starts_with("postgres")
+        && !cfg.common.meta_store.starts_with("mysql")
+    {
+        return Err(anyhow::anyhow!(
+            "Meta store only support mysql or postgres in cluster mode."
+        ));
+    }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
         return Err(anyhow::anyhow!(
             "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
