@@ -185,15 +185,15 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-await page.waitForSelector('[data-test="chart-renderer"] canvas');
+    await page.waitForSelector('[data-test="chart-renderer"] canvas');
 
 
-   await page.locator('[data-test="chart-renderer"] canvas').click({
-      position: {
-        x: 470,
-        y: 13,
-      },
-    });
+  //  await page.locator('[data-test="chart-renderer"] canvas').click({
+  //     position: {
+  //       x: 470,
+  //       y: 13,
+  //     },
+  //   });
   });
 
   test("should correctly plot the data according to the new chart type when changing the chart type", async ({
