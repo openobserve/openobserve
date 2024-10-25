@@ -518,7 +518,7 @@ mod tests {
     fn test_stream_res() {
         let stats = StreamStats::default();
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = stream_res("Test", StreamType::Logs, schema, Some(stats));
+        let res = stream_res("Test", StreamType::Logs, schema, Some(stats.clone()));
         assert_eq!(res.stats, stats);
     }
 }

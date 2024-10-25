@@ -247,7 +247,7 @@ impl From<&String> for MergeStrategy {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamStats {
     pub created_at: i64,
     pub doc_time_min: i64,

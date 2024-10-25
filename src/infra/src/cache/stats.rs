@@ -30,7 +30,10 @@ pub fn get_stats() -> RwHashMap<String, StreamStats> {
 #[inline]
 pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) -> StreamStats {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    STATS.get(&key).map(|v| *v.value()).unwrap_or_default()
+    STATS
+        .get(&key)
+        .map(|v| v.value().clone())
+        .unwrap_or_default()
 }
 
 #[inline]
@@ -116,7 +119,7 @@ mod tests {
             compressed_size: 3,
         };
 
-        set_stream_stats("nexus", "default", StreamType::Logs, val);
+        set_stream_stats("nexus", "default", StreamType::Logs, val.clone());
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats, val);
 
