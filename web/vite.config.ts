@@ -30,6 +30,8 @@ import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
 
+console.log("VITE_OPENOBSERVE_CLOUD", process.env.VITE_COVERAGE);
+
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
   dotenv.config({ path: ".env.production" });
