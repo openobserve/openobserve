@@ -1420,7 +1420,7 @@ pub async fn search_partition(
         })
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchHistoryResponse, example = json ! ({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json ! ({
             "took": 40,
             "took_detail": {
                 "total": 0,
