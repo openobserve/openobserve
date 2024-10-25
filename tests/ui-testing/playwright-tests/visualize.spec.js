@@ -185,7 +185,7 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-await page.waitForTimeout(3000);
+    await page.waitForResponse("**/api/**/_search**");
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 470,
