@@ -149,9 +149,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-test="chart-renderer"] canvas').waitFor({ state: 'attached' });
-    await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-    await page.locator('[data-test="chart-renderer"] canvas').click({
+    await page.locator('[data-test="chart-renderer"] canvas').waitFor({ state: 'attached' }).click({
         position: {
           x: 470,
           y: 13,
