@@ -154,7 +154,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
   });
 
-  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
+  test.only("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -518,7 +518,7 @@ test.describe(" visualize UI testcases", () => {
     await expect(errorCount).toBe(0); // Fail the test if any error messages are present
   });
 
-  test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
+  test.only("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
     // Interact with various elements
