@@ -171,7 +171,7 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "70e61fc344b9db2f191cfba9ad58ee08e79d30b4" }
-vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }
+vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
 infra.workspace = true
@@ -284,6 +284,11 @@ reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls-native-roots",
   "stream",
 ] }
+sea-orm = { version = "1.1.0", features = [
+  "sqlx-all",
+  "runtime-tokio-rustls",
+  "macros",
+] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -317,4 +322,5 @@ tracing-subscriber = { version = "0.3.0", features = [
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
+vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"

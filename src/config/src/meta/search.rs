@@ -557,6 +557,7 @@ pub struct QueryStatus {
     pub stream_type: Option<String>,
     pub query: Option<QueryInfo>,
     pub scan_stats: Option<ScanStats>,
+    pub search_type: Option<SearchEventType>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

@@ -21,8 +21,7 @@ use chrono::Utc;
 use config::get_config;
 use infra::{
     db::{Event, NEED_WATCH},
-    short_url,
-    short_url::ShortUrlRecord,
+    table::short_urls,
 };
 
 use crate::{common::infra::config::SHORT_URLS, service::db};
@@ -38,7 +37,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
         return Ok(v.original_url.to_string());
     }
 
-    let val = short_url::get(short_id)
+    let val = short_urls::get(short_id)
         .await
         .map_err(|_| anyhow!("Short URL not found in db"))?;
     let original_url = val.original_url.clone();
@@ -46,8 +45,8 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
     Ok(original_url)
 }
 
-pub async fn set(short_id: &str, entry: ShortUrlRecord) -> Result<(), anyhow::Error> {
-    if let Err(e) = short_url::add(short_id, &entry.original_url).await {
+pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
+    if let Err(e) = short_urls::add(short_id, &entry.original_url).await {
         return Err(e).context("Failed to add short URL to DB");
     }
 
@@ -89,7 +88,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match short_url::get(item_key).await {
+                let item_value = match short_urls::get(item_key).await {
                     Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
@@ -109,7 +108,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 /// Preload all short URLs from the database into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let ret = short_url::list(Some(SHORT_URL_CACHE_LIMIT)).await?;
+    let ret = short_urls::list(Some(SHORT_URL_CACHE_LIMIT)).await?;
     for row in ret.into_iter() {
         SHORT_URLS.insert(row.short_id.to_owned(), row);
     }
@@ -143,7 +142,7 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
     let expired_before = Utc::now() - retention_period;
 
     // get expired ids
-    if let Ok(expired_short_ids) = short_url::get_expired(
+    if let Ok(expired_short_ids) = short_urls::get_expired(
         expired_before.timestamp_micros(),
         Some(SHORT_URL_CACHE_LIMIT),
     )
@@ -151,7 +150,7 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
     {
         if !expired_short_ids.is_empty() {
             // delete from db
-            short_url::batch_remove(expired_short_ids.clone()).await?;
+            short_urls::batch_remove(expired_short_ids.clone()).await?;
 
             // delete from cache
             for short_id in expired_short_ids {
