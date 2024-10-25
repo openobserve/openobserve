@@ -110,6 +110,18 @@ fn default_span_id_field_name() -> String {
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
+pub struct OrganizationSettingPayload {
+    /// Ideally this should be the same as prometheus-scrape-interval (in
+    /// seconds).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scrape_interval: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id_field_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_id_field_name: Option<String>,
+}
+
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSetting {
     /// Ideally this should be the same as prometheus-scrape-interval (in
     /// seconds).
