@@ -49,6 +49,7 @@ impl super::SchemaHistory for MysqlSchemaHistory {
         create_table_index().await
     }
 
+    #[tracing::instrument(name = "db::schema_history::create", skip(self))] 
     async fn create(
         &self,
         org_id: &str,
