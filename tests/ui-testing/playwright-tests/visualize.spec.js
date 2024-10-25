@@ -195,9 +195,10 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     console.log("step 11: refresh btn clicked again");
+    const sapi = page.waitForResponse("**/api/**/_search**")
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     console.log("step 12: waiting for response");
-    await page.waitForResponse("**/api/**/_search**");
+    await sapi;
     console.log("step 13: clicking on chart");
     await page.locator('[data-test="chart-renderer"] canvas').waitFor();
     console.log("step 14: complete");
