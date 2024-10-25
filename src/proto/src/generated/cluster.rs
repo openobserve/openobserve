@@ -972,8 +972,6 @@ pub struct SearchRequest {
     pub index_type: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "12")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "13")]
-    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -2808,8 +2806,6 @@ pub struct FlightSearchRequest {
     pub index_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "18")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "19")]
-    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::StreamType;
-use proto::cluster_rpc::FlightSearchRequest;
 
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -98,19 +97,19 @@ impl Request {
     }
 }
 
-impl From<FlightSearchRequest> for Request {
-    fn from(request: FlightSearchRequest) -> Self {
-        Self {
-            trace_id: request.trace_id,
-            org_id: request.org_id,
-            stream_type: StreamType::from(request.stream_type.as_str()),
-            timeout: request.timeout,
-            user_id: request.user_id,
-            work_group: request.work_group,
-            time_range: Some((request.start_time, request.end_time)),
-            search_event_type: request.search_event_type,
-            inverted_index_type: request.index_type,
-            use_inverted_index: request.use_inverted_index,
-        }
-    }
-}
+// impl From<FlightSearchRequest> for Request {
+//     fn from(request: FlightSearchRequest) -> Self {
+//         Self {
+//             trace_id: request.trace_id,
+//             org_id: request.org_id,
+//             stream_type: StreamType::from(request.stream_type.as_str()),
+//             timeout: request.timeout,
+//             user_id: request.user_id,
+//             work_group: request.work_group,
+//             time_range: Some((request.start_time, request.end_time)),
+//             // search_event_type: request.search_event_type,
+//             inverted_index_type: request.index_type,
+//             use_inverted_index: request.use_inverted_index,
+//         }
+//     }
+// }
