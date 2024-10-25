@@ -38,9 +38,7 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
-        stream::{
-            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
-        },
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,
     utils::{
@@ -832,10 +830,10 @@ pub(crate) async fn generate_index_on_ingester(
                 "generate_index_on_ingester create schema error: schema not found"
             ));
         };
-        // update schema to enable bloomfilter for field: term, file_name
+        // update schema to enable bloomfilter for field: term
         let settings = StreamSettings {
             bloom_filter_fields: vec!["term".to_string()],
-            partition_keys: vec![StreamPartition::new_prefix("term")],
+            partition_keys: vec![],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
@@ -872,23 +870,24 @@ pub(crate) async fn generate_index_on_ingester(
             };
         }
 
+        // TODO: disable it, because the prefix partition key will cause the file_list much bigger
         // add prefix partition for index <= v0.12.1
-        if let Some(settings) = stream_setting.as_mut() {
-            let term_partition_exists = settings
-                .partition_keys
-                .iter()
-                .any(|partition| partition.field == "term");
-            if !term_partition_exists {
-                settings
-                    .partition_keys
-                    .push(StreamPartition::new_prefix("term"));
+        // if let Some(settings) = stream_setting.as_mut() {
+        //     let term_partition_exists = settings
+        //         .partition_keys
+        //         .iter()
+        //         .any(|partition| partition.field == "term");
+        //     if !term_partition_exists {
+        //         settings
+        //             .partition_keys
+        //             .push(StreamPartition::new_prefix("term"));
 
-                let mut metadata = schema.schema().metadata().clone();
-                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
-                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
-                    .await?;
-            }
-        }
+        //         let mut metadata = schema.schema().metadata().clone();
+        //         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+        //         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index,
+        // metadata)             .await?;
+        //     }
+        // }
     }
 
     let schema_key = idx_schema.hash_key();
