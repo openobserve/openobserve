@@ -139,6 +139,7 @@ impl Search for Searcher {
         let req = req.get_ref().to_owned();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.clone();
+        let s_event_type = req.search_event_type.clone();
 
         // set search task
         #[cfg(feature = "enterprise")]
@@ -161,6 +162,7 @@ impl Search for Searcher {
                     sql,
                     start_time,
                     end_time,
+                    s_event_type,
                 ),
             )
             .await;
@@ -244,6 +246,7 @@ impl Search for Searcher {
                     sql,
                     start_time,
                     end_time,
+                    req.search_event_type.clone(),
                 ),
             )
             .await;
