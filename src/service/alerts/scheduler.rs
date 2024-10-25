@@ -284,10 +284,10 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         evaluation_took_in_secs: None,
     };
 
-    let evalutaion_took = Instant::now();
+    let evaluation_took = Instant::now();
     // evaluate alert
     let result = alert.evaluate(None, start_time).await;
-    let evaluation_took = evalutaion_took.elapsed().as_secs_f64();
+    let evaluation_took = evaluation_took.elapsed().as_secs_f64();
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
         let err = result.err().unwrap();
@@ -588,7 +588,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 }
 
 async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
-    let (_, max_retires) = get_scheduler_max_retries();
+    let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "Inside handle_report_trigger,org: {}, module_key: {}",
         &trigger.org,
@@ -694,7 +694,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         evaluation_took_in_secs: None,
     };
 
-    if trigger.retries >= max_retires {
+    if trigger.retries >= max_retries {
         // It has been tried the maximum time, just update the
         // next_run_at to the next expected trigger time
         log::info!(
@@ -718,7 +718,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
         Err(e) => {
             log::error!("Error sending report to subscribers: {e}");
-            if trigger.retries + 1 >= max_retires && !run_once {
+            if trigger.retries + 1 >= max_retries && !run_once {
                 // It has been tried the maximum time, just update the
                 // next_run_at to the next expected trigger time
                 log::debug!(
