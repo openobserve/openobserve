@@ -148,16 +148,15 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-    await page.waitForSelector('[data-test="chart-renderer"] canvas');
-
-    expect(await page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-
-    //  await page.locator('[data-test="chart-renderer"] canvas').click({
-    //     position: {
-    //       x: 470,
-    //       y: 13,
-    //     },
-    //   });
+    await page.waitForLoadState('networkidle');
+    await page.locator('[data-test="chart-renderer"] canvas').waitFor({ state: 'attached' });
+    await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
+    await page.locator('[data-test="chart-renderer"] canvas').click({
+        position: {
+          x: 470,
+          y: 13,
+        },
+      });
   });
 
   test("should correctly plot the data according to the new chart type when changing the chart type", async ({
