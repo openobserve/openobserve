@@ -475,8 +475,6 @@ pub async fn delete_stream(
 fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
-    stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
-    stats.compressed_size = (stats.compressed_size * 100.0).round() / 100.0;
 }
 
 pub fn stream_created(schema: &Schema) -> Option<i64> {

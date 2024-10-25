@@ -49,8 +49,8 @@ pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
-pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
-pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+pub const SIZE_IN_MB: i64 = 1024 * 1024;
+pub const SIZE_IN_GB: i64 = 1024 * 1024 * 1024;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error

@@ -703,8 +703,8 @@ UPDATE stream_stats
             .bind(stats.doc_time_min)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
-            .bind(stats.storage_size as i64)
-            .bind(stats.compressed_size as i64)
+            .bind(stats.storage_size)
+            .bind(stats.compressed_size)
             .bind(stream_key)
             .execute(&mut *tx)
             .await

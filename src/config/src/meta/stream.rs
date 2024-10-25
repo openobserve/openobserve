@@ -254,8 +254,8 @@ pub struct StreamStats {
     pub doc_time_max: i64,
     pub doc_num: i64,
     pub file_num: i64,
-    pub storage_size: f64,
-    pub compressed_size: f64,
+    pub storage_size: i64,
+    pub compressed_size: i64,
 }
 
 impl StreamStats {
@@ -292,16 +292,16 @@ impl StreamStats {
         self.doc_num = max(0, self.doc_num + meta.records);
         self.doc_time_min = self.doc_time_min.min(meta.min_ts);
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
-        self.storage_size += meta.original_size as f64;
-        self.compressed_size += meta.compressed_size as f64;
+        self.storage_size += meta.original_size;
+        self.compressed_size += meta.compressed_size;
         if self.doc_time_min == 0 {
             self.doc_time_min = meta.min_ts;
         }
-        if self.storage_size < 0.0 {
-            self.storage_size = 0.0;
+        if self.storage_size < 0 {
+            self.storage_size = 0;
         }
-        if self.compressed_size < 0.0 {
-            self.compressed_size = 0.0;
+        if self.compressed_size < 0 {
+            self.compressed_size = 0;
         }
     }
 
@@ -344,8 +344,8 @@ impl From<Stats> for StreamStats {
             doc_time_max: meta.max_ts,
             doc_num: meta.records,
             file_num: 0,
-            storage_size: meta.original_size,
-            compressed_size: meta.compressed_size.unwrap_or_default(),
+            storage_size: meta.original_size as i64,
+            compressed_size: meta.compressed_size.unwrap_or_default() as i64,
         }
     }
 }
@@ -360,8 +360,8 @@ impl std::ops::Sub<FileMeta> for StreamStats {
             doc_num: self.doc_num - rhs.records,
             doc_time_min: self.doc_time_min.min(rhs.min_ts),
             doc_time_max: self.doc_time_max.max(rhs.max_ts),
-            storage_size: self.storage_size - rhs.original_size as f64,
-            compressed_size: self.compressed_size - rhs.compressed_size as f64,
+            storage_size: self.storage_size - rhs.original_size,
+            compressed_size: self.compressed_size - rhs.compressed_size,
         };
         if ret.doc_time_min == 0 {
             ret.doc_time_min = rhs.min_ts;
