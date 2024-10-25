@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     /// The count of jobs for the given module (Report/Alert etc.)
+    #[tracing::instrument(name = "db::scheduler::len_module", skip(self))] 
     async fn len_module(&self, module: TriggerModule) -> usize {
         let pool = CLIENT_RO.clone();
         let ret = match sqlx::query(
@@ -126,6 +127,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
     }
 
     /// Pushes a Trigger job into the queue
+    #[tracing::instrument(name = "db::scheduler::push", skip(self))] 
     async fn push(&self, trigger: Trigger) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -186,6 +188,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     /// Deletes the Trigger job matching the given parameters
+    #[tracing::instrument(name = "db::scheduler::delete", skip(self))] 
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -213,6 +216,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     /// Updates the status of the Trigger job
+    #[tracing::instrument(name = "db::scheduler::update_status", skip(self))] 
     async fn update_status(
         &self,
         org: &str,
@@ -241,6 +245,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::scheduler::update_trigger", skip(self))] 
     async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -286,6 +291,7 @@ WHERE org = $7 AND module_key = $8 AND module = $9;"#,
     /// - Changes their statuses from "Waiting" to "Processing"
     /// - Commits as a single transaction
     /// - Returns the Trigger jobs
+    #[tracing::instrument(name = "db::scheduler::pull", skip(self))] 
     async fn pull(
         &self,
         concurrency: i64,
@@ -338,6 +344,7 @@ RETURNING *;"#;
         Ok(jobs)
     }
 
+    #[tracing::instrument(name = "db::scheduler::get", skip(self))] 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT_RO.clone();
         let query = r#"
@@ -361,6 +368,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         Ok(job)
     }
 
+    #[tracing::instrument(name = "db::scheduler::list", skip(self))] 
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
         let client = CLIENT_RO.clone();
         let jobs: Vec<Trigger> = if let Some(module) = module {
@@ -380,6 +388,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
+    #[tracing::instrument(name = "db::scheduler::clean_complete", skip(self))] 
     async fn clean_complete(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -397,6 +406,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// - calculate the current timestamp and difference from `start_time` of each record
     /// - Get the record ids with difference more than the given timeout
     /// - Update their status back to "Waiting" and increase their "retries" by 1
+    #[tracing::instrument(name = "db::scheduler::watch_timeout", skip(self))] 
     async fn watch_timeout(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -415,6 +425,7 @@ WHERE status = $2 AND end_time <= $3;
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::scheduler::len", skip(self))] 
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         let ret = match sqlx::query(
@@ -440,6 +451,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
         self.len().await == 0
     }
 
+    #[tracing::instrument(name = "db::scheduler::clear", skip(self))] 
     async fn clear(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
