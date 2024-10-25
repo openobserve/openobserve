@@ -149,7 +149,8 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-test="chart-renderer"] canvas').waitFor({ state: 'attached' }).click({
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="chart-renderer"] canvas').click({
         position: {
           x: 470,
           y: 13,
