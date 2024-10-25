@@ -100,6 +100,7 @@ impl super::Db for MysqlDb {
         create_table().await
     }
 
+    #[tracing::instrument(name = "db::stats", skip(self))]
     async fn stats(&self) -> Result<super::Stats> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
@@ -114,6 +115,7 @@ impl super::Db for MysqlDb {
         })
     }
 
+    #[tracing::instrument(name = "db::get", skip(self))]
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
@@ -138,6 +140,7 @@ impl super::Db for MysqlDb {
         Ok(Bytes::from(value))
     }
 
+    #[tracing::instrument(name = "db::put", skip(self, value))]
     async fn put(
         &self,
         key: &str,
@@ -203,6 +206,7 @@ impl super::Db for MysqlDb {
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::get_for_update", skip(self, update_fn))]
     async fn get_for_update(
         &self,
         key: &str,
@@ -449,6 +453,7 @@ impl super::Db for MysqlDb {
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::delete", skip(self))]
     async fn delete(
         &self,
         key: &str,
@@ -514,6 +519,7 @@ impl super::Db for MysqlDb {
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::list", skip(self))]
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
@@ -544,6 +550,7 @@ impl super::Db for MysqlDb {
             .collect())
     }
 
+    #[tracing::instrument(name = "db::list_keys", skip(self))]
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
@@ -569,6 +576,7 @@ impl super::Db for MysqlDb {
             .collect())
     }
 
+    #[tracing::instrument(name = "db::list_values", skip(self))]
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
         let mut items = self.list(prefix).await?;
         let mut keys = items.keys().map(|k| k.to_string()).collect::<Vec<_>>();
@@ -579,6 +587,7 @@ impl super::Db for MysqlDb {
             .collect())
     }
 
+    #[tracing::instrument(name = "db::list_values_by_start_dt", skip(self))]
     async fn list_values_by_start_dt(
         &self,
         prefix: &str,
@@ -618,6 +627,7 @@ impl super::Db for MysqlDb {
             .collect())
     }
 
+    #[tracing::instrument(name = "db::count", skip(self))]
     async fn count(&self, prefix: &str) -> Result<i64> {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();

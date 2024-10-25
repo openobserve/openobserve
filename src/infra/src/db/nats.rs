@@ -48,6 +48,7 @@ pub async fn get_nats_client() -> &'static Client {
     NATS_CLIENT.get_or_init(connect).await
 }
 
+#[tracing::instrument(name = "nats::get_bucket_by_key")]
 async fn get_bucket_by_key<'a>(
     prefix: &'a str,
     key: &'a str,
@@ -95,6 +96,7 @@ impl NatsDb {
         Self::new(SUPER_CLUSTER_PREFIX)
     }
 
+    #[tracing::instrument(name = "nats::get_key_value", skip(self))]
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let bucket_name = bucket
@@ -164,6 +166,7 @@ impl super::Db for NatsDb {
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::stats", skip(self))]
     async fn stats(&self) -> Result<super::Stats> {
         let client = get_nats_client().await.clone();
         let jetstream = async_nats::jetstream::new(client);
@@ -180,6 +183,7 @@ impl super::Db for NatsDb {
         })
     }
 
+    #[tracing::instrument(name = "db::get", skip(self))]
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = key_encode(new_key);
@@ -224,6 +228,7 @@ impl super::Db for NatsDb {
         }
     }
 
+    #[tracing::instrument(name = "db::put", skip(self, value))]
     async fn put(
         &self,
         key: &str,
@@ -245,6 +250,7 @@ impl super::Db for NatsDb {
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::get_for_update", skip(self, update_fn))]
     async fn get_for_update(
         &self,
         key: &str,
@@ -306,6 +312,7 @@ impl super::Db for NatsDb {
         ret
     }
 
+    #[tracing::instrument(name = "db::delete", skip(self))]
     async fn delete(
         &self,
         key: &str,
@@ -353,6 +360,7 @@ impl super::Db for NatsDb {
         Ok(())
     }
 
+    #[tracing::instrument(name = "db::list", skip(self))]
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
         let bucket = &bucket;
@@ -403,6 +411,7 @@ impl super::Db for NatsDb {
         Ok(result)
     }
 
+    #[tracing::instrument(name = "db::list_keys", skip(self))]
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
         let bucket = &bucket;
@@ -433,6 +442,7 @@ impl super::Db for NatsDb {
         Ok(keys)
     }
 
+    #[tracing::instrument(name = "db::list_values", skip(self))]
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
         let bucket = &bucket;
@@ -474,6 +484,7 @@ impl super::Db for NatsDb {
         Ok(result)
     }
 
+    #[tracing::instrument(name = "db::list_values_by_start_dt", skip(self))]
     async fn list_values_by_start_dt(
         &self,
         prefix: &str,
@@ -545,11 +556,13 @@ impl super::Db for NatsDb {
         Ok(result)
     }
 
+    #[tracing::instrument(name = "db::count", skip(self))]
     async fn count(&self, prefix: &str) -> Result<i64> {
         let keys = self.list_keys(prefix).await?;
         Ok(keys.len() as i64)
     }
 
+    #[tracing::instrument(name = "db::watch", skip(self))]
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
         let (tx, rx) = mpsc::channel(65535);
         let prefix = prefix.to_string();
@@ -715,6 +728,7 @@ impl Locker {
     }
 
     /// lock with timeout, 0 means use default timeout, unit: second
+    #[tracing::instrument(name = "nats::locker::lock", skip(self))]
     pub(crate) async fn lock(
         &mut self,
         timeout: u64,
@@ -799,6 +813,7 @@ impl Locker {
         }
     }
 
+    #[tracing::instrument(name = "nats::locker::unlock", skip(self))]
     pub(crate) async fn unlock(&self) -> Result<()> {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
