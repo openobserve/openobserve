@@ -157,41 +157,59 @@ test.describe(" visualize UI testcases", () => {
   test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
     page,
   }) => {
+/*************  ✨ Codeium Command 🌟  *************/
+    console.log("step 1: refresh btn clicked");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    console.log("step 2: visualize toggle clicked");
     await page.locator('[data-test="logs-visualize-toggle"]').click();
+    console.log("step 3: x axis item removed");
     await page
       .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
+    console.log("step 4: error message appeared");
     await page.getByText("Chart configuration has been").click();
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
+    console.log("step 5: refresh btn clicked again");
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
+    console.log("step 6: error message appeared again");
     await expect(page.getByText("There are some errors, please")).toBeVisible();
+    console.log("step 7: x axis item added");
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
       )
       .click();
+    console.log("step 8: refresh btn clicked again");
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
+    console.log("step 9: y axis item removed");
     await page
       .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
       .click();
+    console.log("step 10: y axis item added");
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+    console.log("step 11: refresh btn clicked again");
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
+    console.log("step 12: waiting for response");
     await page.waitForResponse("**/api/**/_search**");
+    console.log("step 13: clicking on chart");
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 470,
         y: 13,
       },
     });
+    console.log("step 14: complete");
+
+
+/******  ca29d2c9-fa5e-4826-b808-1e2cda8d07d0  *******/
   });
 
   // test("should correctly plot the data according to the new chart type when changing the chart type", async ({
