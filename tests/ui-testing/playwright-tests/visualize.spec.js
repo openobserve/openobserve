@@ -157,7 +157,6 @@ test.describe(" visualize UI testcases", () => {
   test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
     page,
   }) => {
-/*************  ✨ Codeium Command 🌟  *************/
     console.log("step 1: refresh btn clicked");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     console.log("step 2: visualize toggle clicked");
@@ -200,16 +199,10 @@ test.describe(" visualize UI testcases", () => {
     console.log("step 12: waiting for response");
     await page.waitForResponse("**/api/**/_search**");
     console.log("step 13: clicking on chart");
-    await page.locator('[data-test="chart-renderer"] canvas').click({
-      position: {
-        x: 470,
-        y: 13,
-      },
-    });
+    await page.locator('[data-test="chart-renderer"] canvas').waitFor();
     console.log("step 14: complete");
 
 
-/******  ca29d2c9-fa5e-4826-b808-1e2cda8d07d0  *******/
   });
 
   // test("should correctly plot the data according to the new chart type when changing the chart type", async ({
