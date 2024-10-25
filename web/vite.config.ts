@@ -120,6 +120,7 @@ export default defineConfig({
         extension: [".js", ".ts", ".vue"],
         requireEnv: true,
         forceBuildInstrument: true,
+        checkProd: false,
       }),
     enterpriseResolverPlugin,
     vueJsx(),
