@@ -471,7 +471,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 trigger_data_stream.success_response = Some(success_msg);
                 // Notification was sent successfully, store the last used end_time in the triggers
                 trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(alert_end_time)
+                    Some(end_time)
                 } else {
                     None
                 };
