@@ -67,7 +67,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
-    let log_ingestion_errors = ingestion_log_enabled(org_id).await;
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);

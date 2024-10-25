@@ -66,7 +66,7 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let mut need_usage_report = true;
-    let log_ingestion_errors = ingestion_log_enabled(org_id).await;
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {

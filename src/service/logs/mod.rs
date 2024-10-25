@@ -260,7 +260,7 @@ async fn write_logs(
     json_data: Vec<(i64, Map<String, Value>)>,
 ) -> Result<RequestStats> {
     let cfg = get_config();
-    let log_ingest_errors = ingestion_log_enabled(org_id).await;
+    let log_ingest_errors = ingestion_log_enabled().await;
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
@@ -551,8 +551,9 @@ pub fn refactor_map(
     new_map
 }
 
-async fn ingestion_log_enabled(org_id: &str) -> bool {
-    match get_org_setting(org_id).await {
+async fn ingestion_log_enabled() -> bool {
+    // the logging will be enabled through meta only, so hardcoded
+    match get_org_setting("_meta").await {
         Ok(b) => {
             let org_settings: OrganizationSetting = json::from_slice(&b).unwrap();
             org_settings.toggle_ingestion_logs

@@ -96,7 +96,7 @@ pub async fn logs_json_handler(
 ) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let log_ingestion_errors = ingestion_log_enabled(org_id).await;
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = match in_stream_name {

@@ -74,7 +74,7 @@ pub async fn handle_grpc_request(
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let log_ingestion_errors = ingestion_log_enabled(org_id).await;
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
