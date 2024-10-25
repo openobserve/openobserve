@@ -372,6 +372,9 @@ pub async fn search(
         let sql = Some(in_req.query.sql.clone());
         let start_time = Some(in_req.query.start_time);
         let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
         // set search task
         SEARCH_SERVER
             .insert(
@@ -385,6 +388,7 @@ pub async fn search(
                     sql,
                     start_time,
                     end_time,
+                    s_event_type,
                 ),
             )
             .await;
@@ -726,6 +730,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
+
+    use std::str::FromStr;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -861,6 +867,9 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
+        let search_type: Option<search::SearchEventType> = result
+            .search_type
+            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -872,6 +881,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             query,
             scan_stats,
             work_group: work_group.to_string(),
+            search_type,
         });
     }
 
