@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.12.0"
+version = "0.13.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

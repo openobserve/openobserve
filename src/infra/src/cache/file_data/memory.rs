@@ -99,7 +99,7 @@ impl FileData {
             );
             // cache is full, need release some space
             let need_release_size = min(
-                self.max_size,
+                self.cur_size,
                 max(get_config().memory_cache.release_size, data_size * 100),
             );
             self.gc(trace_id, need_release_size).await?;
@@ -134,7 +134,7 @@ impl FileData {
         loop {
             let item = self.data.remove();
             if item.is_none() {
-                log::error!(
+                log::warn!(
                     "[trace_id {trace_id}] File memory cache is corrupt, it shouldn't be none"
                 );
                 break;
