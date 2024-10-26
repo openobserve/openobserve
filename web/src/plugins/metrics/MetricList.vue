@@ -111,7 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     expand-icon-class="field-expansion-icon"
                     expand-icon="expand_more"
                     expanded-icon="expand_less"
-                    @before-show="(event: any) => openFilterCreator(event, props.row)"
+                    @before-show="
+                      (event: any) => openFilterCreator(event, props.row)
+                    "
                   >
                     <template v-slot:header>
                       <div
@@ -212,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       addValueToEditor(
                                         props.row.name,
                                         value.key,
-                                        '='
+                                        '=',
                                       )
                                     "
                                   >
@@ -229,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       addValueToEditor(
                                         props.row.name,
                                         value.key,
-                                        '!='
+                                        '!=',
                                       )
                                     "
                                   >
@@ -280,6 +282,7 @@ import {
   watch,
   onMounted,
   computed,
+  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -342,7 +345,7 @@ export default defineComponent({
       () => {
         streamOptions.value = props.metricsList;
       },
-      { deep: true }
+      { deep: true },
     );
     onMounted(() => {
       if (!streamOptions.value.length) streamOptions.value = props.metricsList;
@@ -352,7 +355,7 @@ export default defineComponent({
         streamOptions.value = props.metricsList;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
         );
       });
     };
@@ -360,7 +363,7 @@ export default defineComponent({
       const streamData = await getStream(
         selectedMetric.value?.value || "",
         "metrics",
-        true
+        true,
       );
 
       selectedMetricLabels.value = streamData.schema;
@@ -373,7 +376,7 @@ export default defineComponent({
       (metric) => {
         if (metric?.value) updateMetricLabels();
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
@@ -490,8 +493,9 @@ export default defineComponent({
         });
     };
 
-    const onMetricChange = () => {
-      updateMetricLabels();
+    const onMetricChange = async () => {
+      await nextTick();
+
       emit("update:change-metric", selectedMetric.value);
     };
     const setSelectedMetricType = (option: any) => {
@@ -503,7 +507,7 @@ export default defineComponent({
     const addValueToEditor = (
       label: string,
       value: string,
-      operator: string
+      operator: string,
     ) => {
       addLabelToEditor(`${label}${operator}"${value}"`);
     };
