@@ -21,6 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     ider,
+    meta::sql::OrderBy,
     utils::{base64, json},
 };
 
@@ -371,7 +372,7 @@ pub struct SearchPartitionResponse {
     pub histogram_interval: Option<i64>, // seconds, for histogram
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
-    pub order_by: super::sql::OrderBy,
+    pub order_by: OrderBy,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -556,6 +557,7 @@ pub struct QueryStatus {
     pub stream_type: Option<String>,
     pub query: Option<QueryInfo>,
     pub scan_stats: Option<ScanStats>,
+    pub search_type: Option<SearchEventType>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

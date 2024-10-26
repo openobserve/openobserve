@@ -35,6 +35,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
+    cache::stats,
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
@@ -381,6 +382,9 @@ pub async fn search(
         let sql = Some(in_req.query.sql.clone());
         let start_time = Some(in_req.query.start_time);
         let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
         // set search task
         SEARCH_SERVER
             .insert(
@@ -394,6 +398,7 @@ pub async fn search(
                     sql,
                     start_time,
                     end_time,
+                    s_event_type,
                 ),
             )
             .await;
@@ -561,14 +566,17 @@ pub async fn search_partition(
     let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     let mut files = Vec::new();
+
     let mut max_query_range = 0;
-    for (stream, schema) in sql.schemas.iter() {
+    for (stream_name, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        if !skip_get_file_list {
+        let use_stream_stats_for_partition = stream_settings.approx_partition;
+
+        if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
                 &sql.org_id,
                 stream_type,
-                stream,
+                stream_name,
                 sql.time_range,
             )
             .await?;
@@ -577,6 +585,34 @@ pub async fn search_partition(
                 stream_settings.max_query_range * 3600 * 1_000_000,
             );
             files.extend(stream_files);
+        } else {
+            // data retention in seconds
+            let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+            // data duration in seconds
+            let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
+            let stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+            let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+            let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+            if data_retention_based_on_stats > 0 {
+                data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
+            };
+            if data_retention == 0 {
+                log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
+                data_retention = 1;
+            }
+            let records = (stats.doc_num as i64 * query_duration) / data_retention;
+            let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
+            log::info!(
+                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {}",
+                stream_name,
+                records,
+                original_size,
+            );
+            files.push(infra::file_list::FileId {
+                id: Utc::now().timestamp_micros(),
+                records,
+                original_size,
+            });
         }
     }
 
@@ -694,6 +730,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
+
+    use std::str::FromStr;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -829,6 +867,9 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
+        let search_type: Option<search::SearchEventType> = result
+            .search_type
+            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -840,6 +881,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             query,
             scan_stats,
             work_group: work_group.to_string(),
+            search_type,
         });
     }
 

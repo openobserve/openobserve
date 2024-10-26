@@ -49,8 +49,8 @@ pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
-pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
-pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+pub const SIZE_IN_MB: i64 = 1024 * 1024;
+pub const SIZE_IN_GB: i64 = 1024 * 1024 * 1024;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
@@ -949,9 +949,9 @@ pub struct Limit {
     )]
     pub alert_considerable_delay: i32,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
-    pub scheduler_clean_interval: u64,
+    pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
-    pub scheduler_watch_interval: u64,
+    pub scheduler_watch_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
@@ -1523,6 +1523,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.meta_store_external = true;
+    }
+    if !cfg.common.local_mode
+        && !cfg.common.meta_store.starts_with("postgres")
+        && !cfg.common.meta_store.starts_with("mysql")
+    {
+        return Err(anyhow::anyhow!(
+            "Meta store only support mysql or postgres in cluster mode."
+        ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
         return Err(anyhow::anyhow!(

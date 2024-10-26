@@ -18,7 +18,10 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::sqlite::{create_index, CLIENT_RW},
+    db::{
+        sqlite::{create_index, CLIENT_RW},
+        IndexStatement,
+    },
     errors::{Error, Result},
 };
 
@@ -107,20 +110,26 @@ CREATE TABLE IF NOT EXISTS schema_history
 }
 
 pub async fn create_table_index() -> Result<()> {
-    create_index("schema_history_org_idx", "schema_history", false, &["org"]).await?;
-    create_index(
+    create_index(IndexStatement::new(
+        "schema_history_org_idx",
+        "schema_history",
+        false,
+        &["org"],
+    ))
+    .await?;
+    create_index(IndexStatement::new(
         "schema_history_stream_idx",
         "schema_history",
         false,
         &["org", "stream_type", "stream_name"],
-    )
+    ))
     .await?;
-    create_index(
+    create_index(IndexStatement::new(
         "schema_history_stream_version_idx",
         "schema_history",
         true,
         &["org", "stream_type", "stream_name", "start_dt"],
-    )
+    ))
     .await?;
 
     Ok(())

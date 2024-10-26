@@ -95,7 +95,7 @@ mod tests {
         fs::remove_dir_all("./data").expect("Delete local dir failed");
     }
 
-    #[test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn e2e_test() {
         // make sure data dir is deleted before we run integration tests
         fs::remove_dir_all("./data")

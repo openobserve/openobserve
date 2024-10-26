@@ -350,9 +350,6 @@ pub async fn merge_by_stream(
         partition.push(file.to_owned());
     }
 
-    // collect stream stats
-    let mut stream_stats = StreamStats::default();
-
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
@@ -473,6 +470,9 @@ pub async fn merge_by_stream(
                     deleted: false,
                     segment_ids: None,
                 });
+
+                // collect stream stats
+                let mut stream_stats: StreamStats = StreamStats::default();
                 for file in new_file_list.iter() {
                     stream_stats = stream_stats - file.meta.clone();
                     events.push(FileKey {
@@ -486,7 +486,24 @@ pub async fn merge_by_stream(
 
                 // write file list to storage
                 match write_file_list(&org_id, &events).await {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        // update stream stats
+                        if stream_stats.doc_num != 0 {
+                            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+                            if let Err(e) = infra_file_list::set_stream_stats(
+                                &org_id,
+                                &[(stream_key.clone(), stream_stats)],
+                            )
+                            .await
+                            {
+                                log::error!(
+                                    "[COMPACT] set_stream_stats failed: {}, err: {}",
+                                    stream_key,
+                                    e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => {
                         log::error!("[COMPACT] write file list failed: {}", e);
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -510,18 +527,6 @@ pub async fn merge_by_stream(
     // update job status
     if let Err(e) = infra_file_list::set_job_done(job_id).await {
         log::error!("[COMPACT] set_job_done failed: {e}");
-    }
-
-    // update stream stats
-    if stream_stats.doc_num != 0 {
-        infra_file_list::set_stream_stats(
-            org_id,
-            &[(
-                format!("{org_id}/{stream_type}/{stream_name}"),
-                stream_stats,
-            )],
-        )
-        .await?;
     }
 
     // metrics
