@@ -30,7 +30,10 @@ pub fn get_stats() -> RwHashMap<String, StreamStats> {
 #[inline]
 pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) -> StreamStats {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    STATS.get(&key).map(|v| *v.value()).unwrap_or_default()
+    STATS
+        .get(&key)
+        .map(|v| v.value().clone())
+        .unwrap_or_default()
 }
 
 #[inline]
@@ -78,8 +81,8 @@ pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error>
     }
     stats.doc_num += val.records;
     stats.file_num += 1;
-    stats.storage_size += val.original_size as f64;
-    stats.compressed_size += val.compressed_size as f64;
+    stats.storage_size += val.original_size;
+    stats.compressed_size += val.compressed_size;
 
     Ok(())
 }
@@ -112,11 +115,11 @@ mod tests {
             doc_time_max: 1667978845374,
             doc_num: 5000,
             file_num: 1,
-            storage_size: 200.00,
-            compressed_size: 3.00,
+            storage_size: 200,
+            compressed_size: 3,
         };
 
-        set_stream_stats("nexus", "default", StreamType::Logs, val);
+        set_stream_stats("nexus", "default", StreamType::Logs, val.clone());
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats, val);
 
