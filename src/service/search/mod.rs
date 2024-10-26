@@ -596,7 +596,10 @@ pub async fn search_partition(
             if data_retention_based_on_stats > 0 {
                 data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
             };
-
+            if data_retention == 0 {
+                log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
+                data_retention = 1;
+            }
             let records = (stats.doc_num as i64 * query_duration) / data_retention;
             let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
             log::info!(
