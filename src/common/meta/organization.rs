@@ -64,8 +64,8 @@ pub struct OrgSummary {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
-    pub total_storage_size: f64,
-    pub total_compressed_size: f64,
+    pub total_storage_size: i64,
+    pub total_compressed_size: i64,
 }
 
 /// A container for passcodes and rumtokens
@@ -107,6 +107,18 @@ fn default_trace_id_field_name() -> String {
 
 fn default_span_id_field_name() -> String {
     "spanId".to_string()
+}
+
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
+pub struct OrganizationSettingPayload {
+    /// Ideally this should be the same as prometheus-scrape-interval (in
+    /// seconds).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scrape_interval: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id_field_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_id_field_name: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]

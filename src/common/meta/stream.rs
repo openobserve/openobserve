@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn test_stats() {
         let stats = StreamStats::default();
-        let stats_str: String = stats.into();
+        let stats_str: String = stats.clone().into();
         let stats_frm_str = StreamStats::from(stats_str.as_str());
         assert_eq!(stats, stats_frm_str);
     }

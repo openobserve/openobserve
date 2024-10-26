@@ -264,10 +264,10 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
         let columns = key.split('/').collect::<Vec<&str>>();
         metrics::STORAGE_ORIGINAL_BYTES
             .with_label_values(&[columns[0], columns[2], columns[1]])
-            .set(stat.storage_size as i64);
+            .set(stat.storage_size);
         metrics::STORAGE_COMPRESSED_BYTES
             .with_label_values(&[columns[0], columns[2], columns[1]])
-            .set(stat.compressed_size as i64);
+            .set(stat.compressed_size);
         metrics::STORAGE_FILES
             .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.file_num);

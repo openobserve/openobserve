@@ -491,8 +491,8 @@ impl From<&StatsRecord> for StreamStats {
             doc_time_max: record.max_ts,
             doc_num: record.records,
             file_num: record.file_num,
-            storage_size: record.original_size as f64,
-            compressed_size: record.compressed_size as f64,
+            storage_size: record.original_size,
+            compressed_size: record.compressed_size,
         }
     }
 }
