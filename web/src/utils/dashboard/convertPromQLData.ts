@@ -21,7 +21,7 @@ import {
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import {
-  ColorMode,
+  ColorModeWithoutMinMax,
   getMetricMinMaxValue,
   getSeriesColor,
 } from "./colorPalette";
@@ -380,7 +380,11 @@ export const convertPromQLData = async (
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
 
-  if (!Object.values(ColorMode).includes(panelSchema.config?.color?.mode)) {
+  if (
+    !Object.values(ColorModeWithoutMinMax).includes(
+      panelSchema.config?.color?.mode,
+    )
+  ) {
     [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
   }
 

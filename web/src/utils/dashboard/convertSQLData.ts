@@ -33,7 +33,11 @@ import {
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
-import { ColorMode, getSeriesColor, getSQLMinMaxValue } from "./colorPalette";
+import {
+  ColorModeWithoutMinMax,
+  getSeriesColor,
+  getSQLMinMaxValue,
+} from "./colorPalette";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -840,7 +844,11 @@ export const convertSQLData = async (
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
-  if (!Object.values(ColorMode).includes(panelSchema.config?.color?.mode)) {
+  if (
+    !Object.values(ColorModeWithoutMinMax).includes(
+      panelSchema.config?.color?.mode,
+    )
+  ) {
     // if heatmap then get min and max from z axis sql data
     if (panelSchema.type == "heatmap") {
       // NOTE: Currently we do not support color options for heatmap
