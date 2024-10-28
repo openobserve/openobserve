@@ -1,9 +1,24 @@
+<!-- Copyright 2023 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
 <template>
   <div class="running-queries-page" v-if="isMetaOrg">
     <q-table
       data-test="running-queries-table"
       ref="qTable"
-      :rows="rowsQuery"
+      :rows="rows"
       :columns="columns"
       :pagination="pagination"
       row-key="trace_id"
@@ -20,10 +35,10 @@
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -55,79 +70,6 @@
         </q-td>
       </template>
 
-      <template #top>
-        <div class="flex justify-between items-center full-width">
-          <div
-            class="text-h6 q-mx-md q-my-xs"
-            data-test="log-stream-title-text"
-          >
-            {{ t("queries.runningQueries") }}
-          </div>
-          <q-space />
-          <div class="flex items-start">
-            <div
-              data-test="streams-search-stream-input"
-              class="flex items-center"
-            >
-              <q-select
-                v-model="selectedSearchField"
-                dense
-                map-options
-                emit-value
-                filled
-                :options="searchFieldOptions"
-                class="q-pa-none search-field-select"
-                data-test="running-queries-search-fields-select"
-                @update:model-value="filterQuery = ''"
-              ></q-select>
-              <q-input
-                v-if="selectedSearchField == 'all'"
-                v-model="filterQuery"
-                borderless
-                filled
-                dense
-                class="q-mb-xs no-border search-input q-pa-none search-running-query"
-                :placeholder="t('queries.search')"
-                data-test="running-queries-search-input"
-              >
-                <template #prepend>
-                  <q-icon name="search" />
-                </template>
-              </q-input>
-              <q-select
-                v-else
-                v-model="filterQuery"
-                borderless
-                map-options
-                emit-value
-                filled
-                dense
-                label="Select option"
-                :options="otherFieldOptions"
-                class="q-mb-xs no-border search-input q-pa-none search-running-query"
-                :placeholder="t('queries.search')"
-                data-test="running-queries-search-input"
-              ></q-select>
-              <q-btn
-                data-test="running-queries-refresh-btn"
-                class="q-ml-md q-mb-xs text-bold no-border"
-                padding="sm lg"
-                color="secondary"
-                no-caps
-                icon="refresh"
-                :label="t(`queries.refreshQuery`)"
-                @click="refreshData"
-              />
-            </div>
-          </div>
-        </div>
-        <div class="label-container">
-          <label class="q-my-sm text-bold"
-            >Last Data Refresh Time: {{ lastRefreshed }}</label
-          >
-        </div>
-      </template>
-
       <template #bottom="scope">
         <q-btn
           data-test="qm-multiple-cancel-query-btn"
@@ -155,13 +97,6 @@
         </div>
       </template>
     </q-table>
-    <confirm-dialog
-      v-model="deleteDialog.show"
-      :title="deleteDialog.title"
-      :message="deleteDialog.message"
-      @update:ok="deleteQuery"
-      @update:cancel="deleteDialog.show = false"
-    />
     <q-dialog
       v-model="showListSchemaDialog"
       position="right"
@@ -177,7 +112,6 @@
 <script lang="ts">
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import SearchService from "@/services/search";
 import {
   onBeforeMount,
   ref,
@@ -199,23 +133,100 @@ import { durationFormatter } from "@/utils/zincutils";
 export default defineComponent({
   name: "RunningQueriesList",
   components: { QueryList, ConfirmDialog, QTablePagination, NoData },
-  setup() {
+  props: {
+    rows: {
+      type: Array,
+      required: true,
+    },
+    selectedRows: {
+      type: Array,
+      required: false,
+    },
+  },
+  emits: ["update:selectedRows", "delete:queries", "delete:query"],
+  setup(props, { emit }) {
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
-    const selectedRow = ref([]);
     const deleteRowCount = ref(0);
     const searchFieldOptions = ref([
       { label: "All Fields", value: "all" },
       { label: "Exec. Duration", value: "exec_duration" },
       { label: "Query Range", value: "query_range" },
     ]);
+
+    const selectedQueryTypeTab = ref("summary");
+
+    const runningQueries = [
+      {
+        trace_id: "2f85ab21ba4c49cca4990de1e3332926-0",
+        status: "waiting",
+        created_at: 1729838872552707,
+        started_at: 0,
+        work_group: "Long",
+        user_id: "omkar1@openobserve.ai",
+        org_id: "otlp-production",
+        stream_type: "logs",
+        query: {
+          sql: 'SELECT histogram(_timestamp,\'43200 seconds\') AS "x_axis_1", COUNT("k8s_container_name") AS "y_axis_1", "k8s_node_name" AS "breakdown_1" FROM "default" GROUP BY "x_axis_1", "breakdown_1" ORDER BY "x_axis_1" ASC',
+          start_time: 1729814400000000,
+          end_time: 1729838871510000,
+        },
+        scan_stats: null,
+      },
+      {
+        trace_id: "0de0b2a1b1b2451488c86652e562c40c-0",
+        status: "processing",
+        created_at: 1729838872353327,
+        started_at: 1729838873022841,
+        work_group: "Long",
+        user_id: "omkar1@openobserve.ai",
+        org_id: "otlp-production",
+        stream_type: "logs",
+        query: {
+          sql: 'SELECT count(k8s_pod_start_time) as "y_axis_1"  FROM "default" ',
+          start_time: 1726210071510000,
+          end_time: 1729838871510000,
+        },
+        scan_stats: {
+          files: 2640,
+          records: 603459598,
+          original_size: 813496,
+          compressed_size: 25986,
+          querier_files: 0,
+          querier_memory_cached_files: 0,
+          querier_disk_cached_files: 0,
+          idx_scan_size: 0,
+          idx_took: 0,
+        },
+      },
+      {
+        trace_id: "13491c0c0d1f41998cc8584608d72312-0",
+        status: "waiting",
+        created_at: 1729838873302399,
+        started_at: 0,
+        work_group: "Long",
+        user_id: "omkar1@openobserve.ai",
+        org_id: "otlp-production",
+        stream_type: "logs",
+        query: {
+          sql: 'SELECT histogram(_timestamp,\'43200 seconds\') AS "x_axis_1", COUNT("k8s_app_instance") AS "y_axis_1", "k8s_pod_name" AS "breakdown_1" FROM "default" GROUP BY "x_axis_1", "breakdown_1" ORDER BY "x_axis_1" ASC',
+          start_time: 1729771200000000,
+          end_time: 1729814400000000,
+        },
+        scan_stats: null,
+      },
+    ];
+
+    const runningQueryTypes = [
+      { label: "User Summary", value: "summary" },
+      { label: "All Queries", value: "all" },
+    ];
     const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
     const refreshData = () => {
-      getRunningQueries();
       lastRefreshed.value = getCurrentTime();
     };
 
@@ -234,7 +245,6 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
-    const queries = ref([]);
 
     const deleteDialog = ref({
       show: false,
@@ -364,11 +374,6 @@ export default defineComponent({
       },
     ]);
 
-    onBeforeMount(() => {
-      getRunningQueries();
-      lastRefreshed.value = getCurrentTime();
-    });
-
     // Watcher to filter queries based on user_id
     const filteredQueries = ref([]);
 
@@ -376,16 +381,16 @@ export default defineComponent({
       const newVal = filterQuery.value;
       if (selectedSearchField.value === "all") {
         if (!newVal) {
-          return queries.value;
+          return props.rows;
         } else {
-          return queries.value.filter(
+          return props.rows.filter(
             (query: any) =>
               query.user_id.toLowerCase().includes(newVal.toLowerCase()) ||
               query.org_id.toLowerCase().includes(newVal.toLowerCase()) ||
               query.stream_type.toLowerCase().includes(newVal.toLowerCase()) ||
               query.status.toLowerCase().includes(newVal.toLowerCase()) ||
               query.trace_id.toLowerCase().includes(newVal.toLowerCase()) ||
-              query.work_group.toLowerCase().includes(newVal.toLowerCase())
+              query.work_group.toLowerCase().includes(newVal.toLowerCase()),
           );
         }
       } else {
@@ -409,7 +414,7 @@ export default defineComponent({
           gt_1M: 30 * 24 * 60 * 60 * 1000000, // 1 month (approx.)
         };
 
-        return queries.value.filter((item: any) => {
+        return props.rows.filter((item: any) => {
           const timeDifference =
             selectedSearchField.value == "exec_duration"
               ? currentTime - item.created_at
@@ -458,75 +463,19 @@ export default defineComponent({
       resultTotal.value = filteredRows.value.length;
     });
 
-    const getRunningQueries = () => {
-      const dismiss = q.notify({
-        message: "Fetching running queries...",
-        color: "primary",
-        position: "bottom",
-        spinner: true,
-      });
-      SearchService.get_running_queries(store.state.zoConfig.meta_org)
-        .then((response: any) => {
-          // resultTotal.value = response?.data?.status?.length;
-          queries.value = response?.data?.status;
-          resultTotal.value = queries.value.length;
-        })
-        .catch((error: any) => {
-          q.notify({
-            message:
-              error.response?.data?.message ||
-              "Failed to fetch running queries",
-            color: "negative",
-            position: "bottom",
-            timeout: 2500,
-          });
-        })
-        .finally(() => {
-          dismiss();
-        });
-    };
-
-    const deleteQuery = () => {
-      SearchService.delete_running_queries(
-        store.state.zoConfig.meta_org,
-        deleteDialog.value.data
-      )
-        .then(() => {
-          selectedRow.value = [];
-
-          getRunningQueries();
-
-          q.notify({
-            message: "Query cancelled",
-            color: "positive",
-            position: "bottom",
-            timeout: 1500,
-          });
-        })
-        .catch((error: any) => {
-          q.notify({
-            message: error.response?.data?.message || "Failed to cancel query",
-            color: "negative",
-            position: "bottom",
-            timeout: 1500,
-          });
-        })
-        .finally(() => {
-          deleteDialog.value.show = false;
-          deleteDialog.value.data = [];
-        });
-    };
+    const selectedRow = computed({
+      get: () => props.selectedRows,
+      set: (value) => {
+        emit("update:selectedRows", value);
+      },
+    });
 
     const confirmDeleteAction = (props: any) => {
-      deleteDialog.value.data = [props.row.trace_id];
-      deleteDialog.value.show = true;
+      emit("delete:query", props.row);
     };
 
     const handleMultiQueryCancel = () => {
-      deleteDialog.value.data = [
-        ...(selectedRow.value?.map((row: any) => row.trace_id) || []),
-      ];
-      deleteDialog.value.show = true;
+      emit("delete:queries");
     };
 
     const rowsQuery = computed(function () {
@@ -558,13 +507,15 @@ export default defineComponent({
         };
       });
     });
+
+    const onChangeQueryTab = (tab: string) => {
+      selectedQueryTypeTab.value = tab;
+    };
+
     return {
       t,
       store,
-      queries,
       columns,
-      getRunningQueries,
-      deleteQuery,
       confirmDeleteAction,
       deleteDialog,
       perPageOptions,
@@ -589,12 +540,21 @@ export default defineComponent({
       searchFieldOptions,
       otherFieldOptions,
       pagination,
+      runningQueryTypes,
+      selectedQueryTypeTab,
+      onChangeQueryTab,
     };
   },
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+.query-management-tabs {
+  ::v-deep .q-btn:before {
+    border: none !important;
+  }
+}
+
 .label-container {
   display: flex;
   width: 100%;

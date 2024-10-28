@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
 import { ref, type Ref, defineComponent, computed, toRaw, watch } from "vue";
@@ -115,7 +114,7 @@ import { durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, ConfirmDialog, QTablePagination, NoData },
+  components: { QueryList, QTablePagination, NoData },
   props: {
     rows: {
       type: Array,
