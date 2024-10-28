@@ -49,8 +49,8 @@ pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
-pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
-pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+pub const SIZE_IN_MB: i64 = 1024 * 1024;
+pub const SIZE_IN_GB: i64 = 1024 * 1024 * 1024;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
@@ -839,7 +839,7 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
@@ -1468,7 +1468,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 64 * 1024 * 1024; // 64MB
+        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
@@ -1523,6 +1523,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.meta_store_external = true;
+    }
+    if !cfg.common.local_mode
+        && !cfg.common.meta_store.starts_with("postgres")
+        && !cfg.common.meta_store.starts_with("mysql")
+    {
+        return Err(anyhow::anyhow!(
+            "Meta store only support mysql or postgres in cluster mode."
+        ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
         return Err(anyhow::anyhow!(

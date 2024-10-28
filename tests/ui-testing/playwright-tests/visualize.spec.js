@@ -8,13 +8,9 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   //   await page.getByText('Login as internal user').click();
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
   //Enter Password
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
   await page.locator('[data-cy="login-sign-in"]').click();
   await page.waitForTimeout(4000);
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -22,14 +18,8 @@ async function login(page) {
 
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
+  await page.locator('[data-test="log-search-index-list-select-stream"]').click({ force: true });
+  await page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
 test.describe(" visualize UI testcases", () => {
   // let logData;
@@ -80,14 +70,11 @@ test.describe(" visualize UI testcases", () => {
     // Making a POST request using fetch API
     const response = await page.evaluate(
       async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(
-          `${url}/api/${orgId}/${streamName}/_json`,
-          {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(logsdata),
-          }
-        );
+        const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(logsdata),
+        });
         return await fetchResponse.json();
       },
       {
@@ -103,29 +90,20 @@ test.describe(" visualize UI testcases", () => {
     //  });
     // const allorgs = page.waitForResponse("**/api/default/organizations**");
     // const functions = page.waitForResponse("**/api/default/functions**");
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
-  test("should create logs when queries are ingested into the search field", async ({
-    page,
-  }) => {
+  test("should create logs when queries are ingested into the search field", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
     await page.getByLabel("SQL Mode").locator("div").nth(2).click();
     await page.waitForTimeout(1000);
+    await page.locator('[data-test="logs-search-index-list"]').getByText("arrow_drop_down").click();
     await page
-      .locator('[data-test="logs-search-index-list"]')
-      .getByText("arrow_drop_down")
-      .click();
-    await page
-      .locator(
-        '[data-test="log-search-index-list-stream-toggle-e2e_automate"] div'
-      )
+      .locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div')
       .nth(2)
       .click();
     await page.locator('[data-test="date-time-btn"]').click();
@@ -137,21 +115,14 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page
-      .locator('[data-test="logs-search-index-list"]')
-      .getByText("arrow_drop_down")
-      .click();
+    await page.locator('[data-test="logs-search-index-list"]').getByText("arrow_drop_down").click();
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-  await page.locator('[data-test="selected-chart-bar-item"]').click();
+    await page.locator('[data-test="selected-chart-bar-item"]').click();
     await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
-    await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-x-item-_timestamp"]')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-y-item-_timestamp"]')).toBeVisible();
   });
 
   test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart", async ({
@@ -159,9 +130,7 @@ test.describe(" visualize UI testcases", () => {
   }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
-      .click();
+    await page.locator('[data-test="dashboard-x-item-_timestamp-remove"]').click();
     await page.getByText("Chart configuration has been").click();
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
@@ -172,21 +141,24 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-    await page
-      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
-      .click();
+    await page.locator('[data-test="dashboard-y-item-_timestamp-remove"]').click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+    const search = page.waitForResponse(logData.applyQuery);
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
+    await expect.poll(async () => (await search).status(), {timeout: 15000}).toBe(200);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    
     await page.locator('[data-test="chart-renderer"] canvas').click({
-      position: {
-        x: 470,
-        y: 13,
-      },
-    });
+        position: {
+          x: 470,
+          y: 13,
+        },
+      });
   });
 
   test("should correctly plot the data according to the new chart type when changing the chart type", async ({
@@ -199,11 +171,9 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-   await page.locator('[data-test="selected-chart-line-item"]').click();
+    await page.locator('[data-test="selected-chart-line-item"]').click();
 
-    await expect(
-      page.locator('[data-test="chart-renderer"] canvas')
-    ).toBeVisible();
+    await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
@@ -306,12 +276,8 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await expect(page.locator(".view-line").first()).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-x-item-_timestamp"]')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-y-item-_timestamp"]')).toBeVisible();
   });
 
   test("should display an error message on the logs page for an invalid query", async ({
@@ -337,19 +303,11 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
     // Verify that X and Y axis items are visible
-    await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-x-item-_timestamp"]')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-y-item-_timestamp"]')).toBeVisible();
 
     // Perform additional visualization actions
-    await page
-      .locator("label")
-      .filter({ hasText: "Streamarrow_drop_down" })
-      .locator("i")
-      .click();
+    await page.locator("label").filter({ hasText: "Streamarrow_drop_down" }).locator("i").click();
 
     await page.waitForTimeout(1000);
 
@@ -385,9 +343,7 @@ test.describe(" visualize UI testcases", () => {
 
     try {
       await expect(
-        page.locator(
-          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
-        )
+        page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]')
       ).toBeVisible();
     } catch (e) {
       exceptionBefore = e;
@@ -402,9 +358,7 @@ test.describe(" visualize UI testcases", () => {
 
     try {
       await expect(
-        page.locator(
-          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
-        )
+        page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]')
       ).toBeVisible();
     } catch (e) {
       exceptionAfter = e;
@@ -500,7 +454,12 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await expect(page.getByText("Navigating away from")).toBeVisible();
     await page.locator('[data-test="confirm-button"]').click();
+
+    await page.waitForSelector('[data-test="logs-visualize-toggle"]');
+
     await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForSelector('[data-test="index-dropdown-stream"]');
 
     // Open the dropdown
     await page.locator('[data-test="index-dropdown-stream"]').click();
@@ -515,9 +474,7 @@ test.describe(" visualize UI testcases", () => {
     expect(dropdownCount).toBeGreaterThan(0);
 
     // Get the row element
-    const row = page
-      .getByRole("row", { name: "_timestamp +X +Y +B +F" })
-      .first();
+    const row = page.getByRole("row", { name: "_timestamp +X +Y +B +F" }).first();
 
     // Alternative assertions
     await expect(row).toBeDefined();
@@ -530,13 +487,9 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
-      .click();
+    await page.locator('[data-test="dashboard-y-item-_timestamp-remove"]').click();
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
-    await expect(
-      page.locator('[data-test="logs-search-result-bar-chart"]')
-    ).toBeVisible();
+    await expect(page.locator('[data-test="logs-search-result-bar-chart"]')).toBeVisible();
   });
 });

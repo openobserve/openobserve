@@ -66,6 +66,7 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-log.workspace = true
 tracing-subscriber.workspace = true
+urlencoding.workspace = true
 utoipa.workspace = true
 vrl.workspace = true
 zstd.workspace = true
