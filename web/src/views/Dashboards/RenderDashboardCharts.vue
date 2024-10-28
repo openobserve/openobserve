@@ -48,18 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panels.length === 1 &&
           panels[0].type === 'table'
         "
-        class="rows_value"
         style="height: 100%; width: 100%"
       >
         <PanelContainer
           @onDeletePanel="onDeletePanel"
           @onViewPanel="onViewPanel"
           :viewOnly="viewOnly"
-          :data="panels[0]"
+          :data="panels[0] || {}"
           :dashboardId="dashboardData.dashboardId"
           :folderId="folderId"
           :selectedTimeDate="
-            currentTimeObj[panels[0].id] || currentTimeObj['__global'] || {}
+            (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
+            currentTimeObj['__global'] ||
+            {}
           "
           :variablesData="variablesData"
           :forceLoad="forceLoad"
@@ -252,9 +253,9 @@ export default defineComponent({
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
-        ? props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === selectedTabId.value
-          )?.panels ?? []
+        ? (props.dashboardData?.tabs?.find(
+            (it: any) => it.tabId === selectedTabId.value,
+          )?.panels ?? [])
         : [];
     });
     const {
@@ -285,17 +286,17 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState
+      variablesAndPanelsDataLoadingState,
     );
 
     //computed property based on panels and variables loading state
     const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
       // Get values of variablesData and panels
       const variablesDataValues = Object.values(
-        variablesAndPanelsDataLoadingState.variablesData
+        variablesAndPanelsDataLoadingState.variablesData,
       );
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
 
       // Check if every value in both variablesData and panels is false
@@ -312,7 +313,7 @@ export default defineComponent({
 
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
       );
 
       if (traceIds.length > 0) {
@@ -366,7 +367,7 @@ export default defineComponent({
                 ...obj,
                 [item.name]: item.isLoading,
               }),
-              {}
+              {},
             );
         }
       } catch (error) {
@@ -389,7 +390,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -410,7 +411,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           props.dashboardData.dashboardId,
           props.dashboardData,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
         );
 
         showPositiveNotification("Dashboard updated successfully");
@@ -419,7 +420,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard update failed"
+              "Dashboard update failed",
           );
         } else {
           showErrorNotification(error?.message ?? "Dashboard update failed", {
@@ -522,7 +523,7 @@ export default defineComponent({
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
-        ...args
+        ...args,
       );
     };
 
