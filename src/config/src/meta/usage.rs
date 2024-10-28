@@ -33,6 +33,8 @@ pub enum TriggerDataStatus {
     Failed,
     #[serde(rename = "condition_not_satisfied")]
     ConditionNotSatisfied,
+    #[serde(rename = "skipped")]
+    Skipped,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -63,6 +65,8 @@ pub struct TriggerData {
     pub error: Option<String>,
     pub success_response: Option<String>,
     pub is_partial: Option<bool>,
+    pub delay_in_secs: Option<i64>,
+    pub evaluation_took_in_secs: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -298,13 +302,13 @@ impl Default for RequestStats {
 impl From<FileMeta> for RequestStats {
     fn from(meta: FileMeta) -> RequestStats {
         RequestStats {
-            size: meta.original_size as f64 / SIZE_IN_MB,
+            size: (meta.original_size / SIZE_IN_MB) as f64,
             records: meta.records,
             response_time: 0.0,
             function: None,
             request_body: None,
             cached_ratio: None,
-            compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
+            compressed_size: Some((meta.compressed_size / SIZE_IN_MB) as f64),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),
             user_email: None,

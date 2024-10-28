@@ -299,6 +299,10 @@ pub async fn update_stream_settings(
             if let Some(store_original_data) = update_settings.store_original_data {
                 settings.store_original_data = store_original_data;
             }
+            if let Some(approx_partition) = update_settings.approx_partition {
+                settings.approx_partition = approx_partition;
+            }
+
             if let Some(flatten_level) = update_settings.flatten_level {
                 settings.flatten_level = Some(flatten_level);
             }
@@ -475,8 +479,6 @@ pub async fn delete_stream(
 fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
-    stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
-    stats.compressed_size = (stats.compressed_size * 100.0).round() / 100.0;
 }
 
 pub fn stream_created(schema: &Schema) -> Option<i64> {
@@ -520,7 +522,7 @@ mod tests {
     fn test_stream_res() {
         let stats = StreamStats::default();
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = stream_res("Test", StreamType::Logs, schema, Some(stats));
+        let res = stream_res("Test", StreamType::Logs, schema, Some(stats.clone()));
         assert_eq!(res.stats, stats);
     }
 }
