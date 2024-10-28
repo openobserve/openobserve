@@ -198,35 +198,13 @@ const getSeriesValueBasedOnSeriesBy = (
 ): number => {
   switch (seriesBy) {
     case "last":
-      return (
-        values
-          .slice()
-          .reverse()
-          .find(
-            (v) =>
-              typeof v === "number" &&
-              !Number.isNaN(v) &&
-              v !== null &&
-              v !== undefined,
-          ) ?? 0
-      );
+      return values[values.length - 1];
     case "min":
       return Math.min(...values);
     case "max":
       return Math.max(...values);
     default:
-      return (
-        values
-          .slice()
-          .reverse()
-          .find(
-            (v) =>
-              typeof v === "number" &&
-              !Number.isNaN(v) &&
-              v !== null &&
-              v !== undefined,
-          ) ?? 0
-      );
+      return values[values.length - 1];
   }
 };
 
