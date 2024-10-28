@@ -20,8 +20,11 @@ import {
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
-import { getMetricMinMaxValue, getSeriesColor } from "./colorPalette";
-import { scaleLinear } from "d3-scale";
+import {
+  ColorMode,
+  getMetricMinMaxValue,
+  getSeriesColor,
+} from "./colorPalette";
 
 let moment: any;
 let momentInitialized = false;
@@ -377,11 +380,7 @@ export const convertPromQLData = async (
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
 
-  if (
-    !["palette-classic-by-series", "palette-classic", "fixed"].includes(
-      panelSchema.config?.color?.mode,
-    )
-  ) {
+  if (!Object.values(ColorMode).includes(panelSchema.config?.color?.mode)) {
     [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
   }
 
@@ -414,13 +413,20 @@ export const convertPromQLData = async (
               return {
                 name: seriesName,
                 itemStyle: {
-                  color: getSeriesColor(
-                    panelSchema?.config?.color,
-                    seriesName,
-                    metric.values.map((value: any) => value[1]),
-                    chartMin,
-                    chartMax,
-                  ),
+                  color: (() => {
+                    try {
+                      return getSeriesColor(
+                        panelSchema?.config?.color,
+                        seriesName,
+                        metric.values.map((value: any) => value[1]),
+                        chartMin,
+                        chartMax,
+                      );
+                    } catch (error) {
+                      console.warn("Failed to get series color:", error);
+                      return undefined; // fallback to default color
+                    }
+                  })(),
                 },
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
@@ -544,14 +550,19 @@ export const convertPromQLData = async (
                   },
                 },
                 itemStyle: {
-                  color:
-                    getSeriesColor(
-                      panelSchema?.config?.color,
-                      seriesName,
-                      values[0][1],
-                      chartMin,
-                      chartMax,
-                    ) ?? null,
+                  color: (() => {
+                    const defaultColor = null;
+                    if (!values?.[0]?.[1]) return defaultColor;
+                    return (
+                      getSeriesColor(
+                        panelSchema?.config?.color,
+                        seriesName,
+                        values[0][1],
+                        chartMin,
+                        chartMax,
+                      ) ?? defaultColor
+                    );
+                  })(),
                 },
               },
             ],

@@ -33,7 +33,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
-import { getSeriesColor, getSQLMinMaxValue } from "./colorPalette";
+import { ColorMode, getSeriesColor, getSQLMinMaxValue } from "./colorPalette";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -559,14 +559,16 @@ export const convertSQLData = async (
       left: panelSchema.config?.axis_width ?? 30,
       right: 20,
       top: "15",
-      bottom:
-        legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? panelSchema.config?.axis_width == null
-            ? 50
-            : 60
-          : panelSchema.config?.axis_width == null
-            ? 35
-            : "40",
+      bottom: (() => {
+        if (
+          legendConfig.orient === "horizontal" &&
+          panelSchema.config?.show_legends
+        ) {
+          return panelSchema.config?.axis_width == null ? 50 : 60;
+        } else {
+          return panelSchema.config?.axis_width == null ? 35 : 40;
+        }
+      })(),
     },
     tooltip: {
       trigger: "axis",
@@ -838,15 +840,13 @@ export const convertSQLData = async (
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
-  if (
-    !["palette-classic-by-series", "palette-classic", "fixed"].includes(
-      panelSchema.config?.color?.mode,
-    )
-  ) {
+  if (!Object.values(ColorMode).includes(panelSchema.config?.color?.mode)) {
     // if heatmap then get min and max from z axis sql data
     if (panelSchema.type == "heatmap") {
       // NOTE: Currently we do not support color options for heatmap
       // [chartMin, chartMax] = getSQLMinMaxValue(zAxisKeys, searchQueryData);
+      chartMin = null;
+      chartMax = null;
     } else {
       [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, searchQueryData);
     }
@@ -1952,7 +1952,8 @@ export const convertSQLData = async (
               // need to consider time range gap
               x = toZonedTime(
                 (new Date(options.xAxis[0].data[index]).getTime() +
-                  metadata?.queries[0]?.timeRangeGap.seconds ?? 0) / 1000,
+                  (metadata?.queries[0]?.timeRangeGap.seconds ?? 0)) /
+                  1000,
                 store.state.timezone,
               );
               timeStringCache[xKey] = x;

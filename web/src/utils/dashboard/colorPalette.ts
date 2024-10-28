@@ -15,6 +15,12 @@
 
 import { scaleLinear } from "d3-scale";
 
+export enum ColorMode {
+  PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
+  PALETTE_CLASSIC = "palette-classic",
+  FIXED = "fixed",
+}
+
 export const classicColorPalette = [
   "#a2b6ff",
   "#889ef9",
