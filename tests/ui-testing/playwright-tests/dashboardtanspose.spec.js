@@ -458,7 +458,6 @@ test.describe("dashboard UI testcases", () => {
       .nth(2)
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-
     await page.waitForTimeout(2000);
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("test");
