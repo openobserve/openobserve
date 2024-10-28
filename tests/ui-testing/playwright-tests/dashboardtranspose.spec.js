@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import logData from "../../ui-testing/cypress/fixtures/log.json";
+import logData from "../cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 
 const randomDashboardName =
