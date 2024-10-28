@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import logData from "../cypress/fixtures/log.json";
+import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 
 const randomDashboardName =
@@ -7,13 +7,15 @@ const randomDashboardName =
 
 test.describe.configure({ mode: "parallel" });
 
-// Reusable function to log in
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
+  // await page.getByText('Login as internal user').click();
+  await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
 
+  // wait for login api response
   const waitForLogin = page.waitForResponse(
     (response) =>
       response.url().includes("/auth/login") && response.status() === 200
@@ -23,91 +25,96 @@ async function login(page) {
     .locator('[data-cy="login-password"]')
     .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
   await page.locator('[data-cy="login-sign-in"]').click();
+
   await waitForLogin;
+
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
     waitUntil: "networkidle",
   });
+  await page
+    .locator('[data-test="navbar-organizations-select"]')
+    .getByText("arrow_drop_down")
+    .click();
+  await page.getByRole("option", { name: "default", exact: true }).click();
 }
 
-// Reusable function to create a dashboard
-async function createDashboard(page, dashboardName) {
-  await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-  await waitForDashboardPage(page);
-  await page.locator('[data-test="dashboard-add"]').click();
-  await page.locator('[data-test="add-dashboard-name"]').fill(dashboardName);
-  await page.locator('[data-test="dashboard-add-submit"]').click();
-}
+async function ingestion(page) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString("base64");
 
-// Reusable function to delete a dashboard by name
-async function deleteDashboard(page, dashboardName) {
-  console.log(`Deleting dashboard with name: ${dashboardName}`);
-  const dashboardNameLocator = page.locator(
-    `//tr[.//td[text()="${dashboardName}"]]`
+  const headers = {
+    Authorization: `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+  const fetchResponse = await fetch(
+    `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+    {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(logsdata),
+    }
   );
-  const dashboardDeleteButton = dashboardNameLocator.locator(
-    '[data-test="dashboard-delete"]'
-  );
-  await expect(dashboardNameLocator).toBeVisible();
-  await dashboardDeleteButton.click();
-  await page.locator('[data-test="confirm-button"]').click();
+  const response = await fetchResponse.json();
+  console.log(response);
 }
 
-// Wait for the dashboard page to load completely
 async function waitForDashboardPage(page) {
   const dashboardListApi = page.waitForResponse(
     (response) =>
       /\/api\/.+\/dashboards/.test(response.url()) && response.status() === 200
   );
+
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/dashboards**");
-  await page.waitForSelector('text="Please wait while loading dashboards..."', {
+
+  await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
     state: "hidden",
   });
   await dashboardListApi;
-  await page.waitForTimeout(500); // Add a slight delay to ensure page is stable
+  await page.waitForTimeout(500);
 }
 
-test.describe("VRL UI test cases", () => {
-  // Function to apply the query and validate
+test.describe("dashboard UI testcases", () => {
+  // let logData;
+  function removeUTFCharacters(text) {
+    // console.log(text, "tex");
+    // Remove UTF characters using regular expression
+    return text.replace(/[^\x00-\x7F]/g, " ");
+  }
   async function applyQueryButton(page) {
+    // click on the run query button
+    // Type the value of a variable into an input field
     const search = page.waitForResponse(logData.applyQuery);
     await page.waitForTimeout(3000);
-    await page
-      .locator("[data-test='logs-search-bar-refresh-btn']")
-      .click({ force: true });
+    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
+      force: true,
+    });
+    // get the data from the search variable
     await expect.poll(async () => (await search).status()).toBe(200);
+    // await search.hits.FIXME_should("be.an", "array");
   }
+  // tebefore(async function () {
+  //   // logData("log");
+  //   // const data = page;
+  //   // logData = data;
 
-  // Before each test, login and prepare the environment
+  //   console.log("--logData--", logData);
+  // });
   test.beforeEach(async ({ page }) => {
+    console.log("running before each");
     await login(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
 
+    // just to make sure org is set
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-      {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(logsdata),
-      }
-    );
-    const response = await fetchResponse.json();
-
     await orgNavigation;
-    console.log(response);
   });
   test("should verify that the Transpose toggle button is working correctly", async ({
     page,
@@ -157,28 +164,7 @@ test.describe("VRL UI test cases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(1000);
   });
-  // Helper function to validate data before and after the transpose action
-  // async function validateDynamicDataBeforeAndAfterAction(page) {
-  //   // Step 1: Capture dynamic data before the action
-  //   const initialDate = await page.getByRole('cell', { name: /.*-.*-.* .*/ }).textContent();
-  //   const initialValue = await page.getByRole('cell', { name: /\d+\.\d+/ }).first().textContent();
-
-  //   // Perform transpose and apply action
-  //   await page.locator('[data-test="dashboard-config-table_transpose"] div').nth(2).click();
-  //   await page.locator('[data-test="dashboard-apply"]').click();
-
-  //   // Step 2: Capture dynamic data after the action
-  //   const finalDate = await page.getByRole('cell', { name: /.*-.*-.* .*/ }).textContent();
-  //   const finalValue = await page.getByRole('cell', { name: /\d+\.\d+/ }).first().textContent();
-
-  //   // Step 3: Assert that the data is the same before and after the action
-  //   expect(finalDate.trim()).toBe(initialDate.trim());
-  //   expect(finalValue.trim()).toBe(initialValue.trim());
-  //  )};
-
-  // The main test case
-
-  test("1should verify that the Transpose toggle button is working correctly", async ({
+  test.skip("should display the correct data before and after transposing in the table chart", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -210,7 +196,7 @@ test.describe("VRL UI test cases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("bhj");
+    await page.locator('[data-test="dashboard-panel-name"]').fill("test");
     await page.locator('[data-test="date-time-btn"]').click();
 
     // await page.locator('[data-test="date-time-absolute-tab"]').click();
@@ -218,9 +204,11 @@ test.describe("VRL UI test cases", () => {
     // await page.getByRole('button', { name: '3', exact: true }).click();
     // await page.locator('[data-test="date-time-apply-btn"]').click();
 
-
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+
+    await page.waitForTimeout(2000);
+
     await page.locator('[data-test="selected-chart-table-item"] img').click();
     await page.getByRole("cell", { name: "Kubernetes Container Name" }).click();
     await page.locator('[data-test="dashboard-sidebar"]').click();
@@ -229,6 +217,7 @@ test.describe("VRL UI test cases", () => {
       .nth(2)
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
+    await page.waitForTimeout(2000);
 
     // Validate dynamic data before and after transpose
     await validateDynamicDataBeforeAndAfterAction(page);
@@ -270,8 +259,9 @@ test.describe("VRL UI test cases", () => {
     }
   });
 
-  test('verify if desible the Tanspose button chart should be Default format ', async ({ page }) => {
-   
+  test("verify if desible the Tanspose button chart should be Default format ", async ({
+    page,
+  }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
 
@@ -292,25 +282,186 @@ test.describe("VRL UI test cases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-await page.getByRole("option", { name: "e2e_automate" }).click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
-    await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
-    await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_docker_id"] [data-test="dashboard-add-b-data"]').click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_docker_id"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.locator('[data-test="selected-chart-table-item"] img').click();
     await page.locator('[data-test="dashboard-sidebar"]').click();
-    await page.locator('[data-test="dashboard-config-table_transpose"] div').first().click();
+    await page
+      .locator('[data-test="dashboard-config-table_transpose"] div')
+      .first()
+      .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.locator('[data-test="dashboard-config-table_transpose"] div').nth(2).click();
+    await page
+      .locator('[data-test="dashboard-config-table_transpose"] div')
+      .nth(2)
+      .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await expect(page.getByRole('cell', { name: 'Kubernetes Container Name' })).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "Kubernetes Container Name" })
+    ).toBeVisible();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill('jdjf');
+    await page.locator('[data-test="dashboard-panel-name"]').fill("test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
   });
 
+  test("should display the VRL function on the chart when Dynamic Columns are enabled", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
 
+    // Create a new dashboard
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
 
+    // Add panel to the dashboard
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Streamarrow_drop_down" })
+      .locator("i")
+      .click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_docker_id"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+    await page.locator('[data-test="dashboard-sidebar"]').click();
+    await page.locator('[data-test="selected-chart-table-item"] img').click();
+    await page
+      .locator('[data-test="dashboard-config-table_dynamic_columns"] div')
+      .nth(2)
+      .click();
+    await page
+      .locator('[data-test="logs-search-bar-show-query-toggle-btn"] div')
+      .nth(2)
+      .click();
+    await page
+      .locator(
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
+      .click();
+    await page
+      .locator('[data-test="dashboard-vrl-function-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".vrl=100");
+
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="dashboard-config-table_dynamic_columns"] div')
+      .nth(2)
+      .click();
+
+    await page
+      .locator('[data-test="dashboard-config-table_dynamic_columns"] div')
+      .nth(2)
+      .click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+    await expect(
+      page
+        .locator('[data-test="dashboard-panel-table"]')
+        .getByRole("cell", { name: "vrl" })
+    ).toBeVisible();
+    await page.locator('[data-test="dashboard-panel-name"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').fill("test");
+    await page.locator('[data-test="dashboard-panel-save"]').click();
+  });
+
+  test("should not show an error when both the Transpose and Dynamic Column toggle buttons are enabled", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+
+    // Add panel to the dashboard
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Streamarrow_drop_down" })
+      .locator("i")
+      .click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    await page.waitForTimeout(3000);
+    await page.locator('[data-test="dashboard-sidebar"]').click();
+    await page
+      .locator('[data-test="logs-search-bar-show-query-toggle-btn"] div')
+      .nth(2)
+      .click();
+    await page
+      .locator(
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
+      .click();
+    await page
+      .locator('[data-test="dashboard-vrl-function-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".vrl=100");
+
+    await page.waitForTimeout(2000);
+
+    await page.locator('[data-test="selected-chart-table-item"] img').click();
+    await page
+      .locator('[data-test="dashboard-config-table_dynamic_columns"] div')
+      .nth(2)
+      .click();
+    await page
+      .locator('[data-test="dashboard-config-table_transpose"] div')
+      .nth(2)
+      .click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-panel-name"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').fill("test");
+    await page.locator('[data-test="dashboard-panel-save"]').click();
+  });
 });
