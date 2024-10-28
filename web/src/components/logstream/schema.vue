@@ -137,6 +137,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="markFormDirty"
               />
             </div>
+
+            <div class="row flex items-center q-pb-xs q-mt-lg">
+              <q-toggle
+                data-test="log-stream-use_approx-toggle-btn"
+                v-model="approxPartition"
+                :label="t('logStream.approxPartition')"
+                @click="formDirtyFlag = true"
+              />
+            </div>
           </template>
 
           <template
@@ -450,6 +459,7 @@ export default defineComponent({
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
     let previousSchemaVersion: any = null;
+    const approxPartition = ref(false);
 
     const selectedFields = ref([]);
 
@@ -479,6 +489,8 @@ export default defineComponent({
       { label: "Secondary index", value: "secondaryIndexKey" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
+      { label: "Prefix partition", value: "prefixPartition" },
+
       { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
       { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
       { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
@@ -491,6 +503,7 @@ export default defineComponent({
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
       storeOriginalData.value = false;
+      approxPartition.value = false;
     });
 
     const isSchemaEvolutionEnabled = computed(() => {
@@ -585,6 +598,8 @@ export default defineComponent({
         property.level = level;
 
         if (partition.types === "value") fieldIndices.push("keyPartition");
+        if (partition.types === "prefix") fieldIndices.push("prefixPartition");
+
 
         if (partition.types?.hash)
           fieldIndices.push(`hashPartition_${partition.types.hash}`);
@@ -645,7 +660,8 @@ export default defineComponent({
           store.state.zoConfig.data_retention_days;
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
-      storeOriginalData.value = streamResponse.settings.store_original_data;
+      storeOriginalData.value = streamResponse.settings.store_original_data || false;
+      approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -728,6 +744,7 @@ export default defineComponent({
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
       settings["store_original_data"] = storeOriginalData.value;
+      settings["approx_partition"] = approxPartition.value;
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
@@ -758,6 +775,19 @@ export default defineComponent({
             added_part_keys.push({
               field: property.name,
               types: "value",
+            });
+          }
+
+          if( property.level && index === 'prefixPartition'){
+            settings.partition_keys.push({
+              field: property.name,
+              types: "prefix",
+            });
+          }
+          else if(index === 'prefixPartition'){
+            added_part_keys.push({
+              field: property.name,
+              types: "prefix",
             });
           }
 
@@ -868,16 +898,22 @@ export default defineComponent({
         selectedIndices += schema.index_type[i];
       }
 
+      if(selectedIndices.includes('prefixPartition') && option.value.includes('keyPartition')){
+        return true;
+      }
+      if(selectedIndices.includes('keyPartition') && option.value.includes('prefixPartition')){
+        return true;
+      }
       if (
         selectedIndices.includes("hashPartition") &&
         selectedHashPartition !== option.value &&
         (option.value.includes("hashPartition") ||
-          option.value.includes("keyPartition"))
+          option.value.includes("keyPartition") || option.value.includes("prefixPartition"))
+
       )
         return true;
-
       if (
-        selectedIndices.includes("keyPartition") &&
+       ( selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition"))&&
         option.value.includes("hashPartition")
       )
         return true;
@@ -1006,6 +1042,7 @@ export default defineComponent({
       getImageURL,
       dataRetentionDays,
       storeOriginalData,
+      approxPartition,
       maxQueryRange,
       showDataRetention,
       formatSizeFromMB,

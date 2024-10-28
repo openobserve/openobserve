@@ -24,7 +24,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
-    ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -44,7 +44,7 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
-        SetExpr, VisitMut, VisitorMut,
+        SetExpr, Statement, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -182,6 +182,17 @@ impl Sql {
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
+        // NOTE: only this place can modify the sql
+        // 9. add _timestamp and _o2_id if need
+        if !is_complex_query(&mut statement) {
+            let mut add_timestamp_visitor = AddTimestampVisitor::new();
+            statement.visit(&mut add_timestamp_visitor);
+            if o2_id_is_needed(&used_schemas) {
+                let mut add_o2_id_visitor = AddO2IdVisitor::new();
+                statement.visit(&mut add_o2_id_visitor);
+            }
+        }
+
         Ok(Sql {
             sql: statement.to_string(),
             org_id: org_id.to_string(),
@@ -273,6 +284,9 @@ fn generate_user_defined_schema(
     if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
         fields.insert(cfg.common.column_all.to_string());
     }
+    if !fields.contains(ID_COL_NAME) {
+        fields.insert(ID_COL_NAME.to_string());
+    }
     let new_fields = fields
         .iter()
         .filter_map(|name| schema.field_with_name(name).cloned())
@@ -296,7 +310,12 @@ fn generate_schema_fields(
         columns.insert(get_config().common.column_timestamp.clone());
     }
 
-    // 2. add field from full text search
+    // 2. check _o2_id
+    if !columns.contains(ID_COL_NAME) {
+        columns.insert(ID_COL_NAME.to_string());
+    }
+
+    // 3. add field from full text search
     if has_match_all {
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -308,7 +327,7 @@ fn generate_schema_fields(
         }
     }
 
-    // 3. generate fields
+    // 4. generate fields
     let mut fields = Vec::with_capacity(columns.len());
     for column in columns {
         if let Some(field) = schema.field_with_name(&column) {
@@ -750,6 +769,186 @@ impl VisitorMut for FieldNameVisitor {
     }
 }
 
+// add _timestamp to the query like `SELECT name FROM t` -> `SELECT _timestamp, name FROM t`
+struct AddTimestampVisitor {}
+
+impl AddTimestampVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddTimestampVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_timestamp = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_timestamp = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_timestamp {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
+                        get_config().common.column_timestamp.clone(),
+                    ))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+// add _o2_id to the query like `SELECT name FROM t` -> `SELECT _o2_id, name FROM t`
+struct AddO2IdVisitor {}
+
+impl AddO2IdVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddO2IdVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_o2_id = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor.field_names.contains(ID_COL_NAME) {
+                            has_o2_id = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor.field_names.contains(ID_COL_NAME) {
+                            has_o2_id = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_o2_id = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_o2_id {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(ID_COL_NAME.to_string()))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn is_complex_query(statement: &mut Statement) -> bool {
+    let mut visitor = ComplexQueryVisitor::new();
+    statement.visit(&mut visitor);
+    visitor.is_complex
+}
+
+// check if the query is complex query
+// 1. has subquery
+// 2. has join
+// 3. has group by
+// 4. has aggregate
+struct ComplexQueryVisitor {
+    pub is_complex: bool,
+}
+
+impl ComplexQueryVisitor {
+    fn new() -> Self {
+        Self { is_complex: false }
+    }
+}
+
+impl VisitorMut for ComplexQueryVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            // check if has group by
+            match select.group_by {
+                GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
+                _ => self.is_complex = true,
+            }
+            // check if has join
+            if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                self.is_complex = true;
+            }
+            if self.is_complex {
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_complex = true;
+            }
+            // check if has aggregate function or window function
+            Expr::Function(func) => {
+                if AGGREGATE_UDF_LIST
+                    .contains(&trim_quotes(&func.name.to_string().to_lowercase()).as_str())
+                    || func.filter.is_some()
+                    || func.over.is_some()
+                    || !func.within_group.is_empty()
+                {
+                    self.is_complex = true;
+                }
+            }
+            // check select * from table
+            Expr::Wildcard => self.is_complex = true,
+            _ => {}
+        }
+        if self.is_complex {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 struct HistogramIntervalVistor {
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,
@@ -998,4 +1197,11 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
         where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
     }
     Ok(Some(where_str))
+}
+
+fn o2_id_is_needed(schemas: &HashMap<String, Arc<SchemaCache>>) -> bool {
+    schemas.values().any(|schema| {
+        let stream_setting = unwrap_stream_settings(schema.schema());
+        stream_setting.map_or(false, |setting| setting.store_original_data)
+    })
 }

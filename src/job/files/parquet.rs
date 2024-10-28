@@ -38,9 +38,7 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
-        stream::{
-            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
-        },
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,
     utils::{
@@ -621,14 +619,20 @@ async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_setting);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_setting);
     let index_fields = get_stream_setting_index_fields(&stream_setting);
-    let defined_schema_fields = stream_setting
-        .unwrap_or_default()
-        .defined_schema_fields
-        .unwrap_or_default();
+    let (defined_schema_fields, need_original) = match stream_setting {
+        Some(s) => (
+            s.defined_schema_fields.unwrap_or_default(),
+            s.store_original_data,
+        ),
+        None => (Vec::new(), false),
+    };
     let schema = if !defined_schema_fields.is_empty() {
-        let latest_schema = SchemaCache::new_from_arc(latest_schema.clone());
-        let latest_schema =
-            generate_schema_for_defined_schema_fields(&latest_schema, &defined_schema_fields);
+        let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
+        let latest_schema = generate_schema_for_defined_schema_fields(
+            &latest_schema,
+            &defined_schema_fields,
+            need_original,
+        );
         latest_schema.schema().clone()
     } else {
         latest_schema.clone()
@@ -826,10 +830,9 @@ pub(crate) async fn generate_index_on_ingester(
                 "generate_index_on_ingester create schema error: schema not found"
             ));
         };
-        // update schema to enable bloomfilter for field: term, file_name
+        // update schema to enable bloomfilter for field: term
         let settings = StreamSettings {
             bloom_filter_fields: vec!["term".to_string()],
-            partition_keys: vec![StreamPartition::new_prefix("term")],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
@@ -866,23 +869,24 @@ pub(crate) async fn generate_index_on_ingester(
             };
         }
 
+        // TODO: disable it, because the prefix partition key will cause the file_list much bigger
         // add prefix partition for index <= v0.12.1
-        if let Some(settings) = stream_setting.as_mut() {
-            let term_partition_exists = settings
-                .partition_keys
-                .iter()
-                .any(|partition| partition.field == "term");
-            if !term_partition_exists {
-                settings
-                    .partition_keys
-                    .push(StreamPartition::new_prefix("term"));
+        // if let Some(settings) = stream_setting.as_mut() {
+        //     let term_partition_exists = settings
+        //         .partition_keys
+        //         .iter()
+        //         .any(|partition| partition.field == "term");
+        //     if !term_partition_exists {
+        //         settings
+        //             .partition_keys
+        //             .push(StreamPartition::new_prefix("term"));
 
-                let mut metadata = schema.schema().metadata().clone();
-                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
-                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
-                    .await?;
-            }
-        }
+        //         let mut metadata = schema.schema().metadata().clone();
+        //         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+        //         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index,
+        // metadata)             .await?;
+        //     }
+        // }
     }
 
     let schema_key = idx_schema.hash_key();

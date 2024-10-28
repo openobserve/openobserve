@@ -21,9 +21,16 @@ use std::{
 
 use arrow_json::reader;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde_json::{Map, Value};
 
+use super::str::find;
 use crate::{get_config, meta::stream::StreamType, FxIndexMap};
+
+const MAX_PARTITION_KEY_LENGTH: usize = 100;
+
+static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,
@@ -235,4 +242,148 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
         .collect::<Vec<_>>();
     fields.sort_by(|a, b| a.name().cmp(b.name()));
     Schema::new(fields)
+}
+
+// format partition key
+pub fn format_partition_key(input: &str) -> String {
+    let mut output = String::with_capacity(std::cmp::min(input.len(), MAX_PARTITION_KEY_LENGTH));
+    for c in input.chars() {
+        if output.len() > MAX_PARTITION_KEY_LENGTH {
+            break;
+        }
+        if c.is_alphanumeric() || c == '=' || c == '-' || c == '_' {
+            output.push(c);
+        }
+    }
+    output
+}
+
+// format stream name
+pub fn format_stream_name(stream_name: &str) -> String {
+    RE_CORRECT_STREAM_NAME
+        .replace_all(stream_name, "_")
+        .to_string()
+}
+
+/// match a source is a needed file or not, return true if needed
+pub fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
+    !filters.iter().any(|(k, v)| {
+        let field = format_partition_key(&format!("{k}="));
+        find(source, &format!("/{field}"))
+            && !v.iter().any(|v| {
+                let value = format_partition_key(&format!("{k}={v}"));
+                find(source, &format!("/{value}/"))
+            })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_by_partition_key_with_str() {
+        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
+        let filters = vec![
+            (vec![], true),
+            (
+                vec![("kuberneteshost".to_string(), vec!["gke-dev1".to_string()])],
+                true,
+            ),
+            (
+                vec![("kuberneteshost".to_string(), vec!["gke-dev2".to_string()])],
+                false,
+            ),
+            (
+                vec![(
+                    "kuberneteshost".to_string(),
+                    vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
+                )],
+                true,
+            ),
+            (
+                vec![("some_other_key".to_string(), vec!["no-matter".to_string()])],
+                true,
+            ),
+            (
+                vec![
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
+                ],
+                true,
+            ),
+            (
+                vec![
+                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    (
+                        "kuberneteshost".to_string(),
+                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
+                    ),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["ziox-dev".to_string()],
+                    ),
+                ],
+                true,
+            ),
+            (
+                vec![
+                    (
+                        "kuberneteshost".to_string(),
+                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
+                    ),
+                    (
+                        "kubernetesnamespacename".to_string(),
+                        vec!["abcdefg".to_string()],
+                    ),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    (
+                        "kuberneteshost".to_string(),
+                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
+                    ),
+                    ("some_other_key".to_string(), vec!["no-matter".to_string()]),
+                ],
+                true,
+            ),
+        ];
+        for (filter, expected) in filters {
+            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+        }
+    }
 }

@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use arrow::ipc::writer::StreamWriter;
 use config::{
     ider,
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, StreamParams, StreamPartition, StreamType},
     metrics,
     utils::{
         file::{get_file_contents, scan_files},
@@ -24,13 +26,14 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use hashbrown::HashMap;
 use infra::errors;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{infra::wal, meta::stream::StreamParams},
+    common::infra::wal,
     handler::grpc::{
         cluster_rpc::{
             metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
@@ -95,7 +98,7 @@ impl Metrics for MetricsQuerier {
         let end_time = req.get_ref().end_time;
         let org_id = &req.get_ref().org_id;
         let stream_name = &req.get_ref().stream_name;
-        let filters = req
+        let mut filters = req
             .get_ref()
             .filters
             .iter()
@@ -103,13 +106,28 @@ impl Metrics for MetricsQuerier {
             .collect::<Vec<_>>();
         let mut resp = MetricsWalFileResponse::default();
 
+        // format partition keys
+        let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Metrics)
+            .await
+            .unwrap_or_default();
+        let partition_keys = &stream_settings.partition_keys;
+        let partition_keys: HashMap<&String, &StreamPartition> =
+            partition_keys.iter().map(|v| (&v.field, v)).collect();
+        for (key, value) in filters.iter_mut() {
+            if let Some(partition_key) = partition_keys.get(key) {
+                for val in value.iter_mut() {
+                    *val = partition_key.get_partition_value(val);
+                }
+            }
+        }
+
         // get memtable records
         let mut mem_data = ingester::read_from_memtable(
             org_id,
             StreamType::Metrics.to_string().as_str(),
             stream_name,
             Some((start_time, end_time)),
-            &[],
+            &filters,
         )
         .await
         .unwrap_or_default();
@@ -121,7 +139,7 @@ impl Metrics for MetricsQuerier {
                 StreamType::Metrics.to_string().as_str(),
                 stream_name,
                 Some((start_time, end_time)),
-                &[],
+                &filters,
             )
             .await
             .unwrap_or_default(),
@@ -188,6 +206,7 @@ impl Metrics for MetricsQuerier {
             .collect::<Vec<_>>();
         wal::lock_files(&files);
 
+        let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
         for file in files.iter() {
             // check time range by filename
             let (file_min_ts, file_max_ts) = parse_time_range_from_filename(file);
@@ -215,11 +234,10 @@ impl Metrics for MetricsQuerier {
                 false,
             );
             if !match_source(
-                StreamParams::new(org_id, stream_name, StreamType::Metrics),
+                stream_params.clone(),
                 Some((start_time, end_time)),
-                filters.as_slice(),
+                &filters,
                 &file_key,
-                true,
             )
             .await
             {

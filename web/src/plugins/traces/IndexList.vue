@@ -403,7 +403,7 @@ export default defineComponent({
           searchObj.data.editorValue += ` AND ${column} IN (${valuesString})`;
         }
 
-        query += " WHERE " + searchObj.data.editorValue;
+        query += " WHERE " + searchObj.data.editorValue.trim();
 
         const parsedQuery: any = parser.astify(query);
 

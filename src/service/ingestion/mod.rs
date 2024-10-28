@@ -25,10 +25,13 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{
-        stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
+        stream::{
+            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
+            StreamType,
+        },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::{flatten, json::*},
+    utils::{flatten, json::*, schema::format_partition_key},
     SIZE_IN_MB,
 };
 use futures::future::try_join_all;
@@ -51,11 +54,11 @@ use crate::{
             alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             ingestion::IngestionRequest,
-            stream::{SchemaRecords, StreamParams},
+            stream::SchemaRecords,
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::db,
 };
 
 pub mod grpc;
@@ -251,6 +254,8 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             error: None,
             success_response: None,
             is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
         };
         match alert.send_notification(val, now, None).await {
             Err(e) => {
@@ -470,7 +475,7 @@ pub async fn write_file(
     for task in task_results {
         match task {
             Ok((entry_records, entry_size)) => {
-                req_stats.size += entry_size as f64 / SIZE_IN_MB;
+                req_stats.size += (entry_size as i64 / SIZE_IN_MB) as f64;
                 req_stats.records += entry_records as i64;
             }
             Err(e) => {

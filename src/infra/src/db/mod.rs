@@ -19,6 +19,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
+use sea_orm::{DatabaseConnection, SqlxMySqlConnector, SqlxPostgresConnector, SqlxSqliteConnector};
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::errors::{DbError, Error, Result};
@@ -36,6 +37,27 @@ static DEFAULT: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static LOCAL_CACHE: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
+
+pub const SQLITE_STORE: &str = "sqlite";
+
+pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
+
+pub async fn connect_to_orm() -> DatabaseConnection {
+    match get_config().common.meta_store.as_str().into() {
+        MetaStore::MySQL => {
+            let pool = mysql::CLIENT.clone();
+            SqlxMySqlConnector::from_sqlx_mysql_pool(pool)
+        }
+        MetaStore::PostgreSQL => {
+            let pool = postgres::CLIENT.clone();
+            SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
+        }
+        _ => {
+            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+        }
+    }
+}
 
 pub async fn get_db() -> &'static Box<dyn Db> {
     DEFAULT.get_or_init(default).await
@@ -247,6 +269,24 @@ pub struct MetaRecord {
 struct DBIndex {
     name: String,
     table: String,
+}
+
+pub struct IndexStatement<'a> {
+    pub idx_name: &'a str,
+    pub table: &'a str,
+    pub unique: bool,
+    pub fields: &'a [&'a str],
+}
+
+impl<'a> IndexStatement<'a> {
+    pub fn new(idx_name: &'a str, table: &'a str, unique: bool, fields: &'a [&'a str]) -> Self {
+        Self {
+            idx_name,
+            table,
+            unique,
+            fields,
+        }
+    }
 }
 
 #[cfg(test)]
