@@ -748,7 +748,7 @@ const updateActiveCell = (cell?: { id: string; column: { id: string } }) => {
 };
 
 // Debounced version of the function
-const debounceCellAction = debounce(updateActiveCell, 500);
+const debounceCellAction = debounce(updateActiveCell, 250);
 
 // Event handlers for mouse over and mouse leave
 const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {

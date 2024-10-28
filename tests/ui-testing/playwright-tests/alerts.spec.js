@@ -239,51 +239,6 @@ test.describe("Alerts testcases", () => {
           ".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
   })
 
-  test.skip("should display error if name has only spaces under destination", async ({ page }) => {
-    await page.waitForTimeout(
-      2000);
-    await page.waitForSelector('[data-test="alert-destinations-tab"]')
-    await page.locator('[data-test="alert-destinations-tab"]').click({ force: true });
-    await page.waitForTimeout(100);
-    await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click({ force: true });
-    await page.locator('[data-test="add-destination-name-input"]').fill("    ");
-    await page.locator('[data-test="add-destination-submit-btn"]').click({ force: true });
-    await expect(page.getByText(/Field is required/).first()).toBeVisible();
-    await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
-  });
-
-  test.skip("should click cancel button under destinations", async ({ page }) => {
-    await page.waitForTimeout(
-      2000); await page.locator(
-        '[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(
-          1000);
-    await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-    await page.locator(
-      '[data-test="alert-destination-list-add-alert-btn"]').click({
-        force: true
-      }); await page.locator(
-
-        '[data-test="add-destination-name-input"]').fill("cy-destination"); await page.locator(
-          '[data-test="add-destination-cancel-btn"]').click({ force: true }); await expect(page.locator(
-            '[data-test="alert-destinations-tab"]')).toBeVisible();
-  });
-
-  test.skip("should display error when stream name is not added under alerts", async ({ page }) => {
-    await page.waitForTimeout(
-      2000); await page.locator(
-        '[data-test="alert-alerts-tab"]').click({ force: true }); await page.locator(
-          '[data-test="alert-list-add-alert-btn"]').click({ force: true });
-    await page.locator('[data-test="add-alert-name-input"]').getByLabel('Name *').fill("cy-alert"); await page.locator(
-
-      ".alert-stream-type > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon").click({
-        force: true
-      });
-    // Find and click on the item with text 'logs'
-    await page.locator(".q-item__label", { hasText: /logs/ }).first().click({ force: true }); await page.locator(
-      '[data-test="add-alert-submit-btn"]').click({ force: true }); await expect(page.getByText(/Field is required/).first()).toBeVisible();
-
-  });
-
+  
 
 });
