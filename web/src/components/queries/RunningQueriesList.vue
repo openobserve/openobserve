@@ -110,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import {
   onBeforeMount,
@@ -132,7 +131,7 @@ import { durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, ConfirmDialog, QTablePagination, NoData },
+  components: { QueryList, QTablePagination, NoData },
   props: {
     rows: {
       type: Array,
@@ -143,7 +142,12 @@ export default defineComponent({
       required: false,
     },
   },
-  emits: ["update:selectedRows", "delete:queries", "delete:query"],
+  emits: [
+    "update:selectedRows",
+    "delete:queries",
+    "delete:query",
+    "show:schema",
+  ],
   setup(props, { emit }) {
     const store = useStore();
     const schemaData = ref({});
@@ -259,9 +263,7 @@ export default defineComponent({
 
     const listSchema = (props: any) => {
       //pass whole props.row to schemaData
-      schemaData.value = props.row;
-
-      showListSchemaDialog.value = true;
+      emit("show:schema", props.row);
     };
 
     const perPageOptions: any = [

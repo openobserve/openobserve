@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
             class="q-mr-md query-management-tabs"
+            data-test="running-queries-query-type-tabs"
           >
             <template v-for="visual in runningQueryTypes" :key="visual.value">
               <q-btn
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
           class="q-mr-md query-management-tabs q-mr-lg"
+          data-test="running-queries-search-type-tabs"
         >
           <template v-for="visual in searchTypes" :key="visual">
             <q-btn
@@ -120,15 +122,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
 
-    <div v-show="selectedQueryTypeTab === 'all'">
+    <div
+      v-show="selectedQueryTypeTab === 'all'"
+      data-test="running-queries-all-queries-list"
+    >
       <RunningQueriesList
         :rows="rowsQuery"
         v-model:selectedRows="selectedRow['all']"
         @delete:query="confirmDeleteAction"
         @delete:queries="handleMultiQueryCancel"
+        @show:schema="listSchema"
       />
     </div>
-    <div v-show="selectedQueryTypeTab === 'summary'">
+    <div
+      v-show="selectedQueryTypeTab === 'summary'"
+      data-test="running-queries-summary-list"
+    >
       <SummaryList
         :rows="summaryRows"
         v-model:selectedRows="selectedRow['summary']"
@@ -313,9 +322,9 @@ export default defineComponent({
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
-    const listSchema = (props: any) => {
+    const listSchema = (row: any) => {
       //pass whole props.row to schemaData
-      schemaData.value = props.row;
+      schemaData.value = row;
 
       showListSchemaDialog.value = true;
     };
