@@ -2858,7 +2858,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
           currentQuery = currentQuery.replaceAll(
             /\$(\w+|\{\w+\})/g,
-            "Dummy_value_replaced",
+            "substituteValue",
           );
         }
 
@@ -2911,7 +2911,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // now check if the correct stream is selected
       function isDummyStreamName(tableName: any) {
-        return tableName?.includes("Dummy_value_replaced");
+        return tableName?.includes("substituteValue");
       }
 
       if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
@@ -2925,13 +2925,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ];
 
-        if (
-          streamFound ||
-          isDummyStreamName(dashboardPanelData.meta.parsedQuery.from[0].table)
-        ) {
-          if (streamFound && currentQuery.fields.stream !== streamFound.name) {
+        const tableName = dashboardPanelData.meta.parsedQuery.from?.[0]?.table;
+        
+        if (streamFound) {
+          if (currentQuery.fields.stream != streamFound.name) {
+            
             currentQuery.fields.stream = streamFound.name;
           }
+        } else if(isDummyStreamName(tableName)){
+          // nothing to do as the stream is dummy
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
         }
