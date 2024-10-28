@@ -63,7 +63,27 @@ export const classicColorPalette = [
   "#d064b3",
 ];
 
-export const shadeColor = (color: any, value: any, min: any, max: any) => {
+const isValidHexColor = (color: string): boolean => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
+  return result !== null;
+};
+
+export const shadeColor = (
+  color: string,
+  value: number,
+  min: number,
+  max: number,
+): string | null => {
+  if (!isValidHexColor(color)) {
+    return null;
+  }
+  if (
+    typeof value !== "number" ||
+    typeof min !== "number" ||
+    typeof max !== "number"
+  ) {
+    return null;
+  }
   let percent = 0;
   if (max === min) {
     percent = 0;
@@ -87,29 +107,42 @@ export const shadeColor = (color: any, value: any, min: any, max: any) => {
   return "#" + newColor;
 };
 
-export const getMetricMinMaxValue = (searchQueryData: any) => {
-  // need min and max value for color
+interface MetricResult {
+  values: [number, number][];
+}
+
+interface Metric {
+  result?: MetricResult[];
+}
+
+export const getMetricMinMaxValue = (
+  searchQueryData: Metric[],
+): [number, number] => {
   let min = Infinity;
   let max = -Infinity;
-  searchQueryData.forEach((metric: any) => {
-    if (metric.result && Array.isArray(metric.result)) {
-      metric?.result?.forEach((valuesArr: any) => {
-        if (valuesArr.values && Array.isArray(valuesArr.values)) {
-          valuesArr.values.forEach((val: any) => {
-            // val[1] should not NaN
-            if (!Number.isNaN(val[1])) {
-              min = Math.min(min, val[1]);
-              max = Math.max(max, val[1]);
-            }
-          });
-        }
-      });
-    }
-  });
+
+  const allValues = searchQueryData
+    .flatMap((metric) => metric.result ?? [])
+    .flatMap((result) => result.values ?? [])
+    .map(([, value]) => value)
+    .filter((value) => !Number.isNaN(value));
+
+  if (allValues.length > 0) {
+    min = Math.min(...allValues);
+    max = Math.max(...allValues);
+  }
+
   return [min, max];
 };
 
-export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
+interface SQLData {
+  [key: string]: number | null | undefined;
+}
+
+export const getSQLMinMaxValue = (
+  yaxiskeys: string[],
+  searchQueryData: SQLData[][],
+): [number, number] => {
   // need min and max value for color
   let min = Infinity;
   let max = -Infinity;
@@ -151,46 +184,70 @@ const getSeriesHash = (seriesName: string) => {
   return Math.abs(hash) % classicColorPaletteLength;
 };
 
-const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: string) => {
+type SeriesBy = "last" | "min" | "max";
+
+const getSeriesValueBasedOnSeriesBy = (
+  values: number[],
+  seriesBy: SeriesBy,
+): number => {
   switch (seriesBy) {
     case "last":
       return values[values.length - 1];
     case "min":
-      return values.reduce((a: any, b: any) => (a < b ? a : b), values[0]);
+      return Math.min(...values);
     case "max":
-      return values.reduce((a: any, b: any) => (a > b ? a : b), values[0]);
+      return Math.max(...values);
     default:
       return values[values.length - 1];
   }
 };
 
+interface ColorConfig {
+  mode:
+    | "fixed"
+    | "shades"
+    | "palette-classic-by-series"
+    | "palette-classic"
+    | "scale";
+  fixedColor?: string[];
+  seriesBy?: SeriesBy;
+}
+
 export const getSeriesColor = (
-  colorCfg: any,
+  colorCfg: ColorConfig | null,
   seriesName: string,
-  value: any,
-  chartMin: any,
-  chartMax: any,
-) => {
+  value: number[],
+  chartMin: number,
+  chartMax: number,
+): string | null => {
   if (!colorCfg) {
     return classicColorPalette[getSeriesHash(seriesName)];
-  } else if (colorCfg.mode === "fixed") {
-    return colorCfg.fixedColor[0];
-  } else if (colorCfg.mode === "shades") {
-    return shadeColor(
-      colorCfg.fixedColor[0],
-      getSeriesValueBasedOnSeriesBy(value, "last"),
-      chartMin,
-      chartMax,
-    );
-  } else if (colorCfg.mode === "palette-classic-by-series") {
-    return classicColorPalette[getSeriesHash(seriesName)];
-  } else if (colorCfg.mode === "palette-classic") {
-    return null;
-  } else {
-    const d3ColorObj = scaleLinear(
-      [chartMin, chartMax / 2, chartMax],
-      colorCfg?.fixedColor?.length ? colorCfg?.fixedColor : classicColorPalette,
-    );
-    return d3ColorObj(getSeriesValueBasedOnSeriesBy(value, colorCfg.seriesBy));
   }
+
+  const colorHandlers: Record<ColorConfig["mode"], () => string | null> = {
+    fixed: () => colorCfg.fixedColor?.[0] ?? null,
+    shades: () =>
+      shadeColor(
+        colorCfg.fixedColor?.[0] ?? "#000000",
+        getSeriesValueBasedOnSeriesBy(value, "last"),
+        chartMin,
+        chartMax,
+      ),
+    "palette-classic-by-series": () =>
+      classicColorPalette[getSeriesHash(seriesName)],
+    "palette-classic": () => null,
+    scale: () => {
+      const d3ColorObj = scaleLinear(
+        [chartMin, chartMax / 2, chartMax],
+        colorCfg?.fixedColor?.length
+          ? colorCfg.fixedColor
+          : classicColorPalette,
+      );
+      return d3ColorObj(
+        getSeriesValueBasedOnSeriesBy(value, colorCfg.seriesBy ?? "last"),
+      );
+    },
+  };
+
+  return colorHandlers[colorCfg.mode]?.() ?? null;
 };
