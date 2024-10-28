@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
+
 <template>
   <div class="running-queries-page" v-if="isMetaOrg">
     <q-table
@@ -21,10 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rows="rows"
       :columns="columns"
       :pagination="pagination"
-      row-key="trace_id"
+      row-key="row_id"
       style="width: 100%"
       selection="multiple"
-      v-model:selected="selectedRowsModel"
+      v-model:selected="selectedRow"
+      @row-click="getAllUserQueries"
     >
       <template #no-data>
         <div v-if="!loadingState" class="text-center full-width full-height">
@@ -43,18 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
-            icon="list_alt"
-            :title="t('queries.queryList')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="listSchema(props)"
-            data-test="queryList-btn"
-          />
-          <q-btn
             :icon="outlinedCancel"
             :title="t('queries.cancelQuery')"
             class="q-ml-xs"
@@ -64,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="color: red"
             round
             flat
-            @click="confirmDeleteAction(props)"
+            @click.stop="confirmDeleteAction(props)"
             data-test="cancelQuery-btn"
           />
         </q-td>
@@ -77,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
           padding="sm lg"
           color="red"
-          :disable="selectedRowsModel?.length === 0"
+          :disable="selectedRow.length === 0"
           @click="handleMultiQueryCancel"
           no-caps
           :label="t('queries.cancelQuery')"
@@ -96,15 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-table>
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
-      data-test="list-schema-dialog"
-    >
-      <QueryList :schemaData="schemaData" />
-    </q-dialog>
   </div>
 </template>
 
@@ -116,12 +97,10 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { useStore } from "vuex";
-import QueryList from "@/components/queries/QueryList.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData },
+  components: { QTablePagination, NoData },
   props: {
     rows: {
       type: Array,
@@ -129,19 +108,16 @@ export default defineComponent({
     },
     selectedRows: {
       type: Array,
-      required: false,
+      required: true,
     },
   },
   emits: [
+    "cancel:hideform",
+    "filter:queries",
     "update:selectedRows",
     "delete:queries",
-    "delete:query",
-    "show:schema",
   ],
   setup(props, { emit }) {
-    const store = useStore();
-    const schemaData = ref({});
-    const lastRefreshed = ref("");
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
 
@@ -157,11 +133,6 @@ export default defineComponent({
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
-
-    const listSchema = (props: any) => {
-      //pass whole props.row to schemaData
-      emit("show:schema", props.row);
-    };
 
     const perPageOptions: any = [
       { label: "5", value: 5 },
@@ -195,53 +166,32 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "org_id",
-        field: "org_id",
-        label: t("organization.id"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "search_type",
-        field: "search_type",
+        name: "search_type_label",
+        field: "search_type_label",
         label: t("queries.searchType"),
         align: "left",
         sortable: true,
       },
       {
+        name: "numOfQueries",
+        label: t("queries.numOfQueries"),
+        align: "left",
+        sortable: true,
+        field: "numOfQueries",
+      },
+      {
         name: "duration",
-        label: t("queries.duration"),
+        label: t("queries.totalDuration"),
         align: "left",
         sortable: true,
         field: "duration",
       },
       {
         name: "queryRange",
-        label: t("queries.queryRange"),
+        label: t("queries.totalTimeRange"),
         align: "left",
         sortable: true,
         field: "queryRange",
-      },
-      {
-        name: "work_group",
-        label: t("queries.queryType"),
-        align: "left",
-        sortable: true,
-        field: "work_group",
-      },
-      {
-        name: "status",
-        field: "status",
-        label: t("queries.status"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "stream_type",
-        field: "stream_type",
-        label: t("alerts.streamType"),
-        align: "left",
-        sortable: true,
       },
       {
         name: "actions",
@@ -251,7 +201,7 @@ export default defineComponent({
       },
     ]);
 
-    const selectedRowsModel = computed({
+    const selectedRow = computed({
       get: () => props.selectedRows,
       set: (value) => {
         emit("update:selectedRows", value);
@@ -259,34 +209,35 @@ export default defineComponent({
     });
 
     const confirmDeleteAction = (props: any) => {
-      emit("delete:query", props.row);
+      emit("delete:queries", props.row.trace_ids || []);
     };
 
     const handleMultiQueryCancel = () => {
       emit("delete:queries");
     };
 
+    const getAllUserQueries = (event: any, row: any) => {
+      emit("filter:queries", row);
+    };
+
     return {
       t,
-      store,
       columns,
       confirmDeleteAction,
       deleteDialog,
       perPageOptions,
-      listSchema,
       showListSchemaDialog,
       changePagination,
       outlinedCancel,
-      schemaData,
       loadingState,
-      lastRefreshed,
       isMetaOrg,
       resultTotal,
       selectedPerPage,
       qTable,
-      selectedRowsModel,
+      selectedRow,
       handleMultiQueryCancel,
       pagination,
+      getAllUserQueries,
     };
   },
 });
@@ -294,7 +245,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .query-management-tabs {
-  :deep(.q-btn:before) {
+  ::v-deep .q-btn:before {
     border: none !important;
   }
 }

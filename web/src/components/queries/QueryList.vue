@@ -1,7 +1,10 @@
 <template>
-  <q-card class="column full-height no-wrap">
+  <q-card
+    class="column full-height no-wrap"
+    style="min-width: 480px; max-width: 800px"
+  >
     <!-- Header -->
-    <div style="width: 40vw" class="q-px-sm q-py-md">
+    <div class="q-px-sm q-py-md">
       <q-card-section class="q-pb-sm q-px-sm q-pt-none">
         <div class="row items-center no-wrap">
           <div class="col">
@@ -64,7 +67,7 @@ export default defineComponent({
       const formattedStartTime = timestampToTimezoneDate(
         timestampOfStartTime / 1000,
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss"
+        "yyyy-MM-dd HH:mm:ss",
       );
       const startTimeEntry = `${formattedStartTime} ${store.state.timezone} (${timestampOfStartTime})`;
 
@@ -72,7 +75,7 @@ export default defineComponent({
       const formattedEndTime = timestampToTimezoneDate(
         timestampOfEndTime / 1000,
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss"
+        "yyyy-MM-dd HH:mm:ss",
       );
       const endTimeEntry = `${formattedEndTime} ${store.state.timezone} (${timestampOfEndTime})`;
 
@@ -92,7 +95,7 @@ export default defineComponent({
       const getDuration = (createdAt: number) => {
         const currentTime = localTimeToMicroseconds();
         const durationInSeconds = Math.floor(
-          (currentTime - createdAt) / 1000000
+          (currentTime - createdAt) / 1000000,
         );
 
         return durationFormatter(durationInSeconds);
