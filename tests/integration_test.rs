@@ -21,18 +21,23 @@ mod tests {
     use actix_web::{http::header::ContentType, test, web, App};
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
-    use chrono::Utc;
+    use chrono::{Duration, Utc};
     use config::{get_config, utils::json};
+    use infra::scheduler::Trigger;
     use openobserve::{
         common::meta::{
-            alerts::destinations::{Destination, DestinationType},
+            alerts::{
+                alert::Alert,
+                destinations::{Destination, DestinationType},
+                QueryCondition, TriggerCondition,
+            },
             dashboards::{v1, Dashboard, Dashboards},
         },
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::router::*,
         },
-        service::search::SEARCH_SERVER,
+        service::{alerts::scheduler::handle_triggers, search::SEARCH_SERVER},
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
@@ -194,8 +199,12 @@ mod tests {
         e2e_post_alert_destination().await;
         e2e_get_alert_destination().await;
         e2e_list_alert_destinations().await;
+        e2e_post_alert_multirange().await;
+        e2e_delete_alert_multirange().await;
         e2e_post_alert().await;
         e2e_get_alert().await;
+        e2e_handle_alert_after_destination_retries().await;
+        e2e_handle_alert_after_evaluation_retries.await;
         e2e_list_alerts().await;
         e2e_list_real_time_alerts().await;
         e2e_delete_alert().await;
@@ -1570,10 +1579,10 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    async fn e2e_post_alert() {
+    async fn e2e_post_alert_multirange() {
         let auth = setup();
         let body_str = r#"{
-                                "name": "alertChk",
+                                "name": "alert_multi_range",
                                 "stream_type": "logs",
                                 "stream_name": "olympics_schema",
                                 "is_real_time": false,
@@ -1582,12 +1591,17 @@ mod tests {
                                         "column": "country",
                                         "operator": "=",
                                         "value": "USA"
+                                    }],
+                                    "search_event_type": "alerts",
+                                    "multi_time_range": [{
+                                        "offset": "1440m"
                                     }]
                                 },
                                 "trigger_condition": {
                                     "period": 5,
                                     "threshold": 1,
-                                    "silence": 10
+                                    "silence": 0,
+                                    "frequency": 1
                                 },
                                 "destinations": ["slack"],
                                 "context_attributes":{
@@ -1614,6 +1628,102 @@ mod tests {
         println!("{:?}", resp.status());
         println!("{:?}", resp.response().body());
         assert!(resp.status().is_success());
+
+        let trigger = openobserve::service::db::scheduler::exists(
+            "e2e",
+            infra::scheduler::TriggerModule::Alert,
+            "logs/olympics_schema/alert_multi_range",
+        )
+        .await;
+        assert!(trigger);
+    }
+
+    async fn e2e_delete_alert_multirange() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::delete()
+            .uri(&format!(
+                "/api/{}/{}/alerts/{}",
+                "e2e", "olympics_schema", "alert_multi_range"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let trigger = openobserve::service::db::scheduler::exists(
+            "e2e",
+            infra::scheduler::TriggerModule::Alert,
+            "logs/olympics_schema/alert_multi_range",
+        )
+        .await;
+        assert!(!trigger);
+    }
+
+    async fn e2e_post_alert() {
+        let auth = setup();
+        let body_str = r#"{
+                                "name": "alertChk",
+                                "stream_type": "logs",
+                                "stream_name": "olympics_schema",
+                                "is_real_time": false,
+                                "enabled": true,
+                                "query_condition": {
+                                    "conditions": [{
+                                        "column": "country",
+                                        "operator": "=",
+                                        "value": "USA"
+                                    }]
+                                },
+                                "trigger_condition": {
+                                    "period": 5,
+                                    "threshold": 1,
+                                    "silence": 0,
+                                    "frequency": 60
+                                },
+                                "destinations": ["slack"],
+                                "context_attributes":{
+                                    "app_name":"App1"
+                                }
+                            }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        println!("{:?}", resp.status());
+        println!("{:?}", resp.response().body());
+        assert!(resp.status().is_success());
+
+        let trigger = openobserve::service::db::scheduler::exists(
+            "e2e",
+            infra::scheduler::TriggerModule::Alert,
+            "logs/olympics_schema/alertChk",
+        )
+        .await;
+        assert!(trigger);
     }
 
     async fn e2e_get_alert() {
@@ -1641,6 +1751,122 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
+    async fn e2e_handle_alert_after_destination_retries() {
+        let now = Utc::now().timestamp_micros();
+        let mins_3_later = now
+            + Duration::try_minutes(3)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let trigger = Trigger {
+            org: "test".to_string(),
+            module: infra::scheduler::TriggerModule::Alert,
+            module_key: "logs/olympics_schema/alertChk".to_string(),
+            start_time: Some(now),
+            end_time: Some(mins_3_later),
+            next_run_at: now,
+            is_realtime: false,
+            is_silenced: false,
+            status: infra::scheduler::TriggerStatus::Processing,
+            retries: 2,
+            data: "{}".to_string(),
+        };
+
+        let res = handle_triggers(trigger).await;
+        log::info!("{:?}", res);
+        // This alert has an invalid destination
+        assert!(res.is_err());
+
+        let trigger = openobserve::service::db::scheduler::get(
+            "test",
+            infra::scheduler::TriggerModule::Alert,
+            "logs/olympics_schema/alertChk",
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        assert!(trigger.next_run_at > now && trigger.retries == 0);
+    }
+
+    async fn e2e_handle_alert_after_evaluation_retries() {
+        let alert = Alert {
+            name: "test_alert_wrong_sql".to_string(),
+            stream_type: "logs".into(),
+            stream_name: "olympics_schema".to_string(),
+            is_real_time: false,
+            enabled: true,
+            query_condition: QueryCondition {
+                query_type: "sql",
+                conditions: None,
+                sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
+                ..Default::default()
+            },
+            trigger_condition: TriggerCondition {
+                period: 5,
+                threshold: 1,
+                silence: 0,
+                frequency: 3600,
+                ..Default::default()
+            },
+            destinations: vec!["slack".to_string()],
+            ..Default::default()
+        };
+
+        let res = openobserve::service::db::alerts::alert::set(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            &alert,
+            true,
+        )
+        .await;
+        assert!(res.is_ok());
+
+        let now = Utc::now().timestamp_micros();
+        let mins_3_later = now
+            + Duration::try_minutes(3)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let trigger = Trigger {
+            org: "test".to_string(),
+            module: infra::scheduler::TriggerModule::Alert,
+            module_key: "logs/olympics_schema/test_alert_wrong_sql".to_string(),
+            start_time: Some(now),
+            end_time: Some(mins_3_later),
+            next_run_at: now,
+            is_realtime: false,
+            is_silenced: false,
+            status: infra::scheduler::TriggerStatus::Processing,
+            retries: 2,
+            data: "{}".to_string(),
+        };
+
+        let res = handle_triggers(trigger).await;
+        log::info!("{:?}", res);
+        assert!(res.is_err());
+
+        let trigger = openobserve::service::db::scheduler::get(
+            "test",
+            infra::scheduler::TriggerModule::Alert,
+            "logs/olympics_schema/test_alert_wrong_sql",
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        assert!(trigger.next_run_at > now && trigger.retries == 0);
+
+        let res = openobserve::service::db::alerts::alert::delete(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "test_alert_wrong_sql",
+        )
+        .await;
+        log::info!("{:?}", res);
+        assert!(res.is_ok());
+    }
+
     async fn e2e_delete_alert() {
         let auth = setup();
         let app = test::init_service(
@@ -1664,6 +1890,14 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
+
+        let trigger = openobserve::service::db::scheduler::exists(
+            "e2e",
+            infra::scheduler::TriggerModule::Alert,
+            "logs/olympics_schema/alertChk",
+        )
+        .await;
+        assert!(!trigger);
     }
 
     async fn e2e_list_alerts() {
