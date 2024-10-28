@@ -144,6 +144,9 @@ jobs:
       #   if: always()
       #   run: cat o2.log
 
+      - name: Generate Coverage Report
+        run: cd tests/ui-testing && npx nyc report
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
