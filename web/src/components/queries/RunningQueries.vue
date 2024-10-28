@@ -694,7 +694,7 @@ export default defineComponent({
       return rows.map((row, index) => {
         return {
           ...row,
-          "#": index + 1,
+          "#": index < 9 ? `0${index + 1}` : index + 1,
         };
       });
     });
