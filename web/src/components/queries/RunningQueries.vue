@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
 
-    <div v-show="selectedQueryTypeTab === 'all'">
+    <div v-if="selectedQueryTypeTab === 'all'">
       <RunningQueriesList
         :rows="rowsQuery"
         v-model:selectedRows="selectedRow['all']"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete:queries="handleMultiQueryCancel"
       />
     </div>
-    <div v-show="selectedQueryTypeTab === 'summary'">
+    <div v-if="selectedQueryTypeTab === 'summary'">
       <SummaryList
         :rows="summaryRows"
         v-model:selectedRows="selectedRow['summary']"
@@ -337,24 +337,21 @@ export default defineComponent({
               queryRange: 0,
               search_type,
               trace_ids: [],
-              start_time,
-              end_time,
               created_at,
+              query: { end_time, start_time },
             };
           }
 
-          if (created_at) {
-            acc[key].created_at > created_at
-              ? (acc[key].created_at = created_at)
-              : acc[key].created_at;
+          if (acc[key].created_at > created_at) {
+            acc[key].created_at = created_at;
           }
 
-          if (acc[key].start_time > start_time) {
-            acc[key].start_time = start_time;
+          if (acc[key].query.start_time > start_time) {
+            acc[key].query.start_time = start_time;
           }
 
-          if (acc[key].end_time < end_time) {
-            acc[key].end_time = end_time;
+          if (acc[key].query.end_time < end_time) {
+            acc[key].query.end_time = end_time;
           }
 
           acc[key].trace_ids.push(trace_id);
@@ -635,6 +632,7 @@ export default defineComponent({
         };
 
         return _queries.filter((item: any) => {
+          console.log("item", item);
           const timeDifference =
             selectedSearchField.value == "exec_duration"
               ? currentTime - item.created_at
