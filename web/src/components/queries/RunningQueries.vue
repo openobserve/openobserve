@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
 
-    <div v-if="selectedQueryTypeTab === 'all'">
+    <div v-show="selectedQueryTypeTab === 'all'">
       <RunningQueriesList
         :rows="rowsQuery"
         v-model:selectedRows="selectedRow['all']"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete:queries="handleMultiQueryCancel"
       />
     </div>
-    <div v-if="selectedQueryTypeTab === 'summary'">
+    <div v-show="selectedQueryTypeTab === 'summary'">
       <SummaryList
         :rows="summaryRows"
         v-model:selectedRows="selectedRow['summary']"
@@ -202,104 +202,6 @@ export default defineComponent({
 
     const selectedSearchType = ref("Dashboards");
     const searchTypes = ["Dashboards", "UI", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
-
-    const runningQueries = [
-      {
-        trace_id: "2f85ab21ba4c49cca4990de1e3332926-0",
-        status: "waiting",
-        created_at: 1729838872552707,
-        started_at: 0,
-        work_group: "Long",
-        user_id: "omkar1@openobserve.ai",
-        org_id: "otlp-production",
-        stream_type: "logs",
-        query: {
-          sql: 'SELECT histogram(_timestamp,\'43200 seconds\') AS "x_axis_1", COUNT("k8s_container_name") AS "y_axis_1", "k8s_node_name" AS "breakdown_1" FROM "default" GROUP BY "x_axis_1", "breakdown_1" ORDER BY "x_axis_1" ASC',
-          start_time: 1729814400000000,
-          end_time: 1729838871510000,
-        },
-        scan_stats: null,
-        search_type: "UI", // Dashboard, Others
-      },
-      {
-        trace_id: "0de0b2a1b1b2451488c86652e562c40c-0",
-        status: "processing",
-        created_at: 1729838872353327,
-        started_at: 1729838873022841,
-        work_group: "Long",
-        user_id: "omkar1@openobserve.ai",
-        org_id: "otlp-production",
-        stream_type: "logs",
-        query: {
-          sql: 'SELECT count(k8s_pod_start_time) as "y_axis_1"  FROM "default" ',
-          start_time: 1726210071510000,
-          end_time: 1729838871510000,
-        },
-        scan_stats: {
-          files: 2640,
-          records: 603459598,
-          original_size: 813496,
-          compressed_size: 25986,
-          querier_files: 0,
-          querier_memory_cached_files: 0,
-          querier_disk_cached_files: 0,
-          idx_scan_size: 0,
-          idx_took: 0,
-        },
-        search_type: "UI",
-      },
-      {
-        trace_id: "13491c0c0d1f41998cc8584608d72312-0",
-        status: "waiting",
-        created_at: 1729838873302399,
-        started_at: 0,
-        work_group: "Long",
-        user_id: "omkar1@openobserve.ai",
-        org_id: "otlp-production",
-        stream_type: "logs",
-        query: {
-          sql: 'SELECT histogram(_timestamp,\'43200 seconds\') AS "x_axis_1", COUNT("k8s_app_instance") AS "y_axis_1", "k8s_pod_name" AS "breakdown_1" FROM "default" GROUP BY "x_axis_1", "breakdown_1" ORDER BY "x_axis_1" ASC',
-          start_time: 1729771200000000,
-          end_time: 1729814400000000,
-        },
-        scan_stats: null,
-        search_type: "Dashboards",
-      },
-      {
-        trace_id: "13491c0c0d1f41998cc8584608d72312-10",
-        status: "waiting",
-        created_at: 1729838873302399,
-        started_at: 0,
-        work_group: "Long",
-        user_id: "omkar1@openobserve.ai",
-        org_id: "otlp-production",
-        stream_type: "logs",
-        query: {
-          sql: 'SELECT histogram(_timestamp,\'43200 seconds\') AS "x_axis_1", COUNT("k8s_app_instance") AS "y_axis_1", "k8s_pod_name" AS "breakdown_1" FROM "default" GROUP BY "x_axis_1", "breakdown_1" ORDER BY "x_axis_1" ASC',
-          start_time: 1729771200000000,
-          end_time: 1729814400000000,
-        },
-        scan_stats: null,
-        search_type: "Alerts",
-      },
-      {
-        trace_id: "13491c0c0d1f41998cc8584608d72313-10",
-        status: "waiting",
-        created_at: 1729838873302399,
-        started_at: 0,
-        work_group: "Long",
-        user_id: "omkar1@openobserve.ai",
-        org_id: "otlp-production",
-        stream_type: "logs",
-        query: {
-          sql: 'SELECT histogram(_timestamp,\'43200 seconds\') AS "x_axis_1", COUNT("k8s_app_instance") AS "y_axis_1", "k8s_pod_name" AS "breakdown_1" FROM "default" GROUP BY "x_axis_1", "breakdown_1" ORDER BY "x_axis_1" ASC',
-          start_time: 1729771200000000,
-          end_time: 1729814400000000,
-        },
-        scan_stats: null,
-        search_type: "Values",
-      },
-    ];
 
     const runningQueryTypes = [
       { label: "User Summary", value: "summary" },
@@ -690,8 +592,6 @@ export default defineComponent({
       });
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
-          // resultTotal.value = response?.data?.status?.length;
-          response.data.status = runningQueries;
           queries.value = response?.data?.status.map((query: any) => {
             return {
               ...query,
@@ -701,6 +601,7 @@ export default defineComponent({
                   : "Others",
             };
           });
+
           resultTotal.value = queries.value.length;
 
           runningQueriesSummary.value = getRunningQueriesSummary();
