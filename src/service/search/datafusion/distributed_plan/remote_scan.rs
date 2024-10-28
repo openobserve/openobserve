@@ -253,6 +253,7 @@ async fn get_remote_batch(
         timeout: req.timeout,
         work_group: req.work_group.clone(),
         user_id: req.user_id.clone(),
+        search_event_type: req.search_event_type,
         use_inverted_index: req.use_inverted_index,
         index_type: req.inverted_index_type.clone(),
     };

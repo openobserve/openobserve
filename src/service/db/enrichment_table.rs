@@ -51,6 +51,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        search_event_context: None,
         index_type: "".to_string(),
     };
     // do search

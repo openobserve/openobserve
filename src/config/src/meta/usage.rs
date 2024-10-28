@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::search::SearchEventType;
+use super::search::{SearchEventContext, SearchEventType};
 use crate::{
     meta::stream::{FileMeta, StreamType},
     SIZE_IN_MB,
@@ -99,6 +99,9 @@ pub struct UsageData {
     pub max_ts: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_event_context: Option<SearchEventContext>,
+    #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_wait_in_queue: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -265,6 +268,9 @@ pub struct RequestStats {
     pub user_email: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_event_context: Option<SearchEventContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -290,6 +296,7 @@ impl Default for RequestStats {
             max_ts: None,
             user_email: None,
             search_type: None,
+            search_event_context: None,
             trace_id: None,
             took_wait_in_queue: None,
             result_cache_ratio: None,
@@ -313,6 +320,7 @@ impl From<FileMeta> for RequestStats {
             max_ts: Some(meta.max_ts),
             user_email: None,
             search_type: None,
+            search_event_context: None,
             trace_id: None,
             took_wait_in_queue: None,
             result_cache_ratio: None,

@@ -22,7 +22,10 @@ use actix_web::http;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config,
-    meta::stream::{StreamParams, StreamType},
+    meta::{
+        search::{SearchEventContext, SearchEventType},
+        stream::{StreamParams, StreamType},
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -354,11 +357,17 @@ impl Alert {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
+            let alert_key = format!(
+                "/alerts/{}/{}/{}/{}",
+                self.org_id, self.stream_type, self.stream_name, self.name
+            );
             self.query_condition
                 .evaluate_scheduled(
                     &self.get_stream_params(),
                     &self.trigger_condition,
                     start_time,
+                    Some(SearchEventType::Alerts),
+                    Some(SearchEventContext::with_alert(alert_key)),
                 )
                 .await
         }

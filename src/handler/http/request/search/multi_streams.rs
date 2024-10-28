@@ -37,8 +37,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
-                get_work_group,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request, get_work_group,
             },
         },
     },
@@ -146,6 +146,9 @@ pub async fn search_multi(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
+    let search_event_context = search_type
+        .as_ref()
+        .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
 
     // handle encoding for query and aggs
     let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
@@ -345,6 +348,7 @@ pub async fn search_multi(
                     max_ts: Some(req.query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    search_event_context: search_event_context.clone(),
                     trace_id: Some(res.trace_id.clone()),
                     took_wait_in_queue: if res.took_detail.is_some() {
                         let resp_took = res.took_detail.as_ref().unwrap();
@@ -562,6 +566,7 @@ pub async fn search_multi(
             trace_id: None,
             // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
+            search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
         report_request_usage_stats(
@@ -926,6 +931,7 @@ pub async fn around_multi(
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            search_event_context: None,
             index_type: "".to_string(),
         };
         let search_res =
@@ -999,6 +1005,7 @@ pub async fn around_multi(
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            search_event_context: None,
             index_type: "".to_string(),
         };
         let search_res =

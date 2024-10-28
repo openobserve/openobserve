@@ -53,8 +53,13 @@ pub struct Request {
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     #[serde(default)]
     pub timeout: i64,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub index_type: String,
 }
@@ -434,6 +439,7 @@ impl SearchHistoryRequest {
             clusters: Vec::new(),
             timeout: 0,
             search_type: Some(SearchEventType::Other),
+            search_event_context: None,
             index_type: "".to_string(),
         };
         Ok(search_req)
@@ -645,6 +651,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
             timeout: req.timeout,
             work_group: "".to_string(),
             user_id: None,
+            search_event_type: req.search_type.map(|event| event.to_string()),
             index_type: req.index_type.clone(),
         }
     }
@@ -746,6 +753,57 @@ impl FromStr for SearchEventType {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename = "snake_case")]
+pub struct SearchEventContext {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_key: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_stream_key: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report_key: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_name: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_folder: Option<String>,
+}
+
+impl SearchEventContext {
+    pub fn with_alert(alert_key: String) -> Self {
+        Self {
+            alert_key: Some(alert_key),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_derived_stream(derived_stream_key: String) -> Self {
+        Self {
+            derived_stream_key: Some(derived_stream_key),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_report(report_key: String) -> Self {
+        Self {
+            report_key: Some(report_key),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_dashboard(dashboard_name: String, dashboard_folder: Option<String>) -> Self {
+        Self {
+            dashboard_name: Some(dashboard_name),
+            dashboard_folder,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MultiSearchPartitionRequest {
     pub sql: Vec<String>,
@@ -813,7 +871,13 @@ pub struct MultiStreamRequest {
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(default)]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub index_type: String, // parquet(default) or fst
     #[serde(default)]
@@ -885,6 +949,7 @@ impl MultiStreamRequest {
                 encoding: self.encoding,
                 timeout: self.timeout,
                 search_type: self.search_type,
+                search_event_context: self.search_event_context.clone(),
                 index_type: self.index_type.clone(),
             });
         }
@@ -970,6 +1035,7 @@ mod tests {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            search_event_context: None,
             index_type: "".to_string(),
         };
 

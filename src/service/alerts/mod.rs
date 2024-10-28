@@ -19,7 +19,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::{
-        search::{SearchEventType, SqlQuery},
+        search::{SearchEventContext, SearchEventType, SqlQuery},
         stream::StreamParams,
     },
     utils::{
@@ -74,6 +74,8 @@ impl QueryCondition {
         stream_param: &StreamParams,
         trigger_condition: &TriggerCondition,
         start_time: Option<i64>,
+        search_type: Option<SearchEventType>,
+        search_event_context: Option<SearchEventContext>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
@@ -259,7 +261,8 @@ impl QueryCondition {
                 regions: vec![],
                 clusters: vec![],
                 timeout: 0,
-                search_type: Some(SearchEventType::Alerts),
+                search_type,
+                search_event_context,
                 from: 0,
                 size,
                 start_time: 0, // ignored
@@ -316,8 +319,8 @@ impl QueryCondition {
                 regions: vec![],
                 clusters: vec![],
                 timeout: 0,
-                search_type: Some(SearchEventType::Alerts), /* TODO(taiming): change the name to
-                                                             * scheduled & inform FE */
+                search_type,
+                search_event_context,
                 index_type: "".to_string(),
             };
             SearchService::search(

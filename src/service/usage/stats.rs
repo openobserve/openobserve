@@ -93,6 +93,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            search_event_context: None,
             index_type: "".to_string(),
         };
         // do search
@@ -151,6 +152,7 @@ async fn get_last_stats(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        search_event_context: None,
         index_type: "".to_string(),
     };
     match SearchService::search(

@@ -18,6 +18,7 @@ use std::str::FromStr;
 use chrono::Utc;
 use config::{
     get_config,
+    meta::search::{SearchEventContext, SearchEventType},
     utils::json::{Map, Value},
 };
 use cron::Schedule;
@@ -120,7 +121,11 @@ pub async fn save(
     }
 
     // test derived_stream
-    if let Err(e) = &derived_stream.evaluate(None, None).await {
+    let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name);
+    if let Err(e) = &derived_stream
+        .evaluate(None, None, trigger_module_key.clone())
+        .await
+    {
         return Err(anyhow::anyhow!(
             "DerivedStream not saved due to failed test run caused by {}",
             e.to_string()
@@ -132,7 +137,7 @@ pub async fn save(
     let trigger = db::scheduler::Trigger {
         org: derived_stream.source.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
-        module_key: derived_stream.get_scheduler_module_key(pipeline_name),
+        module_key: trigger_module_key,
         next_run_at,
         is_realtime: derived_stream.is_real_time,
         is_silenced: false,
@@ -182,12 +187,19 @@ impl DerivedStreamMeta {
         &self,
         row: Option<&Map<String, Value>>,
         start_time: Option<i64>,
+        module_key: String,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition
-                .evaluate_scheduled(&self.source, &self.trigger_condition, start_time)
+                .evaluate_scheduled(
+                    &self.source,
+                    &self.trigger_condition,
+                    start_time,
+                    Some(SearchEventType::DerivedStream),
+                    Some(SearchEventContext::with_derived_stream(module_key)),
+                )
                 .await
         }
     }
