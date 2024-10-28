@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 class="query-management-query-tab-selection-btn"
                 style="height: 30px; margin: 0 0px; padding: 4px 12px"
-                @click="onChangeQueryTab(visual.value)"
+                @click="onChangeQueryTab(visual.value as 'summary' | 'all')"
               >
                 {{ visual.label }}</q-btn
               >
@@ -196,7 +196,10 @@ export default defineComponent({
     const lastRefreshed = ref("");
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
-    const selectedRow = ref({
+    const selectedRow = ref<{
+      all: any[];
+      summary: any[];
+    }>({
       all: [],
       summary: [],
     });
@@ -207,7 +210,7 @@ export default defineComponent({
       { label: "Query Range", value: "query_range" },
     ]);
 
-    const selectedQueryTypeTab = ref("summary");
+    const selectedQueryTypeTab = ref<"summary" | "all">("summary");
 
     const selectedSearchType = ref("Dashboards");
     const searchTypes = ["Dashboards", "UI", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
@@ -228,58 +231,61 @@ export default defineComponent({
      */
     const getRunningQueriesSummary = () => {
       try {
-        const result = queries.value.reduce((acc, query) => {
-          const {
-            trace_id,
-            user_id,
-            search_type,
-            created_at,
-            query: { start_time, end_time },
-          } = query;
-
-          const key = `${user_id}-${search_type}`;
-
-          if (!acc[key]) {
-            acc[key] = {
-              row_id: key,
-              user_id: user_id,
-              numOfQueries: 0,
-              duration: 0,
-              queryRange: 0,
+        const result = queries.value.reduce(
+          (acc: { [key: string]: any }, query: any) => {
+            const {
+              trace_id,
+              user_id,
               search_type,
-              trace_ids: [],
               created_at,
-              query: { end_time, start_time },
-            };
-          }
+              query: { start_time, end_time },
+            } = query;
 
-          if (acc[key].created_at > created_at) {
-            acc[key].created_at = created_at;
-          }
+            const key = `${user_id}-${search_type}`;
 
-          if (acc[key].query.start_time > start_time) {
-            acc[key].query.start_time = start_time;
-          }
+            if (!acc[key]) {
+              acc[key] = {
+                row_id: key,
+                user_id: user_id,
+                numOfQueries: 0,
+                duration: 0,
+                queryRange: 0,
+                search_type,
+                trace_ids: [],
+                created_at,
+                query: { end_time, start_time },
+              };
+            }
 
-          if (acc[key].query.end_time < end_time) {
-            acc[key].query.end_time = end_time;
-          }
+            if (acc[key].created_at > created_at) {
+              acc[key].created_at = created_at;
+            }
 
-          acc[key].trace_ids.push(trace_id);
+            if (acc[key].query.start_time > start_time) {
+              acc[key].query.start_time = start_time;
+            }
 
-          acc[key].numOfQueries += 1;
+            if (acc[key].query.end_time < end_time) {
+              acc[key].query.end_time = end_time;
+            }
 
-          if (created_at) {
-            acc[key].duration += getDuration(created_at).durationInSeconds;
-          }
+            acc[key].trace_ids.push(trace_id);
 
-          acc[key].queryRange += queryRange(
-            start_time,
-            end_time,
-          ).queryRangeInSeconds;
+            acc[key].numOfQueries += 1;
 
-          return acc;
-        }, {});
+            if (created_at) {
+              acc[key].duration += getDuration(created_at).durationInSeconds;
+            }
+
+            acc[key].queryRange += queryRange(
+              start_time,
+              end_time,
+            ).queryRangeInSeconds;
+
+            return acc;
+          },
+          {},
+        );
 
         return Object.values(result).map((user: any, index: number) => ({
           ...user,
@@ -480,7 +486,7 @@ export default defineComponent({
     // Watcher to filter queries based on user_id
     const filteredQueries = ref([]);
 
-    const runningQueriesSummary = ref([]);
+    const runningQueriesSummary = ref<any[]>([]);
 
     const filteredRows = computed(() => {
       const newVal = filterQuery.value;
@@ -731,7 +737,7 @@ export default defineComponent({
       });
     });
 
-    const onChangeQueryTab = (tab: string) => {
+    const onChangeQueryTab = (tab: "summary" | "all") => {
       selectedQueryTypeTab.value = tab;
     };
 

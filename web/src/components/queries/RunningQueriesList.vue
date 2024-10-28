@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
           padding="sm lg"
           color="red"
-          :disable="selectedRow.length === 0"
+          :disable="selectedRow?.length === 0"
           @click="handleMultiQueryCancel"
           no-caps
           :label="t('queries.cancelQuery')"
