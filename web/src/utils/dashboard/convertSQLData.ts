@@ -1943,7 +1943,7 @@ export const convertSQLData = async (
               // need to consider time range gap
               x = toZonedTime(
                 new Date(options.xAxis[0].data[index] + "Z").getTime() +
-                  metadata?.queries[0]?.timeRangeGap.seconds ?? 0,
+                  (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
                 store.state.timezone,
               );
               timeStringCache[xKey] = x;
@@ -2104,7 +2104,7 @@ export const convertSQLData = async (
             // need to consider time range gap
             toZonedTime(
               new Date(options.xAxis[0].data[index] + "Z").getTime() +
-                metadata?.queries[0]?.timeRangeGap.seconds ?? 0,
+                (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
               store.state.timezone,
             ),
             it ?? null,
@@ -2114,7 +2114,8 @@ export const convertSQLData = async (
             // need to consider time range gap
             toZonedTime(
               (new Date(options.xAxis[0].data[index]).getTime() +
-                metadata?.queries[0]?.timeRangeGap.seconds ?? 0) / 1000,
+                (metadata?.queries[0]?.timeRangeGap.seconds ?? 0)) /
+                1000,
               store.state.timezone,
             ),
             it ?? null,

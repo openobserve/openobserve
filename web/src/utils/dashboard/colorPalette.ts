@@ -153,8 +153,8 @@ export const getSQLMinMaxValue = (
   let min = Infinity;
   let max = -Infinity;
 
-  searchQueryData[0]?.forEach((data: any) => {
-    yaxiskeys?.forEach((key: any) => {
+  searchQueryData[0]?.forEach((data: SQLData) => {
+    yaxiskeys?.forEach((key: string) => {
       if (
         data[key] !== undefined &&
         !Number.isNaN(data[key]) &&
@@ -183,7 +183,7 @@ const getSeriesHash = (seriesName: string) => {
   for (let i = 0; i < seriesName.length; i++) {
     const char = seriesName.charCodeAt(i); // Get the Unicode value of the character
     hash = (hash << 5) - hash + char; // Bitwise hash computation
-    hash = hash & hash; // Convert to 32-bit integer
+    hash |= 0; // Convert to 32-bit integer
   }
 
   // Ensure the hash is positive and between 0 to 99
@@ -198,13 +198,35 @@ const getSeriesValueBasedOnSeriesBy = (
 ): number => {
   switch (seriesBy) {
     case "last":
-      return values[values.length - 1];
+      return (
+        values
+          .slice()
+          .reverse()
+          .find(
+            (v) =>
+              typeof v === "number" &&
+              !Number.isNaN(v) &&
+              v !== null &&
+              v !== undefined,
+          ) ?? 0
+      );
     case "min":
       return Math.min(...values);
     case "max":
       return Math.max(...values);
     default:
-      return values[values.length - 1];
+      return (
+        values
+          .slice()
+          .reverse()
+          .find(
+            (v) =>
+              typeof v === "number" &&
+              !Number.isNaN(v) &&
+              v !== null &&
+              v !== undefined,
+          ) ?? 0
+      );
   }
 };
 
@@ -219,6 +241,26 @@ interface ColorConfig {
   seriesBy?: SeriesBy;
 }
 
+function getDomainPartitions(
+  chartMin: number,
+  chartMax: number,
+  numPartitions: number,
+) {
+  // If there's only one partition, return just chartMin and chartMax
+  if (numPartitions < 2) {
+    return [chartMin, chartMax];
+  }
+
+  const partitions = [];
+  const step = (chartMax - chartMin) / (numPartitions - 1);
+
+  for (let i = 0; i < numPartitions; i++) {
+    partitions.push(chartMin + i * step);
+  }
+
+  return partitions;
+}
+
 export const getSeriesColor = (
   colorCfg: ColorConfig | null,
   seriesName: string,
@@ -228,32 +270,30 @@ export const getSeriesColor = (
 ): string | null => {
   if (!colorCfg) {
     return classicColorPalette[getSeriesHash(seriesName)];
-  }
-
-  const colorHandlers: Record<ColorConfig["mode"], () => string | null> = {
-    fixed: () => colorCfg.fixedColor?.[0] ?? null,
-    shades: () =>
-      shadeColor(
-        colorCfg.fixedColor?.[0] ?? "#000000",
-        getSeriesValueBasedOnSeriesBy(value, "last"),
+  } else if (colorCfg.mode === "fixed") {
+    return colorCfg?.fixedColor?.[0] ?? "#53ca53";
+  } else if (colorCfg.mode === "shades") {
+    return shadeColor(
+      colorCfg?.fixedColor?.[0] ?? "#53ca53",
+      getSeriesValueBasedOnSeriesBy(value, "last"),
+      chartMin,
+      chartMax,
+    );
+  } else if (colorCfg.mode === "palette-classic-by-series") {
+    return classicColorPalette[getSeriesHash(seriesName)];
+  } else if (colorCfg.mode === "palette-classic") {
+    return null;
+  } else {
+    const d3ColorObj = scaleLinear(
+      getDomainPartitions(
         chartMin,
         chartMax,
+        colorCfg?.fixedColor?.length ?? classicColorPalette.length,
       ),
-    "palette-classic-by-series": () =>
-      classicColorPalette[getSeriesHash(seriesName)],
-    "palette-classic": () => null,
-    scale: () => {
-      const d3ColorObj = scaleLinear(
-        [chartMin, chartMax / 2, chartMax],
-        colorCfg?.fixedColor?.length
-          ? colorCfg.fixedColor
-          : classicColorPalette,
-      );
-      return d3ColorObj(
-        getSeriesValueBasedOnSeriesBy(value, colorCfg.seriesBy ?? "last"),
-      );
-    },
-  };
-
-  return colorHandlers[colorCfg.mode]?.() ?? null;
+      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : classicColorPalette,
+    );
+    return d3ColorObj(
+      getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last"),
+    );
+  }
 };
