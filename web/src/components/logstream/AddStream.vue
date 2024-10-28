@@ -177,7 +177,9 @@ const isSchemaEvolutionEnabled = computed(() => {
 });
 
 const filteredStreamTypes = computed(() => {
-  return props.isInPipeline ? streamTypes.filter(type => type.value === 'logs') : streamTypes;
+  //here we can filter out based on isInPipeline prop
+  //but for testing purpose we are returning all streamTypes
+  return streamTypes;
 });
 
 
