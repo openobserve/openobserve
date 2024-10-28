@@ -210,7 +210,7 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     show_symbol: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    line_interpolation: Option<String>,
+    line_interpolation: Option<LineInterpolation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
@@ -439,7 +439,26 @@ pub struct LegendWidth {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct LabelOption {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub position: Option<String>,
+    pub position:  Option<LabelPosition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotate: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LineInterpolation {
+    Smooth,
+    Linear,
+    StepStart,
+    StepEnd,
+    StepMiddle,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LabelPosition {
+    Top,
+    Inside,
+    InsideTop,
+    InsideBottom
 }

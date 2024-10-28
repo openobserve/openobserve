@@ -724,7 +724,7 @@ export const convertSQLData = async (
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         label: {
           show:
-            panelSchema.config?.label_option?.position == null ? false : true,
+            panelSchema.config?.label_option?.position != null,
           position: panelSchema.config?.label_option?.position || "None",
           rotate: panelSchema.config?.label_option?.rotate || 0,
         },
@@ -911,9 +911,7 @@ export const convertSQLData = async (
                 ...defaultSeriesProps,
                 label: {
                   show:
-                    panelSchema.config?.label_option?.position == null
-                      ? false
-                      : true,
+                    panelSchema.config?.label_option?.position != null,
                   position:
                     panelSchema.config?.label_option?.position || "None",
                   rotate: panelSchema.config?.label_option?.rotate || 0,
@@ -946,9 +944,7 @@ export const convertSQLData = async (
             )?.label,
             label: {
               show:
-                panelSchema.config?.label_option?.position == null
-                  ? false
-                  : true,
+                panelSchema.config?.label_option?.position != null,
               position: panelSchema.config?.label_option?.position || "None",
               rotate: panelSchema.config?.label_option?.rotate || 0,
             },
@@ -1047,9 +1043,7 @@ export const convertSQLData = async (
             )?.label,
             label: {
               show:
-                panelSchema.config?.label_option?.position == null
-                  ? false
-                  : true,
+                panelSchema.config?.label_option?.position != null,
               position: panelSchema.config?.label_option?.position || "None",
               rotate: panelSchema.config?.label_option?.rotate || 0,
             },
@@ -1087,7 +1081,7 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           label: {
             show:
-              panelSchema.config?.label_option?.position == null ? false : true,
+              panelSchema.config?.label_option?.position != null,
             position: panelSchema.config?.label_option?.position || "None",
             rotate: panelSchema.config?.label_option?.rotate || 0,
           },
@@ -1134,7 +1128,7 @@ export const convertSQLData = async (
           },
           label: {
             show:
-              panelSchema.config?.label_option?.position == null ? false : true,
+              panelSchema.config?.label_option?.position != null,
             position: panelSchema.config?.label_option?.position || "None",
             rotate: panelSchema.config?.label_option?.rotate || 0,
           },
@@ -1342,7 +1336,7 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           label: {
             show:
-              panelSchema.config?.label_option?.position == null ? false : true,
+              panelSchema.config?.label_option?.position != null,
             position: panelSchema.config?.label_option?.position || "None",
             rotate: panelSchema.config?.label_option?.rotate || 0,
           },
@@ -1559,7 +1553,7 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           label: {
             show:
-              panelSchema.config?.label_option?.position == null ? false : true,
+              panelSchema.config?.label_option?.position != null,
             position: panelSchema.config?.label_option?.position || "None",
             rotate: panelSchema.config?.label_option?.rotate || 0,
           },
@@ -2302,9 +2296,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         emphasis: { focus: "series" },
         smooth:
           panelSchema.config?.line_interpolation === "smooth" ||
-          panelSchema.config?.line_interpolation == null
-            ? true
-            : false,
+          panelSchema.config?.line_interpolation == null,
         step: ["step-start", "step-end", "step-middle"].includes(
           panelSchema.config?.line_interpolation,
         )
@@ -2373,9 +2365,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         type: "line",
         smooth:
           panelSchema.config?.line_interpolation === "smooth" ||
-          panelSchema.config?.line_interpolation == null
-            ? true
-            : false,
+          panelSchema.config?.line_interpolation == null,
         step: ["step-start", "step-end", "step-middle"].includes(
           panelSchema.config?.line_interpolation,
         )
@@ -2414,9 +2404,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         type: "line",
         smooth:
           panelSchema.config?.line_interpolation === "smooth" ||
-          panelSchema.config?.line_interpolation == null
-            ? true
-            : false,
+          panelSchema.config?.line_interpolation == null,
         step: ["step-start", "step-end", "step-middle"].includes(
           panelSchema.config?.line_interpolation,
         )
