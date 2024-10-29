@@ -151,7 +151,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-${{ matrix.testfilename }} # Unique name for each job
-          path: tests/ui-testing/.n8_output
+          path: tests/ui-testing/.nyc_output
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -177,8 +177,8 @@ jobs:
 
       - name: Combine Coverage Data
         run: |
-          mkdir -p tests/ui-testing/.n8_output
-          mv coverage-data-*/* tests/ui-testing/.n8_output/ # Move all JSON files to one folder
+          mkdir -p tests/ui-testing/.nyc_output
+          mv coverage-data-*/* tests/ui-testing/.nyc_output/ # Move all JSON files to one folder
           cd tests/ui-testing && npx nyc report # Generate combined report
 
       - name: Upload Coverage Report
