@@ -28,6 +28,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
+use tracing::{info_span, Instrument};
 
 use crate::{
     db::postgres::CLIENT,
@@ -529,7 +530,8 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
                             .collect::<Vec<_>>()
                     })
                 }
-            }));
+            }).instrument(info_span!("search_partition",start_time=time_start,end_time=time_end))
+        );
         }
 
         let mut files = Vec::new();

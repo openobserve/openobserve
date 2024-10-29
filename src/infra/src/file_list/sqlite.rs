@@ -26,6 +26,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
+use tracing::{info_span, Instrument};
 
 use crate::{
     db::sqlite::{CLIENT_RO, CLIENT_RW},
@@ -404,71 +405,78 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut tasks = Vec::with_capacity(day_partitions.len());
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
-            tasks.push(tokio::task::spawn(async move {
-                let pool = CLIENT_RO.clone();
-                let cfg = get_config();
-                if cfg.limit.use_upper_bound_for_max_ts {
-                    // TODO: if partition is daily, we need to remove this logic
-                    let max_ts_upper_bound =
-                        time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-                    sqlx::query_as::<_, super::FileRecord>(
-                        r#"
+            tasks.push(
+                tokio::task::spawn(async move {
+                    let pool = CLIENT_RO.clone();
+                    let cfg = get_config();
+                    if cfg.limit.use_upper_bound_for_max_ts {
+                        // TODO: if partition is daily, we need to remove this logic
+                        let max_ts_upper_bound =
+                            time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                        sqlx::query_as::<_, super::FileRecord>(
+                            r#"
 SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                         "#,
-                    )
-                    .bind(stream_key.clone())
-                    .bind(time_start)
-                    .bind(max_ts_upper_bound)
-                    .bind(time_end)
-                    .fetch_all(&pool)
-                    .await
-                    .map(|r| {
-                        r.into_iter()
-                            .map(|r| {
-                                (
-                                    "files/".to_string()
-                                        + &stream_key
-                                        + "/"
-                                        + &r.date
-                                        + "/"
-                                        + &r.file,
-                                    FileMeta::from(&r),
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                } else {
-                    sqlx::query_as::<_, super::FileRecord>(
-                        r#"
+                        )
+                        .bind(stream_key.clone())
+                        .bind(time_start)
+                        .bind(max_ts_upper_bound)
+                        .bind(time_end)
+                        .fetch_all(&pool)
+                        .await
+                        .map(|r| {
+                            r.into_iter()
+                                .map(|r| {
+                                    (
+                                        "files/".to_string()
+                                            + &stream_key
+                                            + "/"
+                                            + &r.date
+                                            + "/"
+                                            + &r.file,
+                                        FileMeta::from(&r),
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    } else {
+                        sqlx::query_as::<_, super::FileRecord>(
+                            r#"
 SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                         "#,
-                    )
-                    .bind(stream_key.clone())
-                    .bind(time_start)
-                    .bind(time_end)
-                    .fetch_all(&pool)
-                    .await
-                    .map(|r| {
-                        r.into_iter()
-                            .map(|r| {
-                                (
-                                    "files/".to_string()
-                                        + &stream_key
-                                        + "/"
-                                        + &r.date
-                                        + "/"
-                                        + &r.file,
-                                    FileMeta::from(&r),
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                }
-            }));
+                        )
+                        .bind(stream_key.clone())
+                        .bind(time_start)
+                        .bind(time_end)
+                        .fetch_all(&pool)
+                        .await
+                        .map(|r| {
+                            r.into_iter()
+                                .map(|r| {
+                                    (
+                                        "files/".to_string()
+                                            + &stream_key
+                                            + "/"
+                                            + &r.date
+                                            + "/"
+                                            + &r.file,
+                                        FileMeta::from(&r),
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    }
+                })
+                .instrument(info_span!(
+                    "search_partition",
+                    start_time = time_start,
+                    end_time = time_end
+                )),
+            );
         }
 
         let mut files = Vec::new();
