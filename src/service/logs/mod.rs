@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ use arrow_schema::{DataType, Field};
 use config::{
     get_config,
     meta::{
-        stream::{PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     utils::{
@@ -42,11 +42,7 @@ use super::{
     schema::stream_schema_exists,
 };
 use crate::{
-    common::meta::{
-        alerts::alert::Alert,
-        ingestion::IngestionStatus,
-        stream::{SchemaRecords, StreamParams},
-    },
+    common::meta::{alerts::alert::Alert, ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         db, ingestion::get_write_partition_key, schema::check_for_schema,
         usage::report_request_usage_stats,
@@ -188,6 +184,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
 }
 
 async fn write_logs_by_stream(
+    thread_id: usize,
     org_id: &str,
     user_email: &str,
     time_stats: (i64, &Instant), // started_at
@@ -204,7 +201,7 @@ async fn write_logs_by_stream(
         }
 
         // write json data by stream
-        let mut req_stats = write_logs(org_id, &stream_name, status, json_data).await?;
+        let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time_took;
@@ -231,6 +228,7 @@ async fn write_logs_by_stream(
 }
 
 async fn write_logs(
+    thread_id: usize,
     org_id: &str,
     stream_name: &str,
     status: &mut IngestionStatus,
@@ -446,7 +444,13 @@ async fn write_logs(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
+    let writer = ingester::get_writer(
+        thread_id,
+        org_id,
+        &StreamType::Logs.to_string(),
+        stream_name,
+    )
+    .await;
     let req_stats = write_file(&writer, stream_name, write_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

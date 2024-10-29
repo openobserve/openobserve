@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -99,7 +99,7 @@ pub async fn save_enrichment_data(
         stats,
         max_enrichment_table_size
     );
-    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as f64 {
+    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as i64 {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -198,6 +198,7 @@ pub async fn save_enrichment_data(
 
     // write data to wal
     let writer = ingester::get_writer(
+        0,
         org_id,
         &StreamType::EnrichmentTables.to_string(),
         stream_name,

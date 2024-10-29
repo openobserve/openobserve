@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,7 +51,9 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config, search::WorkGroup,
+};
 
 use super::{
     file_type::{FileType, GetExt},
@@ -163,9 +165,8 @@ pub async fn merge_parquet_files(
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
-        // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE) ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     } else if cfg.limit.distinct_values_hourly
@@ -219,11 +220,14 @@ pub fn create_session_config(
     target_partitions: usize,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
-    let target_partitions = if target_partitions == 0 {
+    let mut target_partitions = if target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
-        std::cmp::max(DATAFUSION_MIN_PARTITION, target_partitions)
+        std::cmp::max(cfg.limit.datafusion_min_partition_num, target_partitions)
     };
+    if target_partitions == 0 {
+        target_partitions = DATAFUSION_MIN_PARTITION;
+    }
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
         .with_target_partitions(target_partitions)
@@ -311,7 +315,7 @@ pub async fn prepare_datafusion_context(
             let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
                 DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
             })?;
-            if O2_CONFIG.search_group.cpu_limit_enabled {
+            if get_o2_config().search_group.cpu_limit_enabled {
                 target_partition = target_partition * cpu as usize / 100;
             }
             memory_size = memory_size * mem as usize / 100;
@@ -422,11 +426,17 @@ pub async fn create_parquet_table(
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
-    let target_partitions = if session.target_partitions == 0 {
+    let mut target_partitions = if session.target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
-        std::cmp::max(DATAFUSION_MIN_PARTITION, session.target_partitions)
+        std::cmp::max(
+            cfg.limit.datafusion_min_partition_num,
+            session.target_partitions,
+        )
     };
+    if target_partitions == 0 {
+        target_partitions = DATAFUSION_MIN_PARTITION;
+    }
 
     // Configure listing options
     let file_format = ParquetFormat::default();

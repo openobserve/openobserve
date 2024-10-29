@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ pub mod queue;
 pub mod scheduler;
 pub mod schema;
 pub mod storage;
+pub mod table;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     db::init().await?;
@@ -32,6 +33,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     queue::init().await?;
     scheduler::init().await?;
     schema::init().await?;
+    table::init().await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())

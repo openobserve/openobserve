@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -624,7 +624,10 @@ export default defineComponent({
     const route = useRoute();
     const title = ref("Add Variable");
     const { getStreams, getStream } = useStreams();
-    const { showErrorNotification } = useNotifications();
+    const {
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -720,7 +723,7 @@ export default defineComponent({
         if (newVal === "") {
           variableData.query_data.max_record_size = null;
         }
-      },
+      }
     );
 
     // watch for filter changes and set default value for Is Null and Is Not Null operators
@@ -735,7 +738,7 @@ export default defineComponent({
           });
         }
       },
-      { deep: true },
+      { deep: true }
     );
 
     onMounted(async () => {
@@ -745,17 +748,13 @@ export default defineComponent({
         // Fetch dashboard data
         const data = JSON.parse(
           JSON.stringify(
-            await getDashboard(
-              store,
-              route.query.dashboard,
-              route.query.folder,
-            ),
-          ),
+            await getDashboard(store, route.query.dashboard, route.query.folder)
+          )
         )?.variables?.list;
 
         // Find the variable to edit
         const edit = (data || []).find(
-          (it: any) => it.name === props.variableName,
+          (it: any) => it.name === props.variableName
         );
 
         // for already created variable, need to add selected fields
@@ -770,7 +769,7 @@ export default defineComponent({
 
           // for custom, check if all are selected
           const allSelected = edit.options.every(
-            (option: any) => option.selected === true,
+            (option: any) => option.selected === true
           );
           if (allSelected) {
             customSelectAllModel.value = true;
@@ -810,7 +809,7 @@ export default defineComponent({
               // get all streams from current stream type
               const streamList: any = await getStreams(
                 variableData?.query_data?.stream_type,
-                false,
+                false
               );
               data.streams = streamList.list ?? [];
 
@@ -820,7 +819,7 @@ export default defineComponent({
                 const fieldWithSchema: any = await getStream(
                   variableData?.query_data?.stream,
                   variableData.query_data.stream_type,
-                  true,
+                  true
                 );
 
                 // assign the schema
@@ -840,7 +839,7 @@ export default defineComponent({
             });
           }
         }
-      },
+      }
     );
 
     const addField = () => {
@@ -889,13 +888,21 @@ export default defineComponent({
             dashId,
             props.variableName,
             toRaw(variableData),
-            route.query.folder ?? "default",
+            route.query.folder ?? "default"
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable update failed", {
-            timeout: 2000,
-          });
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                "Variable update failed"
+            );
+          } else {
+            showErrorNotification(error.message ?? "Variable update failed", {
+              timeout: 2000,
+            });
+          }
         }
       } else {
         try {
@@ -903,13 +910,21 @@ export default defineComponent({
             store,
             dashId,
             variableData,
-            route.query.folder ?? "default",
+            route.query.folder ?? "default"
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable creation failed", {
-            timeout: 2000,
-          });
+          if (error?.response?.status === 409) {
+            showConfictErrorNotificationWithRefreshBtn(
+              error?.response?.data?.message ??
+                error?.message ??
+                "Variable creation failed"
+            );
+          } else {
+            showErrorNotification(error.message ?? "Variable creation failed", {
+              timeout: 2000,
+            });
+          }
         }
       }
     };
@@ -921,12 +936,8 @@ export default defineComponent({
         // get all variables data.
         let variablesData: any = JSON.parse(
           JSON.stringify(
-            await getDashboard(
-              store,
-              route.query.dashboard,
-              route.query.folder,
-            ),
-          ),
+            await getDashboard(store, route.query.dashboard, route.query.folder)
+          )
         )?.variables?.list;
 
         // current updated variable data need to merge/update in above variablesData.
@@ -935,7 +946,7 @@ export default defineComponent({
         if (editMode.value) {
           //if name already exists
           const variableIndex = variablesData.findIndex(
-            (variable: any) => variable.name == props.variableName,
+            (variable: any) => variable.name == props.variableName
           );
 
           // Update the variable data in the list
@@ -958,7 +969,7 @@ export default defineComponent({
         if (hasCycle) {
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->",
+            "->"
           )} -> ${hasCycle[0]}`;
           return true;
         }
@@ -971,7 +982,7 @@ export default defineComponent({
           err?.message ??
             (editMode.value
               ? "Variable update failed"
-              : "Variable creation failed"),
+              : "Variable creation failed")
         );
         return true;
       }
@@ -999,7 +1010,7 @@ export default defineComponent({
             err?.message ??
               (editMode.value
                 ? "Variable update failed"
-                : "Variable creation failed"),
+                : "Variable creation failed")
           );
         });
       });
@@ -1023,7 +1034,7 @@ export default defineComponent({
         // get all streams from current stream type
         const streamList: any = await getStreams(
           variableData?.query_data?.stream_type,
-          false,
+          false
         );
 
         // assign the stream list
@@ -1048,7 +1059,7 @@ export default defineComponent({
           const fieldWithSchema: any = await getStream(
             variableData?.query_data?.stream,
             variableData.query_data.stream_type,
-            true,
+            true
           );
 
           // assign the schema
@@ -1074,7 +1085,7 @@ export default defineComponent({
           label: it.name,
           value: "$" + it.name,
         }))
-        .filter((it: any) => it.label !== variableData.name),
+        .filter((it: any) => it.label !== variableData.name)
     );
 
     // Add new custom value to the array
@@ -1092,7 +1103,7 @@ export default defineComponent({
       () => variableData?.multiSelect,
       (newVal) => {
         if (!newVal) {
-          variableData.selectAllValueForMultiSelect = 'first';
+          variableData.selectAllValueForMultiSelect = "first";
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {
@@ -1105,7 +1116,7 @@ export default defineComponent({
             }
           }
         }
-      },
+      }
     );
 
     watch(
@@ -1114,7 +1125,7 @@ export default defineComponent({
         if (newVal != "custom") {
           variableData.customMultiSelectValue = [];
         }
-      },
+      }
     );
 
     const onCheckboxClick = (index: any) => {

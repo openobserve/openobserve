@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -43,7 +43,7 @@ use crate::{
         alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-        stream::{SchemaRecords, StreamParams},
+        stream::SchemaRecords,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
@@ -495,7 +495,7 @@ pub async fn metrics_json_handler(
 
         // write to file
         let writer =
-            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
         // if let Err(e) = writer.sync().await {
         //     log::error!("ingestion error while syncing writer: {}", e);

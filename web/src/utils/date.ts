@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -194,7 +194,7 @@ export const getDurationObjectFromParams = (params: any) => {
 };
 
 export const getConsumableRelativeTime = (period: string) => {
-  const periodString = period?.match(/(\d+)([mhdwM])/);
+  const periodString = period?.match(/(\d+)([smhdwM])/);
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];
@@ -216,7 +216,7 @@ export const getConsumableRelativeTime = (period: string) => {
 
     const startTimeStamp = date.subtractFromDate(
       endTimeStamp,
-      JSON.parse(subtractObject),
+      JSON.parse(subtractObject)
     );
 
     return {
@@ -228,6 +228,7 @@ export const getConsumableRelativeTime = (period: string) => {
 
 export const getRelativePeriod = (period: string) => {
   const mapping: { [key: string]: string } = {
+    s: "Seconds",
     m: "Minutes",
     h: "Hours",
     d: "Days",
@@ -262,7 +263,7 @@ export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
 export const convertDateToTimestamp = (
   date: string,
   time: string,
-  timezone: string,
+  timezone: string
 ) => {
   try {
     const browserTime =

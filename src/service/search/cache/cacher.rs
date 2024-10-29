@@ -66,7 +66,8 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let mut result_ts_col = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let ts_result = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
         return MultiCachedQueryResponse::default();
     }
@@ -534,10 +535,18 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-pub fn get_ts_col(parsed_sql: &Sql, ts_col: &str, is_aggregate: bool) -> Option<String> {
+pub fn get_ts_col_order_by(
+    parsed_sql: &Sql,
+    ts_col: &str,
+    is_aggregate: bool,
+) -> Option<(String, bool)> {
+    let mut is_descending = true;
+    let order_by = &parsed_sql.order_by;
+    let mut result_ts_col = String::new();
+
     for (original, alias) in &parsed_sql.aliases {
-        if original.contains("histogram") {
-            return Some(alias.clone());
+        if original == ts_col || original.contains("histogram") {
+            result_ts_col = alias.clone();
         }
     }
     if !is_aggregate
@@ -547,10 +556,22 @@ pub fn get_ts_col(parsed_sql: &Sql, ts_col: &str, is_aggregate: bool) -> Option<
             .any(|(_, v)| v.contains(&ts_col.to_owned()))
             || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
     {
-        return Some(ts_col.to_string());
+        result_ts_col = ts_col.to_string();
     }
 
-    None
+    if !order_by.is_empty() && !result_ts_col.is_empty() {
+        for (field, order) in order_by {
+            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+                is_descending = order == &OrderBy::Desc;
+                break;
+            }
+        }
+    };
+    if result_ts_col.is_empty() {
+        None
+    } else {
+        Some((result_ts_col, is_descending))
+    }
 }
 
 #[tracing::instrument]

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ use actix_web::http;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config,
-    meta::stream::StreamType,
+    meta::stream::{StreamParams, StreamType},
     utils::{
         base64,
         json::{Map, Value},
@@ -41,7 +41,6 @@ use crate::{
                 FrequencyType, Operator, QueryType,
             },
             authz::Authz,
-            stream::StreamParams,
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
@@ -49,6 +48,7 @@ use crate::{
         alerts::{build_sql, destinations},
         db,
         search::sql::RE_ONLY_SELECT,
+        short_url,
     },
 };
 
@@ -358,7 +358,6 @@ impl Alert {
                 .evaluate_scheduled(
                     &self.get_stream_params(),
                     &self.trigger_condition,
-                    &self.query_condition,
                     start_time,
                 )
                 .await
@@ -439,9 +438,24 @@ pub async fn send_notification(
     )
     .await;
 
+    let email_subject = if !dest.template.title.is_empty() {
+        process_dest_template(
+            &dest.template.title,
+            alert,
+            rows,
+            &rows_tpl_val,
+            rows_end_time,
+            start_time,
+        )
+        .await
+    } else {
+        dest.template.name.clone()
+    };
+
     match dest.destination_type {
         DestinationType::Http => send_http_notification(dest, msg.clone()).await,
-        DestinationType::Email => send_email_notification(&alert.name, dest, msg).await,
+        DestinationType::Email => send_email_notification(&email_subject, dest, msg).await,
+        DestinationType::Sns => send_sns_notification(&alert.name, dest, msg).await,
     }
 }
 
@@ -507,7 +521,7 @@ pub async fn send_http_notification(
 }
 
 pub async fn send_email_notification(
-    alert_name: &str,
+    email_subject: &str,
     dest: &DestinationWithTemplate,
     msg: String,
 ) -> Result<String, anyhow::Error> {
@@ -523,7 +537,7 @@ pub async fn send_email_notification(
 
     let mut email = Message::builder()
         .from(cfg.smtp.smtp_from_email.parse()?)
-        .subject(format!("Openobserve Alert - {}", alert_name));
+        .subject(format!("Openobserve Alert - {}", email_subject));
 
     for recipient in recipients {
         email = email.to(recipient.parse()?);
@@ -537,8 +551,44 @@ pub async fn send_email_notification(
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
-        Ok(resp) => Ok(format!("sent response code: {}", resp.code())),
+        Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
+    }
+}
+
+pub async fn send_sns_notification(
+    alert_name: &str,
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    let mut message_attributes = HashMap::new();
+    message_attributes.insert(
+        "AlertName".to_string(),
+        aws_sdk_sns::types::MessageAttributeValue::builder()
+            .data_type("String")
+            .string_value(alert_name)
+            .build()?,
+    );
+
+    let sns_client = config::get_sns_client().await;
+    let ret = sns_client
+        .publish()
+        .topic_arn(
+            dest.sns_topic_arn
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("SNS Topic ARN is missing"))?,
+        )
+        .message(msg)
+        .set_message_attributes(Some(message_attributes))
+        .send()
+        .await;
+    match ret {
+        Ok(resp) => Ok(format!(
+            "sent SNS response message_id: {:?}, sequence_number: {:?}",
+            resp.message_id(),
+            resp.sequence_number()
+        )),
+        Err(e) => Err(anyhow::anyhow!("Error sending SNS notification: {e}")),
     }
 }
 
@@ -670,12 +720,21 @@ async fn process_dest_template(
         }
     }
 
+    // Use only the main alert time range if multi_time_range is enabled
+    let use_given_time = alert.query_condition.multi_time_range.is_some()
+        && !alert
+            .query_condition
+            .multi_time_range
+            .as_ref()
+            .unwrap()
+            .is_empty();
     // calculate start and end time
     let (alert_start_time, alert_end_time) = get_alert_start_end_time(
         &vars,
         alert.trigger_condition.period,
         rows_end_time,
         start_time,
+        use_given_time,
     );
 
     let alert_start_time_str = if alert_start_time > 0 {
@@ -780,6 +839,15 @@ async fn process_dest_template(
         )
     };
 
+    // Shorten the alert url
+    let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
+        Ok(short_url) => short_url,
+        Err(e) => {
+            log::error!("Error shortening alert url: {e}");
+            alert_url
+        }
+    };
+
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", &alert.stream_type.to_string())
@@ -870,7 +938,22 @@ pub fn get_alert_start_end_time(
     period: i64,
     rows_end_time: i64,
     start_time: Option<i64>,
+    use_given_time: bool,
 ) -> (i64, i64) {
+    if use_given_time {
+        let start_time = match start_time {
+            Some(start_time) => start_time,
+            None => {
+                rows_end_time
+                    - Duration::try_minutes(period)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
+            }
+        };
+        return (start_time, rows_end_time);
+    }
+
     let cfg = get_config();
 
     // calculate start and end time

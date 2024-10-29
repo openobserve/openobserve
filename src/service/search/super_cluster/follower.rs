@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,16 +26,14 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
     errors::{Error, Result},
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-    },
+    schema::get_stream_setting_index_fields,
 };
 use proto::cluster_rpc::{FlightSearchRequest, KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     cluster::flight::{
-        check_work_group, get_file_id_list, get_inverted_index_file_list, get_online_querier_nodes,
+        check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
         partition_filt_list,
     },
     datafusion::{
@@ -111,19 +109,14 @@ pub async fn search(
         schema_latest_map.insert(field.name(), field);
     }
 
-    let stream_settings = unwrap_stream_settings(schema_latest.as_ref()).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, req.stream_type);
-
     // 1. get file id list
-    let file_id_list = get_file_id_list(
+    let file_id_list = crate::service::file_list::query_ids(
         &req.org_id,
         req.stream_type,
         stream_name,
         req.time_range,
-        partition_time_level,
     )
-    .await;
+    .await?;
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
@@ -281,7 +274,7 @@ async fn get_inverted_index_file_lists(
         .iter()
         .map(|v| (v.key.to_string(), v.value.to_string()))
         .collect::<Vec<_>>();
-    // filter euqal_items with index_fields
+    // filter equal_items with index_fields
     let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&schema);
     let index_fields = get_stream_setting_index_fields(&stream_settings);

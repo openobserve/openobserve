@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,13 +26,14 @@ use sqlparser::{
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
+use utoipa::ToSchema;
 
 use crate::get_config;
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ToSchema, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum OrderBy {
     #[default]
@@ -88,6 +89,7 @@ pub enum SqlOperator {
 pub enum SqlValue {
     String(String),
     Number(i64),
+    Float(f64),
 }
 
 pub struct Projection<'a>(pub &'a Vec<SelectItem>);
@@ -207,6 +209,7 @@ impl std::fmt::Display for SqlValue {
         match self {
             SqlValue::String(s) => write!(f, "{s}"),
             SqlValue::Number(n) => write!(f, "{n}"),
+            SqlValue::Float(fl) => write!(f, "{fl}"),
         }
     }
 }
@@ -481,6 +484,7 @@ fn parse_timestamp(s: &SqlValue) -> Result<Option<i64>, anyhow::Error> {
                 Err(anyhow::anyhow!("Invalid timestamp: {}", n))
             }
         }
+        SqlValue::Float(f) => Err(anyhow::anyhow!("Invalid timestamp: {}", f)),
     }
 }
 
@@ -830,7 +834,14 @@ fn get_value_from_expr(expr: &SqlExpr) -> Option<SqlValue> {
         SqlExpr::Value(value) => match value {
             Value::SingleQuotedString(s) => Some(SqlValue::String(s.to_string())),
             Value::DoubleQuotedString(s) => Some(SqlValue::String(s.to_string())),
-            Value::Number(s, _) => Some(SqlValue::Number(s.parse::<i64>().unwrap())),
+            Value::Number(s, _) => {
+                if let Ok(num) = s.parse::<i64>() {
+                    Some(SqlValue::Number(num))
+                } else {
+                    // Not integer, try float
+                    s.parse::<f64>().ok().map(SqlValue::Float)
+                }
+            }
             _ => None,
         },
         SqlExpr::Function(f) => Some(SqlValue::String(f.to_string())),

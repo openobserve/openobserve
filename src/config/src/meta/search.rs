@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     ider,
+    meta::sql::OrderBy,
     utils::{base64, json},
 };
 
@@ -197,6 +198,8 @@ pub struct Response {
     pub new_end_time: Option<i64>,
     #[serde(default)]
     pub result_cache_ratio: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_group: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -241,6 +244,7 @@ impl Response {
             new_start_time: None,
             new_end_time: None,
             result_cache_ratio: 0,
+            work_group: None,
         }
     }
 
@@ -304,12 +308,21 @@ impl Response {
         self.trace_id = trace_id;
     }
 
-    pub fn set_partial(&mut self, is_partial: bool) {
+    pub fn set_partial(&mut self, is_partial: bool, msg: String) {
         self.is_partial = is_partial;
+        if self.function_error.is_empty() {
+            self.function_error = msg;
+        } else {
+            self.function_error = format!("{} \n {}", self.function_error, msg);
+        }
     }
 
     pub fn set_histogram_interval(&mut self, val: Option<i64>) {
         self.histogram_interval = val;
+    }
+
+    pub fn set_work_group(&mut self, val: Option<String>) {
+        self.work_group = val;
     }
 }
 
@@ -359,7 +372,7 @@ pub struct SearchPartitionResponse {
     pub histogram_interval: Option<i64>, // seconds, for histogram
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
-    pub order_by: super::sql::OrderBy,
+    pub order_by: OrderBy,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -432,7 +445,6 @@ pub struct SearchHistoryHitResponse {
     pub org_id: String,
     pub stream_type: String,
     pub stream_name: String,
-    pub user_email: String,
     #[serde(rename = "start_time")]
     pub min_ts: i64,
     #[serde(rename = "end_time")]
@@ -447,6 +459,14 @@ pub struct SearchHistoryHitResponse {
     pub response_time: f64,
     pub cached_ratio: i64,
     pub trace_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _timestamp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
 }
 
 impl TryFrom<json::Value> for SearchHistoryHitResponse {
@@ -468,11 +488,6 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
                 .get("stream_name")
                 .and_then(|v| v.as_str())
                 .ok_or("stream_name missing".to_string())?
-                .to_string(),
-            user_email: value
-                .get("user_email")
-                .and_then(|v| v.as_str())
-                .ok_or("user_email missing".to_string())?
                 .to_string(),
             min_ts: value
                 .get("min_ts")
@@ -508,6 +523,19 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
                 .and_then(|v| v.as_str())
                 .ok_or("trace_id missing".to_string())?
                 .to_string(),
+            function: value
+                .get("function")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
+            _timestamp: value.get("_timestamp").and_then(|v| v.as_i64()),
+            unit: value
+                .get("unit")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
+            event: value
+                .get("event")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
         })
     }
 }
@@ -529,6 +557,7 @@ pub struct QueryStatus {
     pub stream_type: Option<String>,
     pub query: Option<QueryInfo>,
     pub scan_stats: Option<ScanStats>,
+    pub search_type: Option<SearchEventType>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -824,7 +853,7 @@ where
 }
 
 impl MultiStreamRequest {
-    pub fn to_query_req(&mut self) -> Vec<Request> {
+    pub fn to_query_req(&self) -> Vec<Request> {
         let mut res = vec![];
         for query in &self.sql {
             let query_fn = if query.is_old_format {
@@ -999,7 +1028,7 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {} WHERE 1=1", search_stream_name);
+            let mut query = format!("SELECT * FROM {} WHERE event='Search'", search_stream_name);
 
             if let Some(org_id) = self.org_id {
                 if !org_id.is_empty() {

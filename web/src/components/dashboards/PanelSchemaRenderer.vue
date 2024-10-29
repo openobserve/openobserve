@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
+          :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -277,7 +278,7 @@ export default defineComponent({
       forceLoad,
       searchType,
       dashboardId,
-      folderId,
+      folderId
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -293,7 +294,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
+      { panels: {}, variablesData: {}, searchRequestTraceIds: {} }
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -342,13 +343,13 @@ export default defineComponent({
               maxIndex: string | number,
               obj: {},
               currentIndex: any,
-              array: { [x: string]: {} },
+              array: { [x: string]: {} }
             ) => {
               const numAttributes = Object.keys(obj).length;
               const maxNumAttributes = Object.keys(array[maxIndex]).length;
               return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
             },
-            0,
+            0
           );
 
           const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
@@ -369,7 +370,7 @@ export default defineComponent({
               chartPanelRef,
               hoveredSeriesState,
               resultMetaData,
-              metadata.value,
+              metadata.value
             );
 
             errorDetail.value = "";
@@ -385,13 +386,13 @@ export default defineComponent({
             panelSchema.value?.error_config?.default_data_on_error
           ) {
             data.value = JSON.parse(
-              panelSchema.value?.error_config?.default_data_on_error,
+              panelSchema.value?.error_config?.default_data_on_error
             );
             errorDetail.value = "";
           }
         }
       },
-      { deep: true },
+      { deep: true }
     );
 
     // when we get the new metadata from the apis, emit the metadata update
@@ -400,7 +401,7 @@ export default defineComponent({
       () => {
         emit("metadata-update", metadata.value);
       },
-      { deep: true },
+      { deep: true }
     );
 
     watch(
@@ -408,7 +409,7 @@ export default defineComponent({
       () => {
         emit("result-metadata-update", resultMetaData.value);
       },
-      { deep: true },
+      { deep: true }
     );
 
     watch(lastTriggeredAt, () => {
@@ -418,19 +419,19 @@ export default defineComponent({
     watch(isCachedDataDifferWithCurrentTimeRange, () => {
       emit(
         "is-cached-data-differ-with-current-time-range-update",
-        isCachedDataDifferWithCurrentTimeRange.value,
+        isCachedDataDifferWithCurrentTimeRange.value
       );
     });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias,
+        (it: any) => it.alias
       );
       const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias,
+        (it: any) => it.alias
       );
       const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias,
+        (it: any) => it.alias
       );
 
       switch (panelType) {
@@ -458,7 +459,7 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every(
               (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0,
+                data.value[0][0][y] != null || data.value[0][0][y] === 0
             )
           );
         }
@@ -658,7 +659,7 @@ export default defineComponent({
           selectedTimeObj?.value?.start_time != "Invalid Date"
         ) {
           drilldownVariables.start_time = new Date(
-            selectedTimeObj?.value?.start_time?.toISOString(),
+            selectedTimeObj?.value?.start_time?.toISOString()
           ).getTime();
         }
 
@@ -667,14 +668,20 @@ export default defineComponent({
           selectedTimeObj?.value?.end_time != "Invalid Date"
         ) {
           drilldownVariables.end_time = new Date(
-            selectedTimeObj?.value?.end_time?.toISOString(),
+            selectedTimeObj?.value?.end_time?.toISOString()
           ).getTime();
         }
 
         // param to pass current query
-        drilldownVariables.query = panelSchema.value.queries[0].query ?? "";
+        // use metadata query[replaced variables values] or panelSchema query
+        drilldownVariables.query =
+          metadata?.value?.queries[0]?.query ??
+          panelSchema?.value?.queries[0]?.query ??
+          "";
         drilldownVariables.query_encoded = b64EncodeUnicode(
-          panelSchema.value.queries[0].query ?? "",
+          metadata?.value?.queries[0]?.query ??
+            panelSchema?.value?.queries[0]?.query ??
+            ""
         );
 
         // if chart type is 'table' then we need to pass the table name
@@ -738,7 +745,7 @@ export default defineComponent({
             // open url
             return window.open(
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
-              drilldownData.targetBlank ? "_blank" : "_self",
+              drilldownData.targetBlank ? "_blank" : "_self"
             );
           } catch (error) {}
         } else if (drilldownData.type == "byDashboard") {
@@ -754,7 +761,7 @@ export default defineComponent({
             await getFoldersList(store);
           }
           const folderId = store.state.organizationData.folders.find(
-            (folder: any) => folder.name == drilldownData.data.folder,
+            (folder: any) => folder.name == drilldownData.data.folder
           )?.folderId;
 
           if (!folderId) {
@@ -764,10 +771,10 @@ export default defineComponent({
           // get dashboard id
           const allDashboardData = await getAllDashboardsByFolderId(
             store,
-            folderId,
+            folderId
           );
           const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title == drilldownData.data.dashboard,
+            (dashboard: any) => dashboard.title == drilldownData.data.dashboard
           );
 
           if (!dashboardData) {
@@ -777,7 +784,7 @@ export default defineComponent({
           // get tab id
           const tabId =
             dashboardData.tabs.find(
-              (tab: any) => tab.name == drilldownData.data.tab,
+              (tab: any) => tab.name == drilldownData.data.tab
             )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
@@ -810,7 +817,7 @@ export default defineComponent({
                 url.searchParams.set(
                   "var-" +
                     replacePlaceholders(variable.name, drilldownVariables),
-                  replacePlaceholders(variable.value, drilldownVariables),
+                  replacePlaceholders(variable.value, drilldownVariables)
                 );
               }
             });

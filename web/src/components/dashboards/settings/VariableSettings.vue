@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -167,8 +167,11 @@ export default defineComponent({
       data: [],
     });
     const $q = useQuasar();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
 
@@ -295,9 +298,17 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Variable deletion failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Variable deletion failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Variable deletion failed", {
+            timeout: 2000,
+          });
+        }
       }
     };
     const handleSaveVariable = async () => {

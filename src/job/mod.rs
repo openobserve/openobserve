@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use regex::Regex;
 
 use crate::{
@@ -35,6 +35,7 @@ mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
 mod prom;
+mod prom_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
@@ -89,6 +90,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { usage::run_audit_publish().await });
 
+    tokio::task::spawn(async move { prom_self_consume::run().await });
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() {
         return Ok(());
@@ -100,6 +102,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { usage::run().await });
+
+    // cache short_urls
+    tokio::task::spawn(async move { db::short_url::watch().await });
+    db::short_url::cache()
+        .await
+        .expect("short url cache failed");
 
     // initialize metadata watcher
     tokio::task::spawn(async move { db::schema::watch().await });
@@ -225,7 +233,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // RBAC model
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         if let Err(e) = crate::common::infra::ofga::init().await {
             log::error!("OFGA init failed: {}", e);
         }

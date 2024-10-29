@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -108,8 +108,11 @@ export default defineComponent({
     const store: any = useStore();
     const { t } = useI18n();
     const route = useRoute();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
 
     const addDashboardForm: Ref<any> = ref(null);
     const closeBtn: Ref<any> = ref(null);
@@ -133,7 +136,7 @@ export default defineComponent({
       const data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default",
+        route.query.folder ?? "default"
       );
 
       dashboardData.title = data.title;
@@ -160,9 +163,9 @@ export default defineComponent({
             await getDashboard(
               store,
               route.query.dashboard,
-              route.query.folder ?? "default",
-            ),
-          ),
+              route.query.folder ?? "default"
+            )
+          )
         );
 
         // update the values
@@ -191,16 +194,24 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           route.query.dashboard,
           data,
-          route?.query?.folder ?? "default",
+          route?.query?.folder ?? "default"
         );
 
         showPositiveNotification("Dashboard updated successfully.");
 
         emit("save");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard updation failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Dashboard updation failed"
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Dashboard updation failed", {
+            timeout: 2000,
+          });
+        }
       }
     });
 
@@ -213,8 +224,8 @@ export default defineComponent({
         saveDashboardApi.execute().catch((err: any) => {
           showErrorNotification(
             JSON.stringify(
-              err.response.data["error"] || "Dashboard creation failed.",
-            ),
+              err.response.data["error"] || "Dashboard creation failed."
+            )
           );
         });
       });

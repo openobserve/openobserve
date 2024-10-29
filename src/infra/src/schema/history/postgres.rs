@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,11 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::{meta::stream::StreamType, utils::json};
+use config::{meta::stream::StreamType, metrics::DB_QUERY_NUMS, utils::json};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    db::postgres::{create_index, CLIENT},
+    db::{
+        postgres::{create_index, CLIENT},
+        IndexStatement,
+    },
     errors::{Error, Result},
 };
 
@@ -56,6 +59,9 @@ impl super::SchemaHistory for PostgresSchemaHistory {
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
         let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "schema_history"])
+            .inc();
         match sqlx::query(
             r#"
 INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
@@ -86,6 +92,9 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
+    DB_QUERY_NUMS
+        .with_label_values(&["create", "schema_history"])
+        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
@@ -106,20 +115,26 @@ CREATE TABLE IF NOT EXISTS schema_history
 }
 
 pub async fn create_table_index() -> Result<()> {
-    create_index("schema_history_org_idx", "schema_history", false, &["org"]).await?;
-    create_index(
+    create_index(IndexStatement::new(
+        "schema_history_org_idx",
+        "schema_history",
+        false,
+        &["org"],
+    ))
+    .await?;
+    create_index(IndexStatement::new(
         "schema_history_stream_idx",
         "schema_history",
         false,
         &["org", "stream_type", "stream_name"],
-    )
+    ))
     .await?;
-    create_index(
+    create_index(IndexStatement::new(
         "schema_history_stream_version_idx",
         "schema_history",
         true,
         &["org", "stream_type", "stream_name", "start_dt"],
-    )
+    ))
     .await?;
 
     Ok(())

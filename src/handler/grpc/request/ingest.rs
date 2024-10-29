@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,9 @@
 
 use actix_web::http::StatusCode;
 use config::utils::json;
-use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
+use proto::cluster_rpc::{
+    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType, StreamType,
+};
 use tonic::{Request, Response, Status};
 
 use crate::service::ingestion::create_log_ingestion_req;
@@ -42,6 +44,7 @@ impl Ingest for Ingester {
                 match create_log_ingestion_req(log_ingestion_type, &data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
+                        0,
                         &org_id,
                         &stream_name,
                         ingestion_req,
@@ -50,6 +53,25 @@ impl Ingest for Ingester {
                     )
                     .await
                     .map_or_else(Err, |_| Ok(())),
+                }
+            }
+            Ok(StreamType::Metrics) => {
+                let log_ingestion_type: IngestionType = req
+                    .ingestion_type
+                    .unwrap_or_default()
+                    .try_into()
+                    .unwrap_or(IngestionType::Multi); // multi is just place holder
+                if log_ingestion_type != IngestionType::Json {
+                    Err(anyhow::anyhow!(
+                        "Internal gPRC metric ingestion only supports json type data, got {:?}",
+                        log_ingestion_type
+                    ))
+                } else {
+                    let data = bytes::Bytes::from(in_data.data);
+                    crate::service::metrics::json::ingest(&org_id, data)
+                        .await
+                        .map(|_| ()) // we don't care about success response
+                        .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
                 }
             }
             Ok(StreamType::EnrichmentTables) => {

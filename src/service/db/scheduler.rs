@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,13 +21,17 @@ use infra::{
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
-    infra::errors::Error, o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    infra::errors::Error,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct DerivedTriggerData {
-    pub period_end_time: i64,
+pub struct ScheduledTriggerData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub period_end_time: Option<i64>,
+    #[serde(default)]
+    pub tolerance: i64,
 }
 
 #[inline]
@@ -38,7 +42,7 @@ pub async fn push(trigger: Trigger) -> Result<()> {
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         super_cluster::queue::scheduler_push(trigger_clone)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -53,7 +57,7 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         super_cluster::queue::scheduler_delete(org, module, key)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -70,7 +74,7 @@ pub async fn update_trigger(trigger: Trigger) -> Result<()> {
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         super_cluster::queue::scheduler_update(trigger_clone)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -91,7 +95,7 @@ pub async fn update_status(
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         super_cluster::queue::scheduler_update_status(org, module, key, status, retries)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;

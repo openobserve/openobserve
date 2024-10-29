@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -42,7 +42,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <slot name="before_panels" />
     <div class="displayDiv">
+      <div
+        v-if="
+          store.state.printMode &&
+          panels.length === 1 &&
+          panels[0].type === 'table'
+        "
+        style="height: 100%; width: 100%"
+      >
+        <PanelContainer
+          @onDeletePanel="onDeletePanel"
+          @onViewPanel="onViewPanel"
+          :viewOnly="viewOnly"
+          :data="panels[0] || {}"
+          :dashboardId="dashboardData.dashboardId"
+          :folderId="folderId"
+          :selectedTimeDate="
+            (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
+            currentTimeObj['__global'] ||
+            {}
+          "
+          :variablesData="variablesData"
+          :forceLoad="forceLoad"
+          :searchType="searchType"
+          @updated:data-zoom="$emit('updated:data-zoom', $event)"
+          @onMovePanel="onMovePanel"
+          @refreshPanelRequest="refreshPanelRequest"
+          @refresh="refreshDashboard"
+          @update:initial-variable-values="updateInitialVariableValues"
+          @onEditLayout="openEditLayout"
+          style="height: 100%; width: 100%"
+        />
+      </div>
       <grid-layout
+        v-else
         ref="gridLayoutRef"
         v-if="panels.length > 0"
         :layout.sync="getDashboardLayout(panels)"
@@ -225,8 +258,11 @@ export default defineComponent({
           )?.panels ?? [])
         : [];
     });
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const {
+      showPositiveNotification,
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
     const refreshDashboard = () => {
       emit("refresh");
     };
@@ -380,9 +416,17 @@ export default defineComponent({
 
         showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard update failed", {
-          timeout: 2000,
-        });
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Dashboard update failed",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Dashboard update failed", {
+            timeout: 2000,
+          });
+        }
 
         // refresh dashboard
         refreshDashboard();

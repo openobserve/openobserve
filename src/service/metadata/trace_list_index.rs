@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -120,7 +120,7 @@ impl Metadata for TraceListIndex {
         }
 
         let writer =
-            ingester::get_writer(org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
+            ingester::get_writer(0, org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
         _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
         if let Err(e) = writer.sync().await {
             log::error!("[TraceListIndex] error while syncing writer: {}", e);
@@ -129,11 +129,11 @@ impl Metadata for TraceListIndex {
         #[cfg(feature = "enterprise")]
         {
             use o2_enterprise::enterprise::{
-                common::infra::config::O2_CONFIG,
+                common::infra::config::get_config as get_o2_config,
                 openfga::authorizer::authz::set_ownership_if_not_exists,
             };
 
-            if O2_CONFIG.openfga.enabled {
+            if get_o2_config().openfga.enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
@@ -206,6 +206,7 @@ impl TraceListIndex {
                 max_query_range: 0,
                 defined_schema_fields: None,
                 store_original_data: false,
+                approx_partition: false,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
@@ -283,6 +284,7 @@ mod tests {
         hour_buf.records_size += data_size;
 
         let writer = ingester::get_writer(
+            0,
             "openobserve",
             &StreamType::Metadata.to_string(),
             STREAM_NAME,

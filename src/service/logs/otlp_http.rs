@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,11 +22,12 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json},
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -38,8 +39,7 @@ use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
         http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
-        stream::StreamParams,
+        ingestion::{IngestionStatus, StreamStatus},
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
@@ -53,14 +53,22 @@ const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
 
 pub async fn logs_proto_handler(
+    thread_id: usize,
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
 ) -> Result<HttpResponse> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
-    match super::otlp_grpc::handle_grpc_request(org_id, request, false, in_stream_name, user_email)
-        .await
+    match super::otlp_grpc::handle_grpc_request(
+        thread_id,
+        org_id,
+        request,
+        false,
+        in_stream_name,
+        user_email,
+    )
+    .await
     {
         Ok(res) => Ok(res),
         Err(e) => {
@@ -78,6 +86,7 @@ pub async fn logs_proto_handler(
 // example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
 // otel collector handling json request for logs https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/plog/json.go
 pub async fn logs_json_handler(
+    thread_id: usize,
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
@@ -459,6 +468,7 @@ pub async fn logs_json_handler(
 
     let mut status = IngestionStatus::Record(stream_status.status);
     let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        thread_id,
         org_id,
         user_email,
         (started_at, &start),

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -116,6 +116,7 @@ pub struct Trigger {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
     pub retries: i32,
+    #[serde(default)]
     pub data: String,
 }
 
@@ -230,4 +231,11 @@ pub async fn is_empty() -> bool {
 #[inline]
 pub async fn clear() -> Result<()> {
     CLIENT.clear().await
+}
+
+/// Returns the scheduler_max_retries set through environment config
+/// The bool element in the tuple indicates if the max retries value is included
+pub fn get_scheduler_max_retries() -> (bool, i32) {
+    let max_retries = config::get_config().limit.scheduler_max_retries;
+    (max_retries > 0, max_retries.unsigned_abs() as i32)
 }

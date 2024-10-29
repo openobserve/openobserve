@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -97,65 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div v-else>
-                <template
-                  v-if="
-                    searchObj.meta.filterType === 'basic' &&
-                    props.row.name === 'duration'
-                  "
-                >
-                  <div class="q-mx-lg q-mt-sm" style="font-size: 14px">
-                    Duration
-                  </div>
-                  <div class="flex justify-start items-center q-px-lg q-mb-md">
-                    <div class="flex column q-mr-md q-mt-xs">
-                      <label>Min (in ms)</label>
-                      <input
-                        type="number"
-                        v-model="duration.input.min"
-                        aria-label="min"
-                        style="width: 100px"
-                      />
-                    </div>
-                    <div class="flex column q-mt-xs">
-                      <label>Max (in ms)</label>
-                      <input
-                        type="number"
-                        aria-label="max"
-                        v-model="duration.input.max"
-                        style="width: 100px"
-                      />
-                    </div>
-                  </div>
-                </template>
-                <template v-else-if="searchObj.meta.filterType === 'basic'">
-                  <advanced-values-filter
-                    v-if="fieldValues[props.row.name]"
-                    :key="searchObj.data.stream.selectedStream.value"
-                    :row="props.row"
-                    v-model:isOpen="fieldValues[props.row.name].isOpen"
-                    v-model:values="fieldValues[props.row.name].values"
-                    v-model:selectedValues="
-                      fieldValues[props.row.name].selectedValues
-                    "
-                    v-model:searchKeyword="
-                      fieldValues[props.row.name].searchKeyword
-                    "
-                    :filter="fieldValues[props.row.name]"
-                    @update:is-open="
-                      (isOpen) => handleFilterCreator(isOpen, props.row.name)
-                    "
-                    @update:selectedValues="
-                      (currValue, prevValue) =>
-                        updateQueryFilter(props.row.name, currValue, prevValue)
-                    "
-                    @update:search-keyword="getFieldValues(props.row.name)"
-                  />
-                </template>
-                <template v-else>
-                  <basic-values-filter :row="props.row" />
-                </template>
-              </div>
+              <basic-values-filter v-else :row="props.row" />
             </q-td>
           </q-tr>
         </template>
@@ -461,7 +403,7 @@ export default defineComponent({
           searchObj.data.editorValue += ` AND ${column} IN (${valuesString})`;
         }
 
-        query += " WHERE " + searchObj.data.editorValue;
+        query += " WHERE " + searchObj.data.editorValue.trim();
 
         const parsedQuery: any = parser.astify(query);
 

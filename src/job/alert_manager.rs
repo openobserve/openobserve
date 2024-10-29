@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use config::{cluster::LOCAL_NODE, get_config};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::time;
 
 use crate::service;
@@ -40,7 +40,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // check super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled {
         let cluster_name =
             o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
         if !cluster_name.is_empty() {
@@ -78,9 +78,11 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.scheduler_clean_interval,
-    ));
+    let scheduler_clean_interval = get_config().limit.scheduler_clean_interval;
+    if scheduler_clean_interval < 0 {
+        return Ok(());
+    }
+    let mut interval = time::interval(time::Duration::from_secs(scheduler_clean_interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -91,9 +93,11 @@ async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.scheduler_watch_interval,
-    ));
+    let scheduler_watch_interval = get_config().limit.scheduler_watch_interval;
+    if scheduler_watch_interval < 0 {
+        return Ok(());
+    }
+    let mut interval = time::interval(time::Duration::from_secs(scheduler_watch_interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

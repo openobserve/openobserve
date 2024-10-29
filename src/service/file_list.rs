@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ use config::{
         search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
+    metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
     utils::{file::get_file_meta as util_get_file_meta, json},
 };
 use hashbrown::HashSet;
@@ -28,6 +29,7 @@ use infra::{
     errors::{Error, Result},
     file_list, storage,
 };
+use rayon::slice::ParallelSliceMut;
 
 use crate::service::db;
 
@@ -67,6 +69,9 @@ pub async fn query(
 
 pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     let cfg = get_config();
+    FILE_LIST_ID_SELECT_COUNT
+        .with_label_values(&[])
+        .set(ids.len() as i64);
     // 1. first query from local cache
     let (mut files, ids) = if !cfg.common.local_mode && cfg.common.meta_store_external {
         let ids_set: HashSet<_> = ids.iter().cloned().collect();
@@ -82,6 +87,10 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
             "[trace_id {trace_id}] file_list cached_ids: {:?}",
             cached_ids.len()
         );
+
+        FILE_LIST_CACHE_HIT_COUNT
+            .with_label_values(&[])
+            .set(cached_ids.len() as i64);
 
         let mut file_keys = Vec::with_capacity(ids.len());
         for (_, key, meta) in cached_files {
@@ -138,20 +147,14 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
 )]
 pub async fn query_ids(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    time_min: i64,
-    time_max: i64,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
 ) -> Result<Vec<file_list::FileId>> {
-    file_list::query_ids(
-        org_id,
-        stream_type,
-        stream_name,
-        time_level,
-        Some((time_min, time_max)),
-    )
-    .await
+    let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
+    files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
+    files.dedup_by(|a, b| a.id == b.id);
+    Ok(files)
 }
 
 #[inline]

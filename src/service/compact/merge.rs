@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -352,9 +352,6 @@ pub async fn merge_by_stream(
         partition.push(file.to_owned());
     }
 
-    // collect stream stats
-    let mut stream_stats = StreamStats::default();
-
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
@@ -475,6 +472,9 @@ pub async fn merge_by_stream(
                     deleted: false,
                     segment_ids: None,
                 });
+
+                // collect stream stats
+                let mut stream_stats: StreamStats = StreamStats::default();
                 for file in new_file_list.iter() {
                     stream_stats = stream_stats - file.meta.clone();
                     events.push(FileKey {
@@ -488,7 +488,24 @@ pub async fn merge_by_stream(
 
                 // write file list to storage
                 match write_file_list(&org_id, &events).await {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        // update stream stats
+                        if stream_stats.doc_num != 0 {
+                            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+                            if let Err(e) = infra_file_list::set_stream_stats(
+                                &org_id,
+                                &[(stream_key.clone(), stream_stats)],
+                            )
+                            .await
+                            {
+                                log::error!(
+                                    "[COMPACT] set_stream_stats failed: {}, err: {}",
+                                    stream_key,
+                                    e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => {
                         log::error!("[COMPACT] write file list failed: {}", e);
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -512,18 +529,6 @@ pub async fn merge_by_stream(
     // update job status
     if let Err(e) = infra_file_list::set_job_done(job_id).await {
         log::error!("[COMPACT] set_job_done failed: {e}");
-    }
-
-    // update stream stats
-    if stream_stats.doc_num != 0 {
-        infra_file_list::set_stream_stats(
-            org_id,
-            &[(
-                format!("{org_id}/{stream_type}/{stream_name}"),
-                stream_stats,
-            )],
-        )
-        .await?;
     }
 
     // metrics
@@ -647,13 +652,20 @@ pub async fn merge_files(
     // convert the file to the latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
-    let defined_schema_fields = stream_setting
-        .and_then(|s| s.defined_schema_fields)
-        .unwrap_or_default();
+    let (defined_schema_fields, need_original) = match stream_setting {
+        Some(s) => (
+            s.defined_schema_fields.unwrap_or_default(),
+            s.store_original_data,
+        ),
+        None => (Vec::new(), false),
+    };
     let schema_latest = if !defined_schema_fields.is_empty() {
         let schema_latest = SchemaCache::new(schema_latest);
-        let schema_latest =
-            generate_schema_for_defined_schema_fields(&schema_latest, &defined_schema_fields);
+        let schema_latest = generate_schema_for_defined_schema_fields(
+            &schema_latest,
+            &defined_schema_fields,
+            need_original,
+        );
         schema_latest.schema().clone()
     } else {
         Arc::new(schema_latest)
@@ -743,7 +755,7 @@ pub async fn merge_files(
     }
 
     let start = std::time::Instant::now();
-    let merge_result = if stream_type == StreamType::Logs {
+    let merge_result = if stream_type.is_basic_type() {
         merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
     } else {
         datafusion::exec::merge_parquet_files(
@@ -795,7 +807,7 @@ pub async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
+            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
                 // generate inverted index RecordBatch
                 if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
                     schema_latest.clone(),
@@ -810,7 +822,7 @@ pub async fn merge_files(
                         index_format,
                         InvertedIndexFormat::Parquet | InvertedIndexFormat::All
                     ) {
-                        let (index_file_name, filemeta) = generate_index_on_compactor(
+                        let files = generate_index_on_compactor(
                             &retain_file_list,
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
@@ -828,16 +840,16 @@ pub async fn merge_files(
                                 retain_file_list
                             )
                         })?;
-                        if !index_file_name.is_empty() {
+                        for (file_name, filemeta) in files {
                             log::info!(
                                 "Created parquet index file during compaction {}",
-                                index_file_name
+                                file_name
                             );
                             // Notify that we wrote the index file to the db.
                             if let Err(e) = write_file_list(
                                 org_id,
                                 &[FileKey {
-                                    key: index_file_name.clone(),
+                                    key: file_name.clone(),
                                     meta: filemeta,
                                     deleted: false,
                                     segment_ids: None,
@@ -847,7 +859,7 @@ pub async fn merge_files(
                             {
                                 log::error!(
                                     "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
-                                    index_file_name,
+                                    file_name,
                                     e.to_string(),
                                     retain_file_list
                                 );
@@ -1075,10 +1087,7 @@ pub fn generate_inverted_idx_recordbatch(
     index_fields: &[String],
 ) -> Result<Option<RecordBatch>, anyhow::Error> {
     let cfg = get_config();
-    if !cfg.common.inverted_index_enabled
-        || batches.is_empty()
-        || !stream_type.create_inverted_index()
-    {
+    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.is_basic_type() {
         return Ok(None);
     }
 

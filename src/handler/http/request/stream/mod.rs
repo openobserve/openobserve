@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,10 @@ use std::{
 };
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{StreamSettings, StreamType, UpdateStreamSettings};
+use config::{
+    meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
+    utils::schema::format_stream_name,
+};
 
 use crate::{
     common::{
@@ -30,7 +33,7 @@ use crate::{
         },
         utils::http::get_stream_type_from_request,
     },
-    service::{format_stream_name, stream},
+    service::stream,
 };
 
 /// GetSchema
@@ -155,8 +158,9 @@ async fn update_settings(
     stream_settings: web::Json<UpdateStreamSettings>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
     let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_stream_name {
+    if !cfg.common.skip_formatting_stream_name {
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -187,13 +191,54 @@ async fn update_settings(
     };
 
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    stream::update_stream_settings(
-        &org_id,
-        &stream_name,
-        stream_type,
-        stream_settings.into_inner(),
-    )
-    .await
+    let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
+    let main_stream_res =
+        stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
+            .await?;
+
+    // sync the data retention to index stream
+    if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
+        let index_stream_name =
+            if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
+                stream_name.to_string()
+            } else {
+                format!("{}_{}", stream_name, stream_type)
+            };
+        if infra::schema::get(&org_id, &index_stream_name, StreamType::Index)
+            .await
+            .is_ok()
+        {
+            let index_stream_settings = UpdateStreamSettings {
+                data_retention: stream_settings.data_retention,
+                ..Default::default()
+            };
+            match stream::update_stream_settings(
+                &org_id,
+                &index_stream_name,
+                StreamType::Index,
+                index_stream_settings,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::debug!(
+                        "Data retention settings for {} synced to index stream {}",
+                        stream_name,
+                        index_stream_name
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "Failed to sync data retention settings to index stream {}: {}",
+                        index_stream_name,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(main_stream_res)
 }
 
 /// DeleteStreamFields

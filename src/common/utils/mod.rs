@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,5 +17,6 @@ pub mod auth;
 pub mod functions;
 pub mod http;
 pub mod jwt;
+pub mod redirect_response;
 pub mod stream;
 pub mod zo_logger;

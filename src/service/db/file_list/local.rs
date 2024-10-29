@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::io::{BufRead, BufReader};
 
 use config::{
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, StreamParams, StreamType},
     utils::{
         asynchronism::file::get_file_contents, file::scan_files, json,
         parquet::parse_file_key_columns,
@@ -26,7 +26,7 @@ use infra::file_list as infra_file_list;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
-use crate::common::{infra::wal, meta::stream::StreamParams};
+use crate::common::infra::wal;
 
 /// use queue to batch send broadcast to other nodes
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =

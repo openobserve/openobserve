@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,6 +35,7 @@ pub struct Dashboard {
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
     pub version: i32,
+    pub hash: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

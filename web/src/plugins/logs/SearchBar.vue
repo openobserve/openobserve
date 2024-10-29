@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="
                               handleFavoriteSavedView(
                                 props.row,
-                                favoriteViews.includes(props.row.view_id),
+                                favoriteViews.includes(props.row.view_id)
                               )
                             "
                           >
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="
                               handleFavoriteSavedView(
                                 props.row,
-                                favoriteViews.includes(props.row.view_id),
+                                favoriteViews.includes(props.row.view_id)
                               )
                             "
                           >
@@ -396,7 +396,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
-          @click="shareLink"
+          @click="shareLink.execute()"
+          :loading="shareLink.isLoading.value"
         ></q-btn>
         <q-btn
           data-test="logs-search-bar-share-link-btn"
@@ -405,7 +406,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="history"
           :title="'Search History'"
           @click="showSearchHistoryfn"
-          
         ></q-btn>
         <div class="float-left">
           <date-time
@@ -938,6 +938,7 @@ import useLogs from "@/composables/useLogs";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
+import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -961,6 +962,7 @@ import { inject } from "vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 const defaultValue: any = () => {
   return {
@@ -1046,7 +1048,7 @@ export default defineComponent({
             query: this.searchObj.data.customDownloadQueryObj,
             page_type: this.searchObj.data.stream.streamType,
           },
-          "UI",
+          "UI"
         )
         .then((res) => {
           this.customDownloadDialog = false;
@@ -1171,7 +1173,7 @@ export default defineComponent({
       (fields) => {
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
-      { immediate: true, deep: true },
+      { immediate: true, deep: true }
     );
 
     watch(
@@ -1179,7 +1181,7 @@ export default defineComponent({
       (funs) => {
         if (funs.length) updateFunctionKeywords(funs);
       },
-      { immediate: true, deep: true },
+      { immediate: true, deep: true }
     );
 
     onBeforeMount(async () => {
@@ -1202,31 +1204,27 @@ export default defineComponent({
       getSuggestions();
     };
 
-    function getColumnNames(data) {
+    const getColumnNames = (columnData: any) => {
       const columnNames = [];
-      data.forEach((item) => {
-        if (item.expr && item.expr.column) {
-          columnNames.push(item.expr.column);
-        } else if (item.expr && item.expr.args && item.expr.args.expr) {
-          if (item.expr.args.expr.column) {
-            columnNames.push(item.expr.args.expr.column);
-          } else if (item.expr.args.expr.value) {
-            columnNames.push(item.expr.args.expr.value);
+      for (const item of columnData) {
+        if (item.expr.type === "column_ref") {
+          columnNames.push(item.expr.column?.expr?.value);
+        } else if (item.expr.type === "aggr_func") {
+          if (item.expr.args?.expr?.hasOwnProperty("column")) {
+            columnNames.push(item.expr.args?.expr?.column?.value);
+          } else if (item.expr.args?.expr?.value) {
+            columnNames.push(item.expr.args?.expr?.value);
           }
-        } else if (
-          item.expr &&
-          item.expr.name &&
-          item.expr.type === "function"
-        ) {
+        } else if (item.expr.type === "function") {
           item.expr.args.value.map((val) => {
             if (val.type === "column_ref") {
-              columnNames.push(val.column);
+              columnNames.push(val.column?.expr?.value);
             }
           });
         }
-      });
+      }
       return columnNames;
-    }
+    };
 
     const updateQueryValue = (value: string) => {
       if (searchObj.meta.quickMode == true) {
@@ -1241,25 +1239,6 @@ export default defineComponent({
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
           onStreamChange(value);
         }
-        // if (
-        //   parsedSQL.hasOwnProperty("columns") &&
-        //   parsedSQL?.columns.length > 0
-        // ) {
-        //   const columnNames = getColumnNames(parsedSQL?.columns);
-        //   searchObj.data.stream.interestingFieldList = [];
-        //   for (const [index, col] of columnNames.entries()) {
-        //     if (
-        //       !searchObj.data.stream.interestingFieldList.includes(col) &&
-        //       col != "*"
-        //     ) {
-        //       // searchObj.data.stream.interestingFieldList.push(col);
-        //       for (const stream of searchObj.data.streamResults.list) {
-        //         if (stream.value == col) {
-        //           searchObj.data.stream.interestingFieldList.push(col);
-        //         }
-        //       }
-        //     }
-        //   }
         if (parsedSQL?.columns?.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
           searchObj.data.stream.interestingFieldList = [];
@@ -1312,7 +1291,7 @@ export default defineComponent({
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
               !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table,
+                searchObj.data.parsedQuery.from[0].table
               ) &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
@@ -1388,12 +1367,12 @@ export default defineComponent({
           value.selectedDate.from = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "yyyy/MM/DD",
+            "yyyy/MM/DD"
           );
           value.selectedTime.startTime = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "HH:mm",
+            "HH:mm"
           );
 
           dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
@@ -1579,7 +1558,7 @@ export default defineComponent({
       if (isSavedFunctionAction.value == "create") {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
-          formData.value,
+          formData.value
         );
 
         callTransform
@@ -1621,7 +1600,7 @@ export default defineComponent({
           saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
-            formData.value,
+            formData.value
           );
 
           callTransform
@@ -1632,7 +1611,7 @@ export default defineComponent({
               });
 
               const transformIndex = searchObj.data.transforms.findIndex(
-                (obj) => obj.name === formData.value.name,
+                (obj) => obj.name === formData.value.name
               );
               if (transformIndex !== -1) {
                 searchObj.data.transforms[transformIndex].name =
@@ -1740,7 +1719,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           functionOptions.value = searchObj.data.transforms.filter(
-            (v) => v.name?.toLowerCase().indexOf(needle) > -1,
+            (v) => v.name?.toLowerCase().indexOf(needle) > -1
           );
         }
       });
@@ -1772,7 +1751,7 @@ export default defineComponent({
       savedviewsService
         .getViewDetail(
           store.state.selectedOrganization.identifier,
-          item.view_id,
+          item.view_id
         )
         .then(async (res) => {
           if (res.status == 200) {
@@ -1815,32 +1794,32 @@ export default defineComponent({
               // ----- Here we are explicitly handling stream change for multistream -----
               let selectedStreams = [];
               const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value,
+                (item) => item.value
               );
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value",
+                    "value"
                   )
                 ) {
                   selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value,
+                    extractedObj.data.stream.selectedStream.value
                   );
                 } else {
                   selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream,
+                    ...extractedObj.data.stream.selectedStream
                   );
                 }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
               }
               const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str),
+                (stream_str) => !streamValues.includes(stream_str)
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
                   "[STREAM_NAME]",
-                  streamNotExist,
+                  streamNotExist
                 );
                 throw new Error(errMsg);
                 return;
@@ -1879,7 +1858,7 @@ export default defineComponent({
                     name: "",
                     function: searchObj.data.tempFunctionContent,
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -1890,7 +1869,7 @@ export default defineComponent({
                     name: "",
                     function: "",
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -1925,15 +1904,15 @@ export default defineComponent({
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value",
+                    "value"
                   )
                 ) {
                   selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value,
+                    extractedObj.data.stream.selectedStream.value
                   );
                 } else {
                   selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream,
+                    ...extractedObj.data.stream.selectedStream
                   );
                 }
               } else {
@@ -1956,7 +1935,7 @@ export default defineComponent({
 
               const streamData = await getStreams(
                 searchObj.data.stream.streamType,
-                true,
+                true
               );
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
@@ -1964,15 +1943,15 @@ export default defineComponent({
               // searchObj.value = mergeDeep(searchObj, extractedObj);
 
               const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value,
+                (item) => item.value
               );
               const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str),
+                (stream_str) => !streamValues.includes(stream_str)
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
                   "[STREAM_NAME]",
-                  streamNotExist,
+                  streamNotExist
                 );
                 throw new Error(errMsg);
                 return;
@@ -1984,7 +1963,7 @@ export default defineComponent({
                     name: "",
                     function: searchObj.data.tempFunctionContent,
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -1995,7 +1974,7 @@ export default defineComponent({
                     name: "",
                     function: "",
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -2032,7 +2011,7 @@ export default defineComponent({
             if (
               extractedObj.data.resultGrid.colOrder &&
               extractedObj.data.resultGrid.colOrder.hasOwnProperty(
-                searchObj.data.stream.selectedStream,
+                searchObj.data.stream.selectedStream
               )
             ) {
               searchObj.data.stream.selectedFields =
@@ -2047,7 +2026,7 @@ export default defineComponent({
             if (
               extractedObj.data.resultGrid.colSizes &&
               extractedObj.data.resultGrid.colSizes.hasOwnProperty(
-                searchObj.data.stream.selectedStream,
+                searchObj.data.stream.selectedStream
               )
             ) {
               searchObj.data.resultGrid.colSizes[
@@ -2116,7 +2095,7 @@ export default defineComponent({
             saveViewLoader.value = true;
             updateSavedViews(
               savedViewSelectedName.value.view_id,
-              savedViewSelectedName.value.view_name,
+              savedViewSelectedName.value.view_name
             );
           });
         } else {
@@ -2135,7 +2114,7 @@ export default defineComponent({
         savedviewsService
           .delete(
             store.state.selectedOrganization.identifier,
-            deleteViewID.value,
+            deleteViewID.value
           )
           .then((res) => {
             if (res.status == 200) {
@@ -2290,7 +2269,7 @@ export default defineComponent({
                     searchObj.data.savedViews[index].payload = viewObj.data;
                     searchObj.data.savedViews[index].view_name = viewName;
                   }
-                },
+                }
               );
 
               $q.notify({
@@ -2337,12 +2316,12 @@ export default defineComponent({
       }
     };
 
-    const shareLink = () => {
+    const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true);
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
         )
         .join("&");
 
@@ -2352,22 +2331,36 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
-      copyToClipboard(shareURL)
-        .then(() => {
-          $q.notify({
-            type: "positive",
-            message: "Link Copied Successfully!",
-            timeout: 5000,
-          });
+      await shortURLService
+        .create(store.state.selectedOrganization.identifier, shareURL)
+        .then((res: any) => {
+          if (res.status == 200) {
+            shareURL = res.data.short_url;
+            copyToClipboard(shareURL)
+              .then(() => {
+                $q.notify({
+                  type: "positive",
+                  message: "Link Copied Successfully!",
+                  timeout: 5000,
+                });
+              })
+              .catch(() => {
+                $q.notify({
+                  type: "negative",
+                  message: "Error while copy link.",
+                  timeout: 5000,
+                });
+              });
+          }
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while copy link.",
+            message: "Error while shortening link.",
             timeout: 5000,
           });
         });
-    };
+    });
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
@@ -2381,12 +2374,12 @@ export default defineComponent({
         ) {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
+            searchObj.data.stream.interestingFieldList.join(",")
           );
         } else {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            "*",
+            "*"
           );
         }
       } else {
@@ -2431,7 +2424,7 @@ export default defineComponent({
             let favoriteViewsList = localSavedViews.value;
             if (favoriteViewsList.length > 0) {
               favoriteViewsList = favoriteViewsList.filter(
-                (item) => item.view_id != row.view_id,
+                (item) => item.view_id != row.view_id
               );
               // for (const [key, item] of favoriteViewsList.entries()) {
               //   console.log(item, key);
@@ -2539,7 +2532,7 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs",
+      "logs"
     );
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -2563,12 +2556,12 @@ export default defineComponent({
 
     const variablesAndPanelsDataLoadingState = inject(
       "variablesAndPanelsDataLoadingState",
-      {},
+      {}
     );
 
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState?.searchRequestTraceIds
       ).filter((item: any) => item.length > 0);
 
       return searchIds.flat() as string[];
@@ -2584,7 +2577,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
+        variablesAndPanelsDataLoadingState.panels
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
@@ -2744,7 +2737,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by",
+                  "order by"
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2755,7 +2748,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit",
+                  "limit"
                 );
                 query =
                   beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
@@ -2766,7 +2759,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by",
+                  "order by"
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2777,7 +2770,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit",
+                  "limit"
                 );
                 query =
                   beforeLimit.trim() +

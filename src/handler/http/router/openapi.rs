@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,8 @@ use crate::{common::meta, handler::http::request};
         request::syslog::list_routes,
         request::syslog::delete_route,
         request::clusters::list_clusters,
+        request::short_url::shorten,
+        request::short_url::retrieve,
     ),
     components(
         schemas(
@@ -129,6 +131,9 @@ use crate::{common::meta, handler::http::request};
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
             config::meta::stream::PartitionTimeLevel,
+            config::meta::stream::UpdateStreamPartition,
+            config::meta::stream::UpdateStreamSettings,
+            config::meta::stream::UpdateStringSettingsArray,
             meta::ingestion::RecordStatus,
             meta::ingestion::StreamStatus,
             meta::ingestion::IngestionResponse,
@@ -149,6 +154,7 @@ use crate::{common::meta, handler::http::request};
             meta::dashboards::Folder,
             meta::dashboards::MoveDashboard,
             meta::dashboards::FolderList,
+            config::meta::sql::OrderBy,
             config::meta::search::Query,
             config::meta::search::Request,
             config::meta::search::RequestEncoding,
@@ -158,11 +164,14 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::SearchEventType,
             config::meta::search::SearchPartitionRequest,
             config::meta::search::SearchPartitionResponse,
+            config::meta::search::SearchHistoryRequest,
             config::meta::search::CancelQueryResponse,
             config::meta::search::QueryStatusResponse,
             config::meta::search::QueryStatus,
             config::meta::search::QueryInfo,
             config::meta::search::ScanStats,
+            config::meta::short_url::ShortenUrlRequest,
+            config::meta::short_url::ShortenUrlResponse,
             meta::saved_view::View,
             meta::saved_view::ViewWithoutData,
             meta::saved_view::ViewsWithoutData,
@@ -179,6 +188,7 @@ use crate::{common::meta, handler::http::request};
             meta::alerts::TriggerCondition,
             meta::alerts::FrequencyType,
             meta::alerts::QueryCondition,
+            meta::alerts::CompareHistoricData,
             meta::alerts::destinations::Destination,
             meta::alerts::destinations::DestinationWithTemplate,
             meta::alerts::destinations::HTTPType,
@@ -236,6 +246,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Traces", description = "Traces data ingestion operations"),
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
+        (name = "Short Url", description = "Short Url Service"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",

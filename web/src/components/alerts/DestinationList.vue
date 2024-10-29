@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -165,7 +165,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import type { DestinationData } from "@/ts/interfaces";
+import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
@@ -180,7 +180,7 @@ export default defineComponent({
   setup() {
     const qTable = ref();
     const store = useStore();
-    const editingDestination: Ref<DestinationData | null> = ref(null);
+    const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
     const q = useQuasar();
     const columns: any = ref<QTableProps["columns"]>([
@@ -220,8 +220,10 @@ export default defineComponent({
         style: "width: 110px",
       },
     ]);
-    const destinations: Ref<DestinationData[]> = ref([]);
-    const templates: Ref<Template[]> = ref([{ name: "test", body: "" }]);
+    const destinations: Ref<DestinationPayload[]> = ref([]);
+    const templates: Ref<Template[]> = ref([
+      { name: "test", body: "", type: "http" },
+    ]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
       data: null,
@@ -342,13 +344,13 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             destination_name: confirmDelete.value.data.name,
           })
-          .then(() =>{ 
+          .then(() => {
             q.notify({
-            type: "positive",
-            message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
-            timeout: 2000,
-          });
-            getDestinations()
+              type: "positive",
+              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
+              timeout: 2000,
+            });
+            getDestinations();
           })
           .catch((err) => {
             if (err.response.data.code === 409) {

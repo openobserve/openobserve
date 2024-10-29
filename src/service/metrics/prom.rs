@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -42,12 +42,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{
-            alerts::alert,
-            functions::StreamTransform,
-            prom::*,
-            stream::{SchemaRecords, StreamParams},
-        },
+        meta::{alerts::alert, functions::StreamTransform, prom::*, stream::SchemaRecords},
     },
     service::{
         db, format_stream_name,
@@ -120,9 +115,30 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+        let stream_schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
-            .unwrap();
+            .unwrap_or(Schema::empty());
+        let schema_metadata = stream_schema.metadata();
+        // check if need to update metadata
+        let mut need_update = false;
+        for (k, v) in extra_metadata.iter() {
+            if schema_metadata.contains_key(k) && schema_metadata.get(k).unwrap() == v {
+                continue;
+            }
+            need_update = true;
+            break;
+        }
+        if need_update {
+            if let Err(e) =
+                update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata).await
+            {
+                log::error!(
+                    "Error updating metadata for stream: {}, err: {}",
+                    metric_name,
+                    e
+                );
+            }
+        }
     }
 
     // maybe empty, we can return immediately
@@ -438,7 +454,7 @@ pub async fn remote_write(
 
         // write to file
         let writer =
-            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
         // if let Err(e) = writer.sync().await {
         //     log::error!("ingestion error while syncing writer: {}", e);

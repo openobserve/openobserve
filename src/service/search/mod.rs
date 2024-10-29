@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,30 +16,28 @@
 use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
-use cache::cacher::get_ts_col;
-use chrono::Duration;
+use cache::cacher::get_ts_col_order_by;
+use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
-        sql::OrderBy,
-        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
+        sql::{OrderBy, SqlOperator},
+        stream::{FileKey, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{
-        base64,
-        sql::is_aggregate_query,
-        str::{find, StringExt},
+        base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query,
+        str::StringExt,
     },
 };
 use hashbrown::HashMap;
 use infra::{
+    cache::stats,
     errors::{Error, ErrorCodes},
-    schema::{
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-    },
+    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
@@ -56,6 +54,7 @@ use {
     crate::service::grpc::get_cached_channel,
     config::meta::cluster::get_internal_grpc_token,
     o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup,
     std::collections::HashSet,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
     tracing::info_span,
@@ -63,9 +62,8 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
+    common::{infra::cluster as infra_cluster, meta, utils::functions},
     handler::grpc::request::search::Searcher,
-    service::format_partition_key,
 };
 
 pub(crate) mod cache;
@@ -98,6 +96,264 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+/// Returns Error if the first query is failed, otherwise returns the partial results.
+/// In case one query fails, the remaining queries are not executed.
+#[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
+pub async fn search_multi(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    multi_req: &search::MultiStreamRequest,
+) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
+    let trace_id = if trace_id.is_empty() {
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            let ctx = tracing::Span::current().context();
+            ctx.span().span_context().trace_id().to_string()
+        } else {
+            ider::uuid()
+        }
+    } else {
+        trace_id.to_string()
+    };
+
+    let mut per_query_resp = multi_req.per_query_response;
+
+    let mut query_fn = multi_req
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
+    if let Some(vrl_function) = &query_fn {
+        if RESULT_ARRAY.is_match(vrl_function) {
+            // The query function expects results array as input
+            // Hence, per_query_resp should be true
+            per_query_resp = true;
+        }
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
+
+    let mut queries = multi_req.to_query_req();
+    log::info!(
+        "search_multi: trace_id: {}, queries.len(): {}",
+        trace_id,
+        queries.len()
+    );
+    let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+    // Before making any rpc requests, first check the sql expressions can be decoded correctly
+    for req in queries.iter_mut() {
+        if let Err(e) = req.decode() {
+            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+        }
+    }
+    let queries_len = queries.len();
+    let mut stream_name = "".to_string();
+    let mut sqls = vec![];
+    let mut index = 0;
+
+    for mut req in queries {
+        stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
+            Ok(v) => v.source.to_string(),
+            Err(e) => {
+                log::error!("report_usage: parse sql error: {:?}", e);
+                "".to_string()
+            }
+        };
+        sqls.push(req.query.sql.clone());
+        if !per_query_resp {
+            req.query.query_fn = query_fn.clone();
+        }
+
+        for fn_name in functions::get_all_transform_keys(org_id).await {
+            if req.query.sql.contains(&format!("{}(", fn_name)) {
+                req.query.uses_zo_fn = true;
+                break;
+            }
+        }
+
+        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
+
+        match res {
+            Ok(res) => {
+                index += 1;
+                multi_res.took += res.took;
+
+                if res.total > multi_res.total {
+                    multi_res.total = res.total;
+                }
+                multi_res.from = res.from;
+                multi_res.size += res.size;
+                multi_res.file_count += res.file_count;
+                multi_res.scan_size += res.scan_size;
+                multi_res.scan_records += res.scan_records;
+                multi_res.columns.extend(res.columns);
+
+                multi_res.response_type = res.response_type;
+                multi_res.trace_id = res.trace_id;
+                multi_res.cached_ratio = res.cached_ratio;
+                log::debug!(
+                    "search_multi: res.hits.len() for query timerange to {} from {} : {}",
+                    req.query.end_time,
+                    req.query.start_time,
+                    res.hits.len()
+                );
+
+                if per_query_resp {
+                    multi_res.hits.push(serde_json::Value::Array(res.hits));
+                } else {
+                    multi_res.hits.extend(res.hits);
+                }
+            }
+            Err(e) => {
+                log::error!("search_multi: search error: {:?}", e);
+                if index == 0 {
+                    // Error in the first query, return the error
+                    return Err(e); // TODO: return partial results
+                } else {
+                    // Error in subsequent queries, add the error to the response and break
+                    // No need to run the remaining queries
+                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.is_partial = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut report_function_usage = false;
+    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.unwrap().trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                report_function_usage = true;
+                if apply_over_hits {
+                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &meta::functions::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        &json::Value::Array(multi_res.hits),
+                        org_id,
+                        &[stream_name.clone()],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            if per_query_resp {
+                                let flattened_array = v
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .map(|item| {
+                                        config::utils::flatten::flatten(item.clone()).unwrap()
+                                    })
+                                    .collect::<Vec<_>>();
+                                Some(serde_json::Value::Array(flattened_array))
+                            } else {
+                                (!v.is_null())
+                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                            }
+                        })
+                        .collect()
+                } else {
+                    multi_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &meta::functions::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                &hit,
+                                org_id,
+                                &[stream_name.clone()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => multi_res.hits,
+        }
+    } else {
+        multi_res.hits
+    };
+    log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
+    let column_timestamp = get_config().common.column_timestamp.to_string();
+    multi_res.cached_ratio /= queries_len;
+    multi_res.hits.sort_by(|a, b| {
+        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
+            return std::cmp::Ordering::Equal;
+        }
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
+        b_ts.cmp(&a_ts)
+    });
+    let time = start.elapsed().as_secs_f64();
+
+    if report_function_usage {
+        let req_stats = RequestStats {
+            // For functions, records = records * num_function, in this case num_function = 1
+            records: multi_res.total as i64,
+            response_time: time,
+            size: multi_res.scan_size as f64,
+            request_body: Some(json::to_string(&sqls).unwrap()),
+            user_email: None,
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            trace_id: None,
+            // took_wait_in_queue: multi_res.t,
+            search_type: multi_req.search_type,
+            ..Default::default()
+        };
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            stream_type,
+            UsageType::Functions,
+            0, // The request stats already contains function event
+            started_at,
+        )
+        .await;
+    }
+    Ok(multi_res)
+}
+
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
@@ -126,6 +382,9 @@ pub async fn search(
         let sql = Some(in_req.query.sql.clone());
         let start_time = Some(in_req.query.start_time);
         let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
         // set search task
         SEARCH_SERVER
             .insert(
@@ -139,6 +398,7 @@ pub async fn search(
                     sql,
                     start_time,
                     end_time,
+                    s_event_type,
                 ),
             )
             .await;
@@ -179,8 +439,19 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] in leader task finish");
 
     // remove task because task if finished
+    let mut _work_group = None;
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(&trace_id, false).await;
+    {
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
+            if let Some((_, stat)) = status.first() {
+                match stat.work_group.as_ref() {
+                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                    None => _work_group = None,
+                }
+            }
+        };
+    }
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[org_id])
@@ -188,7 +459,8 @@ pub async fn search(
 
     // do this because of clippy warning
     match res {
-        Ok(res) => {
+        Ok(mut res) => {
+            res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
             let (report_usage, search_type) = match in_req.search_type {
                 Some(search_type) => match search_type {
@@ -217,6 +489,11 @@ pub async fn search(
                     response_time: time,
                     size: res.scan_size as f64,
                     request_body: Some(req_query.sql.clone()),
+                    function: if req_query.query_fn.is_empty() {
+                        None
+                    } else {
+                        Some(req_query.query_fn.clone())
+                    },
                     user_email: user_id,
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),
@@ -230,15 +507,17 @@ pub async fn search(
                     } else {
                         None
                     },
+                    work_group: _work_group,
                     ..Default::default()
                 };
+                let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
                 report_request_usage_stats(
                     req_stats,
                     org_id,
                     &stream_name,
                     StreamType::Logs,
                     UsageType::Search,
-                    0,
+                    num_fn,
                     started_at,
                 )
                 .await;
@@ -282,27 +561,58 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let ts_column = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
-
+    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let ts_column = res_ts_column.map(|(v, _)| v);
     let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     let mut files = Vec::new();
+
     let mut max_query_range = 0;
-    for (stream, schema) in sql.schemas.iter() {
+    for (stream_name, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-        if !skip_get_file_list {
-            let stream_files = get_file_list(
-                &sql,
-                stream,
+        let use_stream_stats_for_partition = stream_settings.approx_partition;
+
+        if !skip_get_file_list && !use_stream_stats_for_partition {
+            let stream_files = crate::service::file_list::query_ids(
+                &sql.org_id,
                 stream_type,
-                partition_time_level,
-                &stream_settings.partition_keys,
+                stream_name,
+                sql.time_range,
             )
-            .await;
-            max_query_range = max(max_query_range, stream_settings.max_query_range);
+            .await?;
+            max_query_range = max(
+                max_query_range,
+                stream_settings.max_query_range * 3600 * 1_000_000,
+            );
             files.extend(stream_files);
+        } else {
+            // data retention in seconds
+            let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+            // data duration in seconds
+            let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
+            let stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+            let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+            let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+            if data_retention_based_on_stats > 0 {
+                data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
+            };
+            if data_retention == 0 {
+                log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
+                data_retention = 1;
+            }
+            let records = (stats.doc_num as i64 * query_duration) / data_retention;
+            let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
+            log::info!(
+                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {}",
+                stream_name,
+                records,
+                original_size,
+            );
+            files.push(infra::file_list::FileId {
+                id: Utc::now().timestamp_micros(),
+                records,
+                original_size,
+            });
         }
     }
 
@@ -331,22 +641,15 @@ pub async fn search_partition(
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
-    let (records, original_size, compressed_size) =
-        files
-            .iter()
-            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
-                (
-                    records + f.meta.records,
-                    original_size + f.meta.original_size,
-                    compressed_size + f.meta.compressed_size,
-                )
-            });
+    let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
+        (records + f.records, original_size + f.original_size)
+    });
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
         records: records as usize,
         original_size: original_size as usize,
-        compressed_size: compressed_size as usize,
+        compressed_size: 0, // there is no compressed size in file list
         histogram_interval: sql.histogram_interval,
         max_query_range,
         partitions: vec![],
@@ -369,6 +672,10 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    // if the partition number is too large, we limit it to 1000
+    if part_num > 1000 {
+        part_num = 1000;
+    }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
@@ -377,13 +684,29 @@ pub async fn search_partition(
     if step % min_step > 0 {
         step = step - step % min_step;
     }
+    // this is to ensure we create partitions less than max_query_range
+    if max_query_range > 0 && step > max_query_range {
+        step = if min_step < max_query_range {
+            max_query_range - max_query_range % min_step
+        } else {
+            max_query_range
+        };
+    }
 
     // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
     let mut last_partition_step = end % min_step;
+    let duration = req.end_time - req.start_time;
     while end > req.start_time {
-        let start = max(end - step - last_partition_step, req.start_time);
+        let mut start = max(end - step, req.start_time);
+        if last_partition_step > 0 && duration > min_step && part_num > 1 {
+            partitions.push([end - last_partition_step, end]);
+            start -= last_partition_step;
+            end -= last_partition_step;
+        } else {
+            start = max(start - last_partition_step, req.start_time);
+        }
         partitions.push([start, end]);
         end = start;
         last_partition_step = 0;
@@ -407,6 +730,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
+
+    use std::str::FromStr;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -542,6 +867,9 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
+        let search_type: Option<search::SearchEventType> = result
+            .search_type
+            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -553,6 +881,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             query,
             scan_stats,
             work_group: work_group.to_string(),
+            search_type,
         });
     }
 
@@ -685,11 +1014,15 @@ pub async fn match_file(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
     source: &FileKey,
-    match_min_ts_only: bool,
-    is_wal: bool,
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
 ) -> bool {
+    // fast path
+    if partition_keys.is_empty() || !source.key.contains('=') {
+        return true;
+    }
+
+    // slow path
     let mut filters = generate_filter_from_equal_items(equal_items);
     let partition_keys: HashMap<&String, &StreamPartition> =
         partition_keys.iter().map(|v| (&v.field, v)).collect();
@@ -701,12 +1034,10 @@ pub async fn match_file(
         }
     }
     match_source(
-        StreamParams::new(org_id, stream_name, stream_type),
+        Arc::new(StreamParams::new(org_id, stream_name, stream_type)),
         time_range,
-        filters.as_slice(),
+        &filters,
         source,
-        is_wal,
-        match_min_ts_only,
     )
     .await
 }
@@ -728,25 +1059,11 @@ pub fn generate_filter_from_equal_items(
 
 /// match a source is a valid file or not
 pub async fn match_source(
-    stream: StreamParams,
+    stream: Arc<StreamParams>,
     time_range: Option<(i64, i64)>,
     filters: &[(String, Vec<String>)],
     source: &FileKey,
-    is_wal: bool,
-    match_min_ts_only: bool,
 ) -> bool {
-    if stream.stream_type.eq(&StreamType::Metrics)
-        && source.key.starts_with(
-            format!(
-                "files/{}/{}/{}/",
-                stream.org_id, stream.stream_type, stream.org_id
-            )
-            .as_str(),
-        )
-    {
-        return true;
-    }
-
     // match org_id & table
     if !source.key.starts_with(
         format!(
@@ -763,10 +1080,6 @@ pub async fn match_source(
         return false;
     }
 
-    if is_wal {
-        return true;
-    }
-
     // check time range
     if source.meta.min_ts == 0 || source.meta.max_ts == 0 {
         return true;
@@ -781,9 +1094,6 @@ pub async fn match_source(
 
     // match partition clause
     if let Some((time_min, time_max)) = time_range {
-        if match_min_ts_only && time_min > 0 {
-            return source.meta.min_ts >= time_min && source.meta.min_ts < time_max;
-        }
         if time_min > 0 && time_min > source.meta.max_ts {
             return false;
         }
@@ -792,18 +1102,6 @@ pub async fn match_source(
         }
     }
     true
-}
-
-/// match a source is a needed file or not, return true if needed
-fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
-    !filters.iter().any(|(k, v)| {
-        let field = format_partition_key(&format!("{k}="));
-        find(source, &format!("/{field}"))
-            && !v.iter().any(|v| {
-                let value = format_partition_key(&format!("{k}={v}"));
-                find(source, &format!("/{value}/"))
-            })
-    })
 }
 
 pub fn server_internal_error(error: impl ToString) -> Error {
@@ -849,30 +1147,6 @@ pub async fn search_partition_multi(
     }
     res.records = total_rec;
     Ok(res)
-}
-
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = stream_name))]
-async fn get_file_list(
-    sql: &Sql,
-    stream_name: &str,
-    stream_type: StreamType,
-    time_level: PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Vec<FileKey> {
-    let (time_min, time_max) = sql.time_range.unwrap();
-    let mut files = super::file_list::query(
-        &sql.org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await
-    .unwrap_or_default();
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    files
 }
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
@@ -946,137 +1220,29 @@ pub fn filter_index_fields(
     result
 }
 
+pub fn generate_filter_from_quick_text(
+    data: &[(String, String, SqlOperator)],
+) -> Vec<(&str, Vec<String>)> {
+    let quick_text_len = data.len();
+    let mut filters = HashMap::with_capacity(quick_text_len);
+    for i in 0..quick_text_len {
+        let (k, v, op) = &data[i];
+        if op == &SqlOperator::And
+            || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+        {
+            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
+            entry.push(v.to_string());
+        } else {
+            filters.clear();
+            break;
+        }
+    }
+    filters.into_iter().collect::<Vec<(_, _)>>()
+}
+
 #[cfg(test)]
 mod tests {
-    use config::meta::sql::SqlOperator;
-
     use super::*;
-
-    #[test]
-    fn test_matches_by_partition_key_with_str() {
-        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
-        let filters = vec![
-            (vec![], true),
-            (
-                vec![("kuberneteshost".to_string(), vec!["gke-dev1".to_string()])],
-                true,
-            ),
-            (
-                vec![("kuberneteshost".to_string(), vec!["gke-dev2".to_string()])],
-                false,
-            ),
-            (
-                vec![(
-                    "kuberneteshost".to_string(),
-                    vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                )],
-                true,
-            ),
-            (
-                vec![("some_other_key".to_string(), vec!["no-matter".to_string()])],
-                true,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["ziox-dev".to_string()],
-                    ),
-                ],
-                true,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev1".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["abcdefg".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["ziox-dev".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    ("kuberneteshost".to_string(), vec!["gke-dev2".to_string()]),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["abcdefg".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    (
-                        "kuberneteshost".to_string(),
-                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                    ),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["ziox-dev".to_string()],
-                    ),
-                ],
-                true,
-            ),
-            (
-                vec![
-                    (
-                        "kuberneteshost".to_string(),
-                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                    ),
-                    (
-                        "kubernetesnamespacename".to_string(),
-                        vec!["abcdefg".to_string()],
-                    ),
-                ],
-                false,
-            ),
-            (
-                vec![
-                    (
-                        "kuberneteshost".to_string(),
-                        vec!["gke-dev1".to_string(), "gke-dev2".to_string()],
-                    ),
-                    ("some_other_key".to_string(), vec!["no-matter".to_string()]),
-                ],
-                true,
-            ),
-        ];
-        for (filter, expected) in filters {
-            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
-        }
-    }
-
-    pub fn generate_filter_from_quick_text(
-        data: &[(String, String, SqlOperator)],
-    ) -> Vec<(&str, Vec<String>)> {
-        let quick_text_len = data.len();
-        let mut filters = HashMap::with_capacity(quick_text_len);
-        for i in 0..quick_text_len {
-            let (k, v, op) = &data[i];
-            if op == &SqlOperator::And
-                || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
-            {
-                let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
-                entry.push(v.to_string());
-            } else {
-                filters.clear();
-                break;
-            }
-        }
-        filters.into_iter().collect::<Vec<(_, _)>>()
-    }
 
     #[test]
     fn test_matches_by_partition_key_with_sql() {

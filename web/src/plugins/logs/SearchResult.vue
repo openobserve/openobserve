@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Math.max(
                 1,
                 searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0,
+                  ?.length || 0
               )
             "
             :input="false"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             redirectToTraces(
               searchObj.data.queryResults.hits[
                 searchObj.meta.resultGrid.navigation.currentRowIndex
-              ],
+              ]
             )
           "
         />
@@ -227,7 +227,7 @@ export default defineComponent({
   components: {
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+      () => import("@/components/dashboards/panels/ChartRenderer.vue")
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
@@ -293,7 +293,7 @@ export default defineComponent({
           this.searchObj.data.resultGrid.currentPage <=
           Math.round(
             this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage,
+              this.searchObj.meta.resultGrid.rowsPerPage
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
@@ -312,7 +312,7 @@ export default defineComponent({
         if (
           this.pageNumberInput >
           Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length,
+            this.searchObj.data.queryResults.partitionDetail.paginations.length
           )
         ) {
           this.$q.notify({
@@ -381,6 +381,7 @@ export default defineComponent({
       refreshPartitionPagination,
       filterHitsColumns,
       reorderSelectedFields,
+      getFilterExpressionByFieldType,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -409,7 +410,7 @@ export default defineComponent({
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams,
+          searchObj.data.histogram.chartParams
         );
         // plotChart.value.forceReLayout();
       }
@@ -436,14 +437,22 @@ export default defineComponent({
       const newIndex = getRowIndex(
         isNext,
         isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
+        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };
 
-    const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
+    const addSearchTerm = (
+      field: string | number,
+      field_value: string | number | boolean,
+      action: string,
+    ) => {
+      const searchExpression = getFilterExpressionByFieldType(
+        field,
+        field_value,
+        action,
+      );
+      searchObj.data.stream.addToFilter = searchExpression;
     };
 
     const removeSearchTerm = (term: string) => {
@@ -463,7 +472,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== fieldName,
+            (v: any) => v !== fieldName
           );
       } else {
         searchObj.data.stream.selectedFields.push(fieldName);
@@ -481,7 +490,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        }),
+        })
       );
     };
 
@@ -530,7 +539,7 @@ export default defineComponent({
 
     const getColumns = computed(() => {
       return searchObj.data?.resultGrid?.columns?.filter(
-        (col: any) => !!col.id,
+        (col: any) => !!col.id
       );
     });
 

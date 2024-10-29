@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use config::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
-        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+        stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
     utils::inverted_index::split_token,
@@ -40,7 +40,6 @@ use infra::{
     dist_lock,
     errors::{Error, Result},
     file_list::FileId,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings, SchemaCache},
 };
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
@@ -74,7 +73,7 @@ pub async fn search(
     sql: Arc<Sql>,
     mut req: Request,
     query: SearchQuery,
-) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
@@ -91,7 +90,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, 0));
+        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string()));
     }
 
     // 1. get file id list
@@ -99,7 +98,6 @@ pub async fn search(
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
-        &sql.schemas,
         sql.time_range,
     )
     .await?;
@@ -223,7 +221,7 @@ pub async fn search(
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
     if super::super::SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender)
+        .insert_sender(trace_id, abort_sender, true)
         .await
         .is_err()
     {
@@ -291,7 +289,7 @@ pub async fn search(
     drop(_defer);
 
     // 9. get data from datafusion
-    let (data, mut scan_stats): (Vec<RecordBatch>, ScanStats) = match task {
+    let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
         Err(err) => Err(Error::Message(err.to_string())),
@@ -300,7 +298,14 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: search finished");
 
     scan_stats.format_to_mb();
-    Ok((data, scan_stats, took_wait, false, idx_took))
+    Ok((
+        data,
+        scan_stats,
+        took_wait,
+        !partial_err.is_empty(),
+        idx_took,
+        partial_err,
+    ))
 }
 
 #[tracing::instrument(name = "service:search:cluster:flight:run_datafusion", skip_all)]
@@ -311,7 +316,7 @@ pub async fn run_datafusion(
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<String, Vec<Vec<i64>>>,
     idx_file_list: Vec<FileKey>,
-) -> Result<(Vec<RecordBatch>, ScanStats)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
 
@@ -327,7 +332,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let equal_keys = sql
+    let mut equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -340,6 +345,18 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
+
+    // check inverted index prefix search
+    if sql.stream_type == StreamType::Index
+        && cfg.common.inverted_index_search_format.to_lowercase() != "contains"
+    {
+        for (stream, items) in sql.prefix_items.iter() {
+            equal_keys
+                .entry(stream.to_string())
+                .or_insert_with(Vec::new)
+                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
+        }
+    }
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -387,7 +404,7 @@ pub async fn run_datafusion(
         Err(e.into())
     } else {
         log::info!("[trace_id {trace_id}] flight->search: datafusion collect done");
-        ret.map(|data| (data, visit.scan_stats))
+        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }
@@ -726,46 +743,16 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[String],
-    schemas: &HashMap<String, Arc<SchemaCache>>,
     time_range: Option<(i64, i64)>,
 ) -> Result<HashMap<String, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for name in stream_names {
-        // stream settings
-        let stream_settings =
-            unwrap_stream_settings(schemas.get(name).unwrap().schema()).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
         // get file list
         let file_id_list =
-            get_file_id_list(org_id, stream_type, name, time_range, partition_time_level).await;
+            crate::service::file_list::query_ids(org_id, stream_type, name, time_range).await?;
         file_lists.insert(name.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-#[tracing::instrument(name = "service:search:cluster:flight:get_file_id_list", skip_all)]
-pub(crate) async fn get_file_id_list(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    time_level: PartitionTimeLevel,
-) -> Vec<FileId> {
-    let (time_min, time_max) = time_range.unwrap();
-    let mut files = crate::service::file_list::query_ids(
-        org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await
-    .unwrap_or_default();
-    files.sort_by(|a, b| a.id.cmp(&b.id));
-    files.dedup_by(|a, b| a.id == b.id);
-    files
 }
 
 #[tracing::instrument(
@@ -917,8 +904,8 @@ pub async fn get_inverted_index_file_list(
             format!("{}_{}", stream_name, stream_type)
         };
     let sql = format!(
-        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
-        index_stream_name, search_condition,
+        "SELECT file_name, segment_ids FROM \"{}\" WHERE {}",
+        index_stream_name, search_condition
     );
 
     req.stream_type = StreamType::Index;
@@ -928,20 +915,7 @@ pub async fn get_inverted_index_file_list(
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-
     let resp = super::http::search(req, query, vec![], vec![]).await?;
-    // get deleted file
-    let deleted_files = resp
-        .hits
-        .iter()
-        .filter_map(|hit| {
-            if hit.get("deleted").unwrap().as_bool().unwrap() {
-                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-            } else {
-                None
-            }
-        })
-        .collect::<HashSet<_>>();
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
@@ -950,9 +924,6 @@ pub async fn get_inverted_index_file_list(
             None => continue,
             Some(v) => v.as_str().unwrap(),
         };
-        if deleted_files.contains(filename) {
-            continue;
-        }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             &org_id, stream_type, stream_name, filename

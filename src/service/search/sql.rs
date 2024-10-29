@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,6 +24,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -43,14 +44,13 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
-        SetExpr, VisitMut, VisitorMut,
+        SetExpr, Statement, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
 use super::request::Request;
-use crate::common::meta::ingestion::ORIGINAL_DATA_COL_NAME;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -67,6 +67,7 @@ pub struct Sql {
     pub stream_names: Vec<String>,
     pub match_items: Option<Vec<String>>, // match_all, only for single stream
     pub equal_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
+    pub prefix_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
     pub columns: HashMap<String, HashSet<String>>, // table_name -> [field_name]
     pub aliases: Vec<(String, String)>,   // field_name, alias
     pub schemas: HashMap<String, Arc<SchemaCache>>,
@@ -150,7 +151,8 @@ impl Sql {
         // 5. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
-            used_schemas = generate_select_star_schema(total_schemas);
+            let has_original_column = has_original_column(&column_visitor.columns);
+            used_schemas = generate_select_star_schema(total_schemas, has_original_column);
         } else {
             for (table_name, schema) in total_schemas.iter() {
                 let columns = match column_visitor.columns.get(table_name) {
@@ -171,10 +173,25 @@ impl Sql {
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         statement.visit(&mut partition_column_visitor);
 
-        // 7. pick up histogram interval
+        // 7. get prefix column value
+        let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
+        statement.visit(&mut prefix_column_visitor);
+
+        // 8. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
+
+        // NOTE: only this place can modify the sql
+        // 9. add _timestamp and _o2_id if need
+        if !is_complex_query(&mut statement) {
+            let mut add_timestamp_visitor = AddTimestampVisitor::new();
+            statement.visit(&mut add_timestamp_visitor);
+            if o2_id_is_needed(&used_schemas) {
+                let mut add_o2_id_visitor = AddO2IdVisitor::new();
+                statement.visit(&mut add_o2_id_visitor);
+            }
+        }
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -183,6 +200,7 @@ impl Sql {
             stream_names,
             match_items: match_visitor.match_items,
             equal_items: partition_column_visitor.equal_items,
+            prefix_items: prefix_column_visitor.prefix_items,
             columns,
             aliases,
             schemas: used_schemas,
@@ -202,7 +220,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{:?}/{:?}, match_items: {:?}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}",
+            "sql: {}, time_range: {:?}, stream: {}/{:?}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -210,6 +228,7 @@ impl std::fmt::Display for Sql {
             self.stream_names,
             self.match_items,
             self.equal_items,
+            self.prefix_items,
             self.aliases,
             self.limit,
             self.offset,
@@ -223,13 +242,15 @@ impl std::fmt::Display for Sql {
 
 fn generate_select_star_schema(
     schemas: HashMap<String, Arc<SchemaCache>>,
+    has_original_column: HashMap<String, bool>,
 ) -> HashMap<String, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+        let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() {
+        if defined_schema_fields.is_empty() && !has_original_column {
             if schema.contains_field(ORIGINAL_DATA_COL_NAME) {
                 // skip selecting "_original" column if `SELECT * ...`
                 let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
@@ -263,6 +284,9 @@ fn generate_user_defined_schema(
     if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
         fields.insert(cfg.common.column_all.to_string());
     }
+    if !fields.contains(ID_COL_NAME) {
+        fields.insert(ID_COL_NAME.to_string());
+    }
     let new_fields = fields
         .iter()
         .filter_map(|name| schema.field_with_name(name).cloned())
@@ -286,7 +310,12 @@ fn generate_schema_fields(
         columns.insert(get_config().common.column_timestamp.clone());
     }
 
-    // 2. add field from full text search
+    // 2. check _o2_id
+    if !columns.contains(ID_COL_NAME) {
+        columns.insert(ID_COL_NAME.to_string());
+    }
+
+    // 3. add field from full text search
     if has_match_all {
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -298,7 +327,7 @@ fn generate_schema_fields(
         }
     }
 
-    // 3. generate fields
+    // 4. generate fields
     let mut fields = Vec::with_capacity(columns.len());
     for column in columns {
         if let Some(field) = schema.field_with_name(&column) {
@@ -306,6 +335,19 @@ fn generate_schema_fields(
         }
     }
     fields
+}
+
+// check if has original column in sql
+fn has_original_column(columns: &HashMap<String, HashSet<String>>) -> HashMap<String, bool> {
+    let mut has_original_column = HashMap::with_capacity(columns.len());
+    for (name, column) in columns.iter() {
+        if column.contains(ORIGINAL_DATA_COL_NAME) {
+            has_original_column.insert(name.clone(), true);
+        } else {
+            has_original_column.insert(name.clone(), false);
+        }
+    }
+    has_original_column
 }
 
 /// visit a sql to get all columns
@@ -590,6 +632,86 @@ impl<'a> VisitorMut for PartitionColumnVisitor<'a> {
     }
 }
 
+/// get all equal items from where clause
+struct PrefixColumnVisitor<'a> {
+    prefix_items: HashMap<String, Vec<(String, String)>>, // filed like 'value%'
+    schemas: &'a HashMap<String, Arc<SchemaCache>>,
+}
+
+impl<'a> PrefixColumnVisitor<'a> {
+    fn new(schemas: &'a HashMap<String, Arc<SchemaCache>>) -> Self {
+        Self {
+            prefix_items: HashMap::new(),
+            schemas,
+        }
+    }
+}
+
+impl<'a> VisitorMut for PrefixColumnVisitor<'a> {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            if let Some(expr) = select.selection.as_ref() {
+                let exprs = split_conjunction(expr);
+                for e in exprs {
+                    if let Expr::Like {
+                        negated: false,
+                        expr,
+                        pattern,
+                        escape_char: _,
+                    } = e
+                    {
+                        match expr.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
+                                    }
+                                }
+                                if count == 1 {
+                                    let pattern = trim_quotes(pattern.to_string().as_str());
+                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                        self.prefix_items.entry(table_name).or_default().push((
+                                            field_name,
+                                            pattern.trim_end_matches('%').to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                            Expr::CompoundIdentifier(idents) => {
+                                let name = idents
+                                    .iter()
+                                    .map(|ident| ident.value.clone())
+                                    .collect::<Vec<_>>();
+                                let table_name = name[0].clone();
+                                let field_name = name[1].clone();
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    let pattern = trim_quotes(pattern.to_string().as_str());
+                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                        self.prefix_items.entry(table_name).or_default().push((
+                                            field_name,
+                                            pattern.trim_end_matches('%').to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 /// get all item from match_all functions
 struct MatchVisitor {
     pub match_items: Option<Vec<String>>, // filed = value
@@ -642,6 +764,186 @@ impl VisitorMut for FieldNameVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Identifier(ident) = expr {
             self.field_names.insert(ident.value.clone());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+// add _timestamp to the query like `SELECT name FROM t` -> `SELECT _timestamp, name FROM t`
+struct AddTimestampVisitor {}
+
+impl AddTimestampVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddTimestampVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_timestamp = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_timestamp = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_timestamp {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
+                        get_config().common.column_timestamp.clone(),
+                    ))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+// add _o2_id to the query like `SELECT name FROM t` -> `SELECT _o2_id, name FROM t`
+struct AddO2IdVisitor {}
+
+impl AddO2IdVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddO2IdVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_o2_id = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor.field_names.contains(ID_COL_NAME) {
+                            has_o2_id = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor.field_names.contains(ID_COL_NAME) {
+                            has_o2_id = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_o2_id = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_o2_id {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(ID_COL_NAME.to_string()))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn is_complex_query(statement: &mut Statement) -> bool {
+    let mut visitor = ComplexQueryVisitor::new();
+    statement.visit(&mut visitor);
+    visitor.is_complex
+}
+
+// check if the query is complex query
+// 1. has subquery
+// 2. has join
+// 3. has group by
+// 4. has aggregate
+struct ComplexQueryVisitor {
+    pub is_complex: bool,
+}
+
+impl ComplexQueryVisitor {
+    fn new() -> Self {
+        Self { is_complex: false }
+    }
+}
+
+impl VisitorMut for ComplexQueryVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            // check if has group by
+            match select.group_by {
+                GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
+                _ => self.is_complex = true,
+            }
+            // check if has join
+            if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                self.is_complex = true;
+            }
+            if self.is_complex {
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_complex = true;
+            }
+            // check if has aggregate function or window function
+            Expr::Function(func) => {
+                if AGGREGATE_UDF_LIST
+                    .contains(&trim_quotes(&func.name.to_string().to_lowercase()).as_str())
+                    || func.filter.is_some()
+                    || func.over.is_some()
+                    || !func.within_group.is_empty()
+                {
+                    self.is_complex = true;
+                }
+            }
+            // check select * from table
+            Expr::Wildcard => self.is_complex = true,
+            _ => {}
+        }
+        if self.is_complex {
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -762,6 +1064,7 @@ fn split_conjunction_inner<'a>(expr: &'a Expr, mut exprs: Vec<&'a Expr>) -> Vec<
             let exprs = split_conjunction_inner(left, exprs);
             split_conjunction_inner(right, exprs)
         }
+        Expr::Nested(expr) => split_conjunction_inner(expr, exprs),
         other => {
             exprs.push(other);
             exprs
@@ -894,4 +1197,11 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
         where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
     }
     Ok(Some(where_str))
+}
+
+fn o2_id_is_needed(schemas: &HashMap<String, Arc<SchemaCache>>) -> bool {
+    schemas.values().any(|schema| {
+        let stream_setting = unwrap_stream_settings(schema.schema());
+        stream_setting.map_or(false, |setting| setting.store_original_data)
+    })
 }

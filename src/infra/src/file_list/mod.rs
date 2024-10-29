@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -83,7 +83,6 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<FileId>>;
     async fn query_deleted(
@@ -264,7 +263,7 @@ pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
 
 #[inline]
 #[tracing::instrument(
-    name = "infra:file_list:query_db_ids",
+    name = "infra:file_list:db:query_ids",
     skip_all,
     fields(org_id = org_id, stream_name = stream_name)
 )]
@@ -272,7 +271,6 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<FileId>> {
     if let Some((start, end)) = time_range {
@@ -281,7 +279,7 @@ pub async fn query_ids(
         }
     }
     CLIENT
-        .query_ids(org_id, stream_type, stream_name, time_level, time_range)
+        .query_ids(org_id, stream_type, stream_name, time_range)
         .await
 }
 
@@ -446,6 +444,7 @@ pub async fn local_cache_gc() -> Result<()> {
 pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
     pub stream: String,
     pub date: String,
     pub file: String,
@@ -492,8 +491,8 @@ impl From<&StatsRecord> for StreamStats {
             doc_time_max: record.max_ts,
             doc_num: record.records,
             file_num: record.file_num,
-            storage_size: record.original_size as f64,
-            compressed_size: record.compressed_size as f64,
+            storage_size: record.original_size,
+            compressed_size: record.compressed_size,
         }
     }
 }
@@ -532,5 +531,6 @@ pub enum FileListJobStatus {
 #[derive(Clone, Debug, Default, sqlx::FromRow)]
 pub struct FileId {
     pub id: i64,
+    pub records: i64,
     pub original_size: i64,
 }

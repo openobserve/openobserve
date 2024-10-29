@@ -94,6 +94,7 @@ import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDrop
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -121,6 +122,11 @@ export default defineComponent({
     const { t } = useI18n();
     const panelTitle = ref("");
 
+    const {
+      showErrorNotification,
+      showConfictErrorNotificationWithRefreshBtn,
+    } = useNotifications();
+
     onBeforeMount(async () => {
       // get folders list
       await getFoldersList(store);
@@ -143,7 +149,7 @@ export default defineComponent({
       dashboardId: string,
       folderId: string,
       tabId: string,
-      panelTitle: string
+      panelTitle: string,
     ) => {
       let dismiss = function () {};
 
@@ -162,7 +168,7 @@ export default defineComponent({
           dashboardId,
           props.dashboardPanelData.data,
           folderId,
-          tabId
+          tabId,
         );
         q.notify({
           message: "Panel added to dashboard",
@@ -174,13 +180,16 @@ export default defineComponent({
           name: "viewDashboard",
           query: { dashboard: dashboardId, folder: folderId, tab: tabId },
         });
-      } catch (err: any) {
-        q.notify({
-          message: "Error while adding panel",
-          type: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
+      } catch (error: any) {
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
+              error?.message ??
+              "Error while adding panel",
+          );
+        } else {
+          showErrorNotification(error?.message ?? "Error while adding panel");
+        }
       } finally {
         dismiss();
         emit("save");
@@ -208,7 +217,7 @@ export default defineComponent({
           selectedDashboard.value,
           activeFolderId.value,
           activeTabId.value,
-          panelTitle.value
+          panelTitle.value,
         );
       }
     });

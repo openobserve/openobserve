@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="min-height: inherit">
     <q-table
       data-test="log-stream-table"
+      class="org-streams-table"
       ref="qTable"
       v-model:selected="selected"
       :rows="logStream"
@@ -658,7 +659,9 @@ export default defineComponent({
     const getSelectedString = () => {
       return selected.value.length === 0
         ? ""
-        : `${selected.value.length} record${selected.value.length > 1 ? "s" : ""} selected`;
+        : `${selected.value.length} record${
+            selected.value.length > 1 ? "s" : ""
+          } selected`;
     };
 
     const exploreStream = (props: any) => {
@@ -763,6 +766,16 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.org-streams-table {
+  ::v-deep .q-table th,
+  ::v-deep .q-table td {
+    padding: 0px 16px;
+    height: 32px;
+  }
+}
+</style>
 
 <style lang="scss">
 .q-table {

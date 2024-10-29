@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,10 @@ import {
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
-import { convertDateToTimestamp, getConsumableRelativeTime } from "@/utils/date";
+import {
+  convertDateToTimestamp,
+  getConsumableRelativeTime,
+} from "@/utils/date";
 import { byString } from "@/utils/json";
 import { logsErrorMessage } from "@/utils/common";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -167,7 +170,7 @@ const defaultObject = {
       colOrder: <any>{},
       colSizes: <any>{},
     },
-    histogramInterval : <any> 0,
+    histogramInterval: <any>0,
     transforms: <any>[],
     queryResults: <any>[],
     sortedQueryResults: <any>[],
@@ -210,6 +213,11 @@ const defaultObject = {
     isOperationCancelled: false,
   },
 };
+
+// TODO OK:
+// useStreamManagement for stream-related functions
+// useQueryProcessing for query-related functions
+// useDataVisualization for histogram and data display functions
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 const searchObjDebug = reactive({
@@ -280,7 +288,8 @@ const useLogs = () => {
     parser = await sqlParser();
   };
 
-  searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
+  searchObj.organizationIdentifier =
+    store.state.selectedOrganization.identifier;
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -455,8 +464,6 @@ const useLogs = () => {
           searchObj.data.stream.streamType || "logs",
           true,
         ).then((res) => {
-         
-
           searchObj.loadingStream = false;
           return res;
         });
@@ -524,7 +531,9 @@ const useLogs = () => {
 
     if (searchObj.data.query) {
       query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(searchObj.data.query);
+      query["query"] = b64EncodeUnicode(
+        searchObj.data.query.trim(),
+      );
     }
 
     if (
@@ -532,7 +541,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent != ""
     ) {
       query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent,
+        searchObj.data.tempFunctionContent.trim(),
       );
     }
 
@@ -551,7 +560,12 @@ const useLogs = () => {
 
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
-
+    if (
+      Object.hasOwn(query, "type") &&
+      query.type == "search_history_re_apply"
+    ) {
+      delete query.type;
+    }
     router.push({ query });
   };
 
@@ -633,7 +647,7 @@ const useLogs = () => {
 
   function buildSearch() {
     try {
-      let query = searchObj.data.editorValue;
+      let query = searchObj.data.editorValue.trim();
       searchObj.data.filterErrMsg = "";
       searchObj.data.missingStreamMessage = "";
       searchObj.data.stream.missingStreamMultiStreamFilter = [];
@@ -786,7 +800,7 @@ const useLogs = () => {
 
         histogramParsedSQL.where = parsedSQL.where;
 
-        let histogramQuery = parser.sqlify(histogramParsedSQL);
+        let histogramQuery = fnUnparsedSQL(histogramParsedSQL);
         histogramQuery = histogramQuery.replace(/`/g, '"');
         req.aggs.histogram = histogramQuery;
 
@@ -795,31 +809,14 @@ const useLogs = () => {
           return false;
         }
 
-        // if (
-        //   hasTimeStampColumn(parsedSQL.columns) &&
-        //   parsedSQL.orderby == null
-        // ) {
-        //   // showErrorNotification("Order by clause is required in SQL mode");
-        //   notificationMsg.value = "Order by clause is required in SQL mode";
-        //   return false;
-        // }
-
-        // if (!hasTimeStampColumn(parsedSQL.columns)) {
-        //   // showErrorNotification("Timestamp column is required in SQL mode");
-        //   notificationMsg.value = "Timestamp column is required in SQL mode";
-        //   return false;
-        // }
-
-        if (parsedSQL.limit != null) {
+        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
           req.query.size = parsedSQL.limit.value[0].value;
 
           if (parsedSQL.limit.separator == "offset") {
             req.query.from = parsedSQL.limit.value[1].value || 0;
           }
 
-          // parsedSQL.limit = null;
-
-          query = parser.sqlify(parsedSQL);
+          query = fnUnparsedSQL(parsedSQL);
 
           //replace backticks with \" for sql_mode
           query = query.replace(/`/g, '"');
@@ -895,7 +892,7 @@ const useLogs = () => {
 
         req.query.sql = req.query.sql.replace(
           "[QUERY_FUNCTIONS]",
-          queryFunctions,
+          queryFunctions.trim(),
         );
 
         // in the case of multi stream, we need to pass query for each selected stream in the form of array
@@ -986,19 +983,7 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream[0],
           );
         }
-
-        // const parsedSQL = parser.astify(req.query.sql);
-        // const unparsedSQL = parser.sqlify(parsedSQL);
       }
-
-      // in case of sql mode or disable histogram to get total records we need to set track_total_hits to true
-      // because histogram query will not be executed
-      // if (
-      //   searchObj.data.resultGrid.currentPage == 1 &&
-      //   (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
-      // ) {
-      //   req.query.track_total_hits = true;
-      // }
 
       if (
         searchObj.data.resultGrid.currentPage > 1 ||
@@ -1050,7 +1035,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !parsedSQL?.limit;
+    return !parsedSQL?.limit || parsedSQL?.limit.value?.length == 0;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1149,43 +1134,6 @@ const useLogs = () => {
                 paginations: [],
               };
 
-              // searchObj.data.queryResults.total = res.data.records;
-              // const partitions = res.data.partitions;
-
-              // searchObj.data.queryResults.partitionDetail.partitions =
-              //   partitions;
-
-              // let pageObject: any = [];
-              // partitions.forEach((item: any, index: number) => {
-              //   pageObject = [
-              //     {
-              //       startTime: item[0],
-              //       endTime: item[1],
-              //       from: 0,
-              //       size: searchObj.meta.resultGrid.rowsPerPage,
-              //     },
-              //   ];
-              //   searchObj.data.queryResults.partitionDetail.paginations.push(
-              //     pageObject
-              //   );
-              //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-              // });
-              // for (const [index, item] of partitions.entries()) {
-              //   pageObject = [
-              //     {
-              //       startTime: item[0],
-              //       endTime: item[1],
-              //       from: 0,
-              //       size: searchObj.meta.resultGrid.rowsPerPage,
-              //     },
-              //   ];
-              //   searchObj.data.queryResults.partitionDetail.paginations.push(
-              //     pageObject
-              //   );
-              //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(
-              //     -1
-              //   );
-              // }
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
                 let partitions = [];
@@ -1252,8 +1200,11 @@ const useLogs = () => {
               searchObj.data.errorMsg =
                 "Error while processing partition request.";
               if (err.response != undefined) {
-                searchObj.data.errorMsg = err.response.data.error;
-                if(err.response.data.hasOwnProperty("error_detail")){
+                searchObj.data.errorMsg =
+                  err.response?.data?.error ||
+                  err.response?.data?.message ||
+                  "";
+                if (err.response.data.hasOwnProperty("error_detail")) {
                   searchObj.data.errorDetail = err.response.data.error_detail;
                 }
                 if (err.response.data.hasOwnProperty("trace_id")) {
@@ -1270,7 +1221,7 @@ const useLogs = () => {
 
               if (err?.request?.status >= 429) {
                 notificationMsg.value = err?.response?.data?.message;
-                searchObj.data.errorMsg = err?.response?.data?.message;
+                searchObj.data.errorMsg = err?.response?.data?.message || "";
                 searchObj.data.errorDetail = err?.response?.data?.error_detail;
               }
 
@@ -1299,22 +1250,6 @@ const useLogs = () => {
         ];
 
         let pageObject: any = [];
-        // searchObj.data.queryResults.partitionDetail.partitions.forEach(
-        //   (item: any, index: number) => {
-        //     pageObject = [
-        //       {
-        //         startTime: item[0],
-        //         endTime: item[1],
-        //         from: 0,
-        //         size: searchObj.meta.resultGrid.rowsPerPage,
-        //       },
-        //     ];
-        //     searchObj.data.queryResults.partitionDetail.paginations.push(
-        //       pageObject
-        //     );
-        //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-        //   }
-        // );
         for (const [
           index,
           item,
@@ -1382,7 +1317,6 @@ const useLogs = () => {
             searchObj.data.queryResults.hasOwnProperty("aggs") &&
             searchObj.data.queryResults.aggs != null
           ) {
-
           }
         } else {
           searchObj.data.queryResults.total =
@@ -1508,6 +1442,7 @@ const useLogs = () => {
       searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
       if (
         !searchObj.data.stream.streamLists?.length ||
         searchObj.data.stream.selectedStream.length == 0
@@ -1715,15 +1650,17 @@ const useLogs = () => {
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
-                 //to improve the cancel query UI experience we add additional check here and further we need to remove it 
-                 if (searchObj.data.isOperationCancelled) {
+                //to improve the cancel query UI experience we add additional check here and further we need to remove it
+                if (searchObj.data.isOperationCancelled) {
                   searchObj.loadingHistogram = false;
                   searchObj.data.isOperationCancelled = false;
-          
+
                   if (!searchObj.data.histogram?.xData?.length) {
                     notificationMsg.value = "Search query was cancelled";
-                    searchObj.data.histogram.errorMsg = "Search query was cancelled";
-                    searchObj.data.histogram.errorDetail = "Search query was cancelled";
+                    searchObj.data.histogram.errorMsg =
+                      "Search query was cancelled";
+                    searchObj.data.histogram.errorDetail =
+                      "Search query was cancelled";
                   }
                   break;
                 }
@@ -1741,18 +1678,9 @@ const useLogs = () => {
           await generateHistogramData();
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {
-              title: getHistogramTitle(),
-              unparsed_x_data: [],
-              timezone: "",
-            },
-            errorCode: 0,
-            errorMsg: "Histogram is not available for limit queries.",
-            errorDetail: "",
-          };
+          resetHistogramWithError(
+            "Histogram is not available for limit queries.",
+          );
         } else {
           let aggFlag = false;
           if (parsedSQL) {
@@ -1801,6 +1729,21 @@ const useLogs = () => {
     }
   };
 
+  function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {
+        title: getHistogramTitle(),
+        unparsed_x_data: [],
+        timezone: "",
+      },
+      errorCode,
+      errorMsg,
+      errorDetail: "",
+    };
+  }
+
   function isTimestampASC(orderby: any) {
     if (orderby) {
       for (const order of orderby) {
@@ -1830,7 +1773,7 @@ const useLogs = () => {
         throw new Error("Invalid interval");
       }
       searchObj.data.histogramInterval = intervalMs;
-      let date = new Date();
+      const date = new Date();
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
       ); // Convert microseconds to milliseconds
@@ -1857,17 +1800,6 @@ const useLogs = () => {
       }
 
       const startTime = startTimeDate.getTime() * 1000;
-      // for (
-      //   let currentTime: any = startTime;
-      //   currentTime < searchObj.data.customDownloadQueryObj.query.end_time;
-      //   currentTime += intervalMs
-      // ) {
-      //   date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
-      //   histogramResults.push({
-      //     zo_sql_key: date.toISOString().slice(0, 19),
-      //     zo_sql_num: 0,
-      //   });
-      // }
     }
   }
 
@@ -1882,24 +1814,6 @@ const useLogs = () => {
     return false; // No aggregation function or non-null groupby property found
   }
 
-  function hasTimeStampColumn(columns: any) {
-    for (const column of columns) {
-      if (
-        column.expr &&
-        (column.expr.column === store.state.zoConfig.timestamp_column ||
-          column.expr.column === "*" ||
-          (column.expr.hasOwnProperty("args") &&
-            column.expr?.args?.expr?.column ===
-              store.state.zoConfig.timestamp_column) ||
-          (column.hasOwnProperty("as") &&
-            column.as === store.state.zoConfig.timestamp_column))
-      ) {
-        return true; // Found _timestamp column
-      }
-    }
-    return false; // No aggregation function or non-null groupby property found
-  }
-
   const fnParsedSQL = () => {
     try {
       const filteredQuery = searchObj.data.query
@@ -1907,6 +1821,8 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
       return parser.astify(filteredQuery);
+
+      // return convertPostgreToMySql(parser.astify(filteredQuery));
     } catch (e: any) {
       return {
         columns: [],
@@ -1918,6 +1834,14 @@ const useLogs = () => {
     }
   };
 
+  const fnUnparsedSQL = (parsedObj: any) => {
+    try {
+      return parser.sqlify(parsedObj);
+    } catch (e: any) {
+      throw new Error(`Error while unparsing SQL : ${e.message}`);
+    }
+  };
+
   const fnHistogramParsedSQL = (query: string) => {
     try {
       const filteredQuery = query
@@ -1925,6 +1849,7 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
       return parser.astify(filteredQuery);
+      // return convertPostgreToMySql(parser.astify(filteredQuery));
     } catch (e: any) {
       return {
         columns: [],
@@ -2074,7 +1999,7 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        if (parsedSQL.limit != null) {
+        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
@@ -2106,6 +2031,13 @@ const useLogs = () => {
           "UI",
         )
         .then(async (res) => {
+          if (
+            res.data.hasOwnProperty("function_error") &&
+            res.data.function_error != ""
+          ) {
+            searchObj.data.functionError = res.data.function_error;
+          }
+
           if (
             res.data.hasOwnProperty("function_error") &&
             res.data.function_error != "" &&
@@ -2162,7 +2094,6 @@ const useLogs = () => {
               hasAggregation(parsedSQL?.columns) ||
               parsedSQL.groupby != null
             ) {
-              const parsedSQL: any = fnParsedSQL();
               searchAggData.total = res.data.total;
               searchAggData.hasAggregation = true;
               searchObj.meta.resultGrid.showPagination = false;
@@ -2250,26 +2181,26 @@ const useLogs = () => {
             setTimeout(async () => {
               processPostPaginationData();
 
-              searchObj.data.functionError = "";
-              if (
-                res.data.hasOwnProperty("function_error") &&
-                res.data.function_error
-              ) {
-                searchObj.data.functionError = res.data.function_error;
-              }
+              // searchObj.data.functionError = "";
+              // if (
+              //   res.data.hasOwnProperty("function_error") &&
+              //   res.data.function_error
+              // ) {
+              //   searchObj.data.functionError = res.data.function_error;
+              // }
             }, 0);
             await getPaginatedData(queryReq, true);
           }
 
           await processPostPaginationData();
 
-          searchObj.data.functionError = "";
-          if (
-            res.data.hasOwnProperty("function_error") &&
-            res.data.function_error
-          ) {
-            searchObj.data.functionError = res.data.function_error;
-          }
+          // searchObj.data.functionError = "";
+          // if (
+          //   res.data.hasOwnProperty("function_error") &&
+          //   res.data.function_error
+          // ) {
+          //   searchObj.data.functionError = res.data.function_error;
+          // }
 
           searchObj.loading = false;
           searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
@@ -2277,6 +2208,8 @@ const useLogs = () => {
           resolve(true);
         })
         .catch((err) => {
+          // TODO OK : create handleError function, which will handle error and return error message and detail
+
           searchObj.loading = false;
           let trace_id = "";
           searchObj.data.errorMsg =
@@ -2284,22 +2217,26 @@ const useLogs = () => {
               ? err
               : "Error while processing histogram request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
-            if(err.response.data.hasOwnProperty("error_detail")){
-              searchObj.data.errorDetail = err.response.data.error_detail;
+            searchObj.data.errorMsg =
+              err.response?.data?.error || err.response?.data?.message || "";
+            if (err.response.data.hasOwnProperty("error_detail")) {
+              searchObj.data.errorDetail =
+                err.response?.data?.error_detail || "";
             }
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
-            searchObj.data.errorMsg = err.message;
+            searchObj.data.errorMsg = err?.message || "";
             if (err.hasOwnProperty("trace_id")) {
               trace_id = err?.trace_id;
             }
           }
 
-          const customMessage = logsErrorMessage(err?.response?.data.code);
-          searchObj.data.errorCode = err?.response?.data.code;
+          const customMessage = logsErrorMessage(
+            err?.response?.data?.code || "",
+          );
+          searchObj.data.errorCode = err?.response?.data?.code || "";
 
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage);
@@ -2308,9 +2245,10 @@ const useLogs = () => {
           notificationMsg.value = searchObj.data.errorMsg;
 
           if (err?.request?.status >= 429) {
-            notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg = err?.response?.data?.message;
-            searchObj.data.errorDetail = err?.response?.data?.error_detail;
+            notificationMsg.value = err?.response?.data?.message || "";
+            searchObj.data.errorMsg = err?.response?.data?.message || "";
+            searchObj.data.errorDetail =
+              err?.response?.data?.error_detail || "";
           }
 
           if (trace_id) {
@@ -2401,58 +2339,74 @@ const useLogs = () => {
             if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
               partitions.reverse();
             }
-            if(partitions[0][0] == queryReq.query.start_time && partitions[0][1] == queryReq.query.end_time){
-              histogramResults = [];
-              let date = new Date();
-              const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
-      
-              const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000 ;
-     
-              const nowString = res.data.hits[0].zo_sql_key;
-              const now = new Date(nowString);
 
-            const day = String(now.getDate()).padStart(2, "0");
-            const month = String(now.getMonth() + 1).padStart(2, "0");
-            const year = now.getFullYear();
-
-            const dateToBePassed = `${day}-${month}-${year}`;
-            const hours = String(now.getHours()).padStart(2, "0");
-            let minutes = String(now.getMinutes() ).padStart(2, "0");
-            if(searchObj.data.histogramInterval / 1000 <= 60000 ){
-              minutes = String(now.getMinutes() + 1).padStart(2, "0");
-            }
-            
-            const time = `${hours}:${minutes}`;
-
-            const currentTimeToBePassed = convertDateToTimestamp (
-              dateToBePassed,
-              time,
-              'UTC'
-            );
-                for (
-                  let currentTime: any = currentTimeToBePassed.timestamp / 1000;
-                  currentTime < endDateTime;
-                  currentTime += searchObj.data.histogramInterval / 1000
+            if (
+              searchObj.data.queryResults.aggs.length == 0 &&
+              res.data.hits.length > 0
+            ) {
+              for (const partition of partitions) {
+                if (
+                  partition[0] == queryReq.query.start_time &&
+                  partition[1] == queryReq.query.end_time
                 ) {
-                  date = new Date(currentTime);
-                  histogramResults.push({
-                    zo_sql_key: date.toISOString().slice(0, 19),
-                    zo_sql_num: 0,
-                  });
+                  histogramResults = [];
+                  let date = new Date();
+                  const startDateTime =
+                    searchObj.data.customDownloadQueryObj.query.start_time /
+                    1000;
+
+                  const endDateTime =
+                    searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+
+                  const nowString = res.data.hits[0].zo_sql_key;
+                  const now = new Date(nowString);
+
+                  const day = String(now.getDate()).padStart(2, "0");
+                  const month = String(now.getMonth() + 1).padStart(2, "0");
+                  const year = now.getFullYear();
+
+                  const dateToBePassed = `${day}-${month}-${year}`;
+                  const hours = String(now.getHours()).padStart(2, "0");
+                  let minutes = String(now.getMinutes()).padStart(2, "0");
+                  if (searchObj.data.histogramInterval / 1000 <= 60000) {
+                    minutes = String(now.getMinutes() + 1).padStart(2, "0");
+                  }
+
+                  const time = `${hours}:${minutes}`;
+
+                  const currentTimeToBePassed = convertDateToTimestamp(
+                    dateToBePassed,
+                    time,
+                    "UTC",
+                  );
+                  for (
+                    let currentTime: any =
+                      currentTimeToBePassed.timestamp / 1000;
+                    currentTime < endDateTime;
+                    currentTime += searchObj.data.histogramInterval / 1000
+                  ) {
+                    date = new Date(currentTime);
+                    histogramResults.push({
+                      zo_sql_key: date.toISOString().slice(0, 19),
+                      zo_sql_num: 0,
+                    });
+                  }
+                  for (
+                    let currentTime: any =
+                      currentTimeToBePassed.timestamp / 1000;
+                    currentTime > startDateTime;
+                    currentTime -= searchObj.data.histogramInterval / 1000
+                  ) {
+                    date = new Date(currentTime);
+                    histogramResults.push({
+                      zo_sql_key: date.toISOString().slice(0, 19),
+                      zo_sql_num: 0,
+                    });
+                  }
                 }
-                for (
-                  let currentTime: any = currentTimeToBePassed.timestamp / 1000;
-                  currentTime > startDateTime;
-                  currentTime -= searchObj.data.histogramInterval / 1000
-                ) {
-                  date = new Date(currentTime);
-                  histogramResults.push({
-                    zo_sql_key: date.toISOString().slice(0, 19),
-                    zo_sql_num: 0,
-                  });
-                }
-                
+              }
             }
+
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
@@ -2461,21 +2415,24 @@ const useLogs = () => {
             const currentStartTime = queryReq.query.start_time;
             const currentEndTime = queryReq.query.end_time;
             let totalHits = 0;
-            searchObj.data.queryResults.partitionDetail.partitions.map((item: any, index: any) => {
-              if(item[0] == currentStartTime && item[1] == currentEndTime){
-                totalHits = res.data.hits.reduce(
-                      (accumulator: number, currentValue: any) =>
-                        accumulator +
-                        Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-                      0,
-                    );
+            searchObj.data.queryResults.partitionDetail.partitions.map(
+              (item: any, index: any) => {
+                if (item[0] == currentStartTime && item[1] == currentEndTime) {
+                  totalHits = res.data.hits.reduce(
+                    (accumulator: number, currentValue: any) =>
+                      accumulator +
+                      Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+                    0,
+                  );
 
-                searchObj.data.queryResults.partitionDetail.partitionTotal[index] = totalHits;
+                  searchObj.data.queryResults.partitionDetail.partitionTotal[
+                    index
+                  ] = totalHits;
 
-                return;
-              }
-      
-            });
+                  return;
+                }
+              },
+            );
 
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
@@ -2485,14 +2442,16 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
 
-            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
             searchObjDebug["histogramEndTime"] = performance.now();
+
             dismiss();
             resolve(true);
           })
@@ -2646,6 +2605,7 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+            console.log("stream", stream)
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
@@ -2962,7 +2922,7 @@ const useLogs = () => {
 
               // Object.keys(recordwithMaxAttribute).forEach((key) => {
               for (const key of Object.keys(recordwithMaxAttribute)) {
-                if(key == '_o2_id' || key == '_original'){
+                if (key == "_o2_id" || key == "_original") {
                   continue;
                 }
                 if (key == store.state.zoConfig.timestamp_column) {
@@ -3403,29 +3363,12 @@ const useLogs = () => {
     try {
       searchObj.loading = true;
       searchObj.data.errorCode = 0;
+      searchObj.data.functionError = "";
       const sqlContext: any = [];
       let query_context: any = "";
       const query = searchObj.data.query;
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL: any = parser.astify(query);
-        //removing this change as datafusion not supporting *, _timestamp. It was working but now throwing error.
-        //hack add time stamp column to parsedSQL if not already added
-        // if (
-        //   !(parsedSQL.columns === "*") &&
-        //   parsedSQL.columns.filter(
-        //     (e: any) => e.expr.column === store.state.zoConfig.timestamp_column
-        //   ).length === 0
-        // ) {
-        //   const ts_col = {
-        //     expr: {
-        //       type: "column_ref",
-        //       table: null,
-        //       column: store.state.zoConfig.timestamp_column,
-        //     },
-        //     as: null,
-        //   };
-        //   parsedSQL.columns.push(ts_col);
-        // }
         parsedSQL.where = null;
         sqlContext.push(
           b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
@@ -3683,7 +3626,12 @@ const useLogs = () => {
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
-      // searchObj.data.histogram.chartParams.title = ""
+      if (
+        Object.hasOwn(router.currentRoute.value.query, "type") &&
+        router.currentRoute.value.query.type == "search_history_re_apply"
+      ) {
+        delete router.currentRoute.value.query.type;
+      }
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -3695,6 +3643,10 @@ const useLogs = () => {
     let fromTimestamp, toTimestamp;
 
     switch (period.slice(-1)) {
+      case "s":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 1000; // 1 second = 1000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
       case "m":
         fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
         toTimestamp = currentTime.getTime();
@@ -3801,7 +3753,12 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
-
+    if (
+      Object.hasOwn(queryParams, "type") &&
+      queryParams.type == "search_history_re_apply"
+    ) {
+      delete queryParams.type;
+    }
     // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
@@ -3910,8 +3867,6 @@ const useLogs = () => {
         );
 
         if (streamData.schema != undefined) {
-
-          
           searchObj.data.stream.selectedStreamFields.push(streamData.schema);
         }
       }
@@ -3991,55 +3946,6 @@ const useLogs = () => {
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while getting stream data", e);
-    }
-  };
-
-  const addOrderByToQuery = (
-    sql: string,
-    column: string,
-    type: "ASC" | "DESC",
-    streamName: string,
-  ) => {
-    // Parse the SQL query into an AST
-    try {
-      const parsedQuery: any = parser.astify(sql);
-
-      if (!parsedQuery.columns.length || !parsedQuery.from) {
-        return sql;
-      }
-
-      // Check for the presence of an ORDER BY clause
-      const hasOrderBy = !!(
-        parsedQuery.orderby && parsedQuery.orderby.length > 0
-      );
-
-      // Check if _timestamp is in the SELECT clause if not SELECT *
-      const includesTimestamp = !!parsedQuery.columns.find(
-        (col: any) => col?.expr?.column === column || col?.expr?.column === "*",
-      );
-
-      // If ORDER BY is present and doesn't include _timestamp, append it
-      if (!hasOrderBy) {
-        // If no ORDER BY clause, add it
-        parsedQuery.orderby = [
-          {
-            expr: {
-              type: "column_ref",
-              table: null,
-              column: column,
-            },
-            type: type,
-          },
-        ];
-      }
-
-      // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-      return quoteTableNameDirectly(
-        parser.sqlify(parsedQuery).replace(/`/g, ""),
-        streamName,
-      );
-    } catch (err) {
-      return sql;
     }
   };
 
@@ -4159,6 +4065,69 @@ const useLogs = () => {
     return selectedFields;
   };
 
+  const getFilterExpressionByFieldType = (
+    field: string | number,
+    field_value: string | number | boolean,
+    action: string,
+  ) => {
+    let operator = action == "include" ? "=" : "!=";
+    try {
+      let fieldType: string = "utf8";
+
+      const getStreamFieldTypes = (stream: any) => {
+        if (!stream.schema) return {};
+        return Object.fromEntries(
+          stream.schema.map((schema: any) => [schema.name, schema.type]),
+        );
+      };
+
+      const fieldTypeList = searchObj.data.streamResults.list
+        .filter((stream: any) =>
+          searchObj.data.stream.selectedStream.includes(stream.name),
+        )
+        .reduce(
+          (acc: any, stream: any) => ({
+            ...acc,
+            ...getStreamFieldTypes(stream),
+          }),
+          {},
+      );
+
+      if (Object.hasOwn(fieldTypeList, field)) {
+        fieldType = fieldTypeList[field];
+      }
+
+      if (
+        field_value === "null" ||
+        field_value === "" ||
+        field_value === null
+      ) {
+        operator = action == "include" ? "is" : "is not";
+        field_value = "null";
+      }
+      let expression =
+        field_value == "null"
+          ? `${field} ${operator} ${field_value}`
+          : `${field} ${operator} '${field_value}'`;
+
+      const isNumericType = (type: string) =>
+        ["int64", "float64"].includes(type.toLowerCase());
+      const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+
+      if (isNumericType(fieldType)) {
+        expression = `${field} ${operator} ${field_value}`;
+      } else if (isBooleanType(fieldType)) {
+        operator = action == "include" ? "is" : "is not";
+        expression = `${field} ${operator} ${field_value}`;
+      }
+
+      return expression;
+    } catch (e: any) {
+      console.log("Error while getting filter expression by field type", e);
+      return `${field} ${operator} '${field_value}'`;
+    }
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -4190,12 +4159,16 @@ const useLogs = () => {
     refreshPartitionPagination,
     filterHitsColumns,
     getHistogramQueryData,
+    generateHistogramSkeleton,
     fnParsedSQL,
-    addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
     reorderSelectedFields,
+    resetHistogramWithError,
+    isNonAggregatedQuery,
+    extractTimestamps,
+    getFilterExpressionByFieldType,
   };
 };
 

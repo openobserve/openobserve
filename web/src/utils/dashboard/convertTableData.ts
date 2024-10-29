@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,12 +15,25 @@
 
 import { toZonedTime } from "date-fns-tz";
 import {
+  findFirstValidMappedValue,
   formatDate,
   formatUnitValue,
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
 } from "./convertDataIntoUnitValue";
+
+const applyValueMapping = (value: any, mappings: any) => {
+  // Find the first valid mapping with a valid text
+  const foundValue = findFirstValidMappedValue(value, mappings, "text");
+
+  // if foundValue is not null and foundValue.text is not null, then return foundValue.text
+  if (foundValue && foundValue.text) {
+    return foundValue.text;
+  }
+
+  return null;
+};
 
 /**
  * Converts table data based on the panel schema and search query data.
@@ -49,6 +62,8 @@ export const convertTableData = (
   let columnData = [...x, ...y];
   let tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
   const histogramFields: string[] = [];
+
+  const overrideConfigs = panelSchema.config.override_config || [];
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -134,17 +149,59 @@ export const convertTableData = (
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
+
+      obj["format"] = (val: any) => {
+        // value mapping
+        const valueMapping = applyValueMapping(
+          val,
+          panelSchema.config?.mappings,
+        );
+
+        if (valueMapping != null) {
+          return valueMapping;
+        }
+        return val;
+      };
+
       // if number then sort by number and use decimal point config option in format
       if (isNumber) {
         obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
         obj["format"] = (val: any) => {
+          // value mapping
+          const valueMapping = applyValueMapping(
+            val,
+            panelSchema.config?.mappings,
+          );
+
+          if (valueMapping != null) {
+            return valueMapping;
+          }
+
+          let unitToUse = null;
+          let customUnitToUse = null;
+
+          if (overrideConfigs.length > 0) {
+            const overrideConfig = overrideConfigs.find(
+              (override: any) => override.field?.value === it.alias,
+            );
+            if (overrideConfig) {
+              unitToUse = overrideConfig.config[0].value.unit;
+              customUnitToUse = overrideConfig.config[0].value.customUnit;
+            }
+          }
+
+          if (!unitToUse) {
+            unitToUse = panelSchema.config?.unit;
+            customUnitToUse = panelSchema.config?.unit_custom;
+          }
+
           return !Number.isNaN(val)
             ? `${
                 formatUnitValue(
                   getUnitValue(
                     val,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    unitToUse,
+                    customUnitToUse,
                     panelSchema.config?.decimals ?? 2,
                   ),
                 ) ?? 0
@@ -157,6 +214,16 @@ export const convertTableData = (
       if (histogramFields.includes(it.alias)) {
         // if current field is histogram field then return formatted date
         obj["format"] = (val: any) => {
+          // value mapping
+          const valueMapping = applyValueMapping(
+            val,
+            panelSchema.config?.mappings,
+          );
+
+          if (valueMapping != null) {
+            return valueMapping;
+          }
+
           return formatDate(
             toZonedTime(
               typeof val === "string"
@@ -251,9 +318,33 @@ export const convertTableData = (
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
 
+        obj["format"] = (val: any) => {
+          // value mapping
+          const valueMapping = applyValueMapping(
+            val,
+            panelSchema.config?.mappings,
+          );
+
+          if (valueMapping != null) {
+            return valueMapping;
+          }
+
+          return val;
+        };
+
         if (isNumber) {
           obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
           obj["format"] = (val: any) => {
+            // value mapping
+            const valueMapping = applyValueMapping(
+              val,
+              panelSchema.config?.mappings,
+            );
+
+            if (valueMapping != null) {
+              return valueMapping;
+            }
+
             return !Number.isNaN(val)
               ? `${
                   formatUnitValue(
@@ -272,6 +363,15 @@ export const convertTableData = (
         // Check if it's a histogram field and apply timezone conversion
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
+            // value mapping
+            const valueMapping = applyValueMapping(
+              val,
+              panelSchema.config?.mappings,
+            );
+
+            if (valueMapping != null) {
+              return valueMapping;
+            }
             return formatDate(
               toZonedTime(
                 typeof val === "string"

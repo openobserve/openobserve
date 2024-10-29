@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,6 +33,8 @@ pub enum TriggerDataStatus {
     Failed,
     #[serde(rename = "condition_not_satisfied")]
     ConditionNotSatisfied,
+    #[serde(rename = "skipped")]
+    Skipped,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -62,6 +64,9 @@ pub struct TriggerData {
     pub retries: i32,
     pub error: Option<String>,
     pub success_response: Option<String>,
+    pub is_partial: Option<bool>,
+    pub delay_in_secs: Option<i64>,
+    pub evaluation_took_in_secs: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -98,6 +103,12 @@ pub struct UsageData {
     pub took_wait_in_queue: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result_cache_ratio: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    #[serde(default)]
+    pub is_partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_group: Option<String>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -241,6 +252,8 @@ pub struct RequestStats {
     #[serde(default)]
     pub request_body: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
@@ -258,6 +271,10 @@ pub struct RequestStats {
     pub took_wait_in_queue: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result_cache_ratio: Option<usize>,
+    #[serde(default)]
+    pub is_partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_group: Option<String>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -266,6 +283,7 @@ impl Default for RequestStats {
             records: 0,
             response_time: 0.0,
             request_body: None,
+            function: None,
             cached_ratio: None,
             compressed_size: None,
             min_ts: None,
@@ -275,6 +293,8 @@ impl Default for RequestStats {
             trace_id: None,
             took_wait_in_queue: None,
             result_cache_ratio: None,
+            is_partial: false,
+            work_group: None,
         }
     }
 }
@@ -282,12 +302,13 @@ impl Default for RequestStats {
 impl From<FileMeta> for RequestStats {
     fn from(meta: FileMeta) -> RequestStats {
         RequestStats {
-            size: meta.original_size as f64 / SIZE_IN_MB,
+            size: (meta.original_size / SIZE_IN_MB) as f64,
             records: meta.records,
             response_time: 0.0,
+            function: None,
             request_body: None,
             cached_ratio: None,
-            compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
+            compressed_size: Some((meta.compressed_size / SIZE_IN_MB) as f64),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),
             user_email: None,
@@ -295,6 +316,8 @@ impl From<FileMeta> for RequestStats {
             trace_id: None,
             took_wait_in_queue: None,
             result_cache_ratio: None,
+            is_partial: false,
+            work_group: None,
         }
     }
 }

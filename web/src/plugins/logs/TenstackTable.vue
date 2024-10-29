@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -610,8 +610,9 @@ const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
+    const virtualIndex = calculateVirtualIndex(index);
     if (index < props.rows.length) {
-      expandRow(index as number);
+      expandRow(virtualIndex as number);
     }
   });
 };
@@ -619,8 +620,12 @@ const setExpandedRows = () => {
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
   emits("copy", value, copyAsJson);
 };
-const addSearchTerm = (value: string) => {
-  emits("addSearchTerm", value);
+const addSearchTerm = (
+  field: string,
+  field_value: string | number | boolean,
+  action: string,
+) => {
+  emits("addSearchTerm", field, field_value, action);
 };
 const addFieldToTable = (value: string) => {
   emits("addFieldToTable", value);
@@ -712,6 +717,16 @@ const calculateActualIndex = (index: number): number => {
   return actualIndex;
 };
 
+const calculateVirtualIndex = (index: number): number => {
+  let virtualIndex = index;
+  expandedRowIndices.value.forEach((expandedIndex) => {
+    if (expandedIndex !== -1 && expandedIndex < virtualIndex) {
+      virtualIndex += 1;
+    }
+  });
+  return virtualIndex;
+};
+
 const handleDataRowClick = (row: any, index: number) => {
   const actualIndex = calculateActualIndex(index);
 
@@ -733,7 +748,7 @@ const updateActiveCell = (cell?: { id: string; column: { id: string } }) => {
 };
 
 // Debounced version of the function
-const debounceCellAction = debounce(updateActiveCell, 500);
+const debounceCellAction = debounce(updateActiveCell, 250);
 
 // Event handlers for mouse over and mouse leave
 const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {

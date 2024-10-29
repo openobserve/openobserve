@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,6 +38,7 @@ use crate::{
             functions,
             http::{
                 get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_work_group,
             },
         },
     },
@@ -147,7 +148,7 @@ pub async fn search_multi(
     };
 
     // handle encoding for query and aggs
-    let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
+    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
@@ -181,8 +182,10 @@ pub async fn search_multi(
     }
     let queries_len = queries.len();
     let mut vrl_stream_name = "".to_string();
+    let mut sqls = vec![];
 
     for mut req in queries {
+        sqls.push(req.query.sql.clone());
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
         rpc_req.org_id = org_id.to_string();
         rpc_req.stream_type = stream_type.to_string();
@@ -205,14 +208,18 @@ pub async fn search_multi(
         {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
-                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
-                    > max_query_range
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
-                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
                     range_error, &stream_name, max_query_range
                 );
+
+                if multi_res.new_start_time.is_none() {
+                    multi_res.new_start_time = Some(req.query.start_time);
+                    multi_res.new_end_time = Some(req.query.end_time);
+                }
             }
         }
 
@@ -343,6 +350,7 @@ pub async fn search_multi(
                     } else {
                         None
                     },
+                    work_group: res.work_group,
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
@@ -388,6 +396,9 @@ pub async fn search_multi(
                         format!("{} \n {}", partial_err, res.function_error)
                     };
                 }
+                if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
+                    multi_res.histogram_interval = res.histogram_interval;
+                }
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -426,6 +437,7 @@ pub async fn search_multi(
         }
     }
 
+    let mut report_function_usage = false;
     multi_res.hits = if query_fn.is_some() && per_query_resp {
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
@@ -452,6 +464,7 @@ pub async fn search_multi(
         };
         match program {
             Some(program) => {
+                report_function_usage = true;
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
@@ -461,7 +474,7 @@ pub async fn search_multi(
                         },
                         &json::Value::Array(multi_res.hits),
                         &org_id,
-                        &[vrl_stream_name],
+                        &[vrl_stream_name.clone()],
                     );
                     ret_val
                         .as_array()
@@ -530,6 +543,35 @@ pub async fn search_multi(
         let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
+
+    let time = start.elapsed().as_secs_f64();
+    if report_function_usage {
+        let req_stats = RequestStats {
+            // For functions, records = records * num_function, in this case num_function = 1
+            records: multi_res.total as i64,
+            response_time: time,
+            size: multi_res.scan_size as f64,
+            request_body: Some(json::to_string(&sqls).unwrap()),
+            user_email: None,
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            trace_id: None,
+            // took_wait_in_queue: multi_res.t,
+            search_type: multi_req.search_type,
+            ..Default::default()
+        };
+        report_request_usage_stats(
+            req_stats,
+            &org_id,
+            &vrl_stream_name,
+            stream_type,
+            UsageType::Functions,
+            0, // The request stats already contains function event
+            started_at,
+        )
+        .await;
+    }
     Ok(HttpResponse::Ok().json(multi_res))
 }
 
@@ -1068,6 +1110,10 @@ pub async fn around_multi(
                 (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
                 _ => None,
             },
+            work_group: get_work_group(vec![
+                resp_forward.work_group.clone(),
+                resp_backward.work_group.clone(),
+            ]),
             ..Default::default()
         };
         let num_fn = query_fn.is_some() as u16;
