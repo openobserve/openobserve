@@ -48,10 +48,17 @@ const getDefaultDashboardPanelData: any = () => ({
       unit: null,
       unit_custom: null,
       decimals: 2,
+      line_thickness: 1.5,
       top_results: null,
       top_results_others: false,
       axis_width: null,
       axis_border_show: false,
+      label_option: {
+        position: null,
+        rotate: 0,
+      },
+      show_symbol: false,
+      line_interpolation: "smooth",
       legend_width: {
         value: null,
         unit: "px",
