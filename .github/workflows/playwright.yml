@@ -150,6 +150,30 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+            name: playwright-report
+            path: playwright-report/
+            retention-days: 30
+
+  generate_coverage_report:
+    name: Generate Coverage Report
+    needs: [build_binary, ui_integration_tests]
+    runs-on: ubuntu-latest
+    if: always() # Ensures this job runs regardless of the outcome of previous jobs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Playwright Report Artifact
+        uses: actions/download-artifact@v4
+        with:
           name: playwright-report
-          path: playwright-report/
+
+      - name: Generate Coverage Report
+        run: cd tests/ui-testing && npx nyc report
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: tests/ui-testing/coverage-report
           retention-days: 30
