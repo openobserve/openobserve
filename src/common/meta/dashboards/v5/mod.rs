@@ -449,8 +449,11 @@ pub struct LabelOption {
 pub enum LineInterpolation {
     Smooth,
     Linear,
+    #[serde(rename = "step-start")]
     StepStart,
+    #[serde(rename = "step-end")]
     StepEnd,
+    #[serde(rename = "step-middle")]
     StepMiddle,
 }
 
