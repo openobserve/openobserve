@@ -74,7 +74,7 @@ async fn upgrade_092_093() -> Result<(), anyhow::Error> {
 
 async fn upgrade_130_131() -> Result<(), anyhow::Error> {
     // migrate pipelines and function associations
-    pipeline_func::run().await?;
+    pipeline_func::run(false).await?;
 
     Ok(())
 }

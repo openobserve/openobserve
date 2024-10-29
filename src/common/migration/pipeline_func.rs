@@ -32,8 +32,10 @@ use config::{
 };
 use infra::db as infra_db;
 
-pub async fn run() -> Result<(), anyhow::Error> {
-    infra::pipeline::drop_table().await?;
+pub async fn run(drop_table_first: bool) -> Result<(), anyhow::Error> {
+    if drop_table_first {
+        infra::pipeline::drop_table().await?;
+    }
     infra::pipeline::init().await?;
     migrate_pipelines().await?;
     Ok(())
@@ -51,6 +53,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         let local_key = key.strip_prefix('/').unwrap_or(&key);
         let key_col = local_key.split('/').collect::<Vec<&str>>();
+        let org_id = key_col[1];
         let mut trans: function::Transform = json::from_slice(&val).unwrap();
         if let Some(stream_orders) = trans.streams.clone() {
             for stream_ord in stream_orders {
@@ -67,7 +70,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 };
                 let entry = stream_funcs
                     .entry(StreamParams::new(
-                        key_col[1],
+                        org_id,
                         &stream_ord.stream,
                         stream_ord.stream_type,
                     ))
@@ -75,7 +78,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 entry.push((stream_ord.order, func_params));
             }
             trans.streams = None;
-            func_to_update.push(trans);
+            func_to_update.push((org_id.to_string(), trans));
         }
     }
 
@@ -335,7 +338,26 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
     }
 
     if ok_to_remove {
-        // TODO(taiming): remove old pipeline and save updated functions after done testing
+        // clear the old pipelines from the meta table
+        if let Err(e) = db
+            .delete("/pipeline/", true, infra_db::NO_NEED_WATCH, None)
+            .await
+        {
+            log::error!(
+                "[Migration-Pipeline] error deleting all pipelines from meta table: {}",
+                e
+            );
+        }
+        // update the functions by removing the stream associations
+        for (org_id, trans) in func_to_update {
+            if let Err(e) = crate::service::db::functions::set(&org_id, &trans.name, &trans).await {
+                log::error!(
+                    "[Migration-Function] error saving updated version of function {}: {}",
+                    trans.name,
+                    e
+                );
+            }
+        }
     }
 
     Ok(())

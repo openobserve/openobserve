@@ -92,10 +92,6 @@ pub async fn update_function(
         return Ok(HttpResponse::Ok().json(func));
     }
 
-    // UI mostly like in 1st version won't send streams, so we need to add them back
-    // from existing function
-    func.streams = existing_fn.streams;
-
     if !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
