@@ -320,6 +320,7 @@ tracing-subscriber = { version = "0.3.0", features = [
   "json",
 ] }
 url = "2.2"
+urlencoding = "2.1"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }

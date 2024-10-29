@@ -24,6 +24,7 @@ pub mod inverted_index;
 pub mod json;
 pub mod md5;
 pub mod parquet;
+pub mod prom_json_encoder;
 pub mod rand;
 pub mod record_batch_ext;
 pub mod schema;

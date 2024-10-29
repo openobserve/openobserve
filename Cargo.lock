@@ -2521,6 +2521,7 @@ dependencies = [
  "tracing",
  "tracing-log",
  "tracing-subscriber",
+ "urlencoding",
  "utoipa",
  "zstd",
 ]
