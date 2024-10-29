@@ -196,6 +196,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     decimals: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    line_thickness: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
@@ -203,6 +205,12 @@ pub struct PanelConfig {
     axis_width: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_border_show: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label_option: Option<LabelOption>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_symbol: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line_interpolation: Option<LineInterpolation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
@@ -426,4 +434,34 @@ pub struct LegendWidth {
     pub value: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct LabelOption {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position:  Option<LabelPosition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotate: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LineInterpolation {
+    Smooth,
+    Linear,
+    #[serde(rename = "step-start")]
+    StepStart,
+    #[serde(rename = "step-end")]
+    StepEnd,
+    #[serde(rename = "step-middle")]
+    StepMiddle,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LabelPosition {
+    Top,
+    Inside,
+    InsideTop,
+    InsideBottom
 }
