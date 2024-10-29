@@ -67,6 +67,9 @@ jobs:
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
+      - name: Create coverage json folder
+        run: mkdir -p tests/ui-testing/.nyc_output
+        
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -114,9 +117,6 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Display structure of downloaded files
-        run: ls -la tests/ui-testing/.nyc_output
-
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
@@ -144,8 +144,8 @@ jobs:
       #   if: always()
       #   run: cat o2.log
 
-      - name: List .nyc_output Directory Contents After Test
-        run: ls -la
+      - name: Display structure of downloaded files
+        run: ls -la tests/ui-testing/.nyc_output
 
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
