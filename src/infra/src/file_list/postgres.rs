@@ -28,6 +28,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
+use tracing::{info_span, Instrument};
 
 use crate::{
     db::{
@@ -540,7 +541,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .fetch_all(&pool)
                     .await
                 }
-            }));
+            }).instrument(info_span!("search_partition",start_time=time_start,end_time=time_end))
+        );
         }
 
         let mut rets = Vec::new();

@@ -28,6 +28,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
+use tracing::{info_span, Instrument};
 
 use crate::{
     db::{
@@ -527,7 +528,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .fetch_all(&pool)
                     .await
                 }
-        }));
+            }).instrument(info_span!("search_partition",start_time=time_start,end_time=time_end))
+        );
         }
 
         let mut rets = Vec::new();
@@ -1250,7 +1252,7 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
             Ok(_) => Ok(()),
         }
     }
-    
+
     #[tracing::instrument(name = "file_list::db::batch_add", skip(self, files))]
     async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
