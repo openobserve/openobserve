@@ -46,10 +46,20 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, inject } from "vue";
+import { defineComponent, ref, inject, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
+
+interface Column {
+  alias: string;
+  label: string;
+  format?: (val: unknown) => string;
+}
+
+interface OverrideConfig {
+  [key: string]: string;
+}
 
 export default defineComponent({
   name: "OverrideConfig",
@@ -64,19 +74,9 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
 
-    interface Column {
-      alias: string;
-      label: string;
-      format?: (val: unknown) => string;
-    }
-
-    interface OverrideConfig {
-      [key: string]: string;
-    }
-
     const showOverrideConfigPopup = ref(false);
-    const columns = ref<Column[]>([]);
-    const overrideConfigs = ref<OverrideConfig>({});
+    const columns: any = ref<Column[]>([]);
+    const overrideConfigs = ref<OverrideConfig>([]);
 
     const fetchColumns = () => {
       const x = dashboardPanelData.data.queries[0].fields.x || [];
@@ -96,7 +96,7 @@ export default defineComponent({
     };
 
     const applyOverrideConfigs = () => {
-      const overrides = dashboardPanelData.data.config.override_config || {};
+      const overrides = dashboardPanelData.data.config.override_config || [];
 
       columns.value = columns.value.map((col: any) => {
         return {
@@ -113,6 +113,13 @@ export default defineComponent({
 
     fetchColumns();
     applyOverrideConfigs();
+
+    onBeforeMount(() => {
+      // Ensure that the override_config object is initialized in config
+      if (!dashboardPanelData.data.config.override_config) {
+        dashboardPanelData.data.config.override_config = [];
+      }
+    });
 
     return {
       store,

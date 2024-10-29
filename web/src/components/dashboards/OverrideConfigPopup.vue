@@ -92,7 +92,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, PropType, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -250,6 +250,13 @@ export default defineComponent({
       emit("save", overrideConfigs.value);
       emit("close");
     };
+
+    onMounted(() => {
+      // if overrideconfig is empty, add default overrideconfig
+      if (overrideConfigs.value.length == 0) {
+        addOverrideConfig();
+      }
+    });
 
     watch(
       () =>
