@@ -722,6 +722,12 @@ export const convertSQLData = async (
         // inverse data for h-stacked and h-bar
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
+        label: {
+          show:
+            panelSchema.config?.label_option?.position != null,
+          position: panelSchema.config?.label_option?.position || "None",
+          rotate: panelSchema.config?.label_option?.rotate || 0,
+        },
         nameLocation: "middle",
         nameGap: 25,
         nameTextStyle: {
@@ -830,7 +836,7 @@ export const convertSQLData = async (
     series: [],
   };
 
-  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
+  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
@@ -897,11 +903,19 @@ export const convertSQLData = async (
               const data = missingValueData.filter(
                 (it: any) => it[key1] == key
               );
+
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                 ...defaultSeriesProps,
+                label: {
+                  show:
+                    panelSchema.config?.label_option?.position != null,
+                  position:
+                    panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
+                },
                 // markLine if exist
                 markLine: {
                   silent: true,
@@ -928,6 +942,12 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
+            label: {
+              show:
+                panelSchema.config?.label_option?.position != null,
+              position: panelSchema.config?.label_option?.position || "None",
+              rotate: panelSchema.config?.label_option?.rotate || 0,
+            },
             // color:
             //   panelSchema.queries[0]?.fields?.y.find(
             //     (it: any) => it.alias == key,
@@ -1021,6 +1041,12 @@ export const convertSQLData = async (
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
+            label: {
+              show:
+                panelSchema.config?.label_option?.position != null,
+              position: panelSchema.config?.label_option?.position || "None",
+              rotate: panelSchema.config?.label_option?.rotate || 0,
+            },
             // color:
             //   panelSchema.queries[0]?.fields?.y.find(
             //     (it: any) => it.alias == key,
@@ -1053,6 +1079,12 @@ export const convertSQLData = async (
           //     ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          label: {
+            show:
+              panelSchema.config?.label_option?.position != null,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
+          },
           // markLine if exist
           markLine: {
             silent: true,
@@ -1093,6 +1125,12 @@ export const convertSQLData = async (
             silent: true,
             animation: false,
             data: getMarkLineData(panelSchema),
+          },
+          label: {
+            show:
+              panelSchema.config?.label_option?.position != null,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
           },
           data: getAxisDataFromKey(key),
           barMinHeight: 1,
@@ -1296,6 +1334,12 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          label: {
+            show:
+              panelSchema.config?.label_option?.position != null,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
+          },
           // markLine if exist
           markLine: {
             silent: true,
@@ -1357,6 +1401,7 @@ export const convertSQLData = async (
           {
             ...defaultSeriesProps,
             name: panelSchema?.queries[0]?.fields?.y[0].label,
+
             data: zValues
               .map((it: any, index: any) => {
                 return xAxisZerothPositionUniqueValue.map(
@@ -1506,6 +1551,12 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          label: {
+            show:
+              panelSchema.config?.label_option?.position != null,
+            position: panelSchema.config?.label_option?.position || "None",
+            rotate: panelSchema.config?.label_option?.rotate || 0,
+          },
           // markLine if exist
           markLine: {
             silent: true,
@@ -2231,8 +2282,8 @@ const largestLabel = (data: any) => {
  * @param {string} type - The type of chart.
  * @return {Object} - The properties for the given chart type.
  */
-const getPropsByChartTypeForSeries = (type: string) => {
-  switch (type) {
+const getPropsByChartTypeForSeries = (panelSchema: any) => {
+  switch (panelSchema.type) {
     case "bar":
       return {
         type: "bar",
@@ -2243,10 +2294,18 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
-        showSymbol: false,
+        smooth:
+          panelSchema.config?.line_interpolation === "smooth" ||
+          panelSchema.config?.line_interpolation == null,
+        step: ["step-start", "step-end", "step-middle"].includes(
+          panelSchema.config?.line_interpolation,
+        )
+        // TODO: replace this with type integrations
+          ? panelSchema.config.line_interpolation.replace("step-", "")
+          : false,
+        showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
     case "scatter":
       return {
@@ -2304,11 +2363,18 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "area":
       return {
         type: "line",
-        smooth: true,
+        smooth:
+          panelSchema.config?.line_interpolation === "smooth" ||
+          panelSchema.config?.line_interpolation == null,
+        step: ["step-start", "step-end", "step-middle"].includes(
+          panelSchema.config?.line_interpolation,
+        )
+          ? panelSchema.config.line_interpolation.replace("step-", "")
+          : false,
         emphasis: { focus: "series" },
         areaStyle: {},
-        showSymbol: false,
-        lineStyle: { width: 1.5 },
+        showSymbol: panelSchema.config?.show_symbol ?? false,
+        lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
     case "stacked":
       return {
@@ -2336,14 +2402,21 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "area-stacked":
       return {
         type: "line",
-        smooth: true,
+        smooth:
+          panelSchema.config?.line_interpolation === "smooth" ||
+          panelSchema.config?.line_interpolation == null,
+        step: ["step-start", "step-end", "step-middle"].includes(
+          panelSchema.config?.line_interpolation,
+        )
+          ? panelSchema.config.line_interpolation.replace("step-", "")
+          : false,
         stack: "Total",
         areaStyle: {},
         emphasis: {
           focus: "series",
         },
-        showSymbol: false,
-        lineStyle: { width: 1.5 },
+        showSymbol: panelSchema.config?.show_symbol ?? false,
+        lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
     case "metric":
       return {
