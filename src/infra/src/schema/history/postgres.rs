@@ -49,7 +49,7 @@ impl super::SchemaHistory for PostgresSchemaHistory {
         create_table_index().await
     }
 
-    #[tracing::instrument(name = "db::schema_history::create", skip(self))] 
+    #[tracing::instrument(name = "db::schema_history::create", skip(self))]
     async fn create(
         &self,
         org_id: &str,
