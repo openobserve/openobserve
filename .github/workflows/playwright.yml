@@ -144,14 +144,17 @@ jobs:
       #   if: always()
       #   run: cat o2.log
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npx nyc report
+      - name: List .nyc_output Directory Contents After Test
+        run: ls -la
 
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
           name: playwright-coverage # Unique name for each job
           path: tests/ui-testing/.nyc_output
+
+      - name: Generate Coverage Report
+        run: cd tests/ui-testing && npx nyc report
 
       - uses: actions/upload-artifact@v4
         if: always()
