@@ -198,9 +198,9 @@ impl DerivedStreamMeta {
                     &self.trigger_condition,
                     start_time,
                     Some(SearchEventType::DerivedStream),
-                    Some(SearchEventContext::with_derived_stream(
+                    Some(SearchEventContext::with_derived_stream(Some(
                         module_key.to_string(),
-                    )),
+                    ))),
                 )
                 .await
         }

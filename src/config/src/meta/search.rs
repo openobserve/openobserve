@@ -766,38 +766,51 @@ pub struct SearchEventContext {
     pub report_key: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_id: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dashboard_name: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub dashboard_folder: Option<String>,
+    pub dashboard_folder_id: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_folder_name: Option<String>,
 }
 
 impl SearchEventContext {
-    pub fn with_alert(alert_key: String) -> Self {
+    pub fn with_alert(alert_key: Option<String>) -> Self {
         Self {
-            alert_key: Some(alert_key),
+            alert_key,
             ..Default::default()
         }
     }
 
-    pub fn with_derived_stream(derived_stream_key: String) -> Self {
+    pub fn with_derived_stream(derived_stream_key: Option<String>) -> Self {
         Self {
-            derived_stream_key: Some(derived_stream_key),
+            derived_stream_key,
             ..Default::default()
         }
     }
 
-    pub fn with_report(report_key: String) -> Self {
+    pub fn with_report(report_key: Option<String>) -> Self {
         Self {
-            report_key: Some(report_key),
+            report_key,
             ..Default::default()
         }
     }
 
-    pub fn with_dashboard(dashboard_name: String, dashboard_folder: Option<String>) -> Self {
+    pub fn with_dashboard(
+        dashboard_id: Option<String>,
+        dashboard_name: Option<String>,
+        dashboard_folder_id: Option<String>,
+        dashboard_folder_name: Option<String>,
+    ) -> Self {
         Self {
-            dashboard_name: Some(dashboard_name),
-            dashboard_folder,
+            dashboard_id,
+            dashboard_name,
+            dashboard_folder_id,
+            dashboard_folder_name,
             ..Default::default()
         }
     }

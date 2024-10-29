@@ -88,16 +88,18 @@ pub(crate) fn get_search_event_context_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Option<SearchEventContext> {
     match search_event_type {
-        SearchEventType::Dashboards => query.get("dashboard_name").map(|dashboard_name| {
-            let dashboard_folder = query.get("dashboard_folder").map(String::from);
-            SearchEventContext::with_dashboard(dashboard_name.to_owned(), dashboard_folder)
-        }),
-        SearchEventType::Alerts => query
-            .get("alert_key")
-            .map(|alert_key| SearchEventContext::with_alert(alert_key.to_owned())),
-        SearchEventType::Reports => query
-            .get("report_key")
-            .map(|report_key| SearchEventContext::with_report(report_key.to_owned())),
+        SearchEventType::Dashboards => Some(SearchEventContext::with_dashboard(
+            query.get("dashboard_id").map(String::from),
+            query.get("dashboard_name").map(String::from),
+            query.get("dashboard_folder_id").map(String::from),
+            query.get("dashboard_folder_name").map(String::from),
+        )),
+        SearchEventType::Alerts => Some(SearchEventContext::with_alert(
+            query.get("alert_key").map(String::from),
+        )),
+        SearchEventType::Reports => Some(SearchEventContext::with_alert(
+            query.get("report_key").map(String::from),
+        )),
         _ => None,
     }
 }
