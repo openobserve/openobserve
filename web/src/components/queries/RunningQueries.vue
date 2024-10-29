@@ -499,32 +499,19 @@ export default defineComponent({
           return _queries.filter(
             (query: any) =>
               (selectedQueryTypeTab.value === "all" &&
-                query.search_type
-                  .toLowerCase()
-                  .includes(selectedSearchType.value.toLowerCase())) ||
+                filterQueryBySearchTypeTab(query)) ||
               selectedQueryTypeTab.value === "summary",
           );
         } else {
           return _queries.filter(
             (query: any) =>
+              // We only have search type tabs in "all" queries
               ((selectedQueryTypeTab.value === "all" &&
-                query.search_type
-                  .toLowerCase()
-                  .includes(selectedSearchType.value.toLowerCase())) ||
+                filterQueryBySearchTypeTab(query)) ||
                 selectedQueryTypeTab.value === "summary") &&
-              (query.user_id?.toLowerCase().includes(newVal.toLowerCase()) ||
-                query?.org_id?.toLowerCase().includes(newVal.toLowerCase()) ||
-                query?.stream_type
-                  ?.toLowerCase()
-                  .includes(newVal.toLowerCase()) ||
-                query?.status?.toLowerCase().includes(newVal.toLowerCase()) ||
-                query?.trace_id?.toLowerCase().includes(newVal.toLowerCase()) ||
-                query?.work_group
-                  ?.toLowerCase()
-                  .includes(newVal.toLowerCase()) ||
-                query?.search_type
-                  ?.toLowerCase()
-                  .includes(newVal.toLowerCase())),
+              Object.values(filterQueryCriteria).some((criteria) =>
+                criteria(query, newVal),
+              ),
           );
         }
       } else {
@@ -549,7 +536,6 @@ export default defineComponent({
         };
 
         return _queries.filter((item: any) => {
-          console.log("item", item);
           const timeDifference =
             selectedSearchField.value == "exec_duration"
               ? currentTime - item.created_at
@@ -566,8 +552,37 @@ export default defineComponent({
       }
     });
 
+    const filterQueryBySearchTypeTab = (query: any) => {
+      return query.search_type
+        .toLowerCase()
+        .includes(selectedSearchType.value.toLowerCase());
+    };
+
+    const filterQueryCriteria = {
+      user_id: (query: any, value: string) =>
+        query?.user_id?.toLowerCase().includes(value.toLowerCase()),
+      org_id: (query: any, value: string) =>
+        query?.org_id?.toLowerCase().includes(value.toLowerCase()),
+      stream_type: (query: any, value: string) =>
+        query?.stream_type?.toLowerCase().includes(value.toLowerCase()),
+      status: (query: any, value: string) =>
+        query?.status?.toLowerCase().includes(value.toLowerCase()),
+      trace_id: (query: any, value: string) =>
+        query?.trace_id?.toLowerCase().includes(value.toLowerCase()),
+      work_group: (query: any, value: string) =>
+        query?.work_group?.toLowerCase().includes(value.toLowerCase()),
+      search_type: (query: any, value: string) =>
+        query?.search_type?.toLowerCase().includes(value.toLowerCase()),
+    };
+
+    watch(
+      () => selectedSearchField.value,
+      () => {
+        filterQuery.value = "";
+      },
+    );
+
     const otherFieldOptions = computed(() => {
-      filterQuery.value = "";
       if (selectedSearchField.value === "exec_duration") {
         return [
           { label: "> 1 second", value: "gt_1s" },
@@ -590,6 +605,8 @@ export default defineComponent({
           { label: "> 1 Month", value: "gt_1M" },
         ];
       }
+
+      return [];
     });
 
     // Watcher to filter queries based on user_id
