@@ -150,7 +150,7 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-data-${{ matrix.testfilename }} # Unique name for each job
+          name: playwright-coverage # Unique name for each job
           path: tests/ui-testing/.nyc_output
 
       - uses: actions/upload-artifact@v4
@@ -170,16 +170,21 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v4
 
-      - name: Download Coverage Data Artifacts
+      - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          name: coverage-data-* # Download all coverage artifacts
+          name: playwright-coverage
 
-      - name: Combine Coverage Data
+      - name: Move Coverage Files to .nyc_output
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv coverage-data-*/* tests/ui-testing/.nyc_output/ # Move all JSON files to one folder
-          cd tests/ui-testing && npx nyc report # Generate combined report
+          mv playwright-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+
+
+      - name: Generate Coverage Report
+        run: |
+          cd tests/ui-testing
+          npx nyc report
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
