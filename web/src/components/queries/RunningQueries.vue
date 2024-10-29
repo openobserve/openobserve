@@ -22,7 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-space />
       <div class="flex items-start">
-        <div data-test="streams-search-stream-input" class="flex items-center">
+        <div
+          data-test="running-queries-filter-container"
+          class="flex items-center"
+        >
           <div
             style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
             class="q-mr-md query-management-tabs"
@@ -601,7 +604,6 @@ export default defineComponent({
           { label: "> 1 hour", value: "gt_1h" },
           { label: "> 1 day", value: "gt_1d" },
           { label: "> 1 week", value: "gt_1w" },
-          { label: "> 1 Month", value: "gt_1M" },
           { label: "> 1 Month", value: "gt_1M" },
         ];
       }
