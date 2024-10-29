@@ -123,7 +123,7 @@ pub async fn save(
     // test derived_stream
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name);
     if let Err(e) = &derived_stream
-        .evaluate(None, None, trigger_module_key.clone())
+        .evaluate(None, None, &trigger_module_key)
         .await
     {
         return Err(anyhow::anyhow!(
@@ -187,7 +187,7 @@ impl DerivedStreamMeta {
         &self,
         row: Option<&Map<String, Value>>,
         start_time: Option<i64>,
-        module_key: String,
+        module_key: &str,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
@@ -198,7 +198,9 @@ impl DerivedStreamMeta {
                     &self.trigger_condition,
                     start_time,
                     Some(SearchEventType::DerivedStream),
-                    Some(SearchEventContext::with_derived_stream(module_key)),
+                    Some(SearchEventContext::with_derived_stream(
+                        module_key.to_string(),
+                    )),
                 )
                 .await
         }

@@ -56,8 +56,7 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
-    #[serde(default)]
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
@@ -754,7 +753,7 @@ impl FromStr for SearchEventType {
 }
 
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
-#[serde(rename = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub struct SearchEventContext {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -874,8 +873,7 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
-    #[serde(default)]
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]

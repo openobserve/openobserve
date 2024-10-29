@@ -99,9 +99,9 @@ pub struct UsageData {
     pub max_ts: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(default, flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
-    #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_wait_in_queue: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -268,7 +268,7 @@ pub struct RequestStats {
     pub user_email: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
