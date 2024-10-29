@@ -64,9 +64,19 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
 
+    interface Column {
+      alias: string;
+      label: string;
+      format?: (val: unknown) => string;
+    }
+
+    interface OverrideConfig {
+      [key: string]: string;
+    }
+
     const showOverrideConfigPopup = ref(false);
-    const columns: any = ref([]);
-    const overrideConfigs = ref({});
+    const columns = ref<Column[]>([]);
+    const overrideConfigs = ref<OverrideConfig>({});
 
     const fetchColumns = () => {
       const x = dashboardPanelData.data.queries[0].fields.x || [];
