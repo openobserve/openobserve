@@ -294,8 +294,8 @@ export function convertOffsetToSeconds(offset: string) {
       return value * 24 * 60 * 60 * 1000;
     case "w": // Weeks
       return value * 7 * 24 * 60 * 60 * 1000;
-    case "M": // Months (approximate, using 30.44 days per month)
-      return value * 30.44 * 24 * 60 * 60 * 1000;
+    case "M": // Months (approximate, using 30 days per month)
+      return value * 30 * 24 * 60 * 60 * 1000;
     default:
       return 0; // Return 0 if the unit is not recognized
   }
@@ -303,7 +303,7 @@ export function convertOffsetToSeconds(offset: string) {
 
 export function convertSecondsToOffset(seconds: number): string {
   const units = [
-    { unit: "Months", factor: 30.44 * 24 * 60 * 60 * 1000 }, // Months (approximate)
+    { unit: "Months", factor: 30 * 24 * 60 * 60 * 1000 }, // Months (approximate, 30 days)
     { unit: "Weeks", factor: 7 * 24 * 60 * 60 * 1000 }, // Weeks
     { unit: "Days", factor: 24 * 60 * 60 * 1000 }, // Days
     { unit: "Hours", factor: 60 * 60 * 1000 }, // Hours
