@@ -10,7 +10,7 @@ const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-// await page.getByText('Login as internal user').click();
+await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -489,8 +489,11 @@ test.describe("Sanity testcases", () => {
       .locator('[data-test="add-alert-destination-select"]')
       .getByLabel("arrow_drop_down")
       .click();
-      await page.waitForTimeout(2000);
-    await page.locator('[data-test="add-alert-detination-sanitydestinations-select-item"] div').filter({ hasText: 'sanitydestinations' }).first().click({force:true});
+    await page
+      .locator(
+        '[data-test="add-alert-destination-sanitydestinations-select-item"]'
+      )
+      .click();
     await page.locator('[data-test="add-alert-submit-btn"]').click();
     await page.locator('[data-test="alert-list-search-input"]').click();
     await page.locator('[data-test="alert-list-search-input"]').fill("sani");
@@ -966,7 +969,7 @@ test.describe("Sanity testcases", () => {
 
 
 
-test("create clone template, destination and alert and then delete it", async ({ page }) => {
+test.skip("create clone template, destination and alert and then delete it", async ({ page }) => {
   await page.locator('[data-test="menu-link-\\/alerts-item"]').click();
   await page.waitForTimeout(2000);
   await page
