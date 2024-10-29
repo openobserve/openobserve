@@ -207,6 +207,9 @@ const getSession = () => {
 
         getSessionDetails();
       })
+      .catch((error) => {
+        console.error("Failed to fetch session:", error);
+      })
       .finally(() => {
         isLoading.value.pop();
         resolve(true);
@@ -267,6 +270,9 @@ const getSessionSegments = () => {
 
       // segments.value = segmentsCopy.flat();
     })
+    .catch((error) => {
+      console.error("Failed to fetch session events:", error);
+    })
     .finally(() => isLoading.value.pop());
 };
 
@@ -318,6 +324,9 @@ const getSessionEvents = () => {
       });
       getSessionErrorLogs();
     })
+    .catch((error) => {
+      console.error("Failed to fetch sesion events:", error);
+    })
     .finally(() => isLoading.value.pop());
 };
 
@@ -362,6 +371,9 @@ const getSessionErrorLogs = () => {
       });
 
       segmentEvents.value.sort((a, b) => a.timestamp - b.timestamp);
+    })
+    .catch((error) => {
+      console.error("Failed to fetch sesion error logs:", error);
     })
     .finally(() => isLoading.value.pop());
 };
