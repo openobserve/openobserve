@@ -86,15 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-table>
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
-      data-test="list-schema-dialog"
-    >
-      <QueryList :schemaData="schemaData" />
-    </q-dialog>
   </div>
 </template>
 
@@ -106,12 +97,10 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { useStore } from "vuex";
-import QueryList from "@/components/queries/QueryList.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData },
+  components: { QTablePagination, NoData },
   props: {
     rows: {
       type: Array,
@@ -129,21 +118,10 @@ export default defineComponent({
     "delete:queries",
   ],
   setup(props, { emit }) {
-    const store = useStore();
-    const schemaData = ref({});
-    const lastRefreshed = ref("");
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
-    const searchFieldOptions = ref([
-      { label: "All Fields", value: "all" },
-      { label: "Exec. Duration", value: "exec_duration" },
-      { label: "Query Range", value: "query_range" },
-    ]);
-
-    const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
     const loadingState = ref(false);
-    const queries = ref([]);
 
     const deleteDialog = ref({
       show: false,
@@ -244,8 +222,6 @@ export default defineComponent({
 
     return {
       t,
-      store,
-      queries,
       columns,
       confirmDeleteAction,
       deleteDialog,
@@ -253,17 +229,13 @@ export default defineComponent({
       showListSchemaDialog,
       changePagination,
       outlinedCancel,
-      schemaData,
       loadingState,
-      lastRefreshed,
       isMetaOrg,
       resultTotal,
       selectedPerPage,
       qTable,
       selectedRow,
       handleMultiQueryCancel,
-      selectedSearchField,
-      searchFieldOptions,
       pagination,
       getAllUserQueries,
     };

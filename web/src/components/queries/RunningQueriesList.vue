@@ -287,7 +287,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .query-management-tabs {
-  ::v-deep .q-btn:before {
+  :deep(.q-btn:before) {
     border: none !important;
   }
 }
