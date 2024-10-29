@@ -136,8 +136,7 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-
-    #[tracing::instrument(name = "db::put", skip(self,value))]
+    #[tracing::instrument(name = "db::put", skip(self, value))]
     async fn put(
         &self,
         key: &str,
@@ -155,7 +154,7 @@ impl super::Db for Etcd {
         Ok(())
     }
 
-    #[tracing::instrument(name = "db::get_for_update", skip(self,update_fn))]
+    #[tracing::instrument(name = "db::get_for_update", skip(self, update_fn))]
     async fn get_for_update(
         &self,
         key: &str,
