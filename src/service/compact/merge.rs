@@ -450,22 +450,14 @@ pub async fn merge_by_stream(
                 let new_file_name = std::mem::take(&mut new_file.key);
                 let new_file_meta = std::mem::take(&mut new_file.meta);
                 let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
-
                 if new_file_name.is_empty() {
-                    if new_file_list.is_empty() {
-                        // no file need to merge
-                        break;
-                    } else {
-                        // delete files from file_list and continue
-                        files_with_size.retain(|f| !&new_file_list.contains(f));
-                        continue;
-                    }
+                    continue;
                 }
 
                 // delete small files keys & write big files keys, use transaction
                 let mut events = Vec::with_capacity(new_file_list.len() + 1);
                 events.push(FileKey {
-                    key: new_file_name.clone(),
+                    key: new_file_name,
                     meta: new_file_meta,
                     deleted: false,
                     segment_ids: None,
