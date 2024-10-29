@@ -76,7 +76,7 @@ export default defineComponent({
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
-    const overrideConfigs = ref<OverrideConfig>([]);
+    const overrideConfigs = ref<OverrideConfig[]>([]);
 
     const fetchColumns = () => {
       const x = dashboardPanelData.data.queries[0].fields.x || [];
