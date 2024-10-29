@@ -399,13 +399,6 @@ pub async fn merge_by_stream(
                 }
                 new_file_size += file.meta.original_size;
                 new_file_list.push(file.clone());
-                // metrics
-                metrics::COMPACT_MERGED_FILES
-                    .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                    .inc();
-                metrics::COMPACT_MERGED_BYTES
-                    .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                    .inc_by(file.meta.original_size as u64);
             }
             if new_file_list.len() > 1 {
                 batch_groups.push(MergeBatch {
@@ -536,8 +529,7 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-/// merge some small files into one big file, upload to storage, returns the big
-/// file key and merged files
+/// merge small files into big file, upload to storage, returns the big file key and merged files
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
