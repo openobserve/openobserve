@@ -98,8 +98,23 @@ import { useI18n } from "vue-i18n";
 export default defineComponent({
   name: "OverrideConfigPopup",
   props: {
-    columns: Array,
-    overrideConfig: Object,
+    columns: {
+      type: Array as PropType<Array<{ label: string; alias: string }>>,
+      required: true,
+      validator: (value: any[]) => value.every(item => 
+        typeof item.label === 'string' && 
+        typeof item.alias === 'string'
+      )
+    },
+    overrideConfig: {
+      type: Object as PropType<{
+        overrideConfigs?: Array<{
+          field: { matchBy: string; value: string };
+          config: Array<{ type: string; value: { unit: string; customUnit: string } }>;
+        }>;
+      }>,
+      required: true
+    },
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
