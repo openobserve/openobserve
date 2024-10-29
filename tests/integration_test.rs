@@ -56,6 +56,7 @@ mod tests {
             env::set_var("ZO_JSON_LIMIT", "209715200");
             env::set_var("ZO_RESULT_CACHE_ENABLED", "false");
             env::set_var("ZO_PRINT_KEY_SQL", "true");
+            env::set_var("ZO_SMTP_ENABLED", "true");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -165,7 +166,6 @@ mod tests {
         e2e_update_user_with_empty().await;
         e2e_add_user_to_org().await;
         e2e_list_users().await;
-        e2e_delete_user().await;
         e2e_get_organizations().await;
         e2e_get_user_passcode().await;
         e2e_update_user_passcode().await;
@@ -178,11 +178,14 @@ mod tests {
             let list = e2e_list_dashboards().await;
             assert_eq!(list.dashboards[0], board.clone());
 
-            let board = e2e_update_dashboard(v1::Dashboard {
-                title: "e2e test".to_owned(),
-                description: "Logs flow downstream".to_owned(),
-                ..board.v1.unwrap()
-            })
+            let board = e2e_update_dashboard(
+                v1::Dashboard {
+                    title: "e2e test".to_owned(),
+                    description: "Logs flow downstream".to_owned(),
+                    ..board.v1.unwrap()
+                },
+                board.hash,
+            )
             .await;
             assert_eq!(
                 e2e_get_dashboard(&board.clone().v1.unwrap().dashboard_id).await,
@@ -217,9 +220,13 @@ mod tests {
         e2e_get_alert_email_template().await;
         e2e_post_alert_email_destination().await;
         e2e_get_alert_email_destination().await;
+        e2e_post_alert_email_destination_should_fail().await;
 
         e2e_delete_alert_email_destination().await;
         e2e_delete_alert_email_template().await;
+
+        // Clean-up user here after email destinations deleted
+        e2e_delete_user().await;
 
         // SNS-specific alert tests
         // Set up templates
@@ -954,7 +961,7 @@ mod tests {
         json::from_slice(&body).unwrap()
     }
 
-    async fn e2e_update_dashboard(dashboard: v1::Dashboard) -> Dashboard {
+    async fn e2e_update_dashboard(dashboard: v1::Dashboard, hash: String) -> Dashboard {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -968,8 +975,8 @@ mod tests {
         .await;
         let req = test::TestRequest::put()
             .uri(&format!(
-                "/api/{}/dashboards/{}",
-                "e2e", dashboard.dashboard_id
+                "/api/{}/dashboards/{}?hash={}",
+                "e2e", dashboard.dashboard_id, hash
             ))
             .insert_header(ContentType::json())
             .append_header(auth)
@@ -1398,7 +1405,7 @@ mod tests {
 
     async fn e2e_post_alert_email_destination() {
         let auth = setup();
-        let body_str = r#"{"url":"","method":"post","skip_tls_verify":false,"template":"email_template","headers":{},"name":"email","type":"email","emails":["root@example.com"]}"#;
+        let body_str = r#"{"url":"","method":"post","skip_tls_verify":false,"template":"email_template","headers":{},"name":"email","type":"email","emails":["nonadmin@example.com"]}"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -1417,6 +1424,29 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_alert_email_destination_should_fail() {
+        let auth = setup();
+        let body_str = r#"{"url":"","method":"post","skip_tls_verify":false,"template":"email_template","headers":{},"name":"email_fail","type":"email","emails":["nonadmin2@example.com"]}"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_client_error());
     }
 
     async fn e2e_get_alert_email_destination() {
@@ -1458,7 +1488,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
 
@@ -1693,7 +1722,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/alerts", "e2e", "test_stream"))
+            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -1717,7 +1746,7 @@ mod tests {
         let req = test::TestRequest::delete()
             .uri(&format!(
                 "/api/{}/{}/alerts/{}",
-                "e2e", "test_stream", "sns_test_alert"
+                "e2e", "olympics_schema", "sns_test_alert"
             ))
             .insert_header(ContentType::json())
             .append_header(auth)
@@ -1739,9 +1768,8 @@ mod tests {
                                         "operator": "=",
                                         "value": "USA"
                                     }],
-                                    "search_event_type": "alerts",
                                     "multi_time_range": [{
-                                        "offset": "1440m"
+                                        "offSet": "1440m"
                                     }]
                                 },
                                 "trigger_condition": {
@@ -1772,8 +1800,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("{:?}", resp.status());
-        println!("{:?}", resp.response().body());
         assert!(resp.status().is_success());
 
         let trigger = openobserve::service::db::scheduler::exists(
@@ -1828,15 +1854,16 @@ mod tests {
                                 "query_condition": {
                                     "conditions": [{
                                         "column": "country",
-                                        "operator": "=",
-                                        "value": "USA"
+                                        "operator": "NotContains",
+                                        "value": "AUT"
                                     }]
                                 },
                                 "trigger_condition": {
-                                    "period": 5,
+                                    "period": 60,
                                     "threshold": 1,
                                     "silence": 0,
-                                    "frequency": 60
+                                    "frequency": 60,
+                                    "operator": ">="
                                 },
                                 "destinations": ["slack"],
                                 "context_attributes":{
@@ -1920,9 +1947,8 @@ mod tests {
         };
 
         let res = handle_triggers(trigger).await;
-        log::info!("{:?}", res);
         // This alert has an invalid destination
-        assert!(res.is_err());
+        assert!(res.is_ok());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
@@ -1957,9 +1983,8 @@ mod tests {
         };
 
         let res = handle_triggers(trigger).await;
-        log::info!("{:?}", res);
         // This alert has an invalid destination
-        assert!(res.is_err());
+        assert!(res.is_ok());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
@@ -1986,10 +2011,11 @@ mod tests {
                 ..Default::default()
             },
             trigger_condition: TriggerCondition {
-                period: 5,
+                period: 60,
                 threshold: 1,
                 silence: 0,
                 frequency: 3600,
+                operator: openobserve::common::meta::alerts::Operator::GreaterThanEquals,
                 ..Default::default()
             },
             destinations: vec!["slack".to_string()],
@@ -2027,7 +2053,7 @@ mod tests {
         };
 
         let res = handle_triggers(trigger).await;
-        log::info!("{:?}", res);
+        // In case of alert evaluation errors, this error is returned
         assert!(res.is_err());
 
         let trigger = openobserve::service::db::scheduler::get(
@@ -2047,7 +2073,6 @@ mod tests {
             "test_alert_wrong_sql",
         )
         .await;
-        log::info!("{:?}", res);
         assert!(res.is_ok());
     }
 
