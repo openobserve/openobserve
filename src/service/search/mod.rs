@@ -1007,6 +1007,7 @@ pub async fn cancel_query(
 }
 
 /// match a source is a valid file or not
+#[tracing::instrument(name = "service::search::match_source", skip(stream, filters))]
 pub async fn match_source(
     stream: StreamParams,
     time_range: Option<(i64, i64)>,
