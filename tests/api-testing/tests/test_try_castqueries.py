@@ -45,8 +45,8 @@ test_data = [
 ),  
     
 (
-    "logs integer cast comparison query",
-    'SELECT * FROM "default" WHERE cast(k8s_container_restart_count as INT) = 1',
+    "logs integer try_cast comparison query",
+    'SELECT * FROM "default" WHERE try_cast(k8s_container_restart_count as INT) = 1',
     1,
 ),  
    
