@@ -2805,6 +2805,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
+  const VARIABLE_PLACEHOLDER = "substituteValue";
   // This function parses the custom query and generates the errors and custom fields
   const updateQueryValue = () => {
     // store the query in the dashboard panel data
@@ -2858,7 +2859,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
           currentQuery = currentQuery.replaceAll(
             /\$(\w+|\{\w+\})/g,
-            "substituteValue",
+            "VARIABLE_PLACEHOLDER",
           );
         }
 
@@ -2911,7 +2912,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // now check if the correct stream is selected
       function isDummyStreamName(tableName: any) {
-        return tableName?.includes("substituteValue");
+        return tableName?.includes("VARIABLE_PLACEHOLDER");
       }
 
       if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
