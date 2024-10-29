@@ -874,7 +874,7 @@ pub(crate) async fn get_file_list(
 ) -> Vec<FileKey> {
     let start = std::time::Instant::now();
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = file_list::query_parallel(
+    let file_list = match file_list::query_parallel(
         trace_id,
         &sql.org_id,
         &sql.stream_name,
@@ -884,7 +884,13 @@ pub(crate) async fn get_file_list(
         time_max,
     )
     .await
-    .unwrap_or_default();
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[trace_id {trace_id}] cluster: get_file_list error: {e}");
+            Vec::new()
+        }
+    };
 
     log::debug!(
         "[trace_id {trace_id}] cluster: get_file_list done, num: {}, took: {} ms",
