@@ -102,7 +102,7 @@ pub async fn check_for_schema(
             .with_label_values(&[
                 org_id,
                 StreamType::Logs.to_string().as_str(),
-                &stream_name,
+                stream_name,
                 SCHEMA_CONFORMANCE_FAILED,
             ])
             .inc();
