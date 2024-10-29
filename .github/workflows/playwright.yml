@@ -150,8 +150,8 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage # Unique name for each job
-          path: tests/ui-testing/.nyc_output
+          name: playwright-coverage
+          path: .nyc_output/
 
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
