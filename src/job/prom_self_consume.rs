@@ -35,8 +35,6 @@ use tonic::{
 
 use crate::service::{self, grpc::get_ingester_channel};
 
-const METRIC_INGEST_ORG: &str = "_meta";
-
 static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
     config::get_config()
         .common
@@ -48,8 +46,9 @@ static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
 });
 
 async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<(), tonic::Status> {
+    let org = config.common.usage_org.as_str();
     let req = IngestionRequest {
-        org_id: METRIC_INGEST_ORG.to_owned(),
+        org_id: org.to_owned(),
         stream_name: "".to_owned(),
         stream_type: StreamType::Metrics.into(),
         data: Some(IngestionData::from(metrics)),
@@ -61,7 +60,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
     let mut client = IngestClient::with_interceptor(channel, move |mut req: Request<()>| {
         req.metadata_mut().insert("authorization", token.clone());
         req.metadata_mut()
-            .insert(org_header_key.clone(), METRIC_INGEST_ORG.parse().unwrap());
+            .insert(org_header_key.clone(), org.parse().unwrap());
         Ok(req)
     });
     client = client
@@ -75,6 +74,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let config = get_config();
+    let org = config.common.usage_org.as_str();
 
     log::debug!(
         "self-metrics consumption enabled status : {}",
@@ -113,7 +113,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.is_ingester() {
             let metrics = JsonEncoder::new().encode_to_string(&prom_data).unwrap();
             let bytes = bytes::Bytes::from(metrics);
-            match service::metrics::json::ingest(METRIC_INGEST_ORG, bytes).await {
+            match service::metrics::json::ingest(org, bytes).await {
                 Ok(_) => {
                     log::debug!("successfully ingested self-metrics");
                 }
