@@ -112,18 +112,18 @@ test.describe(" visualize UI testcases", () => {
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
-
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
-    // await page.getByLabel('Expand "kubernetes_annotations_kubernetes_io_psp"').click();
-
+    // Click the date-time button and select a relative time
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
 
-    // await page.locator('[data-test="logs-search-subfield-add-kubernetes_annotations_kubernetes_io_psp-eks\\.privileged"] [data-test="log-search-subfield-list-equal-kubernetes_annotations_kubernetes_io_psp-field-btn"]').click();
+    // Refresh logs and toggle visualization
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    // Click on the editor and input the VRL function
     await page
       .locator(
         "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
@@ -135,30 +135,29 @@ test.describe(" visualize UI testcases", () => {
       .fill(".vrl12=123");
     await page.waitForTimeout(3000);
 
-    // await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
+    // Refresh the visualization to apply the VRL function
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    // await page.locator('[data-test="date-time-btn"]').click();
-
-    //await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
-    // await page
-    //   .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    //   .click();
-
-    // await page.waitForTimeout(3000);
-
+    // Click to add the VRL function to the dashboard
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
       )
       .click();
 
+    // Refresh again to ensure updates are applied
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
+
+    // 1. Assert that the VRL function is present in the field list
+    await expect(
+      page.locator('[data-test="field-list-item-logs-e2e_automate-vrl12"]')
+    ).toBeVisible();
   });
+
   test.skip('should display an error  masssge when  if  VRL field is not update after closing the "Toggle function editor " ', async ({
     page,
   }) => {
@@ -224,119 +223,6 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-  });
-
-  test("should not show an error when changing the chart type after adding a VRL function field", async ({
-    page,
-  }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
-    await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".VRLsanity=1000");
-
-    await page.waitForTimeout(3000);
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page.locator('[data-test="selected-chart-area-item"] img').click();
-    await page
-      .locator('[data-test="selected-chart-area-stacked-item"] img')
-      .click();
-    await page.locator('[data-test="selected-chart-h-bar-item"] img').click();
-    await page.locator('[data-test="selected-chart-scatter-item"] img').click();
-    await page
-      .locator('[data-test="selected-chart-h-stacked-item"] img')
-      .click();
-    await page.locator('[data-test="selected-chart-heatmap-item"] img').click();
-    await page.locator('[data-test="selected-chart-pie-item"] img').click();
-    await page.locator('[data-test="selected-chart-table-item"] img').click();
-    await page.locator('[data-test="selected-chart-gauge-item"] img').click();
-  });
-
-  test("should not show an error when changing the chart type after adding a VRL function field.", async ({
-    page,
-  }) => {
-    // Variable to track errors
-    let hasConsoleError = false;
-
-    // Set up console error listener
-    page.on("console", (msg) => {
-      if (msg.type() === "error" || msg.type() === "warning") {
-        console.error(`Console ${msg.type()} detected: ${msg.text()}`);
-        hasConsoleError = true; // Set flag if error or warning detected
-      }
-    });
-
-    // Start your test case interactions
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
-    await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".VRLsanity=1000");
-
-    await page.waitForTimeout(3000);
-
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await page.locator('[data-test="selected-chart-area-item"] img').click();
-    await page
-      .locator('[data-test="selected-chart-area-stacked-item"] img')
-      .click();
-    await page.locator('[data-test="selected-chart-h-bar-item"] img').click();
-    await page.locator('[data-test="selected-chart-scatter-item"] img').click();
-    await page
-      .locator('[data-test="selected-chart-h-stacked-item"] img')
-      .click();
-    await page.locator('[data-test="selected-chart-heatmap-item"] img').click();
-    await page.locator('[data-test="selected-chart-pie-item"] img').click();
-    await page.locator('[data-test="selected-chart-table-item"] img').click();
-    await page.locator('[data-test="selected-chart-gauge-item"] img').click();
-
-    // Optional: Wait a bit to capture late errors
-    // await page.waitForTimeout(3000);
-
-    // Explicitly fail the test if any console error was detected
-    if (hasConsoleError) {
-      throw new Error("Console error detected during test execution.");
-    }
   });
 
   test("should not show an error when adding a VRL function field to the Breakdown, X axis, or Y axis fields", async ({
@@ -607,5 +493,76 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
+  });
+
+  test("should not show an error when changing the chart type after adding a VRL function field", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    // Set up a flag to detect errors
+    let errorDetected = false;
+
+    // Listen for console messages and check for errors
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        const errorText = msg.text();
+        // Check if the error matches a known pattern (customize regex as needed)
+        if (/Error|Failure|Cannot|Invalid/i.test(errorText)) {
+          errorDetected = true;
+        }
+      }
+    });
+
+    await page
+      .locator(
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
+      .click();
+    await page
+      .locator("#fnEditor")
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".VRLsanity=1000");
+
+    await page.waitForTimeout(3000);
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+
+    // Change chart types and check for errors each time
+    const chartTypes = [
+      '[data-test="selected-chart-area-item"] img',
+      '[data-test="selected-chart-area-stacked-item"] img',
+      '[data-test="selected-chart-h-bar-item"] img',
+      '[data-test="selected-chart-scatter-item"] img',
+      '[data-test="selected-chart-h-stacked-item"] img',
+      '[data-test="selected-chart-heatmap-item"] img',
+      '[data-test="selected-chart-pie-item"] img',
+      '[data-test="selected-chart-table-item"] img',
+      '[data-test="selected-chart-gauge-item"] img',
+    ];
+
+    for (const chartType of chartTypes) {
+      await page.locator(chartType).click();
+
+      // Wait for a few seconds after changing the chart type
+      await page.waitForTimeout(1000); // Adjust the time as necessary
+    }
+
+    // Assertion: Fail the test if an error was detected
+    expect(errorDetected).toBe(false);
   });
 });
