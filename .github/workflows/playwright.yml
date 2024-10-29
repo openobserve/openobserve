@@ -115,7 +115,7 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Display structure of downloaded files
-        run: ls -la .
+        run: ls -la tests/ui-testing/.nyc_output
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
