@@ -605,6 +605,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
+      <q-btn
+        data-test="logs-search-field-list-collapse-btn"
+        :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
+        :title="isFocused ? 'Collapse' : 'Expand'"
+        dense
+        size="10px"
+        round
+        class="field-list-collapse-btn"
+        color="primary"
+        @click="isFocused = !isFocused"
+        style="position: absolute; top: 42px; right: 10px; z-index: 20;"
+      ></q-btn>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -1188,11 +1200,6 @@ export default defineComponent({
         if(values[0] == true && values[1] == true){
           //this is for non focus mode
           isFocused.value = false;
-          console.log(values)
-        }
-        else{
-          //this for focus mode
-          isFocused.value = true;
         }
       }
     );
@@ -1362,6 +1369,11 @@ export default defineComponent({
         console.log(e, "Logs: Error while updating query value");
       }
     };
+    const  handleEscKey = (event: KeyboardEvent) =>{
+      if (event.key === 'Escape') {
+        isFocused.value = false;       
+      }
+    }
 
     const updateDateTime = async (value: object) => {
       if (
@@ -1502,12 +1514,15 @@ export default defineComponent({
         fnEditorRef?.value?.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
       }
+      window.addEventListener('keydown', handleEscKey);
+
     });
 
     onUnmounted(() => {
       window.removeEventListener("click", () => {
         fnEditorRef?.value?.resetEditorLayout();
       });
+      window.removeEventListener('keydown', handleEscKey);
     });
 
     onActivated(() => {
