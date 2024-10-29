@@ -49,7 +49,6 @@ describe("Streams", async () => {
 
   it("Should display stream title", () => {
     const streamTitle = wrapper.find('[data-test="schema-stream-title-text"]');
-    console.log(streamTitle.text());
     expect(streamTitle.text()).toBe("k8s_json");
   });
 
@@ -80,7 +79,6 @@ describe("Streams", async () => {
       .find("tr")
       .findAll("th");
 
-    console.log("tableHeaders", tableHeaders[0].text());
     expect(tableHeaders[0].text()).toBe("Docs Count");
     expect(tableHeaders[1].text()).toBe("Ingested Data");
     expect(tableHeaders[2].text()).toBe("Compressed Size");
@@ -142,6 +140,9 @@ describe("Streams", async () => {
     expect(tableData[2].text()).toBe("Int64");
   });
 
+  // TODO : Check if we can update this test case
+  // - expect(logCheckbox.find(".q-checkbox__inner--truthy").exists()).toBeTruthy();
+  // + expect(wrapper.vm.ftsKeys.includes('log')).toBeTruthy();
   it("Should check if log and message full text search checkbox is active in field mapping table", () => {
     const logCheckbox = wrapper
       .find('[data-test="schema-log-stream-field-mapping-table"]')

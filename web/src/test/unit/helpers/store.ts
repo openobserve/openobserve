@@ -2,7 +2,6 @@ import { createStore } from "vuex";
 
 const store = createStore({
   state: {
-    organizationPasscode: 11,
     API_ENDPOINT: "http://localhost:8080",
     selectedOrganization: {
       label: "default Organization",
