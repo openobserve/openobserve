@@ -2805,6 +2805,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
+  const VARIABLE_PLACEHOLDER = "substituteValue";
   // This function parses the custom query and generates the errors and custom fields
   const updateQueryValue = () => {
     // store the query in the dashboard panel data
@@ -2856,7 +2857,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           );
         }
         if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10");
+          currentQuery = currentQuery.replaceAll(
+            /\$(\w+|\{\w+\})/g,
+            "VARIABLE_PLACEHOLDER",
+          );
         }
 
         dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
@@ -2907,21 +2911,30 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
 
       // now check if the correct stream is selected
+      function isDummyStreamName(tableName: any) {
+        return tableName?.includes("VARIABLE_PLACEHOLDER");
+      }
+
       if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
         const streamFound = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
-            it.name == dashboardPanelData.meta.parsedQuery.from[0].table
+            it.name == dashboardPanelData.meta.parsedQuery.from[0].table,
         );
+
+        const currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ];
+
+        const tableName = dashboardPanelData.meta.parsedQuery.from?.[0]?.table;
+        
         if (streamFound) {
-          if (
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream != streamFound.name
-          ) {
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream = streamFound.name;
+          if (currentQuery.fields.stream != streamFound.name) {
+            
+            currentQuery.fields.stream = streamFound.name;
           }
+        } else if(isDummyStreamName(tableName)){
+          // nothing to do as the stream is dummy
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
         }
