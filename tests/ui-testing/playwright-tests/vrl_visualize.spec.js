@@ -574,7 +574,6 @@ test.describe(" visualize UI testcases", () => {
 
   test("should update the data on the chart when changing the time after applying a VRL field", async ({
     page,
-    
   }) => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
