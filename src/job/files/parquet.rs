@@ -38,7 +38,7 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::{writer::PuffinBytesWriter, BLOB_TYPE},
-        puffin_dir::puffin_dir_writer::PuffinDirWriter,
+        puffin_directory::writer::PuffinDirWriter,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,

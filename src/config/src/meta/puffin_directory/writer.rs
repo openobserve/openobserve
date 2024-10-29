@@ -15,7 +15,7 @@ use crate::{
     get_config,
     meta::{
         puffin::writer::PuffinBytesWriter,
-        puffin_dir::{ALLOWED_FILE_EXT, META_JSON, TANTIVY_INDEX_VERSION},
+        puffin_directory::{ALLOWED_FILE_EXT, META_JSON, TANTIVY_INDEX_VERSION},
     },
 };
 /// Puffin directory is a puffin file which contains all the tantivy files.

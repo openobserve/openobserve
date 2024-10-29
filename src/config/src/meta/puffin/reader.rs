@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use core::ops::Range;
 use std::io::{Read, SeekFrom};
 
 use anyhow::{anyhow, ensure, Result};
@@ -70,6 +71,41 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
 
         Ok(decompressed)
     }
+
+    /// Read the slice of bytes from the blob in a puffin file, given the blob metadata
+    // pub async fn read_slice(
+    //     &mut self,
+    //     blob_metadata: &BlobMetadata,
+    //     range: Range<usize>,
+    // ) -> Result<Vec<u8>> {
+    //     let offset = blob_metadata.offset as usize;
+    //     let start = offset + range.start;
+    //     let end = offset + range.end;
+    //     let slice_len = range.start - range.end;
+
+    //     match blob_metadata.compression_codec {
+    //         Some(CompressionCodec::Lz4) => unimplemented!(),
+    //         Some(CompressionCodec::Zstd) => {
+    //             self.source.seek(SeekFrom::Start(offset as _)).await?;
+
+    //             let mut compressed = vec![0u8; blob_metadata.length as usize];
+    //             self.source.read_exact(&mut compressed).await?;
+
+    //             // Read the blob, decompress it, and give slice
+    //             let mut decompressed = Vec::new();
+    //             let mut decoder = zstd::Decoder::new(&compressed[..])?;
+    //             decoder.read_to_end(&mut decompressed)?;
+    //             Ok(decompressed[start..end].to_vec())
+    //         }
+    //         None => {
+    //             // Read slice directly using offsets, return vec
+    //             self.source.seek(SeekFrom::Start(start as _)).await?;
+    //             let mut compressed = vec![0u8; slice_len as usize];
+    //             self.source.read_exact(&mut compressed).await?;
+    //             Ok(compressed)
+    //         }
+    //     }
+    // }
 
     pub async fn get_metadata(&mut self) -> Result<PuffinMeta> {
         if let Some(meta) = &self.metadata {

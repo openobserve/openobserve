@@ -1,17 +1,17 @@
 use std::{io::Write, path::PathBuf, sync::LazyLock};
 
 use anyhow::Result;
-use puffin_dir_writer::PuffinDirWriter;
 use tantivy::{
     directory::{Directory, OwnedBytes},
     doc,
     schema::Schema,
 };
+use writer::PuffinDirWriter;
 
 use crate::get_config;
 
-pub mod puffin_dir_reader;
-pub mod puffin_dir_writer;
+pub mod reader;
+pub mod writer;
 
 // This is an identifier for tantivy blobs inside puffin file.
 // Note: Tantivy blobs are not compressed.

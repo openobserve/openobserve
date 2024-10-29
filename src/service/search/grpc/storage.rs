@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp, sync::Arc};
+use std::{cmp, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -22,7 +22,7 @@ use config::{
     meta::{
         bitvec::BitVec,
         inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
-        puffin_dir::{convert_puffin_dir_to_tantivy_dir, puffin_dir_reader::PuffinDirReader},
+        puffin_directory::{convert_puffin_dir_to_tantivy_dir, reader::RamDirectoryReader},
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
@@ -45,7 +45,7 @@ use itertools::Itertools;
 use proto::cluster_rpc::KvItem;
 use tantivy::{
     query::{PhrasePrefixQuery, Query, QueryParser, RegexQuery},
-    Term,
+    Directory, Term,
 };
 use tokio::sync::Semaphore;
 use tracing::Instrument;
@@ -714,6 +714,21 @@ fn search_tantivy_index_with_field(
     Ok((matched_docs, max_doc_id))
 }
 
+pub async fn get_tantivy_directory(
+    trace_id: &str,
+    file_name: &str,
+) -> anyhow::Result<Box<dyn Directory>> {
+    // if file_data::disk::exist(file_name).await {
+    //     Ok(Box::new(
+    //         StdFsReader::from_dir(&PathBuf::from(file_name)).await?,
+    //     ))
+    // } else {
+    let index_file_bytes = fetch_file(trace_id, &file_name).await?;
+    let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
+    Ok(Box::new(puffin_dir))
+    // }
+}
+
 async fn search_tantivy_index(
     trace_id: &str,
     parquet_file_name: &str,
@@ -730,7 +745,7 @@ async fn search_tantivy_index(
         ));
     };
 
-    let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
+    // let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
     let fetch_file_tt = search_index_timer.elapsed();
     log::info!(
         "[trace_id {}] search->storage: fetch_file took {} s, {} ms",
@@ -739,7 +754,7 @@ async fn search_tantivy_index(
         fetch_file_tt.as_millis(),
     );
 
-    let puffin_dir = PuffinDirReader::from_bytes(Cursor::new(index_file_bytes)).await?;
+    let puffin_dir = get_tantivy_directory(trace_id, &tantivy_index_file_name).await?;
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;

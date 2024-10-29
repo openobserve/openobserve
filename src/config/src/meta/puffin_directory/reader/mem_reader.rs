@@ -14,18 +14,18 @@ use tantivy::{
 
 use crate::meta::{
     puffin::reader::PuffinBytesReader,
-    puffin_dir::{
+    puffin_directory::{
         get_file_from_empty_puffin_dir_with_ext, EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID,
     },
 };
 
 #[derive(Debug)]
-pub struct PuffinDirReader<R> {
+pub struct RamDirectoryReader<R> {
     source: Arc<PuffinBytesReader<R>>,
     blob_metadata_map: Arc<RwLock<HashMap<PathBuf, OwnedBytes>>>,
 }
 
-impl<R> PuffinDirReader<R>
+impl<R> RamDirectoryReader<R>
 where
     R: AsyncRead + AsyncSeek + Send + Unpin + Sync + Clone,
 {
@@ -48,7 +48,7 @@ where
             }
         }
 
-        let puffin_dir = PuffinDirReader {
+        let puffin_dir = RamDirectoryReader {
             source: Arc::new(puffin_reader),
             blob_metadata_map: Arc::new(RwLock::new(blob_meta_map)),
         };
@@ -57,12 +57,12 @@ where
     }
 }
 
-impl<R> Clone for PuffinDirReader<R>
+impl<R> Clone for RamDirectoryReader<R>
 where
     R: Clone,
 {
     fn clone(&self) -> Self {
-        PuffinDirReader {
+        RamDirectoryReader {
             source: self.source.clone(),
             blob_metadata_map: self.blob_metadata_map.clone(),
         }
@@ -95,7 +95,7 @@ impl FileHandle for PuffinSliceHandle {
     }
 }
 
-impl<R> Directory for PuffinDirReader<R>
+impl<R> Directory for RamDirectoryReader<R>
 where
     R: AsyncRead + AsyncSeek + Send + Unpin + Sync + Clone + std::fmt::Debug + 'static,
 {

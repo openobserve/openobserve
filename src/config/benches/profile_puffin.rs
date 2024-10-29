@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-use config::meta::puffin_dir::puffin_dir_reader::PuffinDirReader;
+use config::meta::puffin_directory::reader::RamDirectoryReader;
 use futures::io::Cursor;
 use tantivy::query::QueryParser;
 
@@ -25,7 +25,7 @@ async fn main() {
     let mut file = File::open("./data/7250413177689604885.ttv").unwrap();
     let _ = file.read_to_end(&mut data);
     tokio::task::block_in_place(|| async {
-        let puffin_dir = PuffinDirReader::from_bytes(Cursor::new(data))
+        let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(data))
             .await
             .unwrap();
         let index = tantivy::Index::open(puffin_dir).unwrap();

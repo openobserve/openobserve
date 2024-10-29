@@ -19,7 +19,7 @@ pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;
 pub mod puffin;
-pub mod puffin_dir;
+pub mod puffin_directory;
 pub mod search;
 pub mod sql;
 pub mod stream;
