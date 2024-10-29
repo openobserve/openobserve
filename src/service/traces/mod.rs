@@ -359,40 +359,40 @@ pub async fn handle_trace_request(
                         std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                     })?;
 
-                // get json object
-                let mut record_val = match value.take() {
-                    json::Value::Object(mut v) => {
-                        // build span metrics item
-                        let sm = crate::job::metrics::TraceMetricsItem {
-                            organization: org_id.to_string(),
-                            traces_stream_name: traces_stream_name.clone(),
-                            service_name: service_name.clone(),
-                            span_name: v
-                                .remove("o2_span_metrics_name")
-                                .map_or(span.name.clone(), |name| {
-                                    name.as_str().unwrap().to_string()
-                                }),
-                            span_status: span_status_for_spanmetric,
-                            span_kind: span.kind.to_string(),
-                            duration: ((end_time - start_time) / 1_000_000) as f64, // milliseconds
-                            span_id: v["span_id"].to_string(),
-                        };
-                        span_metrics.push(sm);
-                        v
-                    }
-                    _ => {
-                        log::error!(
-                            "[TRACE] stream did not receive a valid json object, trace_id: {}",
-                            trace_id
-                        );
-                        return Ok(HttpResponse::InternalServerError().json(
-                            MetaHttpResponse::error(
-                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                "stream did not receive a valid json objectt".into(),
-                            ),
-                        ));
-                    }
-                };
+                    // get json object
+                    let mut record_val = match value.take() {
+                        json::Value::Object(mut v) => {
+                            // build span metrics item
+                            let sm = crate::job::metrics::TraceMetricsItem {
+                                organization: org_id.to_string(),
+                                traces_stream_name: traces_stream_name.clone(),
+                                service_name: service_name.clone(),
+                                span_name: v
+                                    .remove("o2_span_metrics_name")
+                                    .map_or(span.name.clone(), |name| {
+                                        name.as_str().unwrap().to_string()
+                                    }),
+                                span_status: span_status_for_spanmetric,
+                                span_kind: span.kind.to_string(),
+                                duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
+                                span_id: v["span_id"].to_string(),
+                            };
+                            span_metrics.push(sm);
+                            v
+                        }
+                        _ => {
+                            log::error!(
+                                "[TRACE] stream did not receive a valid json object, trace_id: {}",
+                                trace_id
+                            );
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    "stream did not receive a valid json objectt".into(),
+                                ),
+                            ));
+                        }
+                    };
 
                     // add timestamp
                     record_val.insert(

@@ -140,6 +140,7 @@ const streamTypes = [
   { label: "Logs", value: "logs" },
   { label: "Metrics", value: "metrics" },
   { label: "Traces", value: "traces" },
+  { label: "Enrichment_Tables", value: "enrichment_tables" },
 ];
 
 const emits = defineEmits(["streamAdded", "close","added:stream-aded"]);

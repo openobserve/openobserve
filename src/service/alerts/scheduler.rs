@@ -999,12 +999,17 @@ async fn handle_derived_stream_triggers(
                     }
                     Ok(pl_results) => {
                         for (stream_params, stream_pl_results) in pl_results {
-                            let (_, results): (Vec<_>, Vec<_>) =
-                                stream_pl_results.into_iter().unzip();
-                            json_data_by_stream
-                                .entry(stream_params)
-                                .or_default()
-                                .extend(results);
+                            if matches!(
+                                stream_params.stream_type,
+                                StreamType::Logs | StreamType::EnrichmentTables
+                            ) {
+                                let (_, results): (Vec<_>, Vec<_>) =
+                                    stream_pl_results.into_iter().unzip();
+                                json_data_by_stream
+                                    .entry(stream_params)
+                                    .or_default()
+                                    .extend(results);
+                            }
                         }
                     }
                 },
