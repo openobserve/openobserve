@@ -40,107 +40,102 @@ export const restHandlers = [
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/org_users`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(users.org_users));
+    ({ request }) => {
+      return HttpResponse.json(users.org_users);
     },
   ),
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/users`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(users.users));
+    ({ request }) => {
+      return HttpResponse.json(users.users);
     },
   ),
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(alerts.alerts.get));
+    ({ request }) => {
+      return HttpResponse.json(alerts.alerts.get);
     },
   ),
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(alerts.templates.get));
+    ({ request }) => {
+      return HttpResponse.json(alerts.templates.get);
     },
   ),
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(alerts.destinations.get));
+    ({ request }) => {
+      return HttpResponse.json(alerts.destinations.get);
     },
   ),
 
   http.post(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(logs.search));
+    ({ request }) => {
+      return HttpResponse.json(logs.search);
     },
   ),
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/organizations`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(organizations.list));
+    ({ request }) => {
+      return HttpResponse.json(organizations.list);
     },
   ),
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/summary`,
-    (req: any, res: any, ctx: any) => {
-      return res(ctx.status(200), ctx.json(home.summary.get));
+    ({ request }) => {
+      return HttpResponse.json(home.summary.get);
     },
   ),
 
-  http.get(
-    `${store.state.API_ENDPOINT}/config`,
-    (req: any, res: any, ctx: any) => {
-      return res(
-        ctx.status(200),
-        ctx.json({
-          version: "v0.3.2",
-          instance: "7049348417797095424",
-          commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
-          build_date: "2023-04-05T11:01:23Z",
-          default_fts_keys: ["log", "message", "msg", "content", "data"],
-          telemetry_enabled: true,
-          default_functions: [
-            {
-              name: "match_all_raw",
-              text: "match_all_raw('v')",
-            },
-            {
-              name: "match_all_raw_ignore_case",
-              text: "match_all_raw_ignore_case('v')",
-            },
-            {
-              name: "match_all",
-              text: "match_all('v')",
-            },
-            {
-              name: "str_match",
-              text: "str_match(field, 'v')",
-            },
-            {
-              name: "str_match_ignore_case",
-              text: "str_match_ignore_case(field, 'v')",
-            },
-            {
-              name: "re_match",
-              text: "re_match(field, 'pattern')",
-            },
-            {
-              name: "re_not_match",
-              text: "re_not_match(field, 'pattern')",
-            },
-          ],
-        }),
-      );
-    },
-  ),
+  http.get(`${store.state.API_ENDPOINT}/config`, ({ request }) => {
+    return HttpResponse.json({
+      version: "v0.3.2",
+      instance: "7049348417797095424",
+      commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
+      build_date: "2023-04-05T11:01:23Z",
+      default_fts_keys: ["log", "message", "msg", "content", "data"],
+      telemetry_enabled: true,
+      default_functions: [
+        {
+          name: "match_all_raw",
+          text: "match_all_raw('v')",
+        },
+        {
+          name: "match_all_raw_ignore_case",
+          text: "match_all_raw_ignore_case('v')",
+        },
+        {
+          name: "match_all",
+          text: "match_all('v')",
+        },
+        {
+          name: "str_match",
+          text: "str_match(field, 'v')",
+        },
+        {
+          name: "str_match_ignore_case",
+          text: "str_match_ignore_case(field, 'v')",
+        },
+        {
+          name: "re_match",
+          text: "re_match(field, 'pattern')",
+        },
+        {
+          name: "re_not_match",
+          text: "re_not_match(field, 'pattern')",
+        },
+      ],
+    });
+  }),
 ];
+
 const server = setupServer(...restHandlers);
 
 // This is added to support multiple responses on same end point.
