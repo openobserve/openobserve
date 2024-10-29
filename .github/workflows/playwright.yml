@@ -147,6 +147,12 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
+      - name: Upload Coverage Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-${{ matrix.testfilename }} # Unique name for each job
+          path: tests/ui-testing/.n8_output
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -158,18 +164,22 @@ jobs:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
     runs-on: ubuntu-latest
-    if: always() # Ensures this job runs regardless of the outcome of previous jobs
+    if: always()
+
     steps:
-      - name: Checkout repository
+      - name: Clone the current repo
         uses: actions/checkout@v4
 
-      - name: Download Playwright Report Artifact
+      - name: Download Coverage Data Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: playwright-report
+          name: coverage-data-* # Download all coverage artifacts
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npx nyc report
+      - name: Combine Coverage Data
+        run: |
+          mkdir -p tests/ui-testing/.n8_output
+          mv coverage-data-*/* tests/ui-testing/.n8_output/ # Move all JSON files to one folder
+          cd tests/ui-testing && npx nyc report # Generate combined report
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
