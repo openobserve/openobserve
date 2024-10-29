@@ -881,7 +881,7 @@ export default defineComponent({
         if (item.expr) {
           if (
             (item.expr.type === "column_ref" &&
-              item.expr?.column?.expr?.value === fieldName) ||
+              item.expr?.column?.expr?.value === fieldName || item.expr.column === fieldName) ||
             (item.expr.type === "aggr_func" &&
               item.expr?.args?.expr?.column?.value === fieldName)
           ) {
@@ -944,8 +944,8 @@ export default defineComponent({
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream[0],
-            `"${searchObj.data.stream.selectedStream[0]}"`,
+            new RegExp(`\\b${searchObj.data.stream.selectedStream[0]}\\b`, 'g'), // Wrap only standalone 'default'
+            `"${searchObj.data.stream.selectedStream[0]}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
