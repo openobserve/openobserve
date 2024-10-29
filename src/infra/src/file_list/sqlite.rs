@@ -26,6 +26,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
+use tracing::{info_span, Instrument};
 
 use crate::{
     db::sqlite::{CLIENT_RO, CLIENT_RW},
@@ -76,6 +77,7 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_remove", skip_all,field(file_count=files.len()))]
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -121,6 +123,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_add_deleted", skip(self,files),field(file_count=files.len()))]
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -163,6 +166,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_remove_deleted", skip_all,field(file_count=files.len()))]
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -212,6 +216,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::get", skip(self))]
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
@@ -230,6 +235,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(FileMeta::from(&ret))
     }
 
+    #[tracing::instrument(name = "file_list::db::contains", skip(self))]
     async fn contains(&self, file: &str) -> Result<bool> {
         let pool = CLIENT_RO.clone();
         let (stream_key, date_key, file_name) =
@@ -248,6 +254,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(!ret.unwrap().is_empty())
     }
 
+    #[tracing::instrument(name = "file_list::db::update_flattened", skip(self))]
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -265,6 +272,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::list", skip(self))]
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
@@ -283,6 +291,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::query", skip(self, _time_level))]
     async fn query(
         &self,
         org_id: &str,
@@ -358,6 +367,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::query_parallel", skip(self))]
     async fn query_parallel(
         &self,
         org_id: &str,
@@ -395,71 +405,78 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut tasks = Vec::with_capacity(day_partitions.len());
         for (time_start, time_end) in day_partitions {
             let stream_key = stream_key.clone();
-            tasks.push(tokio::task::spawn(async move {
-                let pool = CLIENT_RO.clone();
-                let cfg = get_config();
-                if cfg.limit.use_upper_bound_for_max_ts {
-                    // TODO: if partition is daily, we need to remove this logic
-                    let max_ts_upper_bound =
-                        time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-                    sqlx::query_as::<_, super::FileRecord>(
-                        r#"
+            tasks.push(
+                tokio::task::spawn(async move {
+                    let pool = CLIENT_RO.clone();
+                    let cfg = get_config();
+                    if cfg.limit.use_upper_bound_for_max_ts {
+                        // TODO: if partition is daily, we need to remove this logic
+                        let max_ts_upper_bound =
+                            time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                        sqlx::query_as::<_, super::FileRecord>(
+                            r#"
 SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                         "#,
-                    )
-                    .bind(stream_key.clone())
-                    .bind(time_start)
-                    .bind(max_ts_upper_bound)
-                    .bind(time_end)
-                    .fetch_all(&pool)
-                    .await
-                    .map(|r| {
-                        r.into_iter()
-                            .map(|r| {
-                                (
-                                    "files/".to_string()
-                                        + &stream_key
-                                        + "/"
-                                        + &r.date
-                                        + "/"
-                                        + &r.file,
-                                    FileMeta::from(&r),
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                } else {
-                    sqlx::query_as::<_, super::FileRecord>(
-                        r#"
+                        )
+                        .bind(stream_key.clone())
+                        .bind(time_start)
+                        .bind(max_ts_upper_bound)
+                        .bind(time_end)
+                        .fetch_all(&pool)
+                        .await
+                        .map(|r| {
+                            r.into_iter()
+                                .map(|r| {
+                                    (
+                                        "files/".to_string()
+                                            + &stream_key
+                                            + "/"
+                                            + &r.date
+                                            + "/"
+                                            + &r.file,
+                                        FileMeta::from(&r),
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    } else {
+                        sqlx::query_as::<_, super::FileRecord>(
+                            r#"
 SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                         "#,
-                    )
-                    .bind(stream_key.clone())
-                    .bind(time_start)
-                    .bind(time_end)
-                    .fetch_all(&pool)
-                    .await
-                    .map(|r| {
-                        r.into_iter()
-                            .map(|r| {
-                                (
-                                    "files/".to_string()
-                                        + &stream_key
-                                        + "/"
-                                        + &r.date
-                                        + "/"
-                                        + &r.file,
-                                    FileMeta::from(&r),
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                }
-            }));
+                        )
+                        .bind(stream_key.clone())
+                        .bind(time_start)
+                        .bind(time_end)
+                        .fetch_all(&pool)
+                        .await
+                        .map(|r| {
+                            r.into_iter()
+                                .map(|r| {
+                                    (
+                                        "files/".to_string()
+                                            + &stream_key
+                                            + "/"
+                                            + &r.date
+                                            + "/"
+                                            + &r.file,
+                                        FileMeta::from(&r),
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    }
+                })
+                .instrument(info_span!(
+                    "search_partition",
+                    start_time = time_start,
+                    end_time = time_end
+                )),
+            );
         }
 
         let mut files = Vec::new();
@@ -477,6 +494,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         Ok(files)
     }
 
+    #[tracing::instrument(name = "file_list::db::query_deleted", skip(self))]
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -506,6 +524,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_min_ts", skip(self))]
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -525,6 +544,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         Ok(ret.unwrap_or_default())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_max_pk_value", skip(self))]
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
         let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
@@ -533,6 +553,7 @@ SELECT date, file, min_ts, max_ts, records, original_size, compressed_size
         Ok(ret.unwrap_or_default())
     }
 
+    #[tracing::instrument(name = "file_list::db::stats", skip(self))]
     async fn stats(
         &self,
         org_id: &str,
@@ -577,6 +598,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_stream_stats", skip(self))]
     async fn get_stream_stats(
         &self,
         org_id: &str,
@@ -603,6 +625,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
             .collect())
     }
 
+    #[tracing::instrument(name = "file_list::db::del_stream_stats", skip(self))]
     async fn del_stream_stats(
         &self,
         org_id: &str,
@@ -619,6 +642,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::set_stream_stats", skip(self,streams),field(stream_count=streams.len()))]
     async fn set_stream_stats(
         &self,
         org_id: &str,
@@ -701,6 +725,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::reset_stream_stats_min_ts", skip(self, _org_id))]
     async fn reset_stream_stats_min_ts(
         &self,
         _org_id: &str,
@@ -723,6 +748,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::reset_stream_stats", skip_all)]
     async fn reset_stream_stats(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -732,6 +758,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::len", skip_all)]
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         let ret = match sqlx::query(r#"SELECT COUNT(*) as num FROM file_list;"#)
@@ -758,6 +785,7 @@ UPDATE stream_stats
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::add_job", skip(self))]
     async fn add_job(
         &self,
         org_id: &str,
@@ -788,6 +816,7 @@ UPDATE stream_stats
         }
     }
 
+    #[tracing::instrument(name = "file_list::db::get_pending_jobs", skip(self))]
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -867,6 +896,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(ret)
     }
 
+    #[tracing::instrument(name = "file_list::db::set_job_pending", skip_all,field(id_count=ids.len()))]
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -884,6 +914,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::set_job_done", skip(self))]
     async fn set_job_done(&self, id: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -896,6 +927,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::update_running_jobs", skip(self))]
     async fn update_running_jobs(&self, id: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -907,6 +939,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::check_running_jobs", skip(self))]
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -924,6 +957,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::clean_done_jobs", skip(self))]
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -939,6 +973,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
+    #[tracing::instrument(name = "file_list::db::get_pending_jobs_count", skip(self))]
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
         let pool = CLIENT_RO.clone();
 
@@ -1009,6 +1044,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
         }
     }
 
+    #[tracing::instrument(name = "file_list::db::batch_add", skip(self, files))]
     async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
