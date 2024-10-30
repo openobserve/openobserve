@@ -115,15 +115,12 @@ test.describe(" visualize UI testcases", () => {
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
-    // Click the date-time button and select a relative time
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
 
-    // Refresh logs and toggle visualization
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    // Click on the editor and input the VRL function
     await page
       .locator(
         "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
@@ -133,26 +130,25 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl12=123");
-    await page.waitForTimeout(3000);
 
-    // Refresh the visualization to apply the VRL function
+      await page
+    .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+    .waitFor({ state: "visible" });
+
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    // Click to add the VRL function to the dashboard
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
       )
       .click();
 
-    // Refresh again to ensure updates are applied
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    // 1. Assert that the VRL function is present in the field list
     await expect(
       page.locator('[data-test="field-list-item-logs-e2e_automate-vrl12"]')
     ).toBeVisible();
@@ -209,13 +205,10 @@ test.describe(" visualize UI testcases", () => {
       .click();
 
     await page.waitForTimeout(500);
-    // await expect(
-    //   page.getByText("There are some errors, please fix them and try again")
-    // ).toBeVisible();
+   
     await page
       .locator('text="There are some errors, please fix them and try again"')
       .waitFor({ state: "visible" });
-    // await page.waitForSelector("There are some errors, please fix them and try again");
 
     await page.locator("#q-notify").getByRole("button").click();
     await expect(page.getByText("Please update Y-Axis")).toBeVisible();
@@ -228,17 +221,13 @@ test.describe(" visualize UI testcases", () => {
   test("should not show an error when adding a VRL function field to the Breakdown, X axis, or Y axis fields", async ({
     page,
   }) => {
-    // Click the date-time button and select the relative time
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
 
-    // Refresh logs search bar
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
-    // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    // Open the function editor and add a VRL function
     await page
       .locator(
         "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
@@ -248,50 +237,45 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRL=1000");
-    await page.waitForTimeout(3000);
 
-    // Refresh visulize search bar
+      await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .waitFor({ state: "visible" });
+
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    // Add VRL function field to Breakdown
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
       .click();
 
-    // Add VRL function field to Y axis
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
 
-    // Refresh logs search bar
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    // Remove the timestamp field from the X axis
     await page
       .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
 
-    // Add VRL function field to X axis
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-x-data"]'
       )
       .click();
 
-    // Refresh logs search bar
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    // Assertions to check that the VRL function fields are correctly added
     const breakdownField = await page
       .locator('[data-test="dashboard-b-item-vrl"]')
       .isVisible();
@@ -306,6 +290,7 @@ test.describe(" visualize UI testcases", () => {
     expect(yAxisField).toBe(true);
     expect(xAxisField).toBe(true);
   });
+  
   test("should display an error message if an invalid VRL function is added", async ({
     page,
   }) => {
@@ -352,8 +337,12 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=123");
-    await page.waitForTimeout(3000);
-    await page
+
+await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .waitFor({ state: "visible" });
+      
+      await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
     await page
@@ -402,7 +391,9 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
 
-    await page.waitForTimeout(2000);
+await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .waitFor({ state: "visible" });
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
@@ -475,7 +466,9 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=123");
 
-    await page.waitForTimeout(3000);
+await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .waitFor({ state: "visible" });
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
@@ -527,8 +520,10 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRLsanity=1000");
 
-    await page.waitForTimeout(3000);
-
+await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .waitFor({ state: "visible" });
+      
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
@@ -558,8 +553,7 @@ test.describe(" visualize UI testcases", () => {
     for (const chartType of chartTypes) {
       await page.locator(chartType).click();
 
-      // Wait for a few seconds after changing the chart type
-      await page.waitForTimeout(1000); // Adjust the time as necessary
+      await page.waitForTimeout(1000); 
     }
 
     // Assertion: Fail the test if an error was detected
