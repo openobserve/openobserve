@@ -232,11 +232,7 @@ pub async fn list() -> Result<Vec<(String, FileMeta)>> {
 }
 
 #[inline]
-#[tracing::instrument(
-    name = "infra:file_list:query_db",
-    skip_all,
-    fields(org_id = org_id, stream_name = stream_name)
-)]
+#[tracing::instrument(name = "infra:file_list:db:query")]
 pub async fn query(
     org_id: &str,
     stream_type: StreamType,
@@ -269,11 +265,7 @@ pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
 }
 
 #[inline]
-#[tracing::instrument(
-    name = "infra:file_list:db:query_ids",
-    skip_all,
-    fields(org_id = org_id, stream_name = stream_name)
-)]
+#[tracing::instrument(name = "infra:file_list:db:query_ids")]
 pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
@@ -291,11 +283,7 @@ pub async fn query_ids(
 }
 
 #[inline]
-#[tracing::instrument(
-    name = "infra:file_list:db:query_old_data_hours",
-    skip_all,
-    fields(org_id = org_id, stream_name = stream_name)
-)]
+#[tracing::instrument(name = "infra:file_list:db:query_old_data_hours")]
 pub async fn query_old_data_hours(
     org_id: &str,
     stream_type: StreamType,
