@@ -1076,7 +1076,10 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_org_id(&Some("org123".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE event='Search' AND org_id = 'org123'");
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND org_id = 'org123'"
+            );
         }
 
         #[test]
