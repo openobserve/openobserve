@@ -177,8 +177,9 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          name: playwright-coverage-*
-          path: merged-coverage # Download each artifact to a subfolder
+          pattern: playwright-coverage-*  # Match all artifacts with this prefix
+          path: merged-coverage
+          merge-multiple: true 
 
       - name: Verify Downloaded Files
         run: ls -R merged-coverage # Check the structure and contents
