@@ -206,7 +206,7 @@ pub async fn generate_job_by_stream(
 /// 1. get old data by hour
 /// 2. check if other node is processing
 /// 3. create job or return
-pub async fn generate_olddata_job_by_stream(
+pub async fn generate_old_data_job_by_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -288,7 +288,7 @@ pub async fn generate_olddata_job_by_stream(
         .with_timezone(&Utc);
         let offset = offset.timestamp_micros();
         log::debug!(
-            "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] hours: {}, offset: {}",
+            "[COMPACTOR] generate_old_data_job_by_stream [{}/{}/{}] hours: {}, offset: {}",
             org_id,
             stream_type,
             stream_name,

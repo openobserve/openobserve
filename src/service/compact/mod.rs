@@ -18,7 +18,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::Role,
+        cluster::{CompactionJobType, Role},
         stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
@@ -139,7 +139,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 }
 
 /// Generate job for compactor
-pub async fn run_generate_job(old_data: bool) -> Result<(), anyhow::Error> {
+pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
@@ -193,29 +193,37 @@ pub async fn run_generate_job(old_data: bool) -> Result<(), anyhow::Error> {
                     continue;
                 }
 
-                if old_data {
-                    if let Err(e) =
-                        merge::generate_olddata_job_by_stream(&org_id, stream_type, &stream_name)
-                            .await
-                    {
-                        log::error!(
-                            "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            e
-                        );
+                match job_type {
+                    CompactionJobType::Current => {
+                        if let Err(e) =
+                            merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
+                        {
+                            log::error!(
+                                "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
+                                org_id,
+                                stream_type,
+                                stream_name,
+                                e
+                            );
+                        }
                     }
-                } else if let Err(e) =
-                    merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
-                {
-                    log::error!(
-                        "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        e
-                    );
+                    CompactionJobType::Historical => {
+                        if let Err(e) = merge::generate_old_data_job_by_stream(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "[COMPACTOR] generate_old_data_job_by_stream [{}/{}/{}] error: {}",
+                                org_id,
+                                stream_type,
+                                stream_name,
+                                e
+                            );
+                        }
+                    }
                 }
             }
         }

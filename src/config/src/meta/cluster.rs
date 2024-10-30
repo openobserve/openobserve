@@ -216,3 +216,9 @@ pub fn get_internal_grpc_token() -> String {
         cfg.grpc.internal_grpc_token.clone()
     }
 }
+
+// CompactionJobType is used to distinguish between current and historical compaction jobs.
+pub enum CompactionJobType {
+    Current,
+    Historical,
+}
