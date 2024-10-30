@@ -47,8 +47,16 @@ pub fn now_micros() -> i64 {
 }
 
 #[inline(always)]
-pub fn one_hour() -> i64 {
-    Duration::try_hours(1).unwrap().num_microseconds().unwrap()
+pub fn hour_micros(n: i64) -> i64 {
+    Duration::try_hours(n).unwrap().num_microseconds().unwrap()
+}
+
+#[inline(always)]
+pub fn second_micros(n: i64) -> i64 {
+    Duration::try_seconds(n)
+        .unwrap()
+        .num_microseconds()
+        .unwrap()
 }
 
 #[inline(always)]

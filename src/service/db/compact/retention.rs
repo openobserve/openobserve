@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use config::{
     meta::stream::StreamType,
-    utils::time::{now_micros, one_hour},
+    utils::time::{hour_micros, now_micros},
     RwHashMap,
 };
 use once_cell::sync::Lazy;
@@ -52,7 +52,7 @@ pub async fn delete_stream(
 
     // write in cache
     if let Some(v) = CACHE.get(&key) {
-        if v.value() + one_hour() > now_micros() {
+        if v.value() + hour_micros(1) > now_micros() {
             return Ok(()); // already in cache, don't create same task in one hour
         }
     }

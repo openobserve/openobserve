@@ -34,6 +34,7 @@ use config::{
         },
         record_batch_ext::{concat_batches, merge_record_batches},
         schema_ext::SchemaExt,
+        time::{hour_micros, second_micros},
     },
     FILE_EXT_PARQUET,
 };
@@ -184,11 +185,11 @@ pub async fn generate_job_by_stream(
     }
 
     // write new offset
-    let offset = offset
-        + Duration::try_seconds(cfg.compact.step_secs)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+    let mut offset = offset + second_micros(cfg.compact.step_secs);
+    if cfg.compact.step_secs >= 3600 {
+        // format to hour with zero minutes, seconds
+        offset = offset - offset % hour_micros(1);
+    }
     db::compact::files::set_offset(
         org_id,
         stream_type,
@@ -260,7 +261,7 @@ pub async fn generate_olddata_job_by_stream(
     }
 
     // get old data by hour, `offset - 2 hours` as old data
-    let end_time = offset - Duration::try_hours(2).unwrap().num_microseconds().unwrap();
+    let end_time = offset - hour_micros(2);
     let start_time = end_time
         - Duration::try_days(stream_data_retention_days as i64)
             .unwrap()
@@ -379,15 +380,9 @@ pub async fn merge_by_stream(
     // get current hour(day) all files
     let (partition_offset_start, partition_offset_end) =
         if partition_time_level == PartitionTimeLevel::Daily {
-            (
-                offset_time_day,
-                offset_time_day + Duration::try_hours(24).unwrap().num_microseconds().unwrap() - 1,
-            )
+            (offset_time_day, offset_time_day + hour_micros(24) - 1)
         } else {
-            (
-                offset_time_hour,
-                offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap() - 1,
-            )
+            (offset_time_hour, offset_time_hour + hour_micros(1) - 1)
         };
     let files = file_list::query(
         org_id,
@@ -598,10 +593,7 @@ pub async fn merge_by_stream(
         .inc_by(time);
     metrics::COMPACT_DELAY_HOURS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .set(
-            (time_now_hour - offset_time_hour)
-                / Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
-        );
+        .set((time_now_hour - offset_time_hour) / hour_micros(1));
 
     Ok(())
 }
