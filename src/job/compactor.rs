@@ -149,10 +149,9 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
 async fn run_generate_olddata_job() -> Result<(), anyhow::Error> {
     loop {
         // run every 1 hour at least
-        time::sleep(time::Duration::from_secs(std::cmp::max(
-            3600,
-            get_config().compact.interval,
-        )))
+        time::sleep(time::Duration::from_secs(
+            get_config().compact.old_data_interval,
+        ))
         .await;
         log::debug!("[COMPACTOR] Running generate merge job for old data");
         if let Err(e) = compact::run_generate_olddata_job().await {

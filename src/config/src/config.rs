@@ -1042,6 +1042,8 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
+    pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time
     pub strategy: String,
     #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
