@@ -298,6 +298,8 @@ async fn move_files(
     let org_id = columns[1].to_string();
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
+    // let _thread_id = columns[4].to_string();
+    let prefix_date = format!("{}-{}-{}", columns[5], columns[6], columns[7]);
 
     // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
@@ -370,6 +372,42 @@ async fn move_files(
             PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
+    }
+
+    // check data retention
+    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let mut stream_data_retention_days = cfg.compact.data_retention_days;
+    if stream_settings.data_retention > 0 {
+        stream_data_retention_days = stream_settings.data_retention;
+    }
+    if stream_data_retention_days > 0 {
+        let date =
+            config::utils::time::now() - Duration::try_days(stream_data_retention_days).unwrap();
+        let stream_data_retention_end = date.format("%Y-%m-%d").to_string();
+        if prefix_date < stream_data_retention_end {
+            for file in files {
+                log::warn!(
+                    "[INGESTER:JOB:{thread_id}] the file [{}/{}/{}] was exceed the data retention, just delete file: {}",
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    file.key,
+                );
+                if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                    log::error!(
+                        "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
+                        file.key,
+                        e
+                    );
+                }
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Ok(());
+        }
     }
 
     // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
