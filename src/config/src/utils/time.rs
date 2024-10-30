@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Datelike, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Utc};
 use once_cell::sync::Lazy;
 
 use crate::utils::json;
@@ -44,6 +44,11 @@ pub fn now() -> DateTime<Utc> {
 #[inline(always)]
 pub fn now_micros() -> i64 {
     Utc::now().timestamp_micros()
+}
+
+#[inline(always)]
+pub fn one_hour() -> i64 {
+    Duration::try_hours(1).unwrap().num_microseconds().unwrap()
 }
 
 #[inline(always)]

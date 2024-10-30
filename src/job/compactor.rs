@@ -94,6 +94,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { run_generate_job().await });
+    tokio::task::spawn(async move { run_generate_olddata_job().await });
     tokio::task::spawn(async move { run_merge(tx).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
@@ -140,6 +141,22 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
         log::debug!("[COMPACTOR] Running generate merge job");
         if let Err(e) = compact::run_generate_job().await {
             log::error!("[COMPACTOR] run generate merge job error: {e}");
+        }
+    }
+}
+
+/// Generate merging jobs for old data
+async fn run_generate_olddata_job() -> Result<(), anyhow::Error> {
+    loop {
+        // run every 1 hour at least
+        time::sleep(time::Duration::from_secs(std::cmp::max(
+            3600,
+            get_config().compact.interval,
+        )))
+        .await;
+        log::debug!("[COMPACTOR] Running generate merge job for old data");
+        if let Err(e) = compact::run_generate_olddata_job().await {
+            log::error!("[COMPACTOR] run generate merge job for old data error: {e}");
         }
     }
 }

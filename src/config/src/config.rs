@@ -1027,17 +1027,11 @@ pub struct Limit {
     )]
     pub max_enrichment_table_size: usize,
     #[env_config(
-        name = "ZO_USE_UPPER_BOUND_FOR_MAX_TS",
-        default = false,
-        help = "use upper bound for max tx"
-    )]
-    pub use_upper_bound_for_max_ts: bool,
-    #[env_config(
         name = "ZO_BUFFER_FOR_MAX_TS",
         default = 60,
         help = "buffer for upper bound in mins"
     )]
-    pub upper_bound_for_max_ts: i64,
+    pub upper_bound_for_max_ts_mins: i64,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
 }
@@ -1050,8 +1044,6 @@ pub struct Compact {
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time
     pub strategy: String,
-    #[env_config(name = "ZO_COMPACT_LOOKBACK_HOURS", default = 0)] // hours
-    pub lookback_hours: i64,
     #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
@@ -1060,6 +1052,10 @@ pub struct Compact {
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
+    pub old_data_max_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_RECORDS", default = 100)] // records
+    pub old_data_records: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
@@ -1420,6 +1416,10 @@ pub fn init() -> Config {
         cfg.limit.consistent_hash_vnodes = 100;
     }
 
+    if cfg.limit.upper_bound_for_max_ts_mins == 0 {
+        cfg.limit.upper_bound_for_max_ts_mins = 60;
+    }
+
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -1569,6 +1569,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.batch_size < 1 {
         cfg.compact.batch_size = 100;
+    }
+    if cfg.compact.old_data_max_days < 1 {
+        cfg.compact.old_data_max_days = 15;
+    }
+    if cfg.compact.old_data_records < 1 {
+        cfg.compact.old_data_records = 100;
     }
 
     // If the default scrape interval is less than 5s, raise an error

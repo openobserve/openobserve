@@ -85,6 +85,13 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<FileId>>;
+    async fn query_old_data_hours(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<String>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -280,6 +287,28 @@ pub async fn query_ids(
     }
     CLIENT
         .query_ids(org_id, stream_type, stream_name, time_range)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(
+    name = "infra:file_list:db:query_old_data_hours",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_old_data_hours(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<String>> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    CLIENT
+        .query_old_data_hours(org_id, stream_type, stream_name, time_range)
         .await
 }
 

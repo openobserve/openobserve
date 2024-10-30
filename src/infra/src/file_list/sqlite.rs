@@ -327,10 +327,9 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
             let cfg = get_config();
-            if cfg.limit.use_upper_bound_for_max_ts {
-                let max_ts_upper_bound =
-                    time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
-                sqlx::query_as::<_, super::FileRecord>(
+            let max_ts_upper_bound =
+                time_end + cfg.limit.upper_bound_for_max_ts_mins * 60 * 1_000_000;
+            sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
@@ -343,20 +342,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .bind(time_end)
             .fetch_all(&pool)
             .await
-            } else {
-                sqlx::query_as::<_, super::FileRecord>(
-                r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
-    WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
-                "#,
-            )
-            .bind(stream_key)
-            .bind(time_start)
-            .bind(time_end)
-            .fetch_all(&pool)
-            .await
-            }
         };
         Ok(ret?
             .iter()
@@ -447,8 +432,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
                 let cfg = get_config();
-                if cfg.limit.use_upper_bound_for_max_ts {
-                    let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
+                    let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts_mins * 60 * 1_000_000;
                     let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
@@ -457,15 +441,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     .bind(time_end)
                     .fetch_all(&pool)
                     .await
-                } else {
-                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;";
-                    sqlx::query_as::<_, super::FileId>(query)
-                    .bind(stream_key)
-                    .bind(time_start)
-                    .bind(time_end)
-                    .fetch_all(&pool)
-                    .await
-                }
             }));
         }
 
@@ -482,6 +457,46 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             };
         }
         Ok(rets)
+    }
+
+    async fn query_old_data_hours(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<String>> {
+        if let Some((start, end)) = time_range {
+            if start == 0 && end == 0 {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT_RO.clone();
+        let (time_start, time_end) = time_range.unwrap_or((0, 0));
+        let cfg = get_config();
+        let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts_mins * 60 * 1_000_000;
+        let sql = r#"
+SELECT date
+    FROM file_list 
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5
+    GROUP BY date HAVING count(*) >= 10;
+            "#;
+
+        let ret = sqlx::query(sql)
+            .bind(stream_key)
+            .bind(time_start)
+            .bind(max_ts_upper_bound)
+            .bind(time_end)
+            .bind(cfg.compact.old_data_records)
+            .fetch_all(&pool)
+            .await?;
+        Ok(ret
+            .into_iter()
+            .map(|r| r.try_get::<String, &str>("date").unwrap_or_default())
+            .collect())
     }
 
     async fn query_deleted(

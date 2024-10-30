@@ -63,10 +63,12 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                     continue; // not this node
                 }
 
-                let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
-                let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
-                let stream_data_retention_end = if stream.settings.data_retention > 0 {
-                    let date = now - Duration::try_days(stream.settings.data_retention).unwrap();
+                let stream_settings =
+                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                        .await
+                        .unwrap_or_default();
+                let stream_data_retention_end = if stream_settings.data_retention > 0 {
+                    let date = now - Duration::try_days(stream_settings.data_retention).unwrap();
                     date.format("%Y-%m-%d").to_string()
                 } else {
                     data_lifecycle_end.clone()
@@ -196,6 +198,79 @@ pub async fn run_generate_job() -> Result<(), anyhow::Error> {
                 {
                     log::error!(
                         "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Generate job for old data for compactor
+pub async fn run_generate_olddata_job() -> Result<(), anyhow::Error> {
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        // check backlist
+        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
+        {
+            continue;
+        }
+        for stream_type in ALL_STREAM_TYPES {
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in streams {
+                let Some(node_name) =
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
+                else {
+                    continue; // no compactor node
+                };
+                if LOCAL_NODE.name.ne(&node_name) {
+                    // Check if this node holds the stream
+                    if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    )
+                    .await
+                    {
+                        // release the stream
+                        db::compact::files::set_offset(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                            offset,
+                            None,
+                        )
+                        .await?;
+                    }
+                    continue; // not this node
+                }
+
+                // check if we are allowed to merge or just skip
+                if db::compact::retention::is_deleting_stream(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    None,
+                ) {
+                    log::warn!(
+                        "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    );
+                    continue;
+                }
+
+                if let Err(e) =
+                    merge::generate_olddata_job_by_stream(&org_id, stream_type, &stream_name).await
+                {
+                    log::error!(
+                        "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] error: {}",
                         org_id,
                         stream_type,
                         stream_name,
