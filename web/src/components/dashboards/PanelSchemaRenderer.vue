@@ -228,6 +228,11 @@ export default defineComponent({
       required: false,
       type: String,
     },
+    reportId: {
+      default: "",
+      required: false,
+      type: String,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -259,6 +264,7 @@ export default defineComponent({
       searchType,
       dashboardId,
       folderId,
+      reportId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -278,7 +284,8 @@ export default defineComponent({
       forceLoad,
       searchType,
       dashboardId,
-      folderId
+      folderId,
+      reportId,
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
