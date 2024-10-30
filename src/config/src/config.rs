@@ -1849,12 +1849,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.max_file_size = 512;
     }
     cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.interval == 0 {
-        cfg.compact.interval = 60;
-    }
-    if cfg.compact.pending_jobs_metric_interval == 0 {
-        cfg.compact.pending_jobs_metric_interval = 300;
-    }
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
@@ -1862,9 +1856,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.delete_files_delay_hours < 1 {
         cfg.compact.delete_files_delay_hours = 2;
-    }
-    if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
     }
 
     if cfg.compact.old_data_interval < 1 {
@@ -1878,6 +1869,13 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+
+    if cfg.compact.batch_size < 1 {
+        cfg.compact.batch_size = 100;
+    }
+    if cfg.compact.pending_jobs_metric_interval == 0 {
+        cfg.compact.pending_jobs_metric_interval = 300;
     }
 
     Ok(())
