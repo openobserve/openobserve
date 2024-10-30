@@ -397,6 +397,7 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
 
+      await page.waitForTimeout(3000);
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
@@ -435,6 +436,9 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrlsanity=100");
+
+      await page.waitForTimeout(3000);
+      
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page
       .locator(
