@@ -283,10 +283,20 @@ export const isTimeStamp = (sample: any) => {
   );
 };
 
-export function convertOffsetToSeconds(offset: string, endISOTimestamp: any) {
+export function convertOffsetToSeconds(
+  offset: string,
+  endISOTimestamp: number,
+) {
   try {
     const periodValue = parseInt(offset.slice(0, -1)); // Extract the numeric part
     const period = offset.slice(-1); // Extract the last character (unit)
+
+    if (isNaN(periodValue)) {
+      return {
+        seconds: 0,
+        periodAsStr: "",
+      };
+    }
 
     const subtractObject: any = {};
 
@@ -317,6 +327,11 @@ export function convertOffsetToSeconds(offset: string, endISOTimestamp: any) {
         subtractObject.months = periodValue;
         periodAsStr += " Months ago";
         break;
+      default:
+        return {
+          seconds: 0,
+          periodAsStr: "",
+        };
     }
 
     // subtract period from endISOTimestamp

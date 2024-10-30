@@ -49,6 +49,13 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
  */
 const PANEL_DATA_LOADER_DEBOUNCE_TIME = 50;
 
+const adjustTimestampByTimeRangeGap = (
+  timestamp: number,
+  timeRangeGapSeconds: number,
+) => {
+  return timestamp - timeRangeGapSeconds * 1000;
+};
+
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
@@ -463,8 +470,14 @@ export const usePanelDataLoader = (
                 const { query: query1, metadata: metadata1 } =
                   replaceQueryValue(
                     it.query,
-                    startISOTimestamp - timeRangeGap.seconds * 1000,
-                    endISOTimestamp - timeRangeGap.seconds * 1000,
+                    adjustTimestampByTimeRangeGap(
+                      startISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    adjustTimestampByTimeRangeGap(
+                      endISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
                     panelSchema.value.queryType,
                   );
 
@@ -477,8 +490,14 @@ export const usePanelDataLoader = (
                 const metadata: any = {
                   originalQuery: it.query,
                   query: query,
-                  startTime: startISOTimestamp - timeRangeGap.seconds * 1000,
-                  endTime: endISOTimestamp - timeRangeGap.seconds * 1000,
+                  startTime: adjustTimestampByTimeRangeGap(
+                    startISOTimestamp,
+                    timeRangeGap.seconds,
+                  ),
+                  endTime: adjustTimestampByTimeRangeGap(
+                    endISOTimestamp,
+                    timeRangeGap.seconds,
+                  ),
                   queryType: panelSchema.value.queryType,
                   variables: [...(metadata1 || []), ...(metadata2 || [])],
                   timeRangeGap: timeRangeGap,
@@ -489,8 +508,14 @@ export const usePanelDataLoader = (
                   metadata,
                   searchRequestObj: {
                     sql: query,
-                    start_time: startISOTimestamp - timeRangeGap.seconds * 1000,
-                    end_time: endISOTimestamp - timeRangeGap.seconds * 1000,
+                    start_time: adjustTimestampByTimeRangeGap(
+                      startISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    end_time: adjustTimestampByTimeRangeGap(
+                      endISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
                     query_fn: null,
                   },
                 });
