@@ -1026,12 +1026,6 @@ pub struct Limit {
         help = "Maximum size of a single enrichment table in mb"
     )]
     pub max_enrichment_table_size: usize,
-    #[env_config(
-        name = "ZO_BUFFER_FOR_MAX_TS",
-        default = 60,
-        help = "buffer for upper bound in mins"
-    )]
-    pub upper_bound_for_max_ts_mins: i64,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
 }
@@ -1418,10 +1412,6 @@ pub fn init() -> Config {
 
     if cfg.limit.consistent_hash_vnodes == 0 {
         cfg.limit.consistent_hash_vnodes = 100;
-    }
-
-    if cfg.limit.upper_bound_for_max_ts_mins == 0 {
-        cfg.limit.upper_bound_for_max_ts_mins = 60;
     }
 
     // check common config

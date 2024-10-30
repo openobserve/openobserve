@@ -363,7 +363,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
-            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end);
+            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
@@ -481,7 +481,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 DB_QUERY_NUMS
                 .with_label_values(&["select", "file_list"])
                 .inc();
-                    let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end);
+                    let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
                     let query = "SELECT id, records, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
@@ -534,7 +534,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let start = std::time::Instant::now();
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
         let cfg = get_config();
-        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end);
+        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
         let sql = r#"
 SELECT date
     FROM file_list 

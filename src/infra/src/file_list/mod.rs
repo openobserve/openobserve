@@ -16,12 +16,9 @@
 use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
-use config::{
-    get_config,
-    meta::{
-        meta_store::MetaStore,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    },
+use config::meta::{
+    meta_store::MetaStore,
+    stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
 };
 use once_cell::sync::Lazy;
 
@@ -457,8 +454,13 @@ fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
     Ok(())
 }
 
-fn calculate_max_ts_upper_bound(time_end: i64) -> i64 {
-    time_end + get_config().limit.upper_bound_for_max_ts_mins * 60 * 1_000_000
+fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+    let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
+    if ts > 0 {
+        time_end + ts
+    } else {
+        time_end + PartitionTimeLevel::Hourly.duration()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
