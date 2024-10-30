@@ -35,6 +35,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
@@ -95,6 +96,7 @@ pub async fn logs_json_handler(
 ) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = match in_stream_name {
@@ -318,6 +320,15 @@ pub async fn logs_json_handler(
                 if timestamp < min_ts {
                     stream_status.status.failed += 1; // to old data, just discard
                     stream_status.status.error = get_upto_discard_error().to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(log_ingestion_errors, &log, &stream_status.status.error);
                     continue;
                 }
                 local_val.insert(

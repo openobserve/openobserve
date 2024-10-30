@@ -16,7 +16,6 @@
 use std::io::Error as StdErr;
 
 use actix_web::{delete, get, post, web, HttpResponse};
-use config::utils::json;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
@@ -88,10 +87,7 @@ async fn create(
 async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
     let org_id = path.into_inner();
     match get_org_setting(&org_id).await {
-        Ok(s) => {
-            let data: OrganizationSetting = json::from_slice(&s).unwrap();
-            Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data }))
-        }
+        Ok(data) => Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data })),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();

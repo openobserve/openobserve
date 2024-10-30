@@ -28,6 +28,7 @@ use config::{
         stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
+    metrics,
     utils::{flatten, json::*},
     SIZE_IN_MB,
 };
@@ -55,7 +56,7 @@ use crate::{
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::{db, format_partition_key, logs::bulk::TRANSFORM_FAILED},
 };
 
 pub mod grpc;
@@ -118,21 +119,39 @@ pub fn apply_vrl_fn(
         Ok(res) => match res.try_into() {
             Ok(val) => val,
             Err(err) => {
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        stream_name,
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
                 log::error!(
-                    "{}/{} vrl failed at processing result {:?}. Returning original row.",
+                    "{}/{} vrl failed at processing result {:?} on record {:?}. Returning original row.",
                     org_id,
                     stream_name,
                     err,
+                    row
                 );
                 row.clone()
             }
         },
         Err(err) => {
+            metrics::INGEST_ERRORS
+                .with_label_values(&[
+                    org_id,
+                    StreamType::Logs.to_string().as_str(),
+                    stream_name,
+                    TRANSFORM_FAILED,
+                ])
+                .inc();
             log::error!(
-                "{}/{} vrl runtime failed at getting result {:?}. Returning original row.",
+                "{}/{} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
                 org_id,
                 stream_name,
                 err,
+                row
             );
             row.clone()
         }
