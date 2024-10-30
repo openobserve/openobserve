@@ -279,7 +279,10 @@ pub async fn generate_old_data_job_by_stream(
     for hour in hours {
         let column = hour.split('/').collect::<Vec<_>>();
         if column.len() != 4 {
-            return Err(anyhow::anyhow!("Unexpected hour format in '{}'", hour));
+            return Err(anyhow::anyhow!(
+                "Unexpected hour format in {}, Expected format YYYY/MM/DD/HH",
+                hour
+            ));
         }
         let offset = DateTime::parse_from_rfc3339(&format!(
             "{}-{}-{}T{}:00:00Z",

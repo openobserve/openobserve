@@ -1573,7 +1573,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.old_data_interval = 3600;
     }
     if cfg.compact.old_data_max_days < 1 {
-        cfg.compact.old_data_max_days = 15;
+        cfg.compact.old_data_max_days = 7;
     }
     if cfg.compact.old_data_min_records < 1 {
         cfg.compact.old_data_min_records = 100;
