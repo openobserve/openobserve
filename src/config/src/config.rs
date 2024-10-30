@@ -1450,6 +1450,11 @@ pub fn init() -> Config {
         panic!("disk cache config error: {e}");
     }
 
+    // check compact config
+    if let Err(e) = check_compact_config(&mut cfg) {
+        panic!("compact config error: {e}");
+    }
+
     // check etcd config
     if let Err(e) = check_etcd_config(&mut cfg) {
         panic!("etcd config error: {e}");
@@ -1551,45 +1556,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
         ));
-    }
-
-    // check compact settings
-    if cfg.compact.interval < 1 {
-        cfg.compact.interval = 60;
-    }
-    // check compact_max_file_size to MB
-    cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.interval == 0 {
-        cfg.compact.interval = 60;
-    }
-    if cfg.compact.pending_jobs_metric_interval == 0 {
-        cfg.compact.pending_jobs_metric_interval = 300;
-    }
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
-        return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
-        ));
-    }
-    if cfg.compact.delete_files_delay_hours < 1 {
-        return Err(anyhow::anyhow!(
-            "Delete files delay is not allowed to be less than 1 hour."
-        ));
-    }
-    if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
-    }
-
-    if cfg.compact.old_data_interval < 1 {
-        cfg.compact.old_data_interval = 3600;
-    }
-    if cfg.compact.old_data_max_days < 1 {
-        cfg.compact.old_data_max_days = 7;
-    }
-    if cfg.compact.old_data_min_records < 1 {
-        cfg.compact.old_data_min_records = 100;
-    }
-    if cfg.compact.old_data_min_files < 1 {
-        cfg.compact.old_data_min_files = 10;
     }
 
     // If the default scrape interval is less than 5s, raise an error
@@ -1869,6 +1835,50 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
+
+    Ok(())
+}
+
+fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // check compact settings
+    if cfg.compact.interval < 1 {
+        cfg.compact.interval = 60;
+    }
+    // check compact_max_file_size to MB
+    if cfg.compact.max_file_size < 1 {
+        cfg.compact.max_file_size = 512;
+    }
+    cfg.compact.max_file_size *= 1024 * 1024;
+    if cfg.compact.interval == 0 {
+        cfg.compact.interval = 60;
+    }
+    if cfg.compact.pending_jobs_metric_interval == 0 {
+        cfg.compact.pending_jobs_metric_interval = 300;
+    }
+    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
+        return Err(anyhow::anyhow!(
+            "Data retention is not allowed to be less than 3 days."
+        ));
+    }
+    if cfg.compact.delete_files_delay_hours < 1 {
+        cfg.compact.delete_files_delay_hours = 2;
+    }
+    if cfg.compact.batch_size < 1 {
+        cfg.compact.batch_size = 100;
+    }
+
+    if cfg.compact.old_data_interval < 1 {
+        cfg.compact.old_data_interval = 3600;
+    }
+    if cfg.compact.old_data_max_days < 1 {
+        cfg.compact.old_data_max_days = 7;
+    }
+    if cfg.compact.old_data_min_records < 1 {
+        cfg.compact.old_data_min_records = 100;
+    }
+    if cfg.compact.old_data_min_files < 1 {
+        cfg.compact.old_data_min_files = 10;
+    }
 
     Ok(())
 }
