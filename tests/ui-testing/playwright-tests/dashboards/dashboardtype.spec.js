@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
-import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
+
 const fs = require('fs');
 const { PNG } = require('pngjs');
 const pixelmatch = require('pixelmatch');

@@ -118,330 +118,330 @@ test.describe("Logs UI testcases", () => {
     await page.getByText("No column found in selected stream.").click();
   });
 
-  // test("should be able to enter valid text in VRL and run query", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await applyQueryButton(page);
+  test("should be able to enter valid text in VRL and run query", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await applyQueryButton(page);
 
 
-  //   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
-  //   await page.waitForTimeout(1000);
-  //   await applyQueryButton(page);
-  //   const warningElement = page.locator('text=warning Query execution');
-  //   await expect(warningElement).toBeHidden()
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
+    await applyQueryButton(page);
+    const warningElement = page.locator('text=warning Query execution');
+    await expect(warningElement).toBeHidden()
   
-  //   await page
-  //     .locator('[data-test="table-row-expand-menu"]')
-  //     .first()
-  //     .click({ force: true });
-  //   await expect(page.locator("text=.a=2")).toBeVisible();
-  //   await expect(
-  //     page.locator('[data-test="logs-search-result-logs-table"]')
-  //   ).toBeVisible();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  // });
+    await page
+      .locator('[data-test="table-row-expand-menu"]')
+      .first()
+      .click({ force: true });
+    await expect(page.locator("text=.a=2")).toBeVisible();
+    await expect(
+      page.locator('[data-test="logs-search-result-logs-table"]')
+    ).toBeVisible();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  });
 
-  // test("should hide and display again after clicking the arrow", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page
-  //     .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
-  //     .click({ force: true });
-  //   await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-  //   await page.waitForTimeout(1000)
-  //   await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-  //   // await page
-  //   //   .locator(".bg-primary > .q-btn__content > .q-icon")
-  //   //   .click({ force: true });
-  //   // await page.waitForTimeout(2000);
-  //   // await page
-  //   //   .locator(".bg-primary > .q-btn__content > .q-icon")
-  //   //   .click({ force: true });
-  //   await expect(
-  //     page.locator('[data-cy="index-field-search-input"]')
-  //   ).toBeVisible();
-  // });
+  test("should hide and display again after clicking the arrow", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await page
+      .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
+      .click({ force: true });
+    await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+    await page.waitForTimeout(1000)
+    await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+    // await page
+    //   .locator(".bg-primary > .q-btn__content > .q-icon")
+    //   .click({ force: true });
+    // await page.waitForTimeout(2000);
+    // await page
+    //   .locator(".bg-primary > .q-btn__content > .q-icon")
+    //   .click({ force: true });
+    await expect(
+      page.locator('[data-cy="index-field-search-input"]')
+    ).toBeVisible();
+  });
 
-  // test("should verify if special characters allowed in saved views name", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page
-  //     .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
-  //     .click({ force: true });
-  //   await page
-  //     .locator(
-  //       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)'
-  //     )
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page.locator('[data-test="add-alert-name-input"]').type("e2e@@@@@");
-  //   await page.waitForTimeout(2000);
-  //   await page
-  //     .locator('[data-test="saved-view-dialog-save-btn"]')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await expect(page.locator(".q-notification__message")).toContainText(
-  //     "Please provide valid view name"
-  //   );
-  // });
+  test("should verify if special characters allowed in saved views name", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await page
+      .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
+      .click({ force: true });
+    await page
+      .locator(
+        '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)'
+      )
+      .click({
+        force: true,
+      });
+    await page.locator('[data-test="add-alert-name-input"]').type("e2e@@@@@");
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="saved-view-dialog-save-btn"]')
+      .click({
+        force: true,
+      });
+    await expect(page.locator(".q-notification__message")).toContainText(
+      "Please provide valid view name"
+    );
+  });
 
-  // test("should allow alphanumeric name under saved view", async ({ page }) => {
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page
-  //     .locator('[data-test="logs-search-saved-views-btn"]')
-  //     .getByLabel("Expand")
-  //     .click();
-  //   await page
-  //     .locator("button")
-  //     .filter({ hasText: "savesaved_search" })
-  //     .click();
-  //   await page.locator('[data-test="add-alert-name-input"]').click();
-  //   await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
-  //   await page
-  //     .locator('[data-test="saved-view-dialog-save-btn"]')
-  //     .click({ force: true });
-  //   await page.waitForTimeout(5000);
-  //   await page
-  //     .locator('[data-test="logs-search-saved-views-btn"]')
-  //     .getByLabel("Expand")
-  //     .click();
-  //   await page
-  //     .locator('[data-test="log-search-saved-view-field-search-input"]')
-  //     .click({ force: true });
-  //   await page
-  //     .locator('[data-test="log-search-saved-view-field-search-input"]')
-  //     .fill("e2enewtest");
-  //   await page.waitForTimeout(3000);
-  //   await page.getByText("e2enewtest").click();
-  //   await page
-  //     .locator('[data-test="logs-search-saved-views-btn"]')
-  //     .getByLabel("Expand")
-  //     .click();
-  //   await page
-  //     .locator('[data-test="log-search-saved-view-field-search-input"]')
-  //     .click();
-  //   await page
-  //     .locator('[data-test="log-search-saved-view-field-search-input"]')
-  //     .fill("e2enewtest");
-  //   await page.getByText("delete").click();
-  //   await page.locator('[data-test="confirm-button"]').click();
-  // });
+  test("should allow alphanumeric name under saved view", async ({ page }) => {
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page
+      .locator('[data-test="logs-search-saved-views-btn"]')
+      .getByLabel("Expand")
+      .click();
+    await page
+      .locator("button")
+      .filter({ hasText: "savesaved_search" })
+      .click();
+    await page.locator('[data-test="add-alert-name-input"]').click();
+    await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
+    await page
+      .locator('[data-test="saved-view-dialog-save-btn"]')
+      .click({ force: true });
+    await page.waitForTimeout(5000);
+    await page
+      .locator('[data-test="logs-search-saved-views-btn"]')
+      .getByLabel("Expand")
+      .click();
+    await page
+      .locator('[data-test="log-search-saved-view-field-search-input"]')
+      .click({ force: true });
+    await page
+      .locator('[data-test="log-search-saved-view-field-search-input"]')
+      .fill("e2enewtest");
+    await page.waitForTimeout(3000);
+    await page.getByText("e2enewtest").click();
+    await page
+      .locator('[data-test="logs-search-saved-views-btn"]')
+      .getByLabel("Expand")
+      .click();
+    await page
+      .locator('[data-test="log-search-saved-view-field-search-input"]')
+      .click();
+    await page
+      .locator('[data-test="log-search-saved-view-field-search-input"]')
+      .fill("e2enewtest");
+    await page.getByText("delete").click();
+    await page.locator('[data-test="confirm-button"]').click();
+  });
 
-  // test("should display error when user directly clicks on OK without adding name", async ({
-  //   page,
-  // }) => {
-  //   // Click on the date-time button
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page
-  //     .locator('[data-test="logs-search-saved-views-btn"]')
-  //     .getByLabel("Expand")
-  //     .click();
-  //   await page
-  //     .locator("button")
-  //     .filter({ hasText: "savesaved_search" })
-  //     .click();
-  //   await page.locator('[data-test="add-alert-name-input"]');
-  //   const saveButton = await page.locator(
-  //     '[data-test="saved-view-dialog-save-btn"]'
-  //   );
-  //   await saveButton.scrollIntoViewIfNeeded();
-  //   await saveButton.click({ force: true });
-  //   // await expect(page.locator('.q-notification__message')).toContainText('Please provide valid view name');
-  // });
+  test("should display error when user directly clicks on OK without adding name", async ({
+    page,
+  }) => {
+    // Click on the date-time button
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page
+      .locator('[data-test="logs-search-saved-views-btn"]')
+      .getByLabel("Expand")
+      .click();
+    await page
+      .locator("button")
+      .filter({ hasText: "savesaved_search" })
+      .click();
+    await page.locator('[data-test="add-alert-name-input"]');
+    const saveButton = await page.locator(
+      '[data-test="saved-view-dialog-save-btn"]'
+    );
+    await saveButton.scrollIntoViewIfNeeded();
+    await saveButton.click({ force: true });
+    // await expect(page.locator('.q-notification__message')).toContainText('Please provide valid view name');
+  });
 
-  // test("should display the details of logs results on graph", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({ force: true });
-  //   await applyQueryButton(page);
-  //   await page.waitForTimeout(5000);
-  //   await expect(
-  //     page.locator(".search-list > :nth-child(1) > .text-left")
-  //   ).toBeVisible();
-  //   await page.waitForTimeout(2000);
-  //   await page.locator('[data-test="log-table-column-0-source"]').click();
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="close-dialog"]').click({
-  //     force: true,
-  //   });
-  //   await expect(
-  //     page.locator(".search-list > :nth-child(1) > .text-left")
-  //   ).not.toBeHidden();
-  // });
+  test("should display the details of logs results on graph", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+      .click({ force: true });
+    await applyQueryButton(page);
+    await page.waitForTimeout(5000);
+    await expect(
+      page.locator(".search-list > :nth-child(1) > .text-left")
+    ).toBeVisible();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="log-table-column-0-source"]').click();
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="close-dialog"]').click({
+      force: true,
+    });
+    await expect(
+      page.locator(".search-list > :nth-child(1) > .text-left")
+    ).not.toBeHidden();
+  });
 
-  // test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
-  //   page,
-  // }) => {
-  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
+  test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
+    page,
+  }) => {
+    await page.route("**/logData.ValueQuery", (route) => route.continue());
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page
-  //     .locator(".q-pl-sm > .q-btn > .q-btn__content")
-  //     .click({ force: true });
-  //   await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
-  //     force: true,
-  //   });
-  //   await expect(page.locator(".q-notification__message")).toContainText(
-  //     "Live mode is enabled"
-  //   );
-  //   await page
-  //     .locator(".q-pl-sm > .q-btn > .q-btn__content")
-  //     .click({ force: true });
-  //   await page
-  //     .locator(
-  //       '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
-  //     )
-  //     .click({ force: true });
-  //   await applyQueryButton(page);
-  // });
+    await page
+      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await page
+      .locator(".q-pl-sm > .q-btn > .q-btn__content")
+      .click({ force: true });
+    await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
+      force: true,
+    });
+    await expect(page.locator(".q-notification__message")).toContainText(
+      "Live mode is enabled"
+    );
+    await page
+      .locator(".q-pl-sm > .q-btn > .q-btn__content")
+      .click({ force: true });
+    await page
+      .locator(
+        '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
+      )
+      .click({ force: true });
+    await applyQueryButton(page);
+  });
 
-  // test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", async ({
-  //   page,
-  // }) => {
-  //   await expect(page.locator("#fnEditor .view-lines")).toBeVisible();
-  //   await page
-  //     .locator(
-  //       '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
-  //     )
-  //     .click({ force: true });
-  //   await expect(page.locator("#fnEditor .view-lines")).not.toBeVisible();
-  // });
+  test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", async ({
+    page,
+  }) => {
+    await expect(page.locator("#fnEditor .view-lines")).toBeVisible();
+    await page
+      .locator(
+        '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
+      )
+      .click({ force: true });
+    await expect(page.locator("#fnEditor .view-lines")).not.toBeVisible();
+  });
 
-  // test("should switch from past 6 weeks to past 6 days on date-time UI", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({ force: true });
-  //   await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
-  //     "Past 6 Weeks"
-  //   );
-  //   await applyQueryButton(page);
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-d-btn"]')
-  //     .click({ force: true });
-  //   await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
-  //     "Past 6 Days"
-  //   );
-  //   await applyQueryButton(page);
-  // });
-  // test("should display SQL query on switching between Menu options & navigating to Logs again", async ({
-  //   page,
-  // }) => {
-  //   // Intercept the GET request, replace 'logData.ValueQuery' with your actual endpoint
-  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
+  test("should switch from past 6 weeks to past 6 days on date-time UI", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+      .click({ force: true });
+    await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
+      "Past 6 Weeks"
+    );
+    await applyQueryButton(page);
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="date-time-relative-6-d-btn"]')
+      .click({ force: true });
+    await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
+      "Past 6 Days"
+    );
+    await applyQueryButton(page);
+  });
+  test("should display SQL query on switching between Menu options & navigating to Logs again", async ({
+    page,
+  }) => {
+    // Intercept the GET request, replace 'logData.ValueQuery' with your actual endpoint
+    await page.route("**/logData.ValueQuery", (route) => route.continue());
 
-  //   // Click on the date-time button
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    // Click on the date-time button
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
-  //   // Click on the SQL Mode toggle
-  //   await page.locator('[aria-label="SQL Mode"]').click({ force: true });
+    // Click on the SQL Mode toggle
+    await page.locator('[aria-label="SQL Mode"]').click({ force: true });
 
-  //   // Assert that the SQL query is visible
-  //   const expectedQuery =
-  //     'SELECT * FROM "e2e_automate"';
-  //   const text = await page.evaluate(() => {
-  //     const editor = document
-  //       .querySelector('[data-test="logs-search-bar-query-editor"]')
-  //       .querySelector(".view-lines"); // Adjust selector if needed
-  //     return editor ? editor.textContent.trim() : null;
-  //   });
+    // Assert that the SQL query is visible
+    const expectedQuery =
+      'SELECT * FROM "e2e_automate"';
+    const text = await page.evaluate(() => {
+      const editor = document
+        .querySelector('[data-test="logs-search-bar-query-editor"]')
+        .querySelector(".view-lines"); // Adjust selector if needed
+      return editor ? editor.textContent.trim() : null;
+    });
 
-  //   console.log(text);
-  //   await expect(text.replace(/\s/g, "")).toContain(
-  //     expectedQuery.replace(/\s/g, "")
-  //   );
-  //   await page.locator('[data-test="menu-link-/-item"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="menu-link-/logs-item"]')
-  //     .click({ force: true });
-  //   await page.waitForTimeout(2000);
-  //   await page
-  //     .locator('[data-test="logs-search-bar-query-editor"]')
-  //     .getByRole("code")
-  //     .locator("div")
-  //     .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
-  //     .nth(4);
-  // });
-  // test("should display ingested logs - search logs, navigate on another tab, revisit logs page", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator(
-  //       '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block'
-  //     )
-  //     .click({ force: true });
-  //   await applyQueryButton(page);
-  //   await page
-  //     .locator('[data-test="menu-link-/traces-item"]')
-  //     .click({ force: true });
-  //   await page.waitForTimeout(100);
-  //   await page
-  //     .locator('[data-test="menu-link-/logs-item"]')
-  //     .click({ force: true });
-  //   await page.waitForTimeout(5000);
-  //   const barChart = await page.locator(
-  //     '[data-test="logs-search-result-bar-chart"]'
-  //   );
-  //   await expect(barChart).toBeTruthy();
-  // });
+    console.log(text);
+    await expect(text.replace(/\s/g, "")).toContain(
+      expectedQuery.replace(/\s/g, "")
+    );
+    await page.locator('[data-test="menu-link-/-item"]').click({ force: true });
+    await page
+      .locator('[data-test="menu-link-/logs-item"]')
+      .click({ force: true });
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("code")
+      .locator("div")
+      .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
+      .nth(4);
+  });
+  test("should display ingested logs - search logs, navigate on another tab, revisit logs page", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator(
+        '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block'
+      )
+      .click({ force: true });
+    await applyQueryButton(page);
+    await page
+      .locator('[data-test="menu-link-/traces-item"]')
+      .click({ force: true });
+    await page.waitForTimeout(100);
+    await page
+      .locator('[data-test="menu-link-/logs-item"]')
+      .click({ force: true });
+    await page.waitForTimeout(5000);
+    const barChart = await page.locator(
+      '[data-test="logs-search-result-bar-chart"]'
+    );
+    await expect(barChart).toBeTruthy();
+  });
 
-  // test("should redirect to logs after clicking on stream explorer via stream page", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page
-  //     .locator('[data-test="menu-link-/streams-item"]')
-  //     .click({ force: true });
-  //   await page.waitForTimeout(1000);
-  //   await page
-  //     .locator('[data-test="menu-link-\\/streams-item"]')
-  //     .click({ force: true });
-  //   await page.getByPlaceholder("Search Stream").click();
-  //   await page.getByPlaceholder("Search Stream").fill("e2e");
-  //   await page
-  //     .getByRole("button", { name: "Explore" })
-  //     .first()
-  //     .click({ force: true });
-  //   await expect(page.url()).toContain("logs");
-  // });
+  test("should redirect to logs after clicking on stream explorer via stream page", async ({
+    page,
+  }) => {
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page
+      .locator('[data-test="menu-link-/streams-item"]')
+      .click({ force: true });
+    await page.waitForTimeout(1000);
+    await page
+      .locator('[data-test="menu-link-\\/streams-item"]')
+      .click({ force: true });
+    await page.getByPlaceholder("Search Stream").click();
+    await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page
+      .getByRole("button", { name: "Explore" })
+      .first()
+      .click({ force: true });
+    await expect(page.url()).toContain("logs");
+  });
 
-  // test('should display error when save function is clicked without any VRL function', async ({ page }) => {
-  //   // await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  //   await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
-  //   await page.locator('#q-notify div').filter({ hasText: 'warningNo function definition' }).nth(3).click();
-  // });
+  test('should display error when save function is clicked without any VRL function', async ({ page }) => {
+    // await page.locator('[data-test="menu-link-\\/logs-item"]').click();
+    await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
+    await page.locator('#q-notify div').filter({ hasText: 'warningNo function definition' }).nth(3).click();
+  });
 
   test('should create a function and then delete it', async ({ page }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -464,123 +464,123 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  // test('should display click save directly while creating a function', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
-  //   await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
-  //   await page.getByText('Function name is not valid.').click();
-  // });
+  test('should display click save directly while creating a function', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
+    await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
+    await page.getByText('Function name is not valid.').click();
+  });
 
-  // test('should display error on adding only blank spaces under function name', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
-  //   await page.locator('[data-test="saved-function-name-input"]').fill(' ');
-  //   await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
-  //   await page.getByText('Function name is not valid.').click();
-  // });
-
-
-  // test('should display error on adding invalid characters under function name', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
-  //   await page.locator('[data-test="saved-function-name-input"]').fill('e2e@@@');
-  //   await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
-  //   await page.getByText('Function name is not valid.').click();
-  // });
-
-  // test('should display added function on switching between tabs and again navigate to log', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.locator('[data-test="menu-link-\\/metrics-item"]').click();
-  //   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  //   await page.locator('[data-test="menu-link-/logs-item"]').click({ force: true });
-  //   // Assert that ".a=2" is visible
-  //   const logsPage = await page.locator('.q-page-container');
-  //   await expect(logsPage).toContainText(".a=2");
-
-  // });
-
-  // test('should display bar chart when histogram toggle is on', async ({ page }) => {
-  //   await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-  //   await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('code');
-  //   await page.waitForTimeout(4000);
-  //   await page.getByLabel('Expand "code"').click();
-  //   await page.waitForTimeout(4000);
-  //   // await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.getByLabel('SQL Mode').locator('div').nth(2).click();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
-  //   });
-  //   await page.getByLabel('SQL Mode').locator('div').nth(2).click();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
-  //   });
-  //   await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
-  // });
-
-  // test('should display search around in histogram mode', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="log-table-column-0-source"]').click();
-  //   await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-  //   await page.waitForTimeout(2000);
-  //   const element = await page.locator('[data-test="log-table-column-0-source"]');
-  //   const isVisible = await element.isVisible();
-  //   expect(isVisible).toBeTruthy();
-
-  // });
+  test('should display error on adding only blank spaces under function name', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
+    await page.locator('[data-test="saved-function-name-input"]').fill(' ');
+    await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
+    await page.getByText('Function name is not valid.').click();
+  });
 
 
-  // test.skip('should display results for search around after adding function', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
-  //   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
-  //   await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-  //   await page.waitForTimeout(1000);
-  //   const element = await page.locator('[data-test="log-table-column-0-source"]');
-  //   const isVisible = await element.isVisible();
-  //   expect(isVisible).toBeTruthy();
+  test('should display error on adding invalid characters under function name', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
+    await page.locator('[data-test="saved-function-name-input"]').fill('e2e@@@');
+    await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
+    await page.getByText('Function name is not valid.').click();
+  });
 
-  // });
+  test('should display added function on switching between tabs and again navigate to log', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="menu-link-\\/metrics-item"]').click();
+    await page.locator('[data-test="menu-link-\\/logs-item"]').click();
+    await page.locator('[data-test="menu-link-/logs-item"]').click({ force: true });
+    // Assert that ".a=2" is visible
+    const logsPage = await page.locator('.q-page-container');
+    await expect(logsPage).toContainText(".a=2");
 
-  // test('should display search around in SQL mode', async ({ page }) => {
-  //   await page.waitForTimeout(1000);
-  //   await page.getByLabel('SQL Mode').locator('div').nth(2).click();
-  //   await page.locator('[data-test="log-table-column-0-source"]').click();
-  //   await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-  //   await page.waitForTimeout(2000)
-  //   const element = await page.locator('[data-test="log-table-column-0-source"]');
-  //   const isVisible = await element.isVisible();
-  //   expect(isVisible).toBeTruthy();
+  });
 
-  // });
+  test('should display bar chart when histogram toggle is on', async ({ page }) => {
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('code');
+    await page.waitForTimeout(4000);
+    await page.getByLabel('Expand "code"').click();
+    await page.waitForTimeout(4000);
+    // await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+    });
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+    });
+    await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+  });
 
-  // test("should display results for search around with limit query", async ({ page }) => {
-  //   await page.waitForTimeout(2000);
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-  //   await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-  //   await page.click('[data-test="logs-search-bar-query-editor"]')
-  //   await page.keyboard.type("match_all('code') limit 5");
-  //   await page.waitForTimeout(2000);
-  //   await page.getByLabel('SQL Mode').locator('div').nth(2).click();
-  //   await page.waitForTimeout(2000);
-  //   await page.locator('[data-test="log-table-column-0-source"]').click();
-  //   await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-  //   await page.waitForTimeout(2000);
-  //   const element = await page.locator('[data-test="log-table-column-0-source"]');
-  //   const isVisible = await element.isVisible();
-  //   expect(isVisible).toBeTruthy();
-  //   await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
-  // });
+  test('should display search around in histogram mode', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="log-table-column-0-source"]').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000);
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+
+  });
+
+
+  test.skip('should display results for search around after adding function', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(1000);
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+
+  });
+
+  test('should display search around in SQL mode', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000)
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+
+  });
+
+  test("should display results for search around with limit query", async ({ page }) => {
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+    await page.click('[data-test="logs-search-bar-query-editor"]')
+    await page.keyboard.type("match_all('code') limit 5");
+    await page.waitForTimeout(2000);
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="log-table-column-0-source"]').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000);
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
 });
