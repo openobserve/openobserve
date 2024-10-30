@@ -512,6 +512,7 @@ test.describe("Sanity testcases", () => {
     await page.getByRole('option', { name: 'e2e_automate' }).click({force:true});
     await page.waitForTimeout(2000);
     await page.locator('[data-test="clone-alert-submit-btn"]').click();
+    await page.getByText('Alert Cloned Successfully').click();
  
   
     // Delete the cloned alert
