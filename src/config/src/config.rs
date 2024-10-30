@@ -1840,20 +1840,20 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    // check compact settings
-    if cfg.compact.interval < 1 {
-        cfg.compact.interval = 60;
-    }
-    // check compact_max_file_size to MB
-    if cfg.compact.max_file_size < 1 {
-        cfg.compact.max_file_size = 512;
-    }
-    cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
         ));
     }
+    if cfg.compact.interval < 1 {
+        cfg.compact.interval = 60;
+    }
+
+    // check compact_max_file_size to MB
+    if cfg.compact.max_file_size < 1 {
+        cfg.compact.max_file_size = 512;
+    }
+    cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.delete_files_delay_hours < 1 {
         cfg.compact.delete_files_delay_hours = 2;
     }
