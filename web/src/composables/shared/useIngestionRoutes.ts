@@ -35,6 +35,7 @@ import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
 import Recommended from "@/components/ingestion/Recommended.vue";
 import Custom from "@/components/ingestion/Custom.vue";
+import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
@@ -112,6 +113,14 @@ const useIngestionRoutes = () => {
                   path: "otel",
                   name: "ingestLogsFromOtel",
                   component: OtelConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "logstash",
+                  name: "logstash",
+                  component: LogstashDatasource,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
