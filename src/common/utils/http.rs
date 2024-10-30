@@ -97,7 +97,7 @@ pub(crate) fn get_search_event_context_from_request(
         SearchEventType::Alerts => Some(SearchEventContext::with_alert(
             query.get("alert_key").map(String::from),
         )),
-        SearchEventType::Reports => Some(SearchEventContext::with_alert(
+        SearchEventType::Reports => Some(SearchEventContext::with_report(
             query.get("report_id").map(String::from),
         )),
         _ => None,
