@@ -25,7 +25,6 @@ import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
-  convertSecondsToOffset,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -73,10 +72,8 @@ export const convertMultiSQLData = async (
           ...options[i].options.series.map((it: any) => {
             return {
               ...it,
-              name: metadata?.queries[i]?.timeRangeGap
-                ? `${it.name} (${convertSecondsToOffset(
-                    metadata?.queries[i]?.timeRangeGap
-                  )} ago) `
+              name: metadata?.queries[i]?.timeRangeGap.periodAsStr
+                ? `${it.name} (${metadata?.queries[i]?.timeRangeGap.periodAsStr})`
                 : it.name,
             };
           }),
@@ -1824,8 +1821,8 @@ export const convertSQLData = async (
               // need to consider time range gap
               x = toZonedTime(
                 new Date(options.xAxis[0].data[index] + "Z").getTime() +
-                  metadata?.queries[0]?.timeRangeGap ?? 0,
-                store.state.timezone
+                  metadata?.queries[0]?.timeRangeGap.seconds ?? 0,
+                store.state.timezone,
               );
               timeStringCache[xKey] = x;
             }
@@ -1841,8 +1838,8 @@ export const convertSQLData = async (
               // need to consider time range gap
               x = toZonedTime(
                 (new Date(options.xAxis[0].data[index]).getTime() +
-                  metadata?.queries[0]?.timeRangeGap ?? 0) / 1000,
-                store.state.timezone
+                  metadata?.queries[0]?.timeRangeGap.seconds ?? 0) / 1000,
+                store.state.timezone,
               );
               timeStringCache[xKey] = x;
             }
@@ -1984,8 +1981,8 @@ export const convertSQLData = async (
             // need to consider time range gap
             toZonedTime(
               new Date(options.xAxis[0].data[index] + "Z").getTime() +
-                metadata?.queries[0]?.timeRangeGap ?? 0,
-              store.state.timezone
+                metadata?.queries[0]?.timeRangeGap.seconds ?? 0,
+              store.state.timezone,
             ),
             it ?? null,
           ]);
@@ -1994,8 +1991,8 @@ export const convertSQLData = async (
             // need to consider time range gap
             toZonedTime(
               (new Date(options.xAxis[0].data[index]).getTime() +
-                metadata?.queries[0]?.timeRangeGap ?? 0) / 1000,
-              store.state.timezone
+                metadata?.queries[0]?.timeRangeGap.seconds ?? 0) / 1000,
+              store.state.timezone,
             ),
             it ?? null,
           ]);
