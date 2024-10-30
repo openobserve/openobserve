@@ -1,3 +1,5 @@
+import { date } from "quasar";
+
 const units: any = {
   bytes: [
     { unit: "B", divisor: 1 },
@@ -281,43 +283,75 @@ export const isTimeStamp = (sample: any) => {
   );
 };
 
-export function convertOffsetToSeconds(offset: string) {
-  const value = parseInt(offset.slice(0, -1)); // Extract the numeric part
-  const unit = offset.slice(-1); // Extract the last character (unit)
+export function convertOffsetToSeconds(
+  offset: string,
+  endISOTimestamp: number,
+) {
+  try {
+    const periodValue = parseInt(offset.slice(0, -1)); // Extract the numeric part
+    const period = offset.slice(-1); // Extract the last character (unit)
 
-  switch (unit) {
-    case "m": // Minutes
-      return value * 60 * 1000;
-    case "h": // Hours
-      return value * 60 * 60 * 1000;
-    case "d": // Days
-      return value * 24 * 60 * 60 * 1000;
-    case "w": // Weeks
-      return value * 7 * 24 * 60 * 60 * 1000;
-    case "M": // Months (approximate, using 30.44 days per month)
-      return value * 30.44 * 24 * 60 * 60 * 1000;
-    default:
-      return 0; // Return 0 if the unit is not recognized
-  }
-}
-
-export function convertSecondsToOffset(seconds: number): string {
-  const units = [
-    { unit: "Months", factor: 30.44 * 24 * 60 * 60 * 1000 }, // Months (approximate)
-    { unit: "Weeks", factor: 7 * 24 * 60 * 60 * 1000 }, // Weeks
-    { unit: "Days", factor: 24 * 60 * 60 * 1000 }, // Days
-    { unit: "Hours", factor: 60 * 60 * 1000 }, // Hours
-    { unit: "Minutes", factor: 60 * 1000 }, // Minutes
-  ];
-
-  for (const { unit, factor } of units) {
-    const value = Math.floor(seconds / factor);
-    if (value > 0) {
-      return `${value} ${unit}`;
+    if (isNaN(periodValue)) {
+      return {
+        seconds: 0,
+        periodAsStr: "",
+      };
     }
-  }
 
-  return "0 Minutes"; // Return "0m" if seconds is 0 or less
+    const subtractObject: any = {};
+
+    let periodAsStr = periodValue.toString();
+
+    switch (period) {
+      case "s": // Seconds
+        subtractObject.seconds = periodValue;
+        periodAsStr += " Seconds ago";
+        break;
+      case "m": // Minutes
+        subtractObject.minutes = periodValue;
+        periodAsStr += " Minutes ago";
+        break;
+      case "h": // Hours
+        subtractObject.hours = periodValue;
+        periodAsStr += " Hours ago";
+        break;
+      case "d": // Days
+        subtractObject.days = periodValue;
+        periodAsStr += " Days ago";
+        break;
+      case "w": // Weeks
+        subtractObject.days = periodValue * 7;
+        periodAsStr += " Weeks ago";
+        break;
+      case "M": // Months (approximate, using 30 days per month)
+        subtractObject.months = periodValue;
+        periodAsStr += " Months ago";
+        break;
+      default:
+        return {
+          seconds: 0,
+          periodAsStr: "",
+        };
+    }
+
+    // subtract period from endISOTimestamp
+    const startTimeStamp = date.subtractFromDate(
+      endISOTimestamp,
+      subtractObject,
+    );
+
+    // return difference of seconds between endISOTimestamp and startTimeStamp
+    return {
+      seconds: endISOTimestamp - startTimeStamp.getTime(),
+      periodAsStr: periodAsStr,
+    };
+  } catch (error) {
+    console.log(error);
+    return {
+      seconds: 0,
+      periodAsStr: "",
+    };
+  }
 }
 
 // will find first valid mapped value based on given fieldToCheck

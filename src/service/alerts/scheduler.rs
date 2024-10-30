@@ -23,7 +23,11 @@ use config::{
         stream::{StreamParams, StreamType},
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    utils::{json, rand::get_rand_num_within},
+    utils::{
+        json,
+        rand::get_rand_num_within,
+        time::{hour_micros, second_micros},
+    },
 };
 use cron::Schedule;
 use futures::future::try_join_all;
@@ -91,11 +95,8 @@ fn get_max_considerable_delay(frequency: i64) -> i64 {
     // If the delay is more than this, the alert will be skipped.
     // The maximum delay is the lowest of 1 hour or 20% of the frequency.
     // E.g. if the frequency is 5 mins, the maximum delay is 1 min.
-    let frequency = Duration::try_seconds(frequency)
-        .unwrap()
-        .num_microseconds()
-        .unwrap();
-    let max_delay = Duration::try_hours(1).unwrap().num_microseconds().unwrap();
+    let frequency = second_micros(frequency);
+    let max_delay = hour_micros(1);
     // limit.alert_considerable_delay is in percentage, convert into float
     let considerable_delay = get_config().limit.alert_considerable_delay as f64 * 0.01;
     let max_considerable_delay = (frequency as f64 * considerable_delay) as i64;

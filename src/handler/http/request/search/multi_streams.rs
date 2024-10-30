@@ -276,6 +276,9 @@ pub async fn search_multi(
             }
         }
 
+        // add search type to request
+        req.search_type = search_type;
+
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&org_id])
             .inc();
