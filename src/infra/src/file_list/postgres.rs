@@ -563,7 +563,7 @@ SELECT date
             .bind(time_start)
             .bind(max_ts_upper_bound)
             .bind(time_end)
-            .bind(cfg.compact.old_data_records)
+            .bind(cfg.compact.old_data_min_records)
             .fetch_all(&pool)
             .await?;
 

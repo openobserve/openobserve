@@ -1054,8 +1054,8 @@ pub struct Compact {
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
-    #[env_config(name = "ZO_COMPACT_OLD_DATA_RECORDS", default = 100)] // records
-    pub old_data_records: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
+    pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
@@ -1573,8 +1573,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_max_days < 1 {
         cfg.compact.old_data_max_days = 15;
     }
-    if cfg.compact.old_data_records < 1 {
-        cfg.compact.old_data_records = 100;
+    if cfg.compact.old_data_min_records < 1 {
+        cfg.compact.old_data_min_records = 100;
     }
 
     // If the default scrape interval is less than 5s, raise an error
