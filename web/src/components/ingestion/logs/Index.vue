@@ -126,6 +126,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           content-class="tab_content"
         />
         <q-route-tab
+          name="logstash"
+          :to="{
+            name: 'logstash',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
+          label="Logstash"
+          content-class="tab_content"
+        />
+        <q-route-tab
           v-if="showSyslog"
           name="syslogNg"
           :to="{
@@ -194,7 +206,7 @@ export default defineComponent({
     const confirmUpdate = ref<boolean>(false);
     const ingestiontabs = ref("");
     const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
     );
     const ingestRoutes = [
       "curl",
