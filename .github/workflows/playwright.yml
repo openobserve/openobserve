@@ -190,7 +190,7 @@ jobs:
           mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
 
       - name: Install Packages and Generate Coverage Report
-        run: cd tests/ui-testing && npm ci npx nyc report
+        run: cd tests/ui-testing && npm ci && npx nyc report
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
