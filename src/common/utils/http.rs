@@ -91,14 +91,14 @@ pub(crate) fn get_search_event_context_from_request(
         SearchEventType::Dashboards => Some(SearchEventContext::with_dashboard(
             query.get("dashboard_id").map(String::from),
             query.get("dashboard_name").map(String::from),
-            query.get("dashboard_folder_id").map(String::from),
-            query.get("dashboard_folder_name").map(String::from),
+            query.get("folder_id").map(String::from),
+            query.get("folder_name").map(String::from),
         )),
         SearchEventType::Alerts => Some(SearchEventContext::with_alert(
             query.get("alert_key").map(String::from),
         )),
         SearchEventType::Reports => Some(SearchEventContext::with_alert(
-            query.get("report_key").map(String::from),
+            query.get("report_id").map(String::from),
         )),
         _ => None,
     }

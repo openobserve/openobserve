@@ -352,6 +352,7 @@ impl Report {
                 &cfg.common.report_user_password,
                 &self.timezone,
                 no_of_recipients,
+                &self.name,
             )
             .await?;
             self.send_email(&report.0, report.1).await
@@ -423,6 +424,7 @@ async fn generate_report(
     user_pass: &str,
     timezone: &str,
     no_of_recipients: usize,
+    report_name: &str,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
@@ -488,10 +490,10 @@ async fn generate_report(
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
-    let search_type = if no_of_recipients == 0 {
-        "ui"
+    let search_type_params = if no_of_recipients == 0 {
+        "search_type=ui".to_string()
     } else {
-        "reports"
+        format!("search_type=reports&report_id={org_id}-{report_name}")
     };
 
     // dashboard link in the email should contain data of the same period as the report
@@ -500,7 +502,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -550,7 +552,7 @@ async fn generate_report(
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
