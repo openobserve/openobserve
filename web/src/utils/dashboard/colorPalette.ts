@@ -214,7 +214,12 @@ interface ColorConfig {
     | "shades"
     | "palette-classic-by-series"
     | "palette-classic"
-    | "scale";
+    | "continuous-green-yellow-red"
+    | "continuous-red-yellow-green"
+    | "continuous-temperature"
+    | "continuous-positive"
+    | "continuous-negative"
+    | "continuous-light-to-dark-blue";
   fixedColor?: string[];
   seriesBy?: SeriesBy;
 }
