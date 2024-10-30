@@ -275,24 +275,26 @@ pub async fn generate_olddata_job_by_stream(
     )
     .await?;
 
-    log::debug!(
-        "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] hours: {:?}",
-        org_id,
-        stream_type,
-        stream_name,
-        hours
-    );
-
     // generate merging job
     for hour in hours {
         let column = hour.split('/').collect::<Vec<_>>();
-        assert!(column.len() == 4);
+        if column.len() != 4 {
+            return Err(anyhow::anyhow!("Unexpected hour format in '{}'", hour));
+        }
         let offset = DateTime::parse_from_rfc3339(&format!(
             "{}-{}-{}T{}:00:00Z",
             column[0], column[1], column[2], column[3]
         ))?
         .with_timezone(&Utc);
         let offset = offset.timestamp_micros();
+        log::debug!(
+            "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] hours: {}, offset: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            hour,
+            offset
+        );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
                 "[COMAPCT] add file_list_jobs for old data failed: {}",

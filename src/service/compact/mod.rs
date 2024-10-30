@@ -139,7 +139,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 }
 
 /// Generate job for compactor
-pub async fn run_generate_job() -> Result<(), anyhow::Error> {
+pub async fn run_generate_job(old_data: bool) -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
@@ -193,84 +193,24 @@ pub async fn run_generate_job() -> Result<(), anyhow::Error> {
                     continue;
                 }
 
-                if let Err(e) =
+                if old_data {
+                    if let Err(e) =
+                        merge::generate_olddata_job_by_stream(&org_id, stream_type, &stream_name)
+                            .await
+                    {
+                        log::error!(
+                            "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] error: {}",
+                            org_id,
+                            stream_type,
+                            stream_name,
+                            e
+                        );
+                    }
+                } else if let Err(e) =
                     merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
                 {
                     log::error!(
                         "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        e
-                    );
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Generate job for old data for compactor
-pub async fn run_generate_olddata_job() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
-    for org_id in orgs {
-        // check backlist
-        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
-        {
-            continue;
-        }
-        for stream_type in ALL_STREAM_TYPES {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
-            for stream_name in streams {
-                let Some(node_name) =
-                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
-                else {
-                    continue; // no compactor node
-                };
-                if LOCAL_NODE.name.ne(&node_name) {
-                    // Check if this node holds the stream
-                    if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                    )
-                    .await
-                    {
-                        // release the stream
-                        db::compact::files::set_offset(
-                            &org_id,
-                            stream_type,
-                            &stream_name,
-                            offset,
-                            None,
-                        )
-                        .await?;
-                    }
-                    continue; // not this node
-                }
-
-                // check if we are allowed to merge or just skip
-                if db::compact::retention::is_deleting_stream(
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    None,
-                ) {
-                    log::warn!(
-                        "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                    );
-                    continue;
-                }
-
-                if let Err(e) =
-                    merge::generate_olddata_job_by_stream(&org_id, stream_type, &stream_name).await
-                {
-                    log::error!(
-                        "[COMPACTOR] generate_olddata_job_by_stream [{}/{}/{}] error: {}",
                         org_id,
                         stream_type,
                         stream_name,

@@ -16,9 +16,12 @@
 use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
-use config::meta::{
-    meta_store::MetaStore,
-    stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+use config::{
+    get_config,
+    meta::{
+        meta_store::MetaStore,
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    },
 };
 use once_cell::sync::Lazy;
 
@@ -241,11 +244,7 @@ pub async fn query(
     time_range: Option<(i64, i64)>,
     flattened: Option<bool>,
 ) -> Result<Vec<(String, FileMeta)>> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
-    }
+    validate_time_range(time_range)?;
     CLIENT
         .query(
             org_id,
@@ -272,11 +271,7 @@ pub async fn query_ids(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<FileId>> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
-    }
+    validate_time_range(time_range)?;
     CLIENT
         .query_ids(org_id, stream_type, stream_name, time_range)
         .await
@@ -290,11 +285,7 @@ pub async fn query_old_data_hours(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<String>> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
-    }
+    validate_time_range(time_range)?;
     CLIENT
         .query_old_data_hours(org_id, stream_type, stream_name, time_range)
         .await
@@ -455,6 +446,19 @@ pub async fn local_cache_gc() -> Result<()> {
     });
 
     Ok(())
+}
+
+fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    Ok(())
+}
+
+fn calculate_max_ts_upper_bound(time_end: i64) -> i64 {
+    time_end + get_config().limit.upper_bound_for_max_ts_mins * 60 * 1_000_000
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

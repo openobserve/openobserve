@@ -139,7 +139,7 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
     loop {
         time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
         log::debug!("[COMPACTOR] Running generate merge job");
-        if let Err(e) = compact::run_generate_job().await {
+        if let Err(e) = compact::run_generate_job(false).await {
             log::error!("[COMPACTOR] run generate merge job error: {e}");
         }
     }
@@ -154,7 +154,7 @@ async fn run_generate_olddata_job() -> Result<(), anyhow::Error> {
         ))
         .await;
         log::debug!("[COMPACTOR] Running generate merge job for old data");
-        if let Err(e) = compact::run_generate_olddata_job().await {
+        if let Err(e) = compact::run_generate_job(true).await {
             log::error!("[COMPACTOR] run generate merge job for old data error: {e}");
         }
     }

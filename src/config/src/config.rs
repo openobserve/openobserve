@@ -1058,6 +1058,8 @@ pub struct Compact {
     pub old_data_max_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
     pub old_data_min_records: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
+    pub old_data_min_files: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
@@ -1545,6 +1547,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // check compact settings
+    if cfg.compact.interval < 1 {
+        cfg.compact.interval = 60;
+    }
     // check compact_max_file_size to MB
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
@@ -1572,11 +1578,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.batch_size < 1 {
         cfg.compact.batch_size = 100;
     }
+
+    if cfg.compact.old_data_interval < 1 {
+        cfg.compact.old_data_interval = 3600;
+    }
     if cfg.compact.old_data_max_days < 1 {
         cfg.compact.old_data_max_days = 15;
     }
     if cfg.compact.old_data_min_records < 1 {
         cfg.compact.old_data_min_records = 100;
+    }
+    if cfg.compact.old_data_min_files < 1 {
+        cfg.compact.old_data_min_files = 10;
     }
 
     // If the default scrape interval is less than 5s, raise an error

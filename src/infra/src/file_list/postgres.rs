@@ -376,9 +376,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .fetch_all(&pool).await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
-            let cfg = get_config();
-            let max_ts_upper_bound =
-                time_end + cfg.limit.upper_bound_for_max_ts_mins * 60 * 1_000_000;
+            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end);
             let sql = r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
@@ -493,11 +491,10 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             let stream_key = stream_key.clone();
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT.clone();
-                let cfg = get_config();
                 DB_QUERY_NUMS
                 .with_label_values(&["select", "file_list"])
                 .inc();
-                let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts_mins * 60 * 1_000_000;
+                let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end);
                 let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
                 sqlx::query_as::<_, super::FileId>(query)
                 .bind(stream_key)
@@ -550,12 +547,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let start = std::time::Instant::now();
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
         let cfg = get_config();
-        let max_ts_upper_bound = time_end + cfg.limit.upper_bound_for_max_ts_mins * 60 * 1_000_000;
+        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end);
         let sql = r#"
 SELECT date
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5
-    GROUP BY date HAVING count(*) >= 10;
+    GROUP BY date HAVING count(*) >= $6;
             "#;
 
         let ret = sqlx::query(sql)
@@ -564,6 +561,7 @@ SELECT date
             .bind(max_ts_upper_bound)
             .bind(time_end)
             .bind(cfg.compact.old_data_min_records)
+            .bind(cfg.compact.old_data_min_files)
             .fetch_all(&pool)
             .await?;
 
