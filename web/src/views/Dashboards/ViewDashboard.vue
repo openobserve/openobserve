@@ -354,7 +354,7 @@ export default defineComponent({
 
     const tabId = computed(() => route.query.tab);
 
-    const reportId =  "12345";
+    const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
 
