@@ -214,7 +214,7 @@ pub async fn ingest(
         if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
             if !transforms.is_empty() {
                 item = match apply_functions(
-                    item.clone(),
+                    item,
                     transforms,
                     &stream_vrl_map,
                     org_id,
@@ -233,7 +233,6 @@ pub async fn ingest(
                                 TRANSFORM_FAILED,
                             ])
                             .inc();
-                        log_failed_record(log_ingestion_errors, &item, &e.to_string());
                         continue;
                     }
                 }
@@ -269,7 +268,7 @@ pub async fn ingest(
         // Start row based transform
         let mut res = if let Some(transforms) = stream_after_functions_map.get(&key) {
             match apply_functions(
-                item.clone(),
+                item,
                 transforms,
                 &stream_vrl_map,
                 org_id,
@@ -288,7 +287,6 @@ pub async fn ingest(
                             TRANSFORM_FAILED,
                         ])
                         .inc();
-                    log_failed_record(log_ingestion_errors, &item, &e.to_string());
                     continue;
                 }
             }

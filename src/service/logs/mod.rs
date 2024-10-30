@@ -31,7 +31,7 @@ use config::{
     },
     metrics,
     utils::{
-        json::{self, estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
         schema_ext::SchemaExt,
     },
     DISTINCT_FIELDS,
@@ -48,7 +48,6 @@ use crate::{
     common::meta::{
         alerts::alert::Alert,
         ingestion::IngestionStatus,
-        organization::OrganizationSetting,
         stream::{SchemaRecords, StreamParams},
     },
     service::{
@@ -554,10 +553,7 @@ pub fn refactor_map(
 async fn ingestion_log_enabled() -> bool {
     // the logging will be enabled through meta only, so hardcoded
     match get_org_setting("_meta").await {
-        Ok(b) => {
-            let org_settings: OrganizationSetting = json::from_slice(&b).unwrap();
-            org_settings.toggle_ingestion_logs
-        }
+        Ok(org_settings) => org_settings.toggle_ingestion_logs,
         Err(_) => false,
     }
 }
