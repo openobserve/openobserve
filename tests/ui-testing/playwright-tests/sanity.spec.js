@@ -423,7 +423,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(100);
     await page
       .locator('[data-test="add-template-name-input"]')
-      .fill("sanitytemplate");
+      .fill("sanitytemp");
     const jsonString = '{"text": "{alert_name} is active"}';
     await page.click(".view-line");
     await page.keyboard.type(jsonString);
@@ -449,9 +449,9 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .locator('[data-test="add-destination-name-input"]')
-      .fill("sanitydestination");
+      .fill("sanitydest");
     await page.locator('[data-test="add-destination-template-select"]').click();
-    await page.getByText("sanitytemplate").click();
+    await page.getByText("sanitytemp").click();
     await page.locator('[data-test="add-destination-url-input"]').click();
     await page
       .locator('[data-test="add-destination-url-input"]')
@@ -470,7 +470,7 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="add-alert-name-input"]')
       .getByLabel("Name *")
-      .fill("sanityalert");
+      .fill("sanityalert1");
     await page
       .locator('[data-test="add-alert-stream-type-select"]')
       .getByText("arrow_drop_down")
@@ -492,7 +492,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator(
-        '[data-test="add-alert-destination-sanitydestination-select-item"]'
+        '[data-test="add-alert-destination-sanitydest-select-item"]'
       )
       .click();
     await page.locator('[data-test="add-alert-submit-btn"]').click();
@@ -520,14 +520,11 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   
     // Delete the original alert
-    await page.locator('[data-test="alert-list-sanityalert-delete-alert"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-  
     await page.locator('[data-test="alert-list-search-input"]').click();
     await page.locator('[data-test="alert-list-search-input"]').fill("sani");
     await page.waitForTimeout(2000);
     await page
-      .locator('[data-test="alert-list-sanityalerts-delete-alert"]')
+      .locator('[data-test="alert-list-sanityalert1-delete-alert"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.waitForTimeout(2000);
@@ -539,7 +536,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="alert-destination-list-sanitydestination-delete-destination"]'
+        '[data-test="alert-destination-list-sanitydes-delete-destination"]'
       )
       .click();
     await page.locator('[data-test="confirm-button"]').click();
@@ -551,7 +548,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="alert-template-list-sanitytemplate-delete-template"]'
+        '[data-test="alert-template-list-sanitytemp-delete-template"]'
       )
       .click();
     await page.locator('[data-test="confirm-button"]').click();
