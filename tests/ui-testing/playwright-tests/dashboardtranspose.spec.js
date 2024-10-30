@@ -164,100 +164,98 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(1000);
   });
-  test.skip("should display the correct data before and after transposing in the table chart", async ({
+
+  test("should display the correct data before and after transposing in the table chart", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
-
+  
     // Create a new dashboard
     await page.locator('[data-test="dashboard-add"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').click();
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .fill(randomDashboardName);
+    await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
     await page.locator('[data-test="dashboard-add-submit"]').click();
-
+  
     // Add panel to the dashboard
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .click();
-    await page
-      .locator("label")
-      .filter({ hasText: "Streamarrow_drop_down" })
-      .locator("i")
-      .click();
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+    await page.locator("label").filter({ hasText: "Streamarrow_drop_down" }).locator("i").click();
     await page.getByRole("option", { name: "e2e_automate" }).click();
-
     await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
-      )
+      .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
+      .click();
+    
+    await page
+      .locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_namespace_name"] [data-test="dashboard-add-x-data"]')
+      .click();
+    await page
+      .locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]')
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("test");
     await page.locator('[data-test="date-time-btn"]').click();
-
-    // await page.locator('[data-test="date-time-absolute-tab"]').click();
-    // await page.getByRole('button', { name: '1', exact: true }).click();
-    // await page.getByRole('button', { name: '3', exact: true }).click();
-    // await page.locator('[data-test="date-time-apply-btn"]').click();
-
+  
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
-
+  
     await page.waitForTimeout(2000);
-
+  
+    // Select table chart and perform transpose
     await page.locator('[data-test="selected-chart-table-item"] img').click();
     await page.getByRole("cell", { name: "Kubernetes Container Name" }).click();
     await page.locator('[data-test="dashboard-sidebar"]').click();
-    await page
-      .locator('[data-test="dashboard-config-table_transpose"] div')
-      .nth(2)
-      .click();
+    await page.locator('[data-test="dashboard-config-table_transpose"] div').nth(2).click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(2000);
+  
+    // Validate data consistency before and after transpose
+    await validateTableDataBeforeAndAfterTranspose(page);
+  
+    // Helper function to validate table data before and after transposing
+    // Helper function to dynamically transpose data and validate it
+    async function validateTableDataBeforeAndAfterTranspose(page) {
+      // Step 1: Capture headers and initial data from the table
+      const headers = await page.$$eval('[data-test="dashboard-panel-table"] thead tr th', (headerCells) =>
+        headerCells.map(cell => cell.textContent.trim().replace(/^arrow_upward/, "")) // Remove "arrow_upward" prefix
+      );
 
-    // Validate dynamic data before and after transpose
-    await validateDynamicDataBeforeAndAfterAction(page);
+      const initialData = await page.$$eval('[data-test="dashboard-panel-table"] tbody tr', (rows) =>
+        rows
+          .map(row => Array.from(row.querySelectorAll("td"), cell => cell.textContent.trim()))
+          .filter(row => row.length > 0 && row.some(cell => cell !== ""))
+      );
 
-    // Helper function to validate data before and after the transpose action
-    async function validateDynamicDataBeforeAndAfterAction(page) {
-      // Step 1: Capture the first dynamic date and value before the action
-      // const initialDateElement = await page
-      //   .getByRole("cell", { name: /.*-.*-.* .*/ })
-      //   .first();
-      const initialValueElement = await page
-        .getByRole("cell", { name: /\d+\.\d+/ })
-        .first();
-
-      // const initialDate = await initialDateElement.textContent();
-      const initialValue = await initialValueElement.textContent();
-
-      // Perform transpose and apply action
-      await page
-        .locator('[data-test="dashboard-config-table_transpose"] div')
-        .nth(2)
-        .click();
+      // Step 2: Perform transpose by simulating the transpose button click
+      await page.locator('[data-test="dashboard-config-table_transpose"] div').nth(2).click();
       await page.locator('[data-test="dashboard-apply"]').click();
+      await page.waitForTimeout(2000);
 
-      // Step 2: Capture the first dynamic date and value after the action
-      // const finalDateElement = await page
-      //   .getByRole("cell", { name: /.*-.*-.* .*/ })
-      //   .first();
-      const finalValueElement = await page
-        .getByRole("cell", { name: /\d+\.\d+/ })
-        .first();
+      // Step 3: Capture transposed data from the table
+      const transposedData = await page.$$eval('[data-test="dashboard-panel-table"] tr', (rows) =>
+        rows
+          .map(row => Array.from(row.querySelectorAll("td"), cell => cell.textContent.trim()))
+          .filter(row => row.length > 0 && row.some(cell => cell !== ""))
+      );
 
-      // const finalDate = await finalDateElement.textContent();
-      const finalValue = await finalValueElement.textContent();
+      console.log("transposedData", JSON.stringify(transposedData, null, 2));
 
-      // Step 3: Assert that the data is the same before and after the action
-      // expect(finalDate.trim()).toBe(initialDate.trim());
-      expect(finalValue.trim()).toBe(initialValue.trim());
+      // Step 4: Flatten `initialData` by pairing each namespace header with its value, excluding the empty namespace
+      const flattenedInitialData = headers.slice(1).map((namespace, index) => [namespace, initialData[0][index + 1]]);
+      console.log("Flattened Initial Data (Unsorted)", JSON.stringify(flattenedInitialData, null, 2));
+
+      // Step 5: Sort both `flattenedInitialData` and `transposedData` for comparison
+      const sortedFlattenedInitialData = flattenedInitialData.sort((a, b) => a[0].localeCompare(b[0]));
+      const sortedTransposedData = transposedData.sort((a, b) => a[0].localeCompare(b[0]));
+
+      console.log("Sorted Flattened Initial Data", JSON.stringify(sortedFlattenedInitialData, null, 2));
+      console.log("Sorted Transposed Data", JSON.stringify(sortedTransposedData, null, 2));
+
+      // Step 6: Directly compare sorted arrays
+      expect(sortedTransposedData).toEqual(sortedFlattenedInitialData);
     }
   });
+  
+  
 
   test("verify if desible the Tanspose button chart should be Default format ", async ({
     page,
