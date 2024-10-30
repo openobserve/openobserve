@@ -52,20 +52,17 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 
 pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error> {
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
-    match ORGANIZATION_SETTING.clone().read().await.get(&key) {
-        Some(v) => Ok(v.clone()),
-        None => {
-            let _settings = db::get(&key).await?;
-            let settings: OrganizationSetting = json::from_slice(&_settings)?;
-            // cache the org setting
-            ORGANIZATION_SETTING
-                .clone()
-                .write()
-                .await
-                .insert(key.to_string(), settings.clone());
-            Ok(settings)
-        }
+    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+        return Ok(v.clone());
     }
+    let _settings = db::get(&key).await?;
+    let settings: OrganizationSetting = json::from_slice(&_settings)?;
+    // cache the org setting
+    ORGANIZATION_SETTING
+        .write()
+        .await
+        .insert(key.to_string(), settings.clone());
+    Ok(settings)
 }
 
 /// Cache the existing org settings in the beginning
