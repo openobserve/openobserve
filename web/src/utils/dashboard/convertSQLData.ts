@@ -976,19 +976,15 @@ export const convertSQLData = async (
           const seriesData = getAxisDataFromKey(key);
 
           const seriesObj = {
-            name: panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == key,
-            )?.label,
-            // color:
-            //   getColor(
-            //     panelSchema,
-            //     panelSchema?.queries[0]?.fields?.y.find(
-            //       (it: any) => it.alias == key,
-            //     )?.label,
-            //     getAxisDataFromKey(key),
-            //     chartMin,
-            //     chartMax,
-            //   ) ?? "#5960b2",
+            name: seriesLabel,
+            color:
+              getSeriesColor(
+                panelSchema.config.color,
+                seriesLabel,
+                seriesData,
+                chartMin,
+                chartMax,
+              ) ?? null,
             opacity: 0.8,
             ...defaultSeriesProps,
             // markLine if exist
@@ -1081,12 +1077,9 @@ export const convertSQLData = async (
           const seriesData = getAxisDataFromKey(key);
 
           const seriesObj = {
-            name: panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == key,
-            )?.label,
+            name: seriesLabel,
             label: {
-              show:
-                panelSchema.config?.label_option?.position != null,
+              show: panelSchema.config?.label_option?.position != null,
               position: panelSchema.config?.label_option?.position || "None",
               rotate: panelSchema.config?.label_option?.rotate || 0,
             },
@@ -1188,8 +1181,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           label: {
-            show:
-              panelSchema.config?.label_option?.position != null,
+            show: panelSchema.config?.label_option?.position != null,
             position: panelSchema.config?.label_option?.position || "None",
             rotate: panelSchema.config?.label_option?.rotate || 0,
           },
