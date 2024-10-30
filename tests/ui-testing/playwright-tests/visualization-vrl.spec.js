@@ -131,9 +131,11 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl12=123");
 
-      await page
-    .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-    .waitFor({ state: "visible" });
+    await page.waitForTimeout(3000);
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .waitFor({ state: "visible" });
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
@@ -205,7 +207,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
 
     await page.waitForTimeout(500);
-   
+
     await page
       .locator('text="There are some errors, please fix them and try again"')
       .waitFor({ state: "visible" });
@@ -238,7 +240,9 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRL=1000");
 
-      await page
+    await page.waitForTimeout(3000);
+
+    await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
 
@@ -290,7 +294,7 @@ test.describe(" visualize UI testcases", () => {
     expect(yAxisField).toBe(true);
     expect(xAxisField).toBe(true);
   });
-  
+
   test("should display an error message if an invalid VRL function is added", async ({
     page,
   }) => {
@@ -321,7 +325,7 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=11abc");
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
@@ -338,11 +342,13 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=123");
 
-await page
+    await page.waitForTimeout(3000);
+
+    await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
-      
-      await page
+
+    await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
     await page
@@ -391,7 +397,7 @@ await page
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
 
-await page
+    await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
 
@@ -466,7 +472,9 @@ await page
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=123");
 
-await page
+    await page.waitForTimeout(3000);
+
+    await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
 
@@ -519,11 +527,12 @@ await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".VRLsanity=1000");
+    await page.waitForTimeout(3000);
 
-await page
+    await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
-      
+
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
@@ -553,7 +562,7 @@ await page
     for (const chartType of chartTypes) {
       await page.locator(chartType).click();
 
-      await page.waitForTimeout(1000); 
+      await page.waitForTimeout(1000);
     }
 
     // Assertion: Fail the test if an error was detected
