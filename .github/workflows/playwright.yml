@@ -150,7 +150,7 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage
+          name: playwright-coverage-${{ matrix.testfilename }}
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
@@ -177,12 +177,16 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          name: playwright-coverage
+          name: playwright-coverage-*
+          path: merged-coverage # Download each artifact to a subfolder
+
+      - name: Verify Downloaded Files
+        run: ls -R merged-coverage # Check the structure and contents
 
       - name: Move Coverage Files to .nyc_output
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv playwright-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+          mv merged-coverage/*/* tests/ui-testing/.nyc_output/ || echo "No files to move"
 
 
       - name: Generate Coverage Report
