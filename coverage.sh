@@ -29,7 +29,6 @@ _cov_test() {
     cargo llvm-cov test \
         --verbose \
         --ignore-filename-regex job \
-        --ignore-run-fail \
         "$@"
 }
 
