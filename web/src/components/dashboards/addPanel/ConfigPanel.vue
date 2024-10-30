@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.unit
             ? unitOptions.find(
-                (it) => it.value == dashboardPanelData.data.config.unit
+                (it) => it.value == dashboardPanelData.data.config.unit,
               )?.label
             : 'Default'
         }`"
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 1,
-                'min'
+                'min',
               )
             "
             :label="t('dashboard.minimum')"
@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style.size_by_value,
                 100,
-                'max'
+                'max',
               )
             "
             :label="t('dashboard.maximum')"
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             handleBlur(
               dashboardPanelData.data.config.map_symbol_style,
               2,
-              'size_fixed'
+              'size_fixed',
             )
           "
           :label="t('dashboard.fixedValue')"
@@ -678,7 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="
           ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
@@ -691,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-input
         v-if="
           ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
@@ -767,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config,
             1,
-            'weight_fixed'
+            'weight_fixed',
           )
         "
         :label="t('common.weight')"
@@ -895,10 +895,197 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+
+      <q-select
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.label_option.position"
+        :options="labelPositionOptions"
+        dense
+        :label="t('dashboard.labelPosition')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.label_option.position
+            ? labelPositionOptions.find(
+                (it) =>
+                  it.value ==
+                  dashboardPanelData.data.config.label_option.position,
+              )?.label
+            : 'None'
+        }`"
+        data-test="dashboard-config-label-position"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
+      <q-input
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+        v-model.number="dashboardPanelData.data.config.label_option.rotate"
+        :label="t('dashboard.labelRotate')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        :type="'number'"
+        placeholder="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.label_option.rotate =
+              value !== '' ? value : 0)
+        "
+        data-test="dashboard-config-label-rotate"
+      >
+      </q-input>
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="
+          ['area', 'area-stacked', 'line'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.show_symbol"
+        :options="showSymbol"
+        dense
+        :label="t('dashboard.showSymbol')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.show_symbol
+            ? showSymbol.find(
+                (it: any) =>
+                  it.value == dashboardPanelData.data.config.show_symbol,
+              )?.label
+            : 'No'
+        }`"
+        data-test="dashboard-config-show_symbol"
+      >
+        <template v-slot:option="scope">
+          <q-item v-bind="scope.itemProps">
+            <q-item-section avatar style="height: 20px">
+              <q-icon>
+                <component :is="scope.opt.iconComponent"></component>
+              </q-icon>
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ scope.opt.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="
+          ['area', 'area-stacked', 'line'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.line_interpolation"
+        :options="lineInterpolationOptions"
+        dense
+        :label="t('dashboard.lineInterpolation')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.line_interpolation
+            ? lineInterpolationOptions.find(
+                (it: any) =>
+                  it.value == dashboardPanelData.data.config.line_interpolation,
+              )?.label
+            : 'smooth'
+        }`"
+        data-test="dashboard-config-line_interpolation"
+      >
+        <template v-slot:option="scope">
+          <q-item v-bind="scope.itemProps">
+            <q-item-section avatar>
+              <q-icon>
+                <component :is="scope.opt.iconComponent"></component>
+              </q-icon>
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ scope.opt.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+      <div class="space"></div>
+
+      <q-input
+        v-if="
+          !promqlMode &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery &&
+          ['area', 'area-stacked', 'line'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
+        v-model.number="dashboardPanelData.data.config.line_thickness"
+        :value="1.5"
+        :min="0"
+        @update:model-value="
+          (value: any) =>
+            (dashboardPanelData.data.config.line_thickness =
+              typeof value == 'number' && value >= 0 ? value : 1.5)
+        "
+        label="Line Thickness"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="Default: 1.5"
+        :type="'number'"
+        data-test="dashboard-config-line_thickness"
+      >
+      </q-input>
+
+      <div class="space"></div>
+
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.type,
           )
         "
         :variablesData="variablesData"
@@ -1008,6 +1195,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-addpanel-config-time-shift-add-btn"
       />
     </div>
+
+    <div class="space"></div>
+    <ColorPaletteDropDown v-if="showColorPalette" />
+    <div class="space"></div>
+
+    <div class="space"></div>
+    <OverrideConfig
+      v-if="dashboardPanelData.data.type == 'table'"
+      :dashboardPanelData="dashboardPanelData"
+    />
+    <div class="space"></div>
   </div>
 </template>
 
@@ -1020,6 +1218,15 @@ import ValueMapping from "./ValueMapping.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
+import OverrideConfig from "./OverrideConfig.vue";
+import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
+import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
+import Smooth from "@/components/icons/dashboards/Smooth.vue";
+import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
+import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
+import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
+import { markRaw } from "vue";
 
 export default defineComponent({
   components: {
@@ -1028,15 +1235,23 @@ export default defineComponent({
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
+    ColorPaletteDropDown,
+    OverrideConfig,
+    LinearIcon,
+    NoSymbol,
+    Smooth,
+    StepBefore,
+    StepAfter,
+    StepMiddle,
   },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
 
@@ -1099,6 +1314,24 @@ export default defineComponent({
       // by default, use table_dynamic_columns  as false
       if (!dashboardPanelData.data.config.table_dynamic_columns) {
         dashboardPanelData.data.config.table_dynamic_columns = false;
+      }
+
+      // by default, use label_option position as null and rotate as 0
+      if (!dashboardPanelData.data.config.label_option) {
+        dashboardPanelData.data.config.label_option = {
+          position: null,
+          rotate: 0,
+        };
+      }
+
+      // by default, set show_symbol as false
+      if (!dashboardPanelData.data.config.show_symbol) {
+        dashboardPanelData.data.config.show_symbol = false;
+      }
+
+      // by default, set line interpolation as smooth
+      if (!dashboardPanelData.data.config.line_interpolation) {
+        dashboardPanelData.data.config.line_interpolation = "smooth";
       }
     });
 
@@ -1246,6 +1479,70 @@ export default defineComponent({
         value: "custom",
       },
     ];
+
+    const labelPositionOptions = [
+      {
+        label: t("dashboard.none"),
+        value: null,
+      },
+      {
+        label: t("dashboard.top"),
+        value: "top",
+      },
+      {
+        label: t("dashboard.inside"),
+        value: "inside",
+      },
+      {
+        label: t("dashboard.insideTop"),
+        value: "insideTop",
+      },
+      {
+        label: t("dashboard.insideBottom"),
+        value: "insideBottom",
+      },
+    ];
+
+    const showSymbol = [
+      {
+        label: t("dashboard.no"),
+        value: false,
+        iconComponent: markRaw(NoSymbol),
+      },
+      {
+        label: t("dashboard.yes"),
+        value: true,
+        iconComponent: markRaw(LinearIcon),
+      },
+    ];
+
+    const lineInterpolationOptions = [
+      {
+        label: t("dashboard.smooth"),
+        value: "smooth",
+        iconComponent: markRaw(Smooth),
+      },
+      {
+        label: t("dashboard.linear"),
+        value: "linear",
+        iconComponent: markRaw(LinearIcon),
+      },
+      {
+        label: t("dashboard.stepBefore"),
+        value: "step-start",
+        iconComponent: markRaw(StepBefore),
+      },
+      {
+        label: t("dashboard.stepAfter"),
+        value: "step-end",
+        iconComponent: markRaw(StepAfter),
+      },
+      {
+        label: t("dashboard.stepMiddle"),
+        value: "step-middle",
+        iconComponent: markRaw(StepMiddle),
+      },
+    ];
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
         dashboardPanelData.data.queries[
@@ -1289,8 +1586,8 @@ export default defineComponent({
             label: it.name,
             value: it.name,
           };
-        }
-      )
+        },
+      ),
     );
 
     const timeShifts = [];
@@ -1332,6 +1629,22 @@ export default defineComponent({
       ].config.time_shift.splice(index, 1);
     };
 
+    const showColorPalette = computed(() => {
+      return [
+        "area",
+        "area-stacked",
+        "bar",
+        "h-bar",
+        "line",
+        "scatter",
+        "stacked",
+        "h-stacked",
+        "pie",
+        "donut",
+        "gauge",
+      ].includes(dashboardPanelData.data.type);
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1341,6 +1654,9 @@ export default defineComponent({
       symbolOptions,
       legendsPositionOptions,
       unitOptions,
+      labelPositionOptions,
+      showSymbol,
+      lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,
       handleBlur,
@@ -1349,6 +1665,7 @@ export default defineComponent({
       selectPromQlNameOption,
       addTimeShift,
       removeTimeShift,
+      showColorPalette,
     };
   },
 });
