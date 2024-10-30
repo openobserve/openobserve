@@ -49,6 +49,13 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
  */
 const PANEL_DATA_LOADER_DEBOUNCE_TIME = 50;
 
+const adjustTimestampByTimeRangeGap = (
+  timestamp: number,
+  timeRangeGapSeconds: number,
+) => {
+  return timestamp - timeRangeGapSeconds * 1000;
+};
+
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
@@ -446,11 +453,14 @@ export const usePanelDataLoader = (
             if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
               // convert time shift to milliseconds
               const timeShiftInMilliSecondsArray = it.config?.time_shift?.map(
-                (it: any) => convertOffsetToSeconds(it.offSet)
+                (it: any) => convertOffsetToSeconds(it.offSet, endISOTimestamp),
               );
 
               // append 0 seconds to the timeShiftInMilliSecondsArray at 0th index
-              timeShiftInMilliSecondsArray.unshift(0);
+              timeShiftInMilliSecondsArray.unshift({
+                seconds: 0,
+                periodAsStr: "",
+              });
 
               const timeShiftQueries: any[] = [];
 
@@ -460,9 +470,15 @@ export const usePanelDataLoader = (
                 const { query: query1, metadata: metadata1 } =
                   replaceQueryValue(
                     it.query,
-                    startISOTimestamp - timeRangeGap * 1000,
-                    endISOTimestamp - timeRangeGap * 1000,
-                    panelSchema.value.queryType
+                    adjustTimestampByTimeRangeGap(
+                      startISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    adjustTimestampByTimeRangeGap(
+                      endISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    panelSchema.value.queryType,
                   );
 
                 const { query: query2, metadata: metadata2 } =
@@ -474,8 +490,14 @@ export const usePanelDataLoader = (
                 const metadata: any = {
                   originalQuery: it.query,
                   query: query,
-                  startTime: startISOTimestamp - timeRangeGap * 1000,
-                  endTime: endISOTimestamp - timeRangeGap * 1000,
+                  startTime: adjustTimestampByTimeRangeGap(
+                    startISOTimestamp,
+                    timeRangeGap.seconds,
+                  ),
+                  endTime: adjustTimestampByTimeRangeGap(
+                    endISOTimestamp,
+                    timeRangeGap.seconds,
+                  ),
                   queryType: panelSchema.value.queryType,
                   variables: [...(metadata1 || []), ...(metadata2 || [])],
                   timeRangeGap: timeRangeGap,
@@ -486,8 +508,14 @@ export const usePanelDataLoader = (
                   metadata,
                   searchRequestObj: {
                     sql: query,
-                    start_time: startISOTimestamp - timeRangeGap * 1000,
-                    end_time: endISOTimestamp - timeRangeGap * 1000,
+                    start_time: adjustTimestampByTimeRangeGap(
+                      startISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    end_time: adjustTimestampByTimeRangeGap(
+                      endISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
                     query_fn: null,
                   },
                 });
@@ -629,7 +657,10 @@ export const usePanelDataLoader = (
                 endTime: endISOTimestamp,
                 queryType: panelSchema.value.queryType,
                 variables: [...(metadata1 || []), ...(metadata2 || [])],
-                timeRangeGap: 0,
+                timeRangeGap: {
+                  seconds: 0,
+                  periodAsStr: "",
+                },
               };
               const { traceparent, traceId } = generateTraceContext();
               addTraceId(traceId);

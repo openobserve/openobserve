@@ -1068,7 +1068,7 @@ mod search_history_utils {
         #[test]
         fn test_empty_query() {
             let query = SearchHistoryQueryBuilder::new().build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE 1=1");
+            assert_eq!(query, "SELECT * FROM usage WHERE event='Search'");
         }
 
         #[test]
@@ -1076,7 +1076,7 @@ mod search_history_utils {
             let query = SearchHistoryQueryBuilder::new()
                 .with_org_id(&Some("org123".to_string()))
                 .build(SEARCH_STREAM_NAME);
-            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND org_id = 'org123'");
+            assert_eq!(query, "SELECT * FROM usage WHERE event='Search' AND org_id = 'org123'");
         }
 
         #[test]
@@ -1086,7 +1086,7 @@ mod search_history_utils {
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(
                 query,
-                "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'"
+                "SELECT * FROM usage WHERE event='Search' AND stream_type = 'logs'"
             );
         }
 
@@ -1097,7 +1097,7 @@ mod search_history_utils {
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(
                 query,
-                "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'"
+                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
             );
         }
 
@@ -1108,7 +1108,7 @@ mod search_history_utils {
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(
                 query,
-                "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'"
+                "SELECT * FROM usage WHERE event='Search' AND user_email = 'user123@gmail.com'"
             );
         }
 
@@ -1119,7 +1119,7 @@ mod search_history_utils {
                 .build(SEARCH_STREAM_NAME);
             assert_eq!(
                 query,
-                "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'"
+                "SELECT * FROM usage WHERE event='Search' AND trace_id = 'trace123'"
             );
         }
 
@@ -1133,7 +1133,7 @@ mod search_history_utils {
                 .with_trace_id(&Some("trace123".to_string()))
                 .build(SEARCH_STREAM_NAME);
 
-            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            let expected_query = "SELECT * FROM usage WHERE event='Search' \
             AND org_id = 'org123' \
             AND stream_type = 'logs' \
             AND stream_name = 'streamA' \
@@ -1150,7 +1150,7 @@ mod search_history_utils {
                 .with_user_email(&Some("user123@gmail.com".to_string()))
                 .build(SEARCH_STREAM_NAME);
 
-            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            let expected_query = "SELECT * FROM usage WHERE event='Search' \
             AND org_id = 'org123' \
             AND user_email = 'user123@gmail.com'";
 
