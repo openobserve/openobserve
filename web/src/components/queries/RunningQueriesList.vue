@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-table-pagination
             data-test="query-stream-table-pagination"
             :scope="scope"
-            :resultTotal="resultTotal"
+            :resultTotal="rows.length"
             :perPageOptions="perPageOptions"
             position="bottom"
             @update:changeRecordPerPage="changePagination"
