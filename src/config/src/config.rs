@@ -1040,8 +1040,6 @@ pub struct Compact {
     pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time
     pub strategy: String,
-    #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
-    pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
@@ -1074,7 +1072,7 @@ pub struct Compact {
     pub job_run_timeout: i64,
     #[env_config(
         name = "ZO_COMPACT_JOB_CLEAN_WAIT_TIME",
-        default = 86400, // 1 day
+        default = 7200, // 2 hours
         help = "Clean the jobs which are finished more than this time"
     )]
     pub job_clean_wait_time: i64,
@@ -1548,12 +1546,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
-    }
-    // check compact_step_secs, min value is 600s
-    if cfg.compact.step_secs == 0 {
-        cfg.compact.step_secs = 3600;
-    } else if cfg.compact.step_secs <= 600 {
-        cfg.compact.step_secs = 600;
     }
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(

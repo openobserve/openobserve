@@ -257,7 +257,7 @@ pub async fn run_merge(
             .unwrap_or_default();
         let partition_time_level =
             unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
-        if partition_time_level == PartitionTimeLevel::Daily || cfg.compact.step_secs < 3600 {
+        if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await

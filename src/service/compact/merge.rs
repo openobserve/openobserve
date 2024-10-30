@@ -34,7 +34,7 @@ use config::{
         },
         record_batch_ext::{concat_batches, merge_record_batches},
         schema_ext::SchemaExt,
-        time::{hour_micros, second_micros},
+        time::hour_micros,
     },
     FILE_EXT_PARQUET,
 };
@@ -144,26 +144,18 @@ pub async fn generate_job_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-    // 1. if step_secs less than 1 hour, must wait for at least max_file_retention_time
-    // 2. if step_secs greater than 1 hour, must wait for at least 3 * max_file_retention_time
+    // must wait for at least 3 * max_file_retention_time
     // -- first period: the last hour local file upload to storage, write file list
     // -- second period, the last hour file list upload to storage
     // -- third period, we can do the merge, so, at least 3 times of
     // max_file_retention_time
-    if (cfg.compact.step_secs < 3600
-        && time_now.timestamp_micros() - offset
+    if offset >= time_now_hour
+        || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                 .unwrap()
                 .num_microseconds()
-                .unwrap())
-        || (cfg.compact.step_secs >= 3600
-            && (offset >= time_now_hour
-                || time_now.timestamp_micros() - offset
-                    <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                        * 3))
+                .unwrap()
+                * 3
     {
         return Ok(()); // the time is future, just wait
     }
@@ -185,11 +177,9 @@ pub async fn generate_job_by_stream(
     }
 
     // write new offset
-    let mut offset = offset + second_micros(cfg.compact.step_secs);
-    if cfg.compact.step_secs >= 3600 {
-        // format to hour with zero minutes, seconds
-        offset = offset - offset % hour_micros(1);
-    }
+    let offset = offset + hour_micros(1);
+    // format to hour with zero minutes, seconds
+    let offset = offset - offset % hour_micros(1);
     db::compact::files::set_offset(
         org_id,
         stream_type,
