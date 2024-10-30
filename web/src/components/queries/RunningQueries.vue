@@ -240,11 +240,12 @@ export default defineComponent({
               trace_id,
               user_id,
               search_type,
+              search_type_label,
               created_at,
               query: { start_time, end_time },
             } = query;
 
-            const key = `${user_id}-${search_type}`;
+            const key = `${user_id}-${search_type_label}`;
 
             if (!acc[key]) {
               acc[key] = {
@@ -254,6 +255,7 @@ export default defineComponent({
                 duration: 0,
                 queryRange: 0,
                 search_type,
+                search_type_label: search_type_label,
                 trace_ids: [],
                 created_at,
                 query: { end_time, start_time },
@@ -556,9 +558,14 @@ export default defineComponent({
     });
 
     const filterQueryBySearchTypeTab = (query: any) => {
-      return query.search_type
-        .toLowerCase()
-        .includes(selectedSearchType.value.toLowerCase());
+      return (
+        query.search_type
+          .toLowerCase()
+          .includes(selectedSearchType.value.toLowerCase()) ||
+        query.search_type_label
+          .toLowerCase()
+          .includes(selectedSearchType.value.toLowerCase())
+      );
     };
 
     const filterQueryCriteria = {
@@ -576,6 +583,8 @@ export default defineComponent({
         query?.work_group?.toLowerCase().includes(value.toLowerCase()),
       search_type: (query: any, value: string) =>
         query?.search_type?.toLowerCase().includes(value.toLowerCase()),
+      search_type_label: (query: any, value: string) =>
+        query?.search_type_label?.toLowerCase().includes(value.toLowerCase()),
     };
 
     watch(
@@ -627,9 +636,11 @@ export default defineComponent({
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
           queries.value = response?.data?.status.map((query: any) => {
+            // we add search_type_label as there are 6 search types defined in the backend, but we only show 3 in the UI
+            // Dashboards, UI and Others
             return {
               ...query,
-              search_type:
+              search_type_label:
                 query.search_type === "Dashboards" || query.search_type === "UI"
                   ? query.search_type
                   : "Others",
@@ -752,6 +763,7 @@ export default defineComponent({
           original_size: row?.scan_stats?.original_size,
           compressed_size: row?.scan_stats?.compressed_size,
           search_type: row?.search_type,
+          search_type_label: row?.search_type_label,
         };
       });
     });
@@ -767,6 +779,7 @@ export default defineComponent({
     const filterUserQueries = (row: any) => {
       selectedQueryTypeTab.value = "all";
       selectedSearchField.value = "all";
+      selectedSearchType.value = row.search_type_label;
       filterQuery.value = row.user_id;
     };
 

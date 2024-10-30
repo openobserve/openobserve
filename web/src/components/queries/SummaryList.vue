@@ -166,8 +166,8 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "search_type",
-        field: "search_type",
+        name: "search_type_label",
+        field: "search_type_label",
         label: t("queries.searchType"),
         align: "left",
         sortable: true,

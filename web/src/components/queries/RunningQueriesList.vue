@@ -202,6 +202,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "search_type",
+        field: "search_type",
+        label: t("queries.searchType"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "duration",
         label: t("queries.duration"),
         align: "left",
