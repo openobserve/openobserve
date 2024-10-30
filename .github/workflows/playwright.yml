@@ -151,7 +151,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-coverage
-          path: .nyc_output/
+          path: tests/ui-testing/.nyc_output
+          include-hidden-files: true
 
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
