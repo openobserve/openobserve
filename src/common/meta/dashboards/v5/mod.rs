@@ -235,6 +235,19 @@ pub struct PanelConfig {
     table_dynamic_columns: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mappings: Option<Vec<Mapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<ColorCfg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorCfg {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fixed_color: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    series_by: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

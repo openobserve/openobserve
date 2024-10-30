@@ -87,6 +87,11 @@ const getDefaultDashboardPanelData: any = () => ({
       wrap_table_cells: false,
       table_transpose: false,
       table_dynamic_columns: false,
+      color: {
+        mode: "palette-classic-by-series",
+        fixedColor: ["#53ca53"],
+        seriesBy: "last",
+      },
     },
     htmlContent: "",
     markdownContent: "",
