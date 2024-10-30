@@ -559,11 +559,11 @@ export default defineComponent({
 
     const filterQueryBySearchTypeTab = (query: any) => {
       return (
-        query.search_type
-          .toLowerCase()
+        query?.search_type
+          ?.toLowerCase()
           .includes(selectedSearchType.value.toLowerCase()) ||
-        query.search_type_label
-          .toLowerCase()
+        query?.search_type_label
+          ?.toLowerCase()
           .includes(selectedSearchType.value.toLowerCase())
       );
     };
