@@ -579,10 +579,6 @@ impl Sql {
     }
 
     /// match a source is a valid file or not
-    #[tracing::instrument(
-        name = "service::search::sql::match_source",
-        skip(self, source, partition_keys)
-    )]
     pub async fn match_source(
         &self,
         source: &FileKey,
