@@ -308,7 +308,7 @@ pub struct Field {
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(rename = "type")]
-    typee: String, 
+    typee: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<Value>,
 }
@@ -473,7 +473,7 @@ pub struct LegendWidth {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct LabelOption {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub position:  Option<LabelPosition>,
+    pub position: Option<LabelPosition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotate: Option<f64>,
 }
@@ -497,5 +497,5 @@ pub enum LabelPosition {
     Top,
     Inside,
     InsideTop,
-    InsideBottom
+    InsideBottom,
 }
