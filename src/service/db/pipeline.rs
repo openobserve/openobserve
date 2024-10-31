@@ -89,7 +89,12 @@ pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<Exe
     let pipeline = infra_pipeline::get_by_stream(stream_params).await.ok();
     match pipeline {
         Some(pl) if pl.enabled => match ExecutablePipeline::new(&pl).await {
-            Ok(exec_pl) => Some(exec_pl),
+            Ok(exec_pl) => {
+                let mut stream_exec_pl_cache = STREAM_EXECUTABLE_PIPELINES.write().await;
+                stream_exec_pl_cache.insert(stream_params.to_owned(), exec_pl.clone());
+                drop(stream_exec_pl_cache);
+                Some(exec_pl)
+            }
             Err(e) => {
                 log::error!(
                     "[Pipeline]: failed to initialize ExecutablePipeline from Pipeline read from database, {}",
@@ -165,8 +170,19 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
             if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                let exec_pl = ExecutablePipeline::new(&pipeline).await?;
-                stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                match ExecutablePipeline::new(&pipeline).await {
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
+                            pipeline.org,
+                            pipeline.id,
+                            e
+                        )
+                    }
+                    Ok(exec_pl) => {
+                        stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                    }
+                };
             }
         }
     }

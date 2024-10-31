@@ -309,7 +309,7 @@ pub async fn handle_grpc_request(
                         }
 
                         let (ts_data, fn_num) = json_data_by_stream
-                            .entry(stream_name.clone())
+                            .entry(stream_params.stream_name.to_string())
                             .or_insert((Vec::new(), None));
                         ts_data.push((timestamps[idx], local_val));
                         *fn_num = Some(function_no); // no pl -> no func
@@ -379,7 +379,7 @@ pub async fn handle_grpc_request(
     let ep = if is_grpc {
         "/grpc/otlp/logs"
     } else {
-        "/api/oltp/v1/logs"
+        "/api/otlp/v1/logs"
     };
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();

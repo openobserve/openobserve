@@ -390,7 +390,7 @@ pub async fn ingest(
                             );
 
                             let (ts_data, fn_num) = json_data_by_stream
-                                .entry(stream_name.clone())
+                                .entry(stream_params.stream_name.to_string())
                                 .or_insert((Vec::new(), None));
                             ts_data.push((timestamp, local_val));
                             *fn_num = Some(function_no)

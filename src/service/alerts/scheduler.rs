@@ -787,9 +787,6 @@ async fn handle_derived_stream_triggers(
     let pipeline_name = columns[2];
     let pipeline_id = columns[3];
 
-    let is_real_time = trigger.is_realtime;
-    let is_silenced = trigger.is_silenced;
-
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_silenced: false,
@@ -797,16 +794,6 @@ async fn handle_derived_stream_triggers(
         retries: 0,
         ..trigger.clone()
     };
-
-    if is_real_time && is_silenced {
-        log::debug!(
-            "Realtime derived_stream needs to wake up, {}/{}",
-            org_id,
-            trigger.module_key
-        );
-        db::scheduler::update_trigger(new_trigger).await?;
-        return Ok(());
-    }
 
     let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         log::warn!(
@@ -827,8 +814,10 @@ async fn handle_derived_stream_triggers(
     };
 
     if !pipeline.enabled {
-        log::info!("Pipeline associated with trigger not enabled.");
-        db::scheduler::update_trigger(new_trigger).await?;
+        // remove the trigger from scheduler. Trigger will be added back when the pipeline is
+        // enabled again
+        log::info!("Pipeline associated with trigger not enabled. Removing trigger from Scheduler");
+        db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Ok(());
     }
 
