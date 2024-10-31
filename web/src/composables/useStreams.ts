@@ -43,7 +43,6 @@ const useStreams = () => {
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
-
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
@@ -107,6 +106,7 @@ const useStreams = () => {
                 reject(new Error(e.message));
               });
           } else {
+
             getStreamsPromise.value = StreamService.nameList(
               store.state.selectedOrganization.identifier,
               _streamName,

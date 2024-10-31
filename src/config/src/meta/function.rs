@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use vrl::{
     compiler::{CompileConfig, Program, TimeZone, VrlRuntime},
     prelude::Function,
 };
+
+use crate::meta::stream::StreamType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -53,52 +54,6 @@ pub struct StreamOrder {
     pub apply_before_flattening: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct StreamTransform {
-    #[serde(flatten)]
-    pub transform: Transform,
-    #[serde(default)]
-    pub stream: String,
-    #[serde(default)]
-    pub order: u8,
-    #[serde(default)]
-    pub stream_type: StreamType,
-    #[serde(default)]
-    pub is_removed: bool,
-    #[serde(default)]
-    #[serde(rename = "applyBeforeFlattening")]
-    pub apply_before_flattening: bool,
-}
-
-impl PartialEq for StreamTransform {
-    fn eq(&self, other: &Self) -> bool {
-        self.stream == other.stream
-            && self.transform.name == other.transform.name
-            && self.stream_type == other.stream_type
-    }
-}
-
-impl Transform {
-    pub fn to_stream_transform(&self) -> Vec<StreamTransform> {
-        let mut ret: Vec<StreamTransform> = vec![];
-        if let Some(streams) = &self.streams {
-            let mut func = self.clone();
-            func.streams = None;
-            for stream in streams {
-                ret.push(StreamTransform {
-                    transform: func.clone(),
-                    stream: stream.stream.clone(),
-                    order: stream.order,
-                    stream_type: stream.stream_type,
-                    is_removed: stream.is_removed,
-                    apply_before_flattening: stream.apply_before_flattening,
-                })
-            }
-        }
-        ret
-    }
-}
-
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.function == other.function && self.params == other.params
@@ -113,11 +68,6 @@ pub struct ZoFunction<'a> {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct FunctionList {
     pub list: Vec<Transform>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
-pub struct StreamFunctionsList {
-    pub list: Vec<StreamTransform>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -141,6 +91,7 @@ pub struct VRLRuntimeConfig {
     pub fields: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub struct VRLResultResolver {
     pub program: Program,
     pub fields: Vec<String>,
@@ -148,9 +99,8 @@ pub struct VRLResultResolver {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json;
-
     use super::*;
+    use crate::utils::json;
 
     #[test]
     fn test_functions() {
