@@ -86,15 +86,7 @@ pub(crate) async fn write_parquet_index_to_disk(
 
     // partition the record batches
     let partitioned_batches = if term_prefix_partition {
-        let partitioned_batches = generate_prefixed_batches(schema.clone(), batches)?;
-        for (prefix, batch) in partitioned_batches.iter() {
-            log::debug!(
-                "write_parquet_index_to_disk: prefix: {}, row count: {}",
-                prefix,
-                batch.num_rows()
-            );
-        }
-        partitioned_batches
+        generate_prefixed_batches(schema.clone(), batches)?
     } else {
         let mut partitioned_batches = HashMap::new();
         let batch = concat_batches(schema.clone(), batches)?;
