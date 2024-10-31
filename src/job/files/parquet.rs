@@ -153,19 +153,19 @@ async fn scan_wal_files(
         }
     });
     let mut files_num = 0;
-    let mut last_time = start.elapsed().as_millis();
+    // let mut last_time = start.elapsed().as_millis();
     loop {
         match rx.recv().await {
             None => {
                 break;
             }
             Some(files) => {
-                log::debug!(
-                    "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
-                    files.len(),
-                    start.elapsed().as_millis() - last_time
-                );
-                last_time = start.elapsed().as_millis();
+                // log::debug!(
+                //     "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
+                //     files.len(),
+                //     start.elapsed().as_millis() - last_time
+                // );
+                // last_time = start.elapsed().as_millis();
                 files_num += files.len();
                 match prepare_files(files).await {
                     Err(e) => {
@@ -279,10 +279,10 @@ async fn prepare_files(
         // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
-    log::debug!(
-        "[INGESTER:JOB] move files get partitions: {}",
-        partition_files_with_size.len()
-    );
+    // log::debug!(
+    //     "[INGESTER:JOB] move files get partitions: {}",
+    //     partition_files_with_size.len()
+    // );
 
     Ok(partition_files_with_size)
 }
@@ -465,10 +465,10 @@ async fn move_files(
         }
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
-        prefix
-    );
+    // log::debug!(
+    //     "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
+    //     prefix
+    // );
 
     // start merge files and upload to s3
     loop {
