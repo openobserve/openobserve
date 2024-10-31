@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panels[0] || {}"
           :dashboardId="dashboardData.dashboardId"
           :folderId="folderId"
+          :reportId= "folderId"
           :selectedTimeDate="
             (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
             currentTimeObj['__global'] ||
@@ -113,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="item"
               :dashboardId="dashboardData.dashboardId"
               :folderId="folderId"
+              :reportId="reportId"
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
@@ -209,6 +211,7 @@ export default defineComponent({
     viewOnly: {},
     dashboardData: {},
     folderId: {},
+    reportId: {},
     currentTimeObj: {},
     initialVariableValues: { value: {} },
     selectedDateForViewPanel: {},

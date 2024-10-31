@@ -29,6 +29,7 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
+        search::{SearchEventContext, SearchEventType},
         stream::StreamType,
     },
     utils::{
@@ -374,6 +375,10 @@ impl AlertExt for Alert {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
+            let search_event_ctx = SearchEventContext::with_alert(Some(format!(
+                "/alerts/{}/{}/{}/{}",
+                self.org_id, self.stream_type, self.stream_name, self.name
+            )));
             self.query_condition
                 .evaluate_scheduled(
                     &self.org_id,
@@ -381,6 +386,8 @@ impl AlertExt for Alert {
                     self.stream_type,
                     &self.trigger_condition,
                     start_time,
+                    Some(SearchEventType::Alerts),
+                    Some(search_event_ctx),
                 )
                 .await
         }

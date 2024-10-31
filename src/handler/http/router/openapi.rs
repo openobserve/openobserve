@@ -177,6 +177,7 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::ResponseTook,
             config::meta::search::ResponseNodeTook,
             config::meta::search::SearchEventType,
+            config::meta::search::SearchEventContext,
             config::meta::search::SearchPartitionRequest,
             config::meta::search::SearchPartitionResponse,
             config::meta::search::SearchHistoryRequest,

@@ -53,8 +53,12 @@ pub struct Request {
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     #[serde(default)]
     pub timeout: i64,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(default, flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub index_type: String,
 }
@@ -434,6 +438,7 @@ impl SearchHistoryRequest {
             clusters: Vec::new(),
             timeout: 0,
             search_type: Some(SearchEventType::Other),
+            search_event_context: None,
             index_type: "".to_string(),
         };
         Ok(search_req)
@@ -747,6 +752,70 @@ impl FromStr for SearchEventType {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct SearchEventContext {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_key: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_stream_key: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report_key: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_id: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_name: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_folder_id: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_folder_name: Option<String>,
+}
+
+impl SearchEventContext {
+    pub fn with_alert(alert_key: Option<String>) -> Self {
+        Self {
+            alert_key,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_derived_stream(derived_stream_key: Option<String>) -> Self {
+        Self {
+            derived_stream_key,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_report(report_key: Option<String>) -> Self {
+        Self {
+            report_key,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_dashboard(
+        dashboard_id: Option<String>,
+        dashboard_name: Option<String>,
+        dashboard_folder_id: Option<String>,
+        dashboard_folder_name: Option<String>,
+    ) -> Self {
+        Self {
+            dashboard_id,
+            dashboard_name,
+            dashboard_folder_id,
+            dashboard_folder_name,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MultiSearchPartitionRequest {
     pub sql: Vec<String>,
@@ -814,7 +883,12 @@ pub struct MultiStreamRequest {
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(default)]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(default, flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub index_type: String, // parquet(default) or fst
     #[serde(default)]
@@ -886,6 +960,7 @@ impl MultiStreamRequest {
                 encoding: self.encoding,
                 timeout: self.timeout,
                 search_type: self.search_type,
+                search_event_context: self.search_event_context.clone(),
                 index_type: self.index_type.clone(),
             });
         }
@@ -971,6 +1046,7 @@ mod tests {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            search_event_context: None,
             index_type: "".to_string(),
         };
 

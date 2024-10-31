@@ -64,7 +64,8 @@ export const usePanelDataLoader = (
   forceLoad: any,
   searchType: any,
   dashboardId: any,
-  folderId: any
+  folderId: any,
+  reportId: any
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -555,9 +556,12 @@ export const usePanelDataLoader = (
                               per_query_response: true,
                               size: -1,
                             },
+                          
                           },
                           page_type: pageType,
                           traceparent,
+                          dashboard_id: dashboardId?.value,
+                          folder_id: folderId?.value,
                         },
                         searchType.value ?? "Dashboards"
                       ),
@@ -738,6 +742,7 @@ export const usePanelDataLoader = (
                   addTraceId(traceId);
 
                   try {
+
                     const searchRes = await callWithAbortController(
                       async () =>
                         await queryService.search(
@@ -759,9 +764,12 @@ export const usePanelDataLoader = (
                                 end_time: partition[1],
                                 size: -1,
                               },
+                            
                             },
                             page_type: pageType,
                             traceparent,
+                            dashboard_id: dashboardId?.value,
+                            folder_id: folderId?.value,
                           },
                           searchType.value ?? "Dashboards"
                         ),
@@ -1538,6 +1546,7 @@ export const usePanelDataLoader = (
   };
 
   onMounted(async () => {
+    console.log("report",reportId.value);
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
       rootMargin: "0px",

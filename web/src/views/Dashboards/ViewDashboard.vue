@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
         :folderId="route.query.folder"
+        :reportId = "reportId"
         :currentTimeObj="currentTimeObjPerPanel"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
@@ -352,6 +353,8 @@ export default defineComponent({
     const folderId = computed(() => route.query.folder);
 
     const tabId = computed(() => route.query.tab);
+
+    const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
 
@@ -982,6 +985,7 @@ export default defineComponent({
       scheduledReports,
       dashboardId,
       folderId,
+      reportId,
       tabId,
       outlinedDescription,
       searchRequestTraceIds,

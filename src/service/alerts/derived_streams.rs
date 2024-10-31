@@ -22,6 +22,7 @@ use config::{
     meta::{
         alerts::{FrequencyType, QueryType},
         pipeline::components::DerivedStream,
+        search::{SearchEventContext, SearchEventType},
     },
     utils::json::{Map, Value},
 };
@@ -77,7 +78,8 @@ pub async fn save(
     }
 
     // test derived_stream
-    if let Err(e) = &derived_stream.evaluate(None).await {
+    let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
+    if let Err(e) = &derived_stream.evaluate(None, &trigger_module_key).await {
         return Err(anyhow::anyhow!(
             "DerivedStream not saved due to failed test run caused by {}",
             e.to_string()
@@ -89,7 +91,7 @@ pub async fn save(
     let trigger = db::scheduler::Trigger {
         org: derived_stream.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
-        module_key: derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id),
+        module_key: trigger_module_key,
         next_run_at,
         is_realtime: false,
         is_silenced: false,
@@ -126,6 +128,7 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
     async fn evaluate(
         &self,
         start_time: Option<i64>,
+        module_key: &str,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 }
 
@@ -141,6 +144,7 @@ impl DerivedStreamExt for DerivedStream {
     async fn evaluate(
         &self,
         start_time: Option<i64>,
+        module_key: &str,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         self.query_condition
             .evaluate_scheduled(
@@ -149,6 +153,10 @@ impl DerivedStreamExt for DerivedStream {
                 self.stream_type,
                 &self.trigger_condition,
                 start_time,
+                Some(SearchEventType::DerivedStream),
+                Some(SearchEventContext::with_derived_stream(Some(
+                    module_key.to_string(),
+                ))),
             )
             .await
     }
