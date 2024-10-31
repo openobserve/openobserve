@@ -21,16 +21,17 @@ mod tests {
     use actix_web::{http::header::ContentType, test, web, App};
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
-    use chrono::Utc;
+    use chrono::{Duration, Utc};
     use config::{
         get_config,
         meta::alerts::{
             alert::Alert,
             destinations::{Destination, DestinationType},
-            QueryCondition, TriggerCondition,
+            Operator, QueryCondition, TriggerCondition,
         },
         utils::json,
     };
+    use infra::scheduler::Trigger;
     use openobserve::{
         common::meta::dashboards::{v1, Dashboard, Dashboards},
         handler::{
@@ -1936,7 +1937,7 @@ mod tests {
                 threshold: 1,
                 silence: 0,
                 frequency: 3600,
-                operator: openobserve::common::meta::alerts::Operator::GreaterThanEquals,
+                operator: Operator::GreaterThanEquals,
                 ..Default::default()
             },
             destinations: vec!["slack".to_string()],
