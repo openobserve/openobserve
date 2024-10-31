@@ -662,7 +662,7 @@ pub struct Common {
     pub usage_batch_size: usize,
     #[env_config(
         name = "ZO_USAGE_PUBLISH_INTERVAL",
-        default = 600,
+        default = 60,
         help = "duration in seconds after last reporting usage will be published"
     )]
     // in seconds
