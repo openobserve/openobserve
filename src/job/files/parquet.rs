@@ -291,7 +291,7 @@ async fn move_files(
         return Ok(());
     }
 
-    let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
+    let columns = prefix.splitn(9, '/').collect::<Vec<&str>>();
     // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
     // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
     // let _ = columns[0].to_string(); // files/
