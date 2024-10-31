@@ -781,8 +781,8 @@ async fn merge_files(
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
                             &org_id,
-                            &stream_name,
                             stream_type,
+                            &stream_name,
                             &full_text_search_fields,
                             &index_fields,
                         )
@@ -819,8 +819,8 @@ pub(crate) async fn generate_index_on_ingester(
     inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
@@ -833,6 +833,7 @@ pub(crate) async fn generate_index_on_ingester(
     let record_batches = prepare_index_record_batches(
         inverted_idx_batch,
         org_id,
+        stream_type,
         stream_name,
         &new_file_key,
         full_text_search_fields,
@@ -988,8 +989,8 @@ pub(crate) async fn generate_index_on_compactor(
     inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
@@ -1002,6 +1003,7 @@ pub(crate) async fn generate_index_on_compactor(
     let mut record_batches = prepare_index_record_batches(
         inverted_idx_batch,
         org_id,
+        stream_type,
         stream_name,
         &new_file_key,
         full_text_search_fields,
@@ -1012,7 +1014,7 @@ pub(crate) async fn generate_index_on_compactor(
     }
     let schema = record_batches.first().unwrap().schema();
 
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
 
     let _timestamp: ArrayRef = Arc::new(Int64Array::from(
@@ -1073,8 +1075,8 @@ pub(crate) async fn generate_index_on_compactor(
         record_batches,
         original_file_size,
         org_id,
-        &index_stream_name,
         StreamType::Index,
+        &index_stream_name,
         &new_file_key,
         "index_creator",
     )
@@ -1087,6 +1089,7 @@ pub(crate) async fn generate_index_on_compactor(
 fn prepare_index_record_batches(
     inverted_idx_batch: RecordBatch,
     org_id: &str,
+    stream_type: StreamType,
     stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
@@ -1107,7 +1110,7 @@ fn prepare_index_record_batches(
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
 
