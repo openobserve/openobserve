@@ -29,7 +29,7 @@ use arrow_flight::{
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
 use arrow_schema::Schema;
-use config::meta::search::ScanStats;
+use config::{meta::search::ScanStats, metrics};
 use datafusion::{
     common::{DataFusionError, Result},
     execution::SendableRecordBatchStream,
@@ -284,6 +284,16 @@ impl Drop for FlightSenderStream {
             self.trace_id,
             end
         );
+
+        // metrics
+        let time = self.start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/search/flight/do_get", "200", "", "", ""])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/search/flight/do_get", "200", "", "", ""])
+            .inc();
+
         if let Some(defer) = self.defer.take() {
             drop(defer);
         } else {

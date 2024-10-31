@@ -153,19 +153,19 @@ async fn scan_wal_files(
         }
     });
     let mut files_num = 0;
-    let mut last_time = start.elapsed().as_millis();
+    // let mut last_time = start.elapsed().as_millis();
     loop {
         match rx.recv().await {
             None => {
                 break;
             }
             Some(files) => {
-                log::debug!(
-                    "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
-                    files.len(),
-                    start.elapsed().as_millis() - last_time
-                );
-                last_time = start.elapsed().as_millis();
+                // log::debug!(
+                //     "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
+                //     files.len(),
+                //     start.elapsed().as_millis() - last_time
+                // );
+                // last_time = start.elapsed().as_millis();
                 files_num += files.len();
                 match prepare_files(files).await {
                     Err(e) => {
@@ -268,16 +268,21 @@ async fn prepare_files(
             continue;
         }
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
+        // remove thread_id from prefix
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+        let mut columns = prefix.split('/').collect::<Vec<&str>>();
+        columns.remove(4);
+        let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(&file_key, parquet_meta, false));
         // mark the file as processing
         // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
-    log::debug!(
-        "[INGESTER:JOB] move files get partitions: {}",
-        partition_files_with_size.len()
-    );
+    // log::debug!(
+    //     "[INGESTER:JOB] move files get partitions: {}",
+    //     partition_files_with_size.len()
+    // );
 
     Ok(partition_files_with_size)
 }
@@ -291,15 +296,15 @@ async fn move_files(
         return Ok(());
     }
 
-    let columns = prefix.splitn(9, '/').collect::<Vec<&str>>();
-    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-    // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
+    let columns = prefix.split('/').collect::<Vec<&str>>();
+    // removed thread_id from prefix, so there is no thread_id in the path
+    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
+    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
     // let _ = columns[0].to_string(); // files/
     let org_id = columns[1].to_string();
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
-    // let _thread_id = columns[4].to_string();
-    let prefix_date = format!("{}-{}-{}", columns[5], columns[6], columns[7]);
+    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
 
     // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
@@ -460,10 +465,10 @@ async fn move_files(
         }
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
-        prefix
-    );
+    // log::debug!(
+    //     "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
+    //     prefix
+    // );
 
     // start merge files and upload to s3
     loop {
@@ -781,8 +786,8 @@ async fn merge_files(
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
                             &org_id,
-                            &stream_name,
                             stream_type,
+                            &stream_name,
                             &full_text_search_fields,
                             &index_fields,
                         )
@@ -819,8 +824,8 @@ pub(crate) async fn generate_index_on_ingester(
     inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
@@ -833,6 +838,7 @@ pub(crate) async fn generate_index_on_ingester(
     let record_batches = prepare_index_record_batches(
         inverted_idx_batch,
         org_id,
+        stream_type,
         stream_name,
         &new_file_key,
         full_text_search_fields,
@@ -988,8 +994,8 @@ pub(crate) async fn generate_index_on_compactor(
     inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
@@ -1002,6 +1008,7 @@ pub(crate) async fn generate_index_on_compactor(
     let mut record_batches = prepare_index_record_batches(
         inverted_idx_batch,
         org_id,
+        stream_type,
         stream_name,
         &new_file_key,
         full_text_search_fields,
@@ -1012,7 +1019,7 @@ pub(crate) async fn generate_index_on_compactor(
     }
     let schema = record_batches.first().unwrap().schema();
 
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
 
     let _timestamp: ArrayRef = Arc::new(Int64Array::from(
@@ -1073,8 +1080,8 @@ pub(crate) async fn generate_index_on_compactor(
         record_batches,
         original_file_size,
         org_id,
-        &index_stream_name,
         StreamType::Index,
+        &index_stream_name,
         &new_file_key,
         "index_creator",
     )
@@ -1087,6 +1094,7 @@ pub(crate) async fn generate_index_on_compactor(
 fn prepare_index_record_batches(
     inverted_idx_batch: RecordBatch,
     org_id: &str,
+    stream_type: StreamType,
     stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
@@ -1107,7 +1115,7 @@ fn prepare_index_record_batches(
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
 
