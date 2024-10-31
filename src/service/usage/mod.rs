@@ -49,7 +49,7 @@ fn initialize_usage_queuer() -> UsageQueuer {
     let timeout = time::Duration::from_secs(cfg.common.usage_publish_interval.try_into().unwrap());
     let batch_size = cfg.common.usage_batch_size;
 
-    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(batch_size);
+    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(batch_size * 2);
 
     tokio::task::spawn(async move { ingest_usage_job(msg_receiver, batch_size, timeout).await });
 
