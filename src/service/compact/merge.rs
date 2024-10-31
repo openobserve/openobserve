@@ -873,8 +873,8 @@ pub async fn merge_files(
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
                             org_id,
-                            stream_name,
                             stream_type,
+                            stream_name,
                             &full_text_search_fields,
                             &index_fields,
                         )
