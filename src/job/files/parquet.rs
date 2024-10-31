@@ -268,6 +268,11 @@ async fn prepare_files(
             continue;
         }
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
+        // remove thread_id from prefix
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+        let mut columns = prefix.split('/').collect::<Vec<&str>>();
+        columns.remove(4);
+        let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(&file_key, parquet_meta, false));
         // mark the file as processing
@@ -291,15 +296,15 @@ async fn move_files(
         return Ok(());
     }
 
-    let columns = prefix.splitn(9, '/').collect::<Vec<&str>>();
-    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-    // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
+    let columns = prefix.split('/').collect::<Vec<&str>>();
+    // removed thread_id from prefix, so there is no thread_id in the path
+    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
+    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
     // let _ = columns[0].to_string(); // files/
     let org_id = columns[1].to_string();
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
-    // let _thread_id = columns[4].to_string();
-    let prefix_date = format!("{}-{}-{}", columns[5], columns[6], columns[7]);
+    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
 
     // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
