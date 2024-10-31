@@ -138,6 +138,7 @@ pub async fn report_request_usage_stats(
             cached_ratio: None,
             compressed_size: None,
             search_type: stats.search_type,
+            search_event_context: stats.search_event_context.clone(),
             trace_id: None,
             took_wait_in_queue: stats.took_wait_in_queue,
             result_cache_ratio: None,
@@ -175,6 +176,7 @@ pub async fn report_request_usage_stats(
         cached_ratio: stats.cached_ratio,
         compressed_size: None,
         search_type: stats.search_type,
+        search_event_context: stats.search_event_context.clone(),
         trace_id: stats.trace_id,
         took_wait_in_queue: stats.took_wait_in_queue,
         result_cache_ratio: stats.result_cache_ratio,
@@ -193,7 +195,12 @@ async fn publish_usage(usage: Vec<UsageData>) {
     }
 
     match USAGE_QUEUER
-        .enqueue(usage.into_iter().map(UsageBuffer::Usage).collect())
+        .enqueue(
+            usage
+                .into_iter()
+                .map(|item| UsageBuffer::Usage(Box::new(item)))
+                .collect(),
+        )
         .await
     {
         Err(e) => {
@@ -212,7 +219,7 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
     }
 
     match USAGE_QUEUER
-        .enqueue(vec![UsageBuffer::Trigger(trigger)])
+        .enqueue(vec![UsageBuffer::Trigger(Box::new(trigger))])
         .await
     {
         Err(e) => {
@@ -321,7 +328,12 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
                         // on error in ingesting usage data, push back the data
                         let curr_usages = curr_usages.clone();
                         if let Err(e) = USAGE_QUEUER
-                            .enqueue(curr_usages.into_iter().map(UsageBuffer::Usage).collect())
+                            .enqueue(
+                                curr_usages
+                                    .into_iter()
+                                    .map(|item| UsageBuffer::Usage(Box::new(item)))
+                                    .collect(),
+                            )
                             .await
                         {
                             log::error!(
@@ -337,7 +349,12 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();
                     if let Err(e) = USAGE_QUEUER
-                        .enqueue(curr_usages.into_iter().map(UsageBuffer::Usage).collect())
+                        .enqueue(
+                            curr_usages
+                                .into_iter()
+                                .map(|item| UsageBuffer::Usage(Box::new(item)))
+                                .collect(),
+                        )
                         .await
                     {
                         log::error!(
@@ -363,7 +380,12 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             log::error!("Error in ingesting usage data {:?}", e);
             // on error in ingesting usage data, push back the data
             if let Err(e) = USAGE_QUEUER
-                .enqueue(curr_usages.into_iter().map(UsageBuffer::Usage).collect())
+                .enqueue(
+                    curr_usages
+                        .into_iter()
+                        .map(|item| UsageBuffer::Usage(Box::new(item)))
+                        .collect(),
+                )
                 .await
             {
                 log::error!("Error in pushing back un-ingested Usage data to UsageQueuer: {e}");
@@ -391,7 +413,12 @@ async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
     if let Err(e) = ingestion_service::ingest(&get_config().common.usage_org, req).await {
         log::error!("Error in ingesting triggers usage data {:?}", e);
         if let Err(e) = USAGE_QUEUER
-            .enqueue(curr_usages.into_iter().map(UsageBuffer::Trigger).collect())
+            .enqueue(
+                curr_usages
+                    .into_iter()
+                    .map(|item| UsageBuffer::Trigger(Box::new(item)))
+                    .collect(),
+            )
             .await
         {
             log::error!("Error in pushing back un-ingested Usage data to UsageQueuer: {e}");
@@ -435,8 +462,8 @@ enum UsageMessage {
 
 #[derive(Debug)]
 enum UsageBuffer {
-    Usage(UsageData),
-    Trigger(TriggerData),
+    Usage(Box<UsageData>),
+    Trigger(Box<TriggerData>),
 }
 
 #[derive(Debug)]
@@ -526,8 +553,8 @@ async fn ingest_buffered_usage(usage_buffer: Vec<UsageBuffer>) {
     let (mut usage_data, mut trigger_data) = (Vec::new(), Vec::new());
     for item in usage_buffer {
         match item {
-            UsageBuffer::Usage(usage) => usage_data.push(usage),
-            UsageBuffer::Trigger(trigger) => trigger_data.push(trigger),
+            UsageBuffer::Usage(usage) => usage_data.push(*usage),
+            UsageBuffer::Trigger(trigger) => trigger_data.push(*trigger),
         }
     }
     if !usage_data.is_empty() {

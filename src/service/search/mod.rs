@@ -336,8 +336,8 @@ pub async fn search_multi(
             max_ts: None,
             cached_ratio: None,
             trace_id: None,
-            // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
+            search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
         report_request_usage_stats(
@@ -462,18 +462,24 @@ pub async fn search(
         Ok(mut res) => {
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
-            let (report_usage, search_type) = match in_req.search_type {
-                Some(search_type) => match search_type {
-                    search::SearchEventType::UI => (false, None),
-                    search::SearchEventType::Dashboards => (true, in_req.search_type),
-                    search::SearchEventType::Reports => (true, in_req.search_type),
-                    search::SearchEventType::Alerts => (true, in_req.search_type),
-                    search::SearchEventType::DerivedStream => (true, in_req.search_type),
-                    search::SearchEventType::RUM => (true, in_req.search_type),
-                    search::SearchEventType::Values => (false, None),
-                    search::SearchEventType::Other => (false, None),
-                },
-                None => (false, None),
+            let (report_usage, search_type, search_event_context) = match in_req.search_type {
+                Some(search_type) => {
+                    if matches!(
+                        search_type,
+                        search::SearchEventType::UI
+                            | search::SearchEventType::Values
+                            | search::SearchEventType::Other
+                    ) {
+                        (false, None, None)
+                    } else {
+                        (
+                            true,
+                            in_req.search_type,
+                            in_req.search_event_context.clone(),
+                        )
+                    }
+                }
+                None => (false, None, None),
             };
 
             if report_usage {
@@ -499,6 +505,7 @@ pub async fn search(
                     max_ts: Some(req_query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    search_event_context,
                     trace_id: Some(trace_id),
                     took_wait_in_queue: if res.took_detail.is_some() {
                         let resp_took = res.took_detail.as_ref().unwrap();

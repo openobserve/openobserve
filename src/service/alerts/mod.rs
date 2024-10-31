@@ -21,7 +21,7 @@ use config::{
     get_config, ider,
     meta::{
         alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
-        search::{SearchEventType, SqlQuery},
+        search::{SearchEventContext, SearchEventType, SqlQuery},
         stream::StreamType,
     },
     utils::{
@@ -46,6 +46,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         row: Option<&Map<String, Value>>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 
+    #[allow(clippy::too_many_arguments)]
     async fn evaluate_scheduled(
         &self,
         org_id: &str,
@@ -53,6 +54,8 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         stream_type: StreamType,
         trigger_condition: &TriggerCondition,
         start_time: Option<i64>,
+        search_type: Option<SearchEventType>,
+        search_event_context: Option<SearchEventContext>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 }
 
@@ -91,6 +94,8 @@ impl QueryConditionExt for QueryCondition {
         stream_type: StreamType,
         trigger_condition: &TriggerCondition,
         start_time: Option<i64>,
+        search_type: Option<SearchEventType>,
+        search_event_context: Option<SearchEventContext>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
@@ -278,7 +283,8 @@ impl QueryConditionExt for QueryCondition {
                 regions: vec![],
                 clusters: vec![],
                 timeout: 0,
-                search_type: Some(SearchEventType::Alerts),
+                search_type,
+                search_event_context,
                 from: 0,
                 size,
                 start_time: 0, // ignored
@@ -328,8 +334,8 @@ impl QueryConditionExt for QueryCondition {
                 regions: vec![],
                 clusters: vec![],
                 timeout: 0,
-                search_type: Some(SearchEventType::Alerts), /* TODO(taiming): change the name to
-                                                             * scheduled & inform FE */
+                search_type,
+                search_event_context,
                 index_type: "".to_string(),
             };
             SearchService::search(&trace_id, org_id, stream_type, None, &req).await

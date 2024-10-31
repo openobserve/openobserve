@@ -737,6 +737,7 @@ pub(crate) async fn get_series(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        search_event_context: None,
         index_type: "".to_string(),
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
@@ -882,6 +883,7 @@ pub(crate) async fn get_label_values(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        search_event_context: None,
         index_type: "".to_string(),
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {

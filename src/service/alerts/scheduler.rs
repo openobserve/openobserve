@@ -872,7 +872,9 @@ async fn handle_derived_stream_triggers(
     }
 
     // evaluate trigger and configure trigger next run time
-    let (ret, end_time) = derived_stream.evaluate(start_time).await?;
+    let (ret, end_time) = derived_stream
+        .evaluate(start_time, &trigger.module_key)
+        .await?;
     if ret.is_some() {
         log::info!(
             "DerivedStream conditions satisfied, org: {}, module_key: {}",
