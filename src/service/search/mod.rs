@@ -62,7 +62,7 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta, utils::functions},
+    common::{infra::cluster as infra_cluster, utils},
     handler::grpc::request::search::Searcher,
 };
 
@@ -169,7 +169,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in functions::get_all_transform_keys(org_id).await {
+        for fn_name in utils::functions::get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -234,7 +234,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let mut runtime = utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
@@ -256,11 +256,11 @@ pub async fn search_multi(
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        &meta::functions::VRLResultResolver {
+                        &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
                             fields: program.fields.clone(),
                         },
-                        &json::Value::Array(multi_res.hits),
+                        json::Value::Array(multi_res.hits),
                         org_id,
                         &[stream_name.clone()],
                     );
@@ -292,11 +292,11 @@ pub async fn search_multi(
                         .filter_map(|hit| {
                             let ret_val = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
-                                &meta::functions::VRLResultResolver {
+                                &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
                                     fields: program.fields.clone(),
                                 },
-                                &hit,
+                                hit,
                                 org_id,
                                 &[stream_name.clone()],
                             );

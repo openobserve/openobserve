@@ -20,6 +20,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
+        function::VRLResultResolver,
         search,
         sql::resolve_stream_names,
         stream::StreamType,
@@ -471,11 +472,11 @@ pub async fn search_multi(
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        &meta::functions::VRLResultResolver {
+                        &VRLResultResolver {
                             program: program.program.clone(),
                             fields: program.fields.clone(),
                         },
-                        &json::Value::Array(multi_res.hits),
+                        json::Value::Array(multi_res.hits),
                         &org_id,
                         &[vrl_stream_name.clone()],
                     );
@@ -507,11 +508,11 @@ pub async fn search_multi(
                         .filter_map(|hit| {
                             let ret_val = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
-                                &meta::functions::VRLResultResolver {
+                                &VRLResultResolver {
                                     program: program.program.clone(),
                                     fields: program.fields.clone(),
                                 },
-                                &hit,
+                                hit,
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
