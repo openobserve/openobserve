@@ -1346,7 +1346,7 @@ pub struct RUM {
 
 pub fn init() -> Config {
     dotenv_override().ok();
-    let mut cfg = Config::init().unwrap();
+    let mut cfg = Config::init().expect("config init error");
 
     // set local mode
     if cfg.common.local_mode {
