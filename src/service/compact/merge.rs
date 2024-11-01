@@ -644,6 +644,7 @@ pub async fn merge_files(
         original_size: new_file_size,
         compressed_size: 0,
         flattened: false,
+        index_file_size: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
@@ -876,7 +877,7 @@ pub async fn merge_files(
                             &new_file_key,
                             &full_text_search_fields,
                             &index_fields,
-                            Some(&retain_file_list),
+                            Some(retain_file_list.as_slice()),
                         )
                         .await?;
                     }
@@ -887,9 +888,10 @@ pub async fn merge_files(
                         create_tantivy_index(
                             inverted_idx_batch,
                             &new_file_key,
-                            &full_text_search_fields,
+                            &mut new_file_meta,
                             &index_fields,
-                            Some(&retain_file_list),
+                            &full_text_search_fields,
+                            Some(retain_file_list.as_slice()),
                         )
                         .await?;
                     }

@@ -457,6 +457,7 @@ pub struct FileRecord {
     pub compressed_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
+    pub index_size: i64,
 }
 
 impl From<&FileRecord> for FileMeta {
@@ -468,6 +469,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: record.original_size,
             compressed_size: record.compressed_size,
             flattened: record.flattened,
+            index_file_size: record.index_size,
         }
     }
 }
@@ -481,6 +483,7 @@ pub struct StatsRecord {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub index_size: i64,
 }
 
 impl From<&StatsRecord> for StreamStats {
@@ -493,6 +496,7 @@ impl From<&StatsRecord> for StreamStats {
             file_num: record.file_num,
             storage_size: record.original_size,
             compressed_size: record.compressed_size,
+            index_size: record.index_size,
         }
     }
 }

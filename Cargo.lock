@@ -6286,6 +6286,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
+ "tokio-util",
  "tonic 0.12.3",
  "tracing",
  "tracing-appender",

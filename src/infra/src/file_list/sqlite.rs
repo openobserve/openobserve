@@ -315,8 +315,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size
+    FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
             )
@@ -332,8 +332,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     time_end + cfg.limit.upper_bound_for_max_ts * 60 * 1_000_000;
                 sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size
+    FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
             )
@@ -346,8 +346,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             } else {
                 sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size
+    FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
             )
@@ -387,7 +387,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -580,8 +580,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         };
         let sql = format!(
             r#"
-SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_num, SUM(records) as records, SUM(original_size) as original_size, SUM(compressed_size) as compressed_size
-    FROM file_list 
+SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_num, SUM(records) as records, SUM(original_size) as original_size, SUM(compressed_size) as compressed_size, SUM(index_size) as index_size
+    FROM file_list
     WHERE {field} = '{value}'
             "#,
         );
@@ -672,9 +672,9 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
             if let Err(e) = sqlx::query(
                 r#"
-    INSERT INTO stream_stats 
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
+    INSERT INTO stream_stats
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
+    VALUES ($1, $2, 0, 0, 0, 0, 0, 0, 0);
                 "#,
             )
             .bind(org_id)
@@ -697,9 +697,9 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         for (stream_key, stats) in update_streams {
             if let Err(e) = sqlx::query(
                 r#"
-UPDATE stream_stats 
-    SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6
-    WHERE stream = $7;
+UPDATE stream_stats
+    SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6, index_size = index_size + $7
+    WHERE stream = $8;
                 "#,
             )
             .bind(stats.file_num)
@@ -708,6 +708,7 @@ UPDATE stream_stats
             .bind(stats.doc_num)
             .bind(stats.storage_size)
             .bind(stats.compressed_size)
+            .bind(stats.index_size)
             .bind(stream_key)
             .execute(&mut *tx)
             .await
@@ -751,7 +752,7 @@ UPDATE stream_stats
     async fn reset_stream_stats(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0;"#)
+        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0, index_size = 0;"#)
         .execute(&*client)
        .await?;
         Ok(())
@@ -821,10 +822,10 @@ UPDATE stream_stats
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
 SELECT stream, max(id) as id, COUNT(*) AS num
-    FROM file_list_jobs 
-    WHERE status = $1 
-    GROUP BY stream 
-    ORDER BY num DESC 
+    FROM file_list_jobs
+    WHERE status = $1
+    GROUP BY stream
+    ORDER BY num DESC
     LIMIT $2;"#,
         )
         .bind(super::FileListJobStatus::Pending)
@@ -1017,8 +1018,8 @@ impl SqliteFileList {
         let client = client.lock().await;
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
         "#).as_str(),
     )
         .bind(id)
@@ -1033,6 +1034,7 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.flattened)
+        .bind(meta.index_file_size)
         .execute(&*client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -1064,7 +1066,7 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
             let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)").as_str(),
+                format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size)").as_str(),
             );
             query_builder.push_values(files, |mut b, (id, item)| {
                 let (stream_key, date_key, file_name) =
@@ -1081,7 +1083,8 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
                     .push_bind(item.meta.records)
                     .push_bind(item.meta.original_size)
                     .push_bind(item.meta.compressed_size)
-                    .push_bind(item.meta.flattened);
+                    .push_bind(item.meta.flattened)
+                    .push_bind(item.meta.index_file_size);
             });
             let need_single_insert = match query_builder.build().execute(&mut *tx).await {
                 Ok(_) => false,
@@ -1146,7 +1149,8 @@ CREATE TABLE IF NOT EXISTS file_list
     max_ts    BIGINT not null,
     records   BIGINT not null,
     original_size   BIGINT not null,
-    compressed_size BIGINT not null
+    compressed_size BIGINT not null,
+    index_size BIGINT not null
 );
         "#,
     )
@@ -1168,7 +1172,8 @@ CREATE TABLE IF NOT EXISTS file_list_history
     max_ts    BIGINT not null,
     records   BIGINT not null,
     original_size   BIGINT not null,
-    compressed_size BIGINT not null
+    compressed_size BIGINT not null,
+    index_size BIGINT not null
 );
         "#,
     )
@@ -1222,12 +1227,20 @@ CREATE TABLE IF NOT EXISTS stream_stats
     max_ts   BIGINT not null,
     records  BIGINT not null,
     original_size   BIGINT not null,
-    compressed_size BIGINT not null
+    compressed_size BIGINT not null,
+    index_size BIGINT not null
 );
         "#,
     )
     .execute(&*client)
     .await?;
+
+    // create column flattened for old version <= 0.10.5
+    let column = "index_size";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "stream_stats", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
 
     // create column flattened for old version <= 0.10.5
     let column = "flattened";

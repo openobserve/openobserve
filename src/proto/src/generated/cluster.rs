@@ -32,6 +32,8 @@ pub struct FileMeta {
     pub original_size: i64,
     #[prost(int64, tag = "5")]
     pub compressed_size: i64,
+    #[prost(int64, tag = "6")]
+    pub index_file_size: i64,
 }
 /// Job information for a request
 #[derive(Eq)]

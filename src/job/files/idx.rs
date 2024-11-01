@@ -90,6 +90,7 @@ pub(crate) async fn write_parquet_index_to_disk(
             original_size: file_size as i64,
             compressed_size: 0,
             flattened: false,
+            index_file_size: 0,
         };
         populate_file_meta(
             schema.clone(),

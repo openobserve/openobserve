@@ -653,6 +653,7 @@ async fn merge_files(
         original_size: new_file_size,
         compressed_size: 0,
         flattened: false,
+        index_file_size: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!(
@@ -780,6 +781,7 @@ async fn merge_files(
                         create_tantivy_index(
                             inverted_idx_batch,
                             &new_file_key,
+                            &mut new_file_meta,
                             &full_text_search_fields,
                             &index_fields,
                             None,
@@ -1370,6 +1372,7 @@ pub(crate) async fn generate_fst_inverted_index(
 pub(crate) async fn create_tantivy_index(
     inverted_idx_batch: RecordBatch,
     parquet_file_name: &str,
+    parquet_file_meta: &mut FileMeta,
     full_text_search_fields: &[String],
     index_fields: &[String],
     file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
@@ -1405,7 +1408,7 @@ pub(crate) async fn create_tantivy_index(
     };
 
     let dir = PuffinDirWriter::new();
-    let _ = generate_tantivy_index(
+    let _index = generate_tantivy_index(
         dir.clone(),
         inverted_idx_batch,
         full_text_search_fields,
@@ -1413,7 +1416,9 @@ pub(crate) async fn create_tantivy_index(
     )?;
 
     let puffin_bytes = dir.to_puffin_bytes()?;
-    let puffin_bytes_len = puffin_bytes.len();
+
+    // Index size set here will be used to aggregate stream stats
+    parquet_file_meta.index_file_size = puffin_bytes.len() as i64;
 
     // write fst bytes into disk
     let Some(tantivy_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
@@ -1426,7 +1431,7 @@ pub(crate) async fn create_tantivy_index(
             log::info!(
                 "{} Written tantivy index file successfully with size {}",
                 caller,
-                puffin_bytes_len,
+                parquet_file_meta.index_file_size,
             );
         }
         Err(e) => {
@@ -1434,6 +1439,7 @@ pub(crate) async fn create_tantivy_index(
             return Err(e);
         }
     }
+
     Ok(())
 }
 
@@ -1651,6 +1657,7 @@ pub(crate) fn prepare_fst_index_bytes(
         original_size: 0,
         compressed_size: 0,
         flattened: false,
+        index_file_size: 0,
     };
 
     let _ = index_file_metas.finish(&mut writer)?;

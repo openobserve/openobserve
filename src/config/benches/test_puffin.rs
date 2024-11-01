@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{fs::File, io::Read};
 
 use config::meta::puffin_directory::reader::RamDirectoryReader;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

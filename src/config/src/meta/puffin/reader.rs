@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use core::ops::Range;
 use std::io::{Read, SeekFrom};
 
 use anyhow::{anyhow, ensure, Result};

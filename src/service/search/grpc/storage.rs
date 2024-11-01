@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp, path::PathBuf, sync::Arc};
+use std::{cmp, sync::Arc};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -22,7 +22,7 @@ use config::{
     meta::{
         bitvec::BitVec,
         inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
-        puffin_directory::{convert_puffin_dir_to_tantivy_dir, reader::RamDirectoryReader},
+        puffin_directory::reader::RamDirectoryReader,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
