@@ -1,0 +1,29 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
+      - docker login --username openobserve --password $DOCKER_HUB_ACCESS_TOKEN
+
+  build:
+    commands:
+      # Increase swap file size
+      - fallocate -l 32G /swapfile
+      - chmod 600 /swapfile
+      - mkswap /swapfile || true
+      - swapon /swapfile || true
+      - pwd
+      - GIT_TAG="$(git describe --tags --abbrev=0)"
+      # disable gxhash
+      - sed -i 's/default = \[\"gxhash\"\]/default = []/g' src/config/Cargo.toml
+      
+      # std version
+      - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
+      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-pi
+      - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-pi
+
+      # debug version
+      - docker build -t openobserve:latest-arm64-debug -f deploy/build/Dockerfile.tag-debug.aarch64 .
+      - docker tag openobserve:latest-arm64-debug public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-pi-debug
+      - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-pi-debug
