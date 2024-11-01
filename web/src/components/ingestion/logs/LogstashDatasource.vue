@@ -56,7 +56,7 @@ export default defineComponent({
     };
     const content = `output {
   http {
-    url => "${endpoint.value.url}"
+    url => "${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json"
     http_method => "post"
     format => "json_batch"
     headers => {
