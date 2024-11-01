@@ -134,6 +134,12 @@ pub async fn search(
         return Err(Error::Message("no querier node online".to_string()));
     }
 
+    log::info!(
+        "[trace_id {trace_id}] flight->search: get nodes num: {}, querier num: {}",
+        nodes.len(),
+        querier_num,
+    );
+
     // waiting in work group queue
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])

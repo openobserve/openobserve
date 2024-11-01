@@ -80,7 +80,6 @@ use crate::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::exec::merge_parquet_files as merge_parquet_files_by_datafusion,
     },
 };
 
@@ -714,11 +713,8 @@ async fn merge_files(
             &mut buf,
         )
         .await
-    } else if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
     } else {
-        merge_parquet_files_by_datafusion(tmp_dir.name(), stream_type, &stream_name, schema.clone())
-            .await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
     };
     let (new_schema, new_batches) = match merge_result {
         Ok(v) => v,
