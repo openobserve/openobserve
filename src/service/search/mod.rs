@@ -62,7 +62,7 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta, utils::functions},
+    common::{infra::cluster as infra_cluster, utils},
     handler::grpc::request::search::Searcher,
 };
 
@@ -169,7 +169,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in functions::get_all_transform_keys(org_id).await {
+        for fn_name in utils::functions::get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -234,7 +234,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let mut runtime = utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
@@ -256,11 +256,11 @@ pub async fn search_multi(
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        &meta::functions::VRLResultResolver {
+                        &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
                             fields: program.fields.clone(),
                         },
-                        &json::Value::Array(multi_res.hits),
+                        json::Value::Array(multi_res.hits),
                         org_id,
                         &[stream_name.clone()],
                     );
@@ -292,11 +292,11 @@ pub async fn search_multi(
                         .filter_map(|hit| {
                             let ret_val = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
-                                &meta::functions::VRLResultResolver {
+                                &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
                                     fields: program.fields.clone(),
                                 },
-                                &hit,
+                                hit,
                                 org_id,
                                 &[stream_name.clone()],
                             );
@@ -336,8 +336,8 @@ pub async fn search_multi(
             max_ts: None,
             cached_ratio: None,
             trace_id: None,
-            // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
+            search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
         report_request_usage_stats(
@@ -462,18 +462,24 @@ pub async fn search(
         Ok(mut res) => {
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
-            let (report_usage, search_type) = match in_req.search_type {
-                Some(search_type) => match search_type {
-                    search::SearchEventType::UI => (false, None),
-                    search::SearchEventType::Dashboards => (true, in_req.search_type),
-                    search::SearchEventType::Reports => (true, in_req.search_type),
-                    search::SearchEventType::Alerts => (true, in_req.search_type),
-                    search::SearchEventType::DerivedStream => (true, in_req.search_type),
-                    search::SearchEventType::RUM => (true, in_req.search_type),
-                    search::SearchEventType::Values => (false, None),
-                    search::SearchEventType::Other => (false, None),
-                },
-                None => (false, None),
+            let (report_usage, search_type, search_event_context) = match in_req.search_type {
+                Some(search_type) => {
+                    if matches!(
+                        search_type,
+                        search::SearchEventType::UI
+                            | search::SearchEventType::Values
+                            | search::SearchEventType::Other
+                    ) {
+                        (false, None, None)
+                    } else {
+                        (
+                            true,
+                            in_req.search_type,
+                            in_req.search_event_context.clone(),
+                        )
+                    }
+                }
+                None => (false, None, None),
             };
 
             if report_usage {
@@ -499,6 +505,7 @@ pub async fn search(
                     max_ts: Some(req_query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    search_event_context,
                     trace_id: Some(trace_id),
                     took_wait_in_queue: if res.took_detail.is_some() {
                         let resp_took = res.took_detail.as_ref().unwrap();

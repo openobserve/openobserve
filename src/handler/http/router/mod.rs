@@ -403,9 +403,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(functions::list_functions)
             .service(functions::delete_function)
             .service(functions::update_function)
-            .service(functions::add_function_to_stream)
-            .service(functions::list_stream_functions)
-            .service(functions::delete_stream_function)
             .service(dashboards::create_dashboard)
             .service(dashboards::update_dashboard)
             .service(dashboards::list_dashboards)
@@ -481,11 +478,12 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(authz::fga::delete_group)
             .service(users::list_roles)
             .service(clusters::list_clusters)
-            .service(pipelines::save_pipeline)
-            .service(pipelines::list_pipelines)
-            .service(pipelines::delete_pipeline)
-            .service(pipelines::update_pipeline)
-            .service(pipelines::update_pipeline)
+            .service(pipeline::save_pipeline)
+            .service(pipeline::update_pipeline)
+            .service(pipeline::list_pipelines)
+            .service(pipeline::list_streams_with_pipeline)
+            .service(pipeline::delete_pipeline)
+            .service(pipeline::enable_pipeline)
             .service(search::multi_streams::search_multi)
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
@@ -547,6 +545,6 @@ mod tests {
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
         let resp = call_service(&mut app, req).await;
-        assert_eq!(resp.status().as_u16(), 200);
+        assert_eq!(resp.status().as_u16(), 404);
     }
 }
