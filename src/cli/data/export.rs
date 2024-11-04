@@ -24,7 +24,10 @@ use config::meta::{
 
 use crate::{
     cli::data::{cli::Cli, Context},
-    common::utils::http::{get_search_type_from_request, get_stream_type_from_request},
+    common::utils::http::{
+        get_search_event_context_from_request, get_search_type_from_request,
+        get_stream_type_from_request,
+    },
     service::search as SearchService,
 };
 
@@ -34,18 +37,22 @@ pub struct Export {}
 impl Context for Export {
     async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
         let map = HashMap::from([("type".to_string(), c.stream_type)]);
+        let query_map = Query(map);
 
-        let stream_type = match get_stream_type_from_request(&Query(map.clone())) {
+        let stream_type = match get_stream_type_from_request(&query_map) {
             Ok(v) => v.unwrap_or(StreamType::Logs),
             Err(_) => return Ok(false),
         };
 
         let cfg = config::get_config();
         let table = c.stream_name;
-        let search_type = match get_search_type_from_request(&Query(map.clone())) {
+        let search_type = match get_search_type_from_request(&query_map) {
             Ok(v) => v,
             Err(_) => return Ok(false),
         };
+        let search_event_context = search_type
+            .as_ref()
+            .and_then(|event_type| get_search_event_context_from_request(event_type, &query_map));
         let query = search::Query {
             sql: format!("select * from {}", table),
             from: 0,
@@ -68,6 +75,7 @@ impl Context for Export {
             clusters: vec![],
             timeout: 0,
             search_type,
+            search_event_context,
             index_type: "".to_string(),
         };
 

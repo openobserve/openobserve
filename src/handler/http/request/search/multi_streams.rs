@@ -20,6 +20,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
+        function::VRLResultResolver,
         search,
         sql::resolve_stream_names,
         stream::StreamType,
@@ -37,8 +38,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
-                get_work_group,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request, get_work_group,
             },
         },
     },
@@ -146,6 +147,9 @@ pub async fn search_multi(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
+    let search_event_context = search_type
+        .as_ref()
+        .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
 
     // handle encoding for query and aggs
     let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
@@ -275,6 +279,9 @@ pub async fn search_multi(
             }
         }
 
+        // add search type to request
+        req.search_type = search_type;
+
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&org_id])
             .inc();
@@ -342,6 +349,7 @@ pub async fn search_multi(
                     max_ts: Some(req.query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    search_event_context: search_event_context.clone(),
                     trace_id: Some(res.trace_id.clone()),
                     took_wait_in_queue: if res.took_detail.is_some() {
                         let resp_took = res.took_detail.as_ref().unwrap();
@@ -468,11 +476,11 @@ pub async fn search_multi(
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        &meta::functions::VRLResultResolver {
+                        &VRLResultResolver {
                             program: program.program.clone(),
                             fields: program.fields.clone(),
                         },
-                        &json::Value::Array(multi_res.hits),
+                        json::Value::Array(multi_res.hits),
                         &org_id,
                         &[vrl_stream_name.clone()],
                     );
@@ -504,11 +512,11 @@ pub async fn search_multi(
                         .filter_map(|hit| {
                             let ret_val = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
-                                &meta::functions::VRLResultResolver {
+                                &VRLResultResolver {
                                     program: program.program.clone(),
                                     fields: program.fields.clone(),
                                 },
-                                &hit,
+                                hit,
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
@@ -559,6 +567,7 @@ pub async fn search_multi(
             trace_id: None,
             // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
+            search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
         report_request_usage_stats(
@@ -923,6 +932,7 @@ pub async fn around_multi(
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            search_event_context: None,
             index_type: "".to_string(),
         };
         let search_res =
@@ -996,6 +1006,7 @@ pub async fn around_multi(
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            search_event_context: None,
             index_type: "".to_string(),
         };
         let search_res =

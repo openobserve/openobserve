@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="300px"
             >
               <span style="font-size: 14px"
-                >Configure the option to enable a cron job.</span
+                >Configure the option to enable a cron expression.</span
               >
             </q-tooltip>
           </q-icon>
@@ -636,12 +636,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="triggerData.cron"
                   dense
                   filled
-                  :label="t('reports.cron') + ' *'"
+                  :label="t('reports.cronExpression') + ' *'"
                   style="background: none; width: 180px"
                   class="showLabelOnTop"
                   stack-label
                   outlined
                   @update:model-value="updateCron"
+                  required
                 />
                 <q-select
                   data-test="add-report-schedule-start-timezone-select"
@@ -779,9 +780,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-alert-period-warning-text"
             v-else
             class="text-primary q-pt-xs"
-            style="font-size: 12px; line-height: 12px"
+            style="font-size: 12px; line-height: 12px ;padding: 8px 0px;"
           >
-            Note: The period should be the same as the cron expression.
+            Note: The period should be the same as frequency.
           </div>
         </div>
       </div>
@@ -1170,7 +1171,8 @@ const filterFunctionOptions = (val: string, update: any) => {
 
 const onBlurQueryEditor = () => {
   queryEditorPlaceholderFlag.value = true;
-  emits("validate-sql");
+
+  // emits("validate-sql");
 };
 
 const validateInputs = (notify: boolean = true) => {
@@ -1224,6 +1226,7 @@ const validateInputs = (notify: boolean = true) => {
 
   return true;
 };
+
 defineExpose({
   tab,
   validateInputs,
@@ -1256,10 +1259,12 @@ defineExpose({
 }
 .scheduled-alerts {
   .monaco-editor {
-    width: 500px !important;
-    height: 100px !important;
-    border: 1px solid $border-color;
-  }
+  min-width: 500px !important;
+  min-height: 100px !important;
+  border: 1px solid $border-color;
+  resize: both;
+  overflow: auto; /* Ensure content adjusts when resized */
+}
 
   .q-btn {
     &.icon-dark {

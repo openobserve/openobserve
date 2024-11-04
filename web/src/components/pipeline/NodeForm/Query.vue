@@ -21,98 +21,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
-      {{ t("pipeline.routing") }}
+      {{ t("pipeline.query") }}
     </div>
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
-      <q-form ref="routeFormRef" @submit="saveRouting">
-        <div
-          data-test="stream-routing-name-input"
-          class="o2-input"
-          style="padding-top: 12px"
-        >
-          <q-input
-            v-model="streamRoute.name"
-            :label="t('function.stream_name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            :rules="[
-              (val: any, rules: any) =>
-                !!val
-                  ? isValidStreamName ||
-                    `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-                  : t('common.nameRequired'),
-            ]"
-            tabindex="0"
-            style="width: 400px"
-            :error-message="
-              streamRoute.name && isValidStreamName
-                ? 'Stream name already exists'
-                : ''
-            "
-            :error="!isValidName"
-            @update:model-value="validateStreamName"
-          />
-        </div>
-
-        <div class="q-gutter-sm">
-          <q-radio
-            data-test="add-alert-realtime-alert-radio"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            v-model="streamRoute.is_real_time"
-            :checked="!streamRoute.is_real_time"
-            :val="true"
-            :label="t('alerts.realTime')"
-            class="q-ml-none"
-          />
-          <q-radio
-            data-test="add-alert-scheduled-alert-radio"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            v-model="streamRoute.is_real_time"
-            :checked="streamRoute.is_real_time"
-            :val="false"
-            :label="t('alerts.standard')"
-            class="q-ml-none"
-          />
-        </div>
-
-        <div
-          v-if="streamRoute.is_real_time"
-          class="q-py-sm showLabelOnTop text-bold text-h7"
-          data-test="add-alert-query-input-title"
-        >
-          <real-time-alert
-            v-if="streamRoute.is_real_time"
-            :columns="filteredColumns"
-            :conditions="streamRoute.conditions"
-            @field:add="addField"
-            @field:remove="removeField"
-          />
-        </div>
-        <div v-else>
+      <q-form ref="queryFormRef" @submit="saveQueryData">
+        <div>
           <div
             data-test="stream-route-stream-type-select"
-            class="stream-route-stream-type o2-input q-mr-sm q-my-md"
+            class="stream-route-stream-type o2-input"
             style="padding-top: 0"
           >
             <q-select
-              v-model="streamRoute.destination.stream_type"
+              v-model="streamRoute.stream_type"
               :options="streamTypes"
               :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'lowercase' }"
               color="input-border"
               bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
+              class="showLabelOnTop no-case"
               stack-label
               outlined
               filled
@@ -132,33 +60,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableVrlFunction="true"
             :isValidSqlQuery="isValidSqlQuery"
             :disableQueryTypeSelection="true"
-            :showTimezoneWarning="showTimezoneWarning"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
             v-model:isAggregationEnabled="isAggregationEnabled"
-            @field:add="addField"
-            @field:remove="removeField"
             @validate-sql="validateSqlQuery"
             class="q-mt-sm"
           />
-
-          <div class="q-mt-md">
-            <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
-            <variables-input
-              class="o2-input"
-              :variables="streamRoute.context_attributes"
-              @add:variable="addVariable"
-              @remove:variable="removeVariable"
-            />
-          </div>
         </div>
 
         <div
-          class="flex justify-start q-mt-lg q-py-sm full-width"
+          class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+      
           <q-btn
             data-test="stream-routing-cancel-btn"
             class="text-bold"
@@ -178,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-            v-if="isUpdating"
+          v-if="pipelineObj.isEditNode"
             data-test="stream-routing-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
@@ -200,23 +116,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, onMounted, ref, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
-import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import {
-  getTimezoneOffset,
-  getUUID,
-  getTimezonesByOffset,
-} from "@/utils/zincutils";
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  ref,
+  type Ref,
+  onActivated,
+} from "vue";
+import { useI18n } from "vue-i18n";
+import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
-import ConfirmDialog from "../ConfirmDialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledPipeline from "@/components/pipeline/ScheduledPipeline.vue";
+import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { convertDateToTimestamp } from "@/utils/date";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue")
@@ -231,14 +149,8 @@ interface RouteCondition {
 
 interface StreamRoute {
   name: string;
+  stream_type: string;
   conditions: RouteCondition[];
-  destination: {
-    // should be part of payload
-    org_id: string;
-    stream_name: string;
-    stream_type: string;
-  };
-  is_real_time: boolean;
   query_condition: {
     sql: string;
     type: string;
@@ -249,14 +161,12 @@ interface StreamRoute {
   trigger_condition: {
     period: number;
     frequency_type: string;
-    frequency: number;
+    frequency: string;
     cron: string;
-    timezone: string;
   };
   context_attributes: any;
   description: string;
   enabled: boolean;
-  tz_offset?: number;
 }
 
 const props = defineProps({
@@ -310,13 +220,11 @@ const indexOptions = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
 
-const isValidName: Ref<boolean> = ref(true);
-
 const isAggregationEnabled = ref(false);
 
-const routeFormRef = ref<any>(null);
+const queryFormRef = ref<any>(null);
 
-const showTimezoneWarning = ref(false);
+const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -330,16 +238,14 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute = () => {
+const getDefaultStreamRoute : any = () => {
+  if (pipelineObj.isEditNode) {
+    return pipelineObj.currentSelectedNodeData.data;
+  }
   return {
     name: "",
     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
-    is_real_time: true,
+    stream_type: "logs",
     query_condition: {
       sql: "",
       type: "sql",
@@ -350,7 +256,6 @@ const getDefaultStreamRoute = () => {
       frequency_type: "minutes",
       cron: "",
       frequency: 15,
-      timezone: "UTC",
     },
     context_attributes: [
       {
@@ -365,42 +270,9 @@ const getDefaultStreamRoute = () => {
 };
 
 onMounted(() => {
-  if (props.editingRoute) {
-    isUpdating.value = true;
-
-    streamRoute.value = JSON.parse(
-      JSON.stringify(props.editingRoute)
-    ) as StreamRoute;
-
-    if (!streamRoute.value.is_real_time) {
-      // If aggregation was present enable aggregation toggle
-      isAggregationEnabled.value =
-        !!props.editingRoute.query_condition.aggregation;
-
-      if (!streamRoute.value.trigger_condition?.timezone) {
-        if (streamRoute.value.tz_offset === 0 || !streamRoute.value.tz_offset) {
-          streamRoute.value.trigger_condition.timezone = "UTC";
-        } else {
-          getTimezonesByOffset(streamRoute.value.tz_offset as number).then(
-            (res: any) => {
-              if (res.length > 1) showTimezoneWarning.value = true;
-              streamRoute.value.trigger_condition.timezone = res[0];
-            }
-          );
-        }
-      }
-
-      // If context attributes are present, convert them to array
-      streamRoute.value.context_attributes = Object.keys(
-        streamRoute.value.context_attributes
-      ).map((attr: string) => {
-        return {
-          key: attr,
-          value: streamRoute.value.context_attributes[attr],
-          id: getUUID(),
-        };
-      });
-    }
+  
+  if (pipelineObj.isEditNode) {
+    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -408,7 +280,15 @@ onMounted(() => {
   updateStreamFields();
 });
 
-const streamTypes = ["logs", "enrichment_tables"];
+onActivated(() => {
+  if (pipelineObj.isEditNode) {
+    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
+  }
+
+  originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
+});
+
+const streamTypes = ["logs"];
 
 const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
@@ -460,25 +340,6 @@ const updateStreamFields = async () => {
   filteredColumns.value = [...streamCols];
 };
 
-const addField = () => {
-  if (streamRoute.value.is_real_time) {
-    streamRoute.value.conditions.push({
-      column: "",
-      operator: "",
-      value: "",
-      id: getUUID(),
-    });
-  }
-};
-
-const removeField = (field: any) => {
-  if (streamRoute.value.is_real_time) {
-    streamRoute.value.conditions = streamRoute.value.conditions.filter(
-      (_field: any) => _field.id !== field.id
-    );
-  }
-};
-
 const closeDialog = () => {
   emit("cancel:hideform");
 };
@@ -499,42 +360,54 @@ const openCancelDialog = () => {
 };
 
 // TODO OK : Add check for duplicate routing name
-const saveRouting = async () => {
-  isValidName.value = true;
-
-  if (!isUpdating.value) validateStreamName();
-
-  if (!isValidName.value) {
-    return;
-  }
-
-  if (!streamRoute.value.is_real_time) {
-    if (!scheduledAlertRef.value.validateInputs()) {
-      return false;
-    }
+const saveQueryData = async () => {
+  if (!scheduledAlertRef.value.validateInputs()) {
+    return false;
   }
 
   try {
+    await validateSqlQuery();
     await validateSqlQueryPromise.value;
+
   } catch (e) {
     return false;
   }
 
-  routeFormRef.value.validate().then((valid: any) => {
+  queryFormRef.value.validate().then((valid: any) => {
     if (!valid) {
       return false;
     }
   });
 
-  // Save routing
-  emit("update:node", {
-    data: {
-      ...getRoutePayload(),
-      name: streamRoute.value.name,
-    },
-    link: nodeLink.value,
-  });
+  const formData = streamRoute.value;
+  let queryPayload = {
+    node_type: "query", // required
+    stream_type: formData.stream_type, // required
+    org_id: store.state.selectedOrganization.identifier, // required
+    query_condition: {
+      // same as before
+      type: formData.query_condition.type,
+      conditions: null,
+      sql: formData.query_condition.sql,
+      promql: null,
+      promql_condition: null,
+      aggregation: formData.query_condition.aggregation,
+      vrl_function: null,
+      search_event_type: "DerivedStream",
 
+    },
+    trigger_condition: {
+      // same as before
+      period: formData.trigger_condition.period || 1,
+      operator: "=",
+      threshold: 0,
+      frequency: parseInt(formData.trigger_condition.frequency),
+      cron: formData.trigger_condition.cron,
+      frequency_type: formData.trigger_condition.frequency_type,
+      silence: 0,
+    },
+  };
+  addNode(queryPayload);
   emit("cancel:hideform");
 };
 
@@ -546,35 +419,25 @@ const openDeleteDialog = () => {
 };
 
 const deleteRoute = () => {
-  emit("delete:node", {
-    data: {
-      ...props.editingRoute,
-      name: props.editingRoute.name,
-    },
-    type: "streamRoute",
-  });
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name,
+  //   },
+  //   type: "streamRoute",
+  // });
 
-  emit("delete:node", {
-    data: {
-      ...props.editingRoute,
-      name: props.editingRoute.name + ":" + "condition",
-    },
-    type: "condition",
-  });
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name + ":" + "condition",
+  //   },
+  //   type: "condition",
+  // });
+  deletePipelineNode (pipelineObj.currentSelectedNodeID);
+
 
   emit("cancel:hideform");
-};
-
-const validateStreamName = () => {
-  isValidName.value = true;
-  Object.values(props.streamRoutes).forEach((route: any) => {
-    if (
-      route.name === streamRoute.value.name ||
-      route.name === props.streamName
-    ) {
-      isValidName.value = false;
-    }
-  });
 };
 
 const addVariable = () => {
@@ -592,104 +455,8 @@ const removeVariable = (variable: any) => {
     );
 };
 
-const getRoutePayload = () => {
-  let payload = JSON.parse(JSON.stringify(streamRoute.value));
-
-  if (payload.uuid) delete payload.uuid;
-
-  if (payload.is_real_time) {
-    payload = {
-      name: payload.name,
-      conditions: payload.conditions,
-      is_real_time: payload.is_real_time,
-    };
-  } else {
-    // Deleting uuid from payload as it was added for reference of frontend
-    payload.destination.org_id = store.state.selectedOrganization.identifier;
-
-    payload.destination.stream_name = payload.name;
-
-    payload.context_attributes = {};
-
-    payload.query_condition.type = payload.is_real_time
-      ? "custom"
-      : streamRoute.value.query_condition.type;
-
-    streamRoute.value.context_attributes.forEach((attr: any) => {
-      if (attr.key?.trim() && attr.value?.trim())
-        payload.context_attributes[attr.key] = attr.value;
-    });
-
-    payload.trigger_condition.period = Number(
-      streamRoute.value.trigger_condition.period
-    );
-
-    payload.trigger_condition.frequency = Number(
-      streamRoute.value.trigger_condition.frequency
-    );
-
-    payload.description = streamRoute.value.description.trim();
-
-    if (
-      !isAggregationEnabled.value ||
-      streamRoute.value.query_condition.type !== "custom"
-    ) {
-      payload.query_condition.aggregation = null;
-    }
-
-    if (payload.query_condition.aggregation?.having) {
-      delete payload.query_condition?.aggregation?.having;
-    }
-
-    payload.tz_offset = getTimezoneOffset();
-
-    if (payload.trigger_condition.frequency_type == "cron") {
-      const now = new Date();
-
-      // Get the day, month, and year from the date object
-      const day = String(now.getDate()).padStart(2, "0");
-      const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
-      const year = now.getFullYear();
-
-      // Combine them in the DD-MM-YYYY format
-      const date = `${day}-${month}-${year}`;
-
-      // Get the hours and minutes, ensuring they are formatted with two digits
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-
-      // Combine them in the HH:MM format
-      const time = `${hours}:${minutes}`;
-
-      const convertedDateTime = convertDateToTimestamp(
-        date,
-        time,
-        payload.trigger_condition.timezone
-      );
-
-      payload.tz_offset = convertedDateTime.offset;
-    }
-
-    delete payload?.conditions;
-
-    delete payload?.query_condition?.conditions;
-  }
-
-  if (isUpdating.value) {
-    payload.updatedAt = new Date().toISOString();
-    payload.lastEditedBy = store.state.userInfo.email;
-  } else {
-    payload.createdAt = new Date().toISOString();
-    payload.owner = store.state.userInfo.email;
-    payload.lastTriggeredAt = new Date().getTime();
-    payload.lastEditedBy = store.state.userInfo.email;
-    payload.updatedAt = new Date().toISOString();
-  }
-
-  return payload;
-};
-
 const validateSqlQuery = () => {
+
   const query = buildQueryPayload({
     sqlMode: true,
     streamName: streamRoute.value.name as string,
@@ -698,6 +465,7 @@ const validateSqlQuery = () => {
   delete query.aggs;
 
   query.query.sql = streamRoute.value.query_condition.sql;
+
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
@@ -724,6 +492,7 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
+
 };
 </script>
 

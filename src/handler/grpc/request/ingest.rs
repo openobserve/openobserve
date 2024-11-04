@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::utils::json;
+use config::{metrics, utils::json};
 use proto::cluster_rpc::{
     ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType, StreamType,
 };
@@ -31,6 +31,7 @@ impl Ingest for Ingester {
         &self,
         request: Request<IngestionRequest>,
     ) -> Result<Response<IngestionResponse>, Status> {
+        let start = std::time::Instant::now();
         // let metadata = request.metadata().clone();
         let req = request.into_inner();
         let org_id = req.org_id;
@@ -131,6 +132,16 @@ impl Ingest for Ingester {
                 message: err.to_string(),
             },
         };
+
+        // metrics
+        let time = start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .inc();
+
         Ok(Response::new(reply))
     }
 }

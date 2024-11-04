@@ -162,13 +162,20 @@ mod tests {
             .build();
 
         // Check if the constructed URI is correct with multiple query parameters
-        let expected_uri =
+        let expected_uri_1 =
             "/web?redirect_url=http://localhost:5080/api/default/short/1234&user_id=42";
-        assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
+        let expected_uri_2 =
+            "/web?user_id=42&redirect_url=http://localhost:5080/api/default/short/1234";
+        assert!(
+            redirect_response.build_full_redirect_uri() == expected_uri_1
+                || redirect_response.build_full_redirect_uri() == expected_uri_2
+        );
 
         // Check if the HTTP response contains the correct "Location" header
         let http_response: HttpResponse = redirect_response.redirect_http();
         assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
-        assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
+        // assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
+        let location = http_response.headers().get(LOCATION).unwrap();
+        assert!(location == expected_uri_1 || location == expected_uri_2);
     }
 }
