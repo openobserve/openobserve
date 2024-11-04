@@ -162,7 +162,6 @@ test.describe("dashboard UI testcases", () => {
       .nth(2)
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.waitForTimeout(1000);
   });
 
   test("should display the correct data before and after transposing in the table chart", async ({
@@ -249,7 +248,7 @@ test.describe("dashboard UI testcases", () => {
     }
   });
 
-  test("verify if desible the Tanspose button chart should be Default format ", async ({
+  test("verify if disabled the Tanspose button chart should be Default format ", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -365,7 +364,6 @@ test.describe("dashboard UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
 
-    await page.waitForTimeout(2000);
     await page
       .locator('[data-test="dashboard-config-table_dynamic_columns"] div')
       .nth(2)
@@ -386,7 +384,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
   });
 
-  test("1should not show an error when both the Transpose and Dynamic Column toggle buttons are enabled", async ({
+  test("should not show an error when both the Transpose and Dynamic Column toggle buttons are enabled", async ({
     page,
 }) => {
     // Set up listener to catch console errors
@@ -416,19 +414,15 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page.waitForTimeout(3000);
     await page.locator('[data-test="dashboard-sidebar"]').click();
     await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
     await page.locator("#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line").click();
     await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill(".vrl=100");
 
-    await page.waitForTimeout(2000);
-
     await page.locator('[data-test="selected-chart-table-item"] img').click();
     await page.locator('[data-test="dashboard-config-table_dynamic_columns"] div').nth(2).click();
     await page.locator('[data-test="dashboard-config-table_transpose"] div').nth(2).click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.waitForTimeout(2000);
 
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("test");
