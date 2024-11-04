@@ -202,7 +202,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         match db::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
                                 for pipeline in pipelines {
-                                    add_tuple_for_pipeline(org_name, &pipeline.name, &mut tuples);
+                                    add_tuple_for_pipeline(org_name, &pipeline.id, &mut tuples);
                                 }
                             }
                             Err(e) => {
