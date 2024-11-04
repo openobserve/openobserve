@@ -363,7 +363,9 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="dashboard-vrl-function-editor"]')
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
-
+    
+    await page.waitForTimeout(2000);
+    
     await page
       .locator('[data-test="dashboard-config-table_dynamic_columns"] div')
       .nth(2)
