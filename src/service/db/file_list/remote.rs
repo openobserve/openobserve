@@ -20,8 +20,11 @@ use std::{
 };
 
 use bytes::Buf;
-use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::{meta::stream::FileKey, utils::json};
+use chrono::{DateTime, TimeZone, Utc};
+use config::{
+    meta::stream::FileKey,
+    utils::{json, time::hour_micros},
+};
 use futures::future::try_join_all;
 use infra::{cache::stats, file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
@@ -218,7 +221,7 @@ pub async fn cache_time_range(time_min: i64, time_max: i64) -> Result<(), anyhow
         let offset_time: DateTime<Utc> = Utc.timestamp_nanos(cur_time * 1000);
         let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
         cache(&file_list_prefix, false).await?;
-        cur_time += Duration::try_hours(1).unwrap().num_microseconds().unwrap();
+        cur_time += hour_micros(1);
     }
     Ok(())
 }
