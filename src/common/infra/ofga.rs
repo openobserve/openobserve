@@ -22,7 +22,7 @@ use o2_enterprise::enterprise::{
     openfga::{
         authorizer::authz::{
             add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
-            get_user_role_tuple, update_tuples,
+            get_ownership_all_org_tuple, get_user_role_tuple, update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
@@ -199,6 +199,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_index_creation_tuples(org_name, &mut tuples).await;
                     }
                     if need_pipeline_migration {
+                        get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
                         match db::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
                                 for pipeline in pipelines {
