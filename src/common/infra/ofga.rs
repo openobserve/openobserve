@@ -15,7 +15,6 @@
 
 use std::cmp::Ordering;
 
-use config::meta::pipeline;
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
@@ -203,7 +202,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             .await
                             .unwrap_or_default();
                         for pipeline in pipelines {
-                            add_tuple_for_pipeline(org, pipeline, &mut tuples);
+                            add_tuple_for_pipeline(org_name, &pipeline.name, &mut tuples);
                         }
                     }
                 }
