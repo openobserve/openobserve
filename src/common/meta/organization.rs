@@ -101,11 +101,11 @@ fn default_scrape_interval() -> u32 {
 }
 
 fn default_trace_id_field_name() -> String {
-    "traceId".to_string()
+    "trace_id".to_string()
 }
 
 fn default_span_id_field_name() -> String {
-    "spanId".to_string()
+    "span_id".to_string()
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
