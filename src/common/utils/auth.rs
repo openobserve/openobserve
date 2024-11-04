@@ -340,7 +340,11 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[2]
                 )
-            } else if method.eq("PUT") && path_columns[1] != "streams" || method.eq("DELETE") {
+            } else if method.eq("PUT")
+                && path_columns[1] != "streams"
+                && path_columns[1] != "pipelines"
+                || method.eq("DELETE")
+            {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -349,9 +353,6 @@ impl FromRequest for AuthExtractor {
                     path_columns[3]
                 )
             } else {
-                if method.eq("POST") && path_columns[3].eq("pipelines") {
-                    method = "PUT".to_string();
-                }
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -401,7 +402,6 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/format_query")
                 || path.contains("/prometheus/api/v1/series")
                 || path.contains("/traces/latest")
-                || (method.eq("LIST") && path.contains("pipelines"))
                 || path.contains("clusters")
                 || path.contains("query_manager")
                 || path.contains("/short")

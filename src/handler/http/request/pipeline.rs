@@ -74,12 +74,16 @@ async fn list_pipelines(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
             user_id.to_str().unwrap(),
             "GET",
-            "logs",
+            OFGA_MODELS
+                .get("pipelines")
+                .map_or("pipelines", |model| model.key),
         )
         .await
         {
