@@ -18,7 +18,6 @@ use std::io::Error;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 
 /// CreatePipeline
 #[utoipa::path(
@@ -75,6 +74,8 @@ async fn list_pipelines(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
