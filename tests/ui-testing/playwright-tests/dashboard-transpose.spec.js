@@ -3,7 +3,7 @@ import logData from "../cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 
 const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+  "Dashboard_" + Math.random().toString(36).slice(2, 11);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -116,7 +116,7 @@ test.describe("dashboard UI testcases", () => {
 
     await orgNavigation;
   });
-  test("should verify that the Transpose toggle button is working correctly", async ({
+  test("should verify that the transpose toggle button is working correctly", async ({
     page,
     browser,
   }) => {
@@ -248,7 +248,7 @@ test.describe("dashboard UI testcases", () => {
     }
   });
 
-  test("verify if disabled the Tanspose button chart should be Default format ", async ({
+  test("should verify that the transpose toggle button is working correctly ", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -306,7 +306,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
   });
 
-  test("should display the VRL function on the chart when Dynamic Columns are enabled", async ({
+  test("should verify that when dynamic columns are enabled, the VRL function should display correctly", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -393,7 +393,7 @@ test.describe("dashboard UI testcases", () => {
     let errorMessage = '';
     page.on('console', (msg) => {
         if (msg.type() === 'error') {
-            errorMessage = msg.text();
+            errorMessage += msg.text() + '\n';
         }
     });
 
