@@ -115,7 +115,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
-        } else if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
+        }
+        if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
         }
     }
