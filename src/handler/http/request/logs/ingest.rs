@@ -293,8 +293,10 @@ pub async fn otlp_logs_write(
         .get(&config::get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     let data = if content_type.eq(CONTENT_TYPE_PROTO) {
+        log::info!("otlp_logs_write: got proto type content");
         <ExportLogsServiceRequest as prost::Message>::decode(body)?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
+        log::info!("otlp_logs_write: got json type content");
         serde_json::from_slice(&body)?
     } else {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

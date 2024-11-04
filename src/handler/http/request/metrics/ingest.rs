@@ -78,6 +78,7 @@ pub async fn otlp_metrics_write(
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
 
     let metrics = if content_type.eq(CONTENT_TYPE_PROTO) {
+        log::info!("otlp_metrics_write: got proto type content");
         match <ExportMetricsServiceRequest as prost::Message>::decode(body) {
             Ok(v) => v,
             Err(e) => {
@@ -88,6 +89,7 @@ pub async fn otlp_metrics_write(
             }
         }
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
+        log::info!("otlp_metrics_write: got json type content");
         match config::utils::json::from_slice(body.as_ref()) {
             Ok(v) => v,
             Err(e) => {
