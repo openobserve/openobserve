@@ -18,6 +18,7 @@ use std::io::Error;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
+use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 
 /// CreatePipeline
 #[utoipa::path(
@@ -79,7 +80,9 @@ async fn list_pipelines(
             &org_id,
             user_id.to_str().unwrap(),
             "GET",
-            "logs",
+            OFGA_MODELS
+                .get("pipelines")
+                .map_or("pipelines", |model| model.key),
         )
         .await
         {
