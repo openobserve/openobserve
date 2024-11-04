@@ -23,6 +23,8 @@ test.describe("Report test cases Updated", () => {
 
     test("Create, use, and delete dashboard and report", async ({ page }) => {
         await dashboardPage.navigateToDashboards();
+        
+
         await dashboardPage.createDashboard();
        
        

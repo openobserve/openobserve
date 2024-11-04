@@ -8,9 +8,8 @@ export class IngestionPage {
   
     async ingestion() {
       const orgId = process.env["ORGNAME"];
-      const streamName = "default";
+      const streamName = "e2e_automate";
       const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-  
       const headers = {
         "Authorization": `Basic ${basicAuthCredentials}`,
         "Content-Type": "application/json",
@@ -28,7 +27,8 @@ export class IngestionPage {
      // const response = await fetchResponse.json();
 
      try {
-      const response = await fetchResponse;
+      //const response = await fetchResponse;
+      const response =  fetchResponse;
       const contentType = response.headers.get("content-type");
     
       if (contentType && contentType.includes("application/json")) {
