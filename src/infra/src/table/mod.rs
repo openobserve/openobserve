@@ -24,6 +24,8 @@ pub mod dashboards;
 mod entity;
 pub mod folders;
 mod migration;
+pub mod org_invites;
+pub mod organizations;
 pub mod short_urls;
 
 pub async fn init() -> Result<(), anyhow::Error> {
