@@ -733,6 +733,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
                 .with_partitions(ctx.state().config().target_partitions())
                 .with_sorted_by_time(sql.sorted_by_time),
         );
+        let stream_name = format!("\"{}\"", stream_name);
         ctx.register_table(stream_name, table)?;
     }
     Ok(())
