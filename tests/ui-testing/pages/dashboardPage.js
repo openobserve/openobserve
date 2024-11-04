@@ -51,12 +51,15 @@ export class DashboardPage {
     });
 
     await this.page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
+    await this.page.waitForTimeout(3000);
     await this.page.getByRole('option', { name: 'default', exact: true }).locator('div').nth(2).click();
+    await this.page.waitForTimeout(3000);
     await this.page.locator('div').filter({ hasText: /^drag_indicator$/ }).nth(1).click();
     await this.page.waitForSelector('[data-test="dashboard-panel-name"]');
     await this.page.locator('[data-test="dashboard-panel-name"]').click();
     await this.page.locator('[data-test="dashboard-panel-name"]').fill('AutoP');
     await this.page.locator('[data-test="dashboard-panel-name"]').press('Enter');
+    await this.page.waitForTimeout(3000);
     await this.page.locator('[data-test="field-list-item-logs-default-k8s_app_instance"] [data-test="dashboard-add-y-data"]').click();
     await this.page.waitForSelector('[data-test="dashboard-apply"]');
     await this.page.locator('[data-test="dashboard-apply"]').click();
