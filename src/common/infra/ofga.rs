@@ -199,11 +199,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_index_creation_tuples(org_name, &mut tuples).await;
                     }
                     if need_pipeline_migration {
-                        let pipelines = db::pipeline::list_by_org(org_name)
-                            .await
-                            .unwrap_or_default();
-                        for pipeline in pipelines {
-                            add_tuple_for_pipeline(org_name, &pipeline.name, &mut tuples);
+                        match db::pipeline::list_by_org(org_name).await {
+                            Ok(pipelines) => {
+                                for pipeline in pipelines {
+                                    add_tuple_for_pipeline(org_name, &pipeline.name, &mut tuples);
+                                }
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to migrate RBAC for org {} pipelines: {}",
+                                    org_name,
+                                    e
+                                );
+                            }
                         }
                     }
                 }
