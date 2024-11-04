@@ -74,7 +74,7 @@ export class ReportsPage {
         await this.continueButtonStep1.click();
         await this.continueButtonStep2.click();
         await this.titleInput.fill("reporterTest");
-        await this.recipientsInput.fill("shyam@openobserve.ai");
+        await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
         await this.saveButton.click();
 
     
