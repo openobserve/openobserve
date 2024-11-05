@@ -562,6 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               editor-id="logsQueryEditor"
               ref="queryEditorRef"
               class="monaco-editor"
+
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
@@ -3242,9 +3243,8 @@ export default defineComponent({
 
 </style>
 <style scoped>
-.expand-on-focus{
-  height: 700px !important;
+.expand-on-focus {
+  height: calc(100vh - 200px) !important;
   z-index: 20 !important;
-  border-bottom: 2px solid #575A5A;
 }
 </style>
