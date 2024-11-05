@@ -76,8 +76,8 @@ const store = createStore({
       folders: [],
       organizationSettings: {
         scrape_interval: 15,
-        trace_id_field_name: "traceId",
-        span_id_field_name: "spanId",
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
       },
       isDataIngested: false,
     },
