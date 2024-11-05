@@ -91,6 +91,10 @@ async fn create(
         field_found = true;
         data.span_id_field_name = span_id_field_name;
     }
+    if let Some(toggle_ingestion_logs) = settings.toggle_ingestion_logs {
+        field_found = true;
+        data.toggle_ingestion_logs = toggle_ingestion_logs;
+    }
 
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
