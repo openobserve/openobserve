@@ -493,32 +493,33 @@ export default defineComponent({
 
     const runningQueriesSummary = ref<any[]>([]);
 
+    const baseFilteredQueries = computed(() =>
+      selectedQueryTypeTab.value === "all"
+        ? queries.value
+        : runningQueriesSummary.value,
+    );
+
+    const searchTypeFiltered = computed(() =>
+      baseFilteredQueries.value.filter(
+        (query) =>
+          (selectedQueryTypeTab.value === "all" &&
+            filterQueryBySearchTypeTab(query)) ||
+          selectedQueryTypeTab.value === "summary",
+      ),
+    );
+
+    const fieldFiltered = computed(() => {
+      if (!filterQuery.value) return searchTypeFiltered.value;
+      return searchTypeFiltered.value.filter((query) =>
+        Object.values(filterQueryCriteria).some((criteria) =>
+          criteria(query, filterQuery.value),
+        ),
+      );
+    });
+
     const filteredRows = computed(() => {
-      const newVal = filterQuery.value;
-      const _queries =
-        selectedQueryTypeTab.value === "all"
-          ? queries.value
-          : runningQueriesSummary.value;
       if (selectedSearchField.value === "all") {
-        if (!newVal) {
-          return _queries.filter(
-            (query: any) =>
-              (selectedQueryTypeTab.value === "all" &&
-                filterQueryBySearchTypeTab(query)) ||
-              selectedQueryTypeTab.value === "summary",
-          );
-        } else {
-          return _queries.filter(
-            (query: any) =>
-              // We only have search type tabs in "all" queries
-              ((selectedQueryTypeTab.value === "all" &&
-                filterQueryBySearchTypeTab(query)) ||
-                selectedQueryTypeTab.value === "summary") &&
-              Object.values(filterQueryCriteria).some((criteria) =>
-                criteria(query, newVal),
-              ),
-          );
-        }
+        return fieldFiltered.value;
       } else {
         const currentTime = Date.now() * 1000; // Convert current time to microseconds
 
@@ -540,16 +541,16 @@ export default defineComponent({
           gt_1M: 30 * 24 * 60 * 60 * 1000000, // 1 month (approx.)
         };
 
-        return _queries.filter((item: any) => {
+        return baseFilteredQueries.value.filter((item: any) => {
           const timeDifference =
             selectedSearchField.value == "exec_duration"
               ? currentTime - item.created_at
               : item.query.end_time - item.query.start_time;
 
-          if (newVal.startsWith("lt_")) {
-            return timeDifference < timeMap[newVal];
-          } else if (newVal.startsWith("gt_")) {
-            return timeDifference > timeMap[newVal];
+          if (filterQuery.value.startsWith("lt_")) {
+            return timeDifference < timeMap[filterQuery.value];
+          } else if (filterQuery.value.startsWith("gt_")) {
+            return timeDifference > timeMap[filterQuery.value];
           } else {
             return true; // If the filter is not recognized, return all items
           }

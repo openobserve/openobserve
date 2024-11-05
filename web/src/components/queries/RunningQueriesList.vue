@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="qTable"
       :rows="rows"
       :columns="columns"
-      :pagination="pagination"
+      :pagination="pagination as QTableProps['pagination']"
       row-key="trace_id"
       style="width: 100%"
       selection="multiple"
