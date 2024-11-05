@@ -258,14 +258,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-card-section>
             <q-form @submit="submitForm">
-              <q-input v-model="toBeCloneAlertName" label="Alert Name" />
+              <q-input  data-test="to-be-clone-alert-name" v-model="toBeCloneAlertName" label="Alert Name" />
               <q-select
+              data-test="to-be-clone-stream-type"
                 v-model="toBeClonestreamType"
                 label="Stream Type"
                 :options="streamTypes"
                 @update:model-value="updateStreams()"
               />
               <q-select
+                data-test="to-be-clone-stream-name"
                 v-model="toBeClonestreamName"
                 :loading="isFetchingStreams"
                 :disable="!toBeClonestreamType"
@@ -280,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="flex justify-center q-mt-lg">
                 <q-btn
-                  data-test="add-alert-cancel-btn"
+                  data-test="clone-alert-cancel-btn"
                   v-close-popup="true"
                   class="q-mb-md text-bold"
                   :label="t('alerts.cancel')"
@@ -289,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   no-caps
                 />
                 <q-btn
-                  data-test="add-alert-submit-btn"
+                  data-test="clone-alert-submit-btn"
                   :label="t('alerts.save')"
                   class="q-mb-md text-bold no-border q-ml-md"
                   color="secondary"

@@ -326,6 +326,7 @@ import {
 import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
+import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
 import templateService from "@/services/alert_templates";
@@ -1251,6 +1252,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     alert: getAlerts,
     template: getTemplates,
     destination: getDestinations,
+    pipeline: getPipelines,
     enrichment_table: getEnrichmentTables,
     function: getFunctions,
     org: getOrgs,
@@ -1426,6 +1428,18 @@ const getTemplates = async () => {
   });
 
   updateResourceEntities("template", ["name"], [...templates.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getPipelines = async () => {
+  const pipelines = await pipelineService.getPipelines(
+    store.state.selectedOrganization.identifier
+  );
+
+  updateResourceEntities("pipeline", ["name"], [...pipelines.data.list]);
 
   return new Promise((resolve) => {
     resolve(true);

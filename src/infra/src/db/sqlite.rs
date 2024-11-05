@@ -353,7 +353,7 @@ impl super::Db for SqliteDb {
             }
         } else {
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY id DESC;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC, id DESC;"#
             )
             .bind(&module)
             .bind(&key1)
@@ -455,20 +455,7 @@ impl super::Db for SqliteDb {
             } else {
                 None
             };
-            if new_value.is_some() {
-                if let Err(e) = CHANNEL
-                    .watch_tx
-                    .clone()
-                    .send(Event::Put(EventData {
-                        key: key.to_string(),
-                        value: Some(Bytes::from("")),
-                        start_dt,
-                    }))
-                    .await
-                {
-                    log::error!("[SQLITE] send event error: {}", e);
-                }
-            } else if value.is_some() {
+            if new_value.is_some() || value.is_some() {
                 if let Err(e) = CHANNEL
                     .watch_tx
                     .clone()

@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::utils::json;
-use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
+use config::{metrics, utils::json};
+use proto::cluster_rpc::{
+    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType, StreamType,
+};
 use tonic::{Request, Response, Status};
 
 use crate::service::ingestion::create_log_ingestion_req;
@@ -29,6 +31,7 @@ impl Ingest for Ingester {
         &self,
         request: Request<IngestionRequest>,
     ) -> Result<Response<IngestionResponse>, Status> {
+        let start = std::time::Instant::now();
         // let metadata = request.metadata().clone();
         let req = request.into_inner();
         let org_id = req.org_id;
@@ -51,6 +54,25 @@ impl Ingest for Ingester {
                     )
                     .await
                     .map_or_else(Err, |_| Ok(())),
+                }
+            }
+            Ok(StreamType::Metrics) => {
+                let log_ingestion_type: IngestionType = req
+                    .ingestion_type
+                    .unwrap_or_default()
+                    .try_into()
+                    .unwrap_or(IngestionType::Multi); // multi is just place holder
+                if log_ingestion_type != IngestionType::Json {
+                    Err(anyhow::anyhow!(
+                        "Internal gPRC metric ingestion only supports json type data, got {:?}",
+                        log_ingestion_type
+                    ))
+                } else {
+                    let data = bytes::Bytes::from(in_data.data);
+                    crate::service::metrics::json::ingest(&org_id, data)
+                        .await
+                        .map(|_| ()) // we don't care about success response
+                        .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
                 }
             }
             Ok(StreamType::EnrichmentTables) => {
@@ -110,6 +132,16 @@ impl Ingest for Ingester {
                 message: err.to_string(),
             },
         };
+
+        // metrics
+        let time = start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .inc();
+
         Ok(Response::new(reply))
     }
 }

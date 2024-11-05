@@ -251,7 +251,7 @@ impl super::Db for PostgresDb {
         } else {
             DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY id DESC;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC, id DESC;"#
             )
             .bind(&module)
             .bind(&key1)

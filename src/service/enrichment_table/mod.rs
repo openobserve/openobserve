@@ -99,7 +99,7 @@ pub async fn save_enrichment_data(
         stats,
         max_enrichment_table_size
     );
-    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as f64 {
+    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as i64 {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

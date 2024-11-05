@@ -26,13 +26,14 @@ use sqlparser::{
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
+use utoipa::ToSchema;
 
 use crate::get_config;
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ToSchema, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum OrderBy {
     #[default]

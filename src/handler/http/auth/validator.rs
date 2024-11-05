@@ -546,8 +546,10 @@ async fn oo_validator_internal(
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     if auth_info.auth.starts_with("Basic") {
-        let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
-            .expect("Failed to decode base64 string");
+        let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
+            Ok(val) => val,
+            Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+        };
 
         let (username, password) = match get_user_details(decoded) {
             Some(value) => value,
@@ -562,14 +564,16 @@ async fn oo_validator_internal(
         if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
             Err((ErrorUnauthorized("Unauthorized Access"), req))
         } else {
-            let decoded = base64::decode(
+            let decoded = match base64::decode(
                 auth_tokens
                     .auth_ext
                     .strip_prefix("auth_ext")
                     .unwrap()
                     .trim(),
-            )
-            .expect("Failed to decode base64 string");
+            ) {
+                Ok(val) => val,
+                Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+            };
             let (username, password) = match get_user_details(decoded) {
                 Some(value) => value,
                 None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
@@ -584,8 +588,10 @@ async fn oo_validator_internal(
 #[cfg(feature = "enterprise")]
 pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
     if auth_str.starts_with("Basic") {
-        let decoded = base64::decode(auth_str.strip_prefix("Basic").unwrap().trim())
-            .expect("Failed to decode base64 string");
+        let decoded = match base64::decode(auth_str.strip_prefix("Basic").unwrap().trim()) {
+            Ok(val) => val,
+            Err(_) => return None,
+        };
 
         match get_user_details(decoded) {
             Some(value) => Some(value.0),
@@ -599,14 +605,16 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
         if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
             None
         } else {
-            let decoded = base64::decode(
+            let decoded = match base64::decode(
                 auth_tokens
                     .auth_ext
                     .strip_prefix("auth_ext")
                     .unwrap()
                     .trim(),
-            )
-            .expect("Failed to decode base64 string");
+            ) {
+                Ok(val) => val,
+                Err(_) => return None,
+            };
             match get_user_details(decoded) {
                 Some(value) => Some(value.0),
                 None => None,
@@ -618,9 +626,10 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
 }
 
 fn get_user_details(decoded: String) -> Option<(String, String)> {
-    let credentials = String::from_utf8(decoded.into())
-        .map_err(|_| ())
-        .expect("Failed to decode base64 string");
+    let credentials = match String::from_utf8(decoded.into()).map_err(|_| ()) {
+        Ok(val) => val,
+        Err(_) => return None,
+    };
     let parts: Vec<&str> = credentials.splitn(2, ':').collect();
     if parts.len() != 2 {
         return None;

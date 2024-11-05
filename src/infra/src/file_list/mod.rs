@@ -16,9 +16,12 @@
 use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
-use config::meta::{
-    meta_store::MetaStore,
-    stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+use config::{
+    meta::{
+        meta_store::MetaStore,
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    },
+    utils::time::second_micros,
 };
 use once_cell::sync::Lazy;
 
@@ -85,6 +88,13 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<FileId>>;
+    async fn query_old_data_hours(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<String>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -225,11 +235,7 @@ pub async fn list() -> Result<Vec<(String, FileMeta)>> {
 }
 
 #[inline]
-#[tracing::instrument(
-    name = "infra:file_list:query_db",
-    skip_all,
-    fields(org_id = org_id, stream_name = stream_name)
-)]
+#[tracing::instrument(name = "infra:file_list:db:query")]
 pub async fn query(
     org_id: &str,
     stream_type: StreamType,
@@ -238,11 +244,7 @@ pub async fn query(
     time_range: Option<(i64, i64)>,
     flattened: Option<bool>,
 ) -> Result<Vec<(String, FileMeta)>> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
-    }
+    validate_time_range(time_range)?;
     CLIENT
         .query(
             org_id,
@@ -262,24 +264,30 @@ pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
 }
 
 #[inline]
-#[tracing::instrument(
-    name = "infra:file_list:db:query_ids",
-    skip_all,
-    fields(org_id = org_id, stream_name = stream_name)
-)]
+#[tracing::instrument(name = "infra:file_list:db:query_ids")]
 pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<FileId>> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
-    }
+    validate_time_range(time_range)?;
     CLIENT
         .query_ids(org_id, stream_type, stream_name, time_range)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_old_data_hours")]
+pub async fn query_old_data_hours(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<String>> {
+    validate_time_range(time_range)?;
+    CLIENT
+        .query_old_data_hours(org_id, stream_type, stream_name, time_range)
         .await
 }
 
@@ -440,6 +448,24 @@ pub async fn local_cache_gc() -> Result<()> {
     Ok(())
 }
 
+fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    Ok(())
+}
+
+fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+    let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
+    if ts > 0 {
+        time_end + second_micros(ts)
+    } else {
+        time_end + second_micros(PartitionTimeLevel::Hourly.duration())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
     #[sqlx(default)]
@@ -491,8 +517,8 @@ impl From<&StatsRecord> for StreamStats {
             doc_time_max: record.max_ts,
             doc_num: record.records,
             file_num: record.file_num,
-            storage_size: record.original_size as f64,
-            compressed_size: record.compressed_size as f64,
+            storage_size: record.original_size,
+            compressed_size: record.compressed_size,
         }
     }
 }

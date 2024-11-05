@@ -880,11 +880,12 @@ export default defineComponent({
       return data.filter((item: any) => {
         if (item.expr) {
           if (
-            (item.expr.type === "column_ref" &&
-              item.expr?.column?.expr?.value === fieldName) ||
-            (item.expr.type === "aggr_func" &&
-              item.expr?.args?.expr?.column?.value === fieldName)
-          ) {
+          (item.expr.type === "column_ref" &&
+            (item.expr?.column?.expr?.value === fieldName || item.expr.column === fieldName)
+          ) ||
+          (item.expr.type === "aggr_func" &&
+            item.expr?.args?.expr?.column?.value === fieldName)
+        ) {
             return false;
           }
         }
@@ -939,13 +940,13 @@ export default defineComponent({
             type: "expr",
           });
         }
-
+        const streamName = searchObj.data.stream.selectedStream[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const newQuery = parser
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream[0],
-            `"${searchObj.data.stream.selectedStream[0]}"`,
+            new RegExp(`\\b${streamName}\\b`, 'g'), // Wrap only standalone stream name
+            `"${searchObj.data.stream.selectedStream[0]}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;

@@ -20,7 +20,12 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use config::{cluster::LOCAL_NODE, ider, meta::stream::FileKey, utils::json};
+use config::{
+    cluster::LOCAL_NODE,
+    ider,
+    meta::stream::FileKey,
+    utils::{json, time::hour_micros},
+};
 use hashbrown::HashMap;
 use infra::{dist_lock, schema::STREAM_SCHEMAS_LATEST, storage};
 use tokio::sync::{RwLock, Semaphore};
@@ -106,7 +111,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // offset
     let mut is_waiting_streams = false;
     for (key, val) in offsets {
-        if (val - Duration::try_hours(1).unwrap().num_microseconds().unwrap()) < offset {
+        if (val - hour_micros(1)) < offset {
             log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
             is_waiting_streams = true;
             break;
@@ -162,7 +167,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     merge_file_list(offset).await?;
 
     // write new sync offset
-    offset = offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap();
+    offset = offset_time_hour + hour_micros(1);
     db::compact::file_list::set_offset(offset).await
 }
 

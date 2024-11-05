@@ -56,8 +56,8 @@
     "description": "Description",
     "cancelChanges": "Cancel Changes",
     "logs": "Logs",
-    "addGroup":"Add Group",
-    "addCondition":"Add Condition",
+    "addGroup": "Add Group",
+    "addCondition": "Add Condition",
     "required": "Value is required",
     "valueMustBeGreaterThanZero": "Value must be greater than zero",
     "links": "Links"
@@ -372,9 +372,9 @@
     "delete": "Delete",
     "deleteIndex": "Delete Stream",
     "confirmDeleteHead": "Delete Stream",
-    "confirmBatchDeleteHead":"Delete Streams",
+    "confirmBatchDeleteHead": "Delete Streams",
     "confirmDeleteMsg": "Are you sure that you want to delete this Stream?",
-    "confirmBatchDeleteMsg":"Are you sure that you want to delete selected streams?",
+    "confirmBatchDeleteMsg": "Are you sure that you want to delete selected streams?",
     "cancel": "Cancel",
     "ok": "Ok",
     "docsCount": "Docs Count",
@@ -402,7 +402,8 @@
     "addField": "Add Field",
     "addSchemaField": "Add to Defined Schema Fields",
     "removeSchemaField": "Remove Defined Schema Fields",
-    "storeOriginalData" : "Store Original Data"
+    "storeOriginalData": "Store Original Data",
+    "approxPartition": "Use Stream Stats for Partitioning"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -416,7 +417,12 @@
     "routing": "Routing",
     "nodes": "Nodes",
     "associateFunction": "Associate Function",
-    "derivedStream": "Derived Stream"
+    "derivedStream": "Derived Stream",
+    "pipelineName": "Enter Pipeline Name",
+    "flatteningLbl": "After Flattening",
+    "streamTitle": "Associate Stream",
+    "conditionTitle": "Associate Condition",
+    "query": "Associate Query"
   },
   "function": {
     "header": "Functions",
@@ -452,7 +458,7 @@
     "selectFunction": "Select Function",
     "appendData": "Append data to existing Enrichment Table",
     "deleteAssociatedFunction": "Delete Associated Function",
-    "streamPipeline": "Stream Pipelines",
+    "streamPipeline": "Pipelines",
     "streamRouting": "Stream Routing"
   },
   "confirmDialog": {
@@ -567,7 +573,7 @@
     "oneFieldMessage": "Add 1 field here",
     "maxtwofieldMessage": "Add maximum 2 fields here",
     "twoFieldsMessage": "Add 1 field here",
-    "zeroOrOneFieldMessage":"Add 0 or 1 field here",
+    "zeroOrOneFieldMessage": "Add 0 or 1 field here",
     "oneOrMoreFieldsMessage": "Add 1 or more fields here",
     "xaxisFieldNAMessage": "X-Axis field is not allowed",
     "oneLabelFieldMessage": "Add 1 label field here",
@@ -581,6 +587,8 @@
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
+    "labelPosition": "Value Position",
+    "labelRotate": "Value Rotate",
     "basemapLabel": "Base Map",
     "customunitLabel": "Custom Unit",
     "currencyDollar": "Currency - Dollar ($)",
@@ -635,7 +643,7 @@
     "percent1": "Percent (0.0-1.0)",
     "percent": "Percent (0-100)",
     "custom": "Custom",
-    "currency":"Currency",
+    "currency": "Currency",
     "count": "Count",
     "countDistinct": "Count (Distinct)",
     "sum": "Sum",
@@ -656,7 +664,21 @@
     "scheduledReports": "Scheduled Reports",
     "newReport": "New Report",
     "scheduledDashboards": "Scheduled Dashboards",
-    "panelHeight": "Panel Height"
+    "panelHeight": "Panel Height",
+    "none": "None",
+    "inside": "Inside",
+    "insideTop": "Inside Top",
+    "insideBottom": "Inside Bottom",
+    "top": "Top",
+    "showSymbol": "Show Symbol",
+    "yes": "Yes",
+    "no": "No",
+    "lineInterpolation": "Line Interpolation",
+    "linear": "Linear",
+    "smooth": "Smooth",
+    "stepBefore": "Step Before",
+    "stepAfter": "Step After",
+    "stepMiddle": "Step Middle"
   },
   "panel": {
     "header": "Panel",
@@ -809,10 +831,12 @@
     "row": "Row Template",
     "preview": "Preview",
     "crontitle": "Enable Cron",
-    "lastTriggered":"Last Triggered At",
-    "lastSatisfied":"Last Satisfied At",
+    "lastTriggered": "Last Triggered At",
+    "lastSatisfied": "Last Satisfied At",
     "owner": "Owner",
-    "title": "Title"
+    "title": "Title",
+    "createFunction": "Create Function",
+    "newFunctionAssociationMsg": "Note: The function will be created, after which you will be redirected to the previous form to associate the newly created function with the pipeline."
   },
   "alert_templates": {
     "header": "Templates",

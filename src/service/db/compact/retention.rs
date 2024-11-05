@@ -15,12 +15,16 @@
 
 use std::sync::Arc;
 
-use config::{meta::stream::StreamType, RwHashSet};
+use config::{
+    meta::stream::StreamType,
+    utils::time::{hour_micros, now_micros},
+    RwHashMap,
+};
 use once_cell::sync::Lazy;
 
 use crate::service::db;
 
-static CACHE: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
+static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
 #[inline]
 fn mk_key(
@@ -47,12 +51,14 @@ pub async fn delete_stream(
     let key = mk_key(org_id, stream_type, stream_name, date_range);
 
     // write in cache
-    if CACHE.contains(&key) {
-        return Ok(()); // already in cache, just skip
+    if let Some(v) = CACHE.get(&key) {
+        if v.value() + hour_micros(1) > now_micros() {
+            return Ok(()); // already in cache, don't create same task in one hour
+        }
     }
 
     let db_key = format!("/compact/delete/{key}");
-    CACHE.insert(key);
+    CACHE.insert(key, now_micros());
 
     Ok(db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?)
 }
@@ -92,7 +98,7 @@ pub fn is_deleting_stream(
     stream_name: &str,
     date_range: Option<(&str, &str)>,
 ) -> bool {
-    CACHE.contains(&mk_key(org_id, stream_type, stream_name, date_range))
+    CACHE.contains_key(&mk_key(org_id, stream_type, stream_name, date_range))
 }
 
 pub async fn delete_stream_done(
@@ -102,9 +108,7 @@ pub async fn delete_stream_done(
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
-    db::delete_if_exists(&format!("/compact/delete/{key}"), false, db::NEED_WATCH)
-        .await
-        .map_err(|e| anyhow::anyhow!(e))?;
+    db::delete_if_exists(&format!("/compact/delete/{key}"), false, db::NEED_WATCH).await?;
 
     // remove in cache
     CACHE.remove(&key);
@@ -128,19 +132,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching stream deleting");
+    log::info!("Start watching compact deleting");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
-                log::error!("watch_stream_deleting: event channel closed");
+                log::error!("watch_compact_deleting: event channel closed");
                 break;
             }
         };
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                CACHE.insert(item_key.to_string());
+                CACHE.insert(item_key.to_string(), now_micros());
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -157,7 +161,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, _) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        CACHE.insert(item_key.to_string());
+        CACHE.insert(item_key.to_string(), now_micros());
     }
     Ok(())
 }

@@ -196,6 +196,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     decimals: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    line_thickness: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
@@ -203,6 +205,12 @@ pub struct PanelConfig {
     axis_width: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_border_show: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label_option: Option<LabelOption>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_symbol: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line_interpolation: Option<LineInterpolation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
@@ -213,6 +221,8 @@ pub struct PanelConfig {
     drilldown: Option<Vec<DrillDown>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mark_line: Option<Vec<MarkLine>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    override_config: Option<Vec<OverrideConfig>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -225,6 +235,19 @@ pub struct PanelConfig {
     table_dynamic_columns: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mappings: Option<Vec<Mapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<ColorCfg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorCfg {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fixed_color: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    series_by: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -276,6 +299,38 @@ pub struct MarkLine {
     typee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OverrideConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    field: Option<Field>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    config: Option<Vec<Config>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Field {
+    match_by: String,
+    value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Config {
+    #[serde(rename = "type")]
+    typee: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Value {
+    unit: String,
+    custom_unit: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -426,4 +481,34 @@ pub struct LegendWidth {
     pub value: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct LabelOption {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<LabelPosition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotate: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LineInterpolation {
+    Smooth,
+    Linear,
+    #[serde(rename = "step-start")]
+    StepStart,
+    #[serde(rename = "step-end")]
+    StepEnd,
+    #[serde(rename = "step-middle")]
+    StepMiddle,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LabelPosition {
+    Top,
+    Inside,
+    InsideTop,
+    InsideBottom,
 }

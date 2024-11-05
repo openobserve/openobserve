@@ -35,15 +35,51 @@ use o2_enterprise::enterprise::common::auditor;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use reqwest::Client;
-use tokio::{sync::RwLock, time};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time,
+};
 
 pub mod ingestion_service;
-pub mod stats;
 
-pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(vec![])));
-pub static TRIGGERS_USAGE_DATA: Lazy<Arc<RwLock<Vec<TriggerData>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(vec![])));
+static USAGE_QUEUER: Lazy<Arc<UsageQueuer>> = Lazy::new(|| Arc::new(initialize_usage_queuer()));
+
+fn initialize_usage_queuer() -> UsageQueuer {
+    let cfg = get_config();
+    let timeout = time::Duration::from_secs(cfg.common.usage_publish_interval.try_into().unwrap());
+    let batch_size = cfg.common.usage_batch_size;
+
+    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(batch_size * 2);
+
+    tokio::task::spawn(async move { ingest_usage_job(msg_receiver, batch_size, timeout).await });
+
+    UsageQueuer::new(msg_sender)
+}
+
+pub async fn run() {
+    let cfg = get_config();
+    if !cfg.common.usage_enabled {
+        return;
+    }
+
+    // Force initialization and wait for the background task to be ready
+    let (ping_sender, ping_receiver) = oneshot::channel();
+    if let Err(e) = USAGE_QUEUER
+        .msg_sender
+        .send(UsageMessage::Ping(ping_sender))
+        .await
+    {
+        log::error!("Failed to initialize usage queuer: {e}");
+        return;
+    }
+
+    if let Err(e) = ping_receiver.await {
+        log::error!("Usage queuer initialization failed: {e}");
+        return;
+    }
+
+    log::debug!("Usage queuer initialized successfully");
+}
 
 pub async fn report_request_usage_stats(
     stats: RequestStats,
@@ -59,7 +95,7 @@ pub async fn report_request_usage_stats(
         .inc_by(stats.records as u64);
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .inc_by((stats.size * SIZE_IN_MB) as u64);
+        .inc_by((stats.size as i64 * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
 
@@ -102,6 +138,7 @@ pub async fn report_request_usage_stats(
             cached_ratio: None,
             compressed_size: None,
             search_type: stats.search_type,
+            search_event_context: stats.search_event_context.clone(),
             trace_id: None,
             took_wait_in_queue: stats.took_wait_in_queue,
             result_cache_ratio: None,
@@ -139,6 +176,7 @@ pub async fn report_request_usage_stats(
         cached_ratio: stats.cached_ratio,
         compressed_size: None,
         search_type: stats.search_type,
+        search_event_context: stats.search_event_context.clone(),
         trace_id: stats.trace_id,
         took_wait_in_queue: stats.took_wait_in_queue,
         result_cache_ratio: stats.result_cache_ratio,
@@ -150,19 +188,28 @@ pub async fn report_request_usage_stats(
     }
 }
 
-pub async fn publish_usage(mut usage: Vec<UsageData>) {
-    let mut usages = USAGE_DATA.write().await;
-    usages.append(&mut usage);
-
-    if usages.len() < get_config().common.usage_batch_size {
+async fn publish_usage(usage: Vec<UsageData>) {
+    let cfg = get_config();
+    if !cfg.common.usage_enabled {
         return;
     }
 
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
-
-    ingest_usages(curr_usages).await
+    match USAGE_QUEUER
+        .enqueue(
+            usage
+                .into_iter()
+                .map(|item| UsageBuffer::Usage(Box::new(item)))
+                .collect(),
+        )
+        .await
+    {
+        Err(e) => {
+            log::error!("Failed to send usage data to background ingesting job: {e}")
+        }
+        Ok(()) => {
+            log::debug!("Successfully queued usage data to be ingested")
+        }
+    }
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
@@ -171,18 +218,17 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
         return;
     }
 
-    let mut usages = TRIGGERS_USAGE_DATA.write().await;
-    usages.push(trigger);
-
-    if usages.len() < cfg.common.usage_batch_size {
-        return;
+    match USAGE_QUEUER
+        .enqueue(vec![UsageBuffer::Trigger(Box::new(trigger))])
+        .await
+    {
+        Err(e) => {
+            log::error!("Failed to send trigger usage data to background ingesting job: {e}")
+        }
+        Ok(()) => {
+            log::debug!("Successfully queued trigger usage data to be ingested")
+        }
     }
-
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
-
-    ingest_trigger_usages(curr_usages).await
 }
 
 pub async fn flush() {
@@ -190,44 +236,13 @@ pub async fn flush() {
     #[cfg(feature = "enterprise")]
     flush_audit().await;
 
-    // flush usage report
-    flush_usage().await;
-    // flush triggers usage report
-    flush_triggers_usage().await;
-}
-
-async fn flush_usage() {
-    if !get_config().common.usage_enabled {
-        return;
+    // shutdown usage_queuer
+    let (res_sender, res_receiver) = oneshot::channel();
+    if let Err(e) = USAGE_QUEUER.shutdown(res_sender).await {
+        log::error!("Error shutting down USAGE_QUEUER: {e}");
     }
-
-    let mut usages = USAGE_DATA.write().await;
-    if usages.len() == 0 {
-        return;
-    }
-
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
-
-    ingest_usages(curr_usages).await
-}
-
-async fn flush_triggers_usage() {
-    if !get_config().common.usage_enabled {
-        return;
-    }
-
-    let mut usages = TRIGGERS_USAGE_DATA.write().await;
-    if usages.len() == 0 {
-        return;
-    }
-
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
-
-    ingest_trigger_usages(curr_usages).await
+    // wait for flush ingestion job
+    res_receiver.await.ok();
 }
 
 async fn ingest_usages(curr_usages: Vec<UsageData>) {
@@ -311,10 +326,20 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
                     );
                     if &cfg.common.usage_reporting_mode != "both" {
                         // on error in ingesting usage data, push back the data
-                        let mut usages = USAGE_DATA.write().await;
-                        let mut curr_usages = curr_usages.clone();
-                        usages.append(&mut curr_usages);
-                        drop(usages);
+                        let curr_usages = curr_usages.clone();
+                        if let Err(e) = USAGE_QUEUER
+                            .enqueue(
+                                curr_usages
+                                    .into_iter()
+                                    .map(|item| UsageBuffer::Usage(Box::new(item)))
+                                    .collect(),
+                            )
+                            .await
+                        {
+                            log::error!(
+                                "Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                            );
+                        }
                     }
                 }
             }
@@ -322,10 +347,20 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
                 log::error!("Error in ingesting usage data to external URL {:?}", e);
                 if &cfg.common.usage_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data
-                    let mut usages = USAGE_DATA.write().await;
-                    let mut curr_usages = curr_usages.clone();
-                    usages.append(&mut curr_usages);
-                    drop(usages);
+                    let curr_usages = curr_usages.clone();
+                    if let Err(e) = USAGE_QUEUER
+                        .enqueue(
+                            curr_usages
+                                .into_iter()
+                                .map(|item| UsageBuffer::Usage(Box::new(item)))
+                                .collect(),
+                        )
+                        .await
+                    {
+                        log::error!(
+                            "Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                        );
+                    }
                 }
             }
         }
@@ -344,10 +379,17 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         if let Err(e) = ingestion_service::ingest(&cfg.common.usage_org, req).await {
             log::error!("Error in ingesting usage data {:?}", e);
             // on error in ingesting usage data, push back the data
-            let mut usages = USAGE_DATA.write().await;
-            let mut curr_usages = curr_usages.clone();
-            usages.append(&mut curr_usages);
-            drop(usages);
+            if let Err(e) = USAGE_QUEUER
+                .enqueue(
+                    curr_usages
+                        .into_iter()
+                        .map(|item| UsageBuffer::Usage(Box::new(item)))
+                        .collect(),
+                )
+                .await
+            {
+                log::error!("Error in pushing back un-ingested Usage data to UsageQueuer: {e}");
+            }
         }
     }
 }
@@ -370,57 +412,156 @@ async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
     };
     if let Err(e) = ingestion_service::ingest(&get_config().common.usage_org, req).await {
         log::error!("Error in ingesting triggers usage data {:?}", e);
-        // on error in ingesting usage data, push back the data
-        let mut usages = TRIGGERS_USAGE_DATA.write().await;
-        let mut curr_usages = curr_usages.clone();
-        usages.append(&mut curr_usages);
-        drop(usages);
+        if let Err(e) = USAGE_QUEUER
+            .enqueue(
+                curr_usages
+                    .into_iter()
+                    .map(|item| UsageBuffer::Trigger(Box::new(item)))
+                    .collect(),
+            )
+            .await
+        {
+            log::error!("Error in pushing back un-ingested Usage data to UsageQueuer: {e}");
+        }
     }
 }
 
-async fn publish_existing_usage() {
-    let mut usages = USAGE_DATA.write().await;
-    log::debug!("publishing usage reports,len: {}", usages.len());
-    if usages.is_empty() {
-        return;
-    }
-
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
-
-    ingest_usages(curr_usages).await
+#[derive(Debug)]
+struct UsageQueuer {
+    msg_sender: mpsc::Sender<UsageMessage>,
 }
 
-async fn publish_existing_triggers_usage() {
-    let mut usages = TRIGGERS_USAGE_DATA.write().await;
-    log::debug!("publishing triggers usage reports,len: {}", usages.len());
-
-    if usages.is_empty() {
-        return;
+impl UsageQueuer {
+    fn new(msg_sender: mpsc::Sender<UsageMessage>) -> Self {
+        Self { msg_sender }
     }
 
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
+    async fn enqueue(
+        &self,
+        usage_buf: Vec<UsageBuffer>,
+    ) -> Result<(), mpsc::error::SendError<UsageMessage>> {
+        self.msg_sender.send(UsageMessage::Data(usage_buf)).await
+    }
 
-    ingest_trigger_usages(curr_usages).await
+    async fn shutdown(
+        &self,
+        res_sender: oneshot::Sender<()>,
+    ) -> Result<(), mpsc::error::SendError<UsageMessage>> {
+        self.msg_sender
+            .send(UsageMessage::Shutdown(res_sender))
+            .await
+    }
 }
 
-pub async fn run() {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
+#[derive(Debug)]
+enum UsageMessage {
+    Data(Vec<UsageBuffer>),
+    Shutdown(oneshot::Sender<()>),
+    Ping(oneshot::Sender<()>),
+}
+
+#[derive(Debug)]
+enum UsageBuffer {
+    Usage(Box<UsageData>),
+    Trigger(Box<TriggerData>),
+}
+
+#[derive(Debug)]
+struct UsageReportRunner {
+    pending: Vec<UsageBuffer>,
+    batch_size: usize,
+    timeout: time::Duration,
+    last_processed: time::Instant,
+}
+
+impl UsageReportRunner {
+    fn new(batch_size: usize, timeout: time::Duration) -> Self {
+        Self {
+            pending: Vec::new(),
+            batch_size,
+            timeout,
+            last_processed: time::Instant::now(),
+        }
     }
-    let mut usage_interval = time::interval(time::Duration::from_secs(
-        cfg.common.usage_publish_interval.try_into().unwrap(),
-    ));
-    usage_interval.tick().await; // trigger the first run
+
+    fn push(&mut self, data: Vec<UsageBuffer>) {
+        self.pending.extend(data);
+    }
+
+    fn should_process(&self) -> bool {
+        self.pending.len() >= self.batch_size
+            || (!self.pending.is_empty() && self.last_processed.elapsed() >= self.timeout)
+    }
+
+    fn take_batch(&mut self) -> Vec<UsageBuffer> {
+        self.last_processed = time::Instant::now();
+        std::mem::take(&mut self.pending)
+    }
+}
+
+/// Background job to collect and ingest UsageData and TriggerData.
+/// Ingestion happens when either the batch_size or the timeout is exceeded, whichever satisfies the
+/// first.
+async fn ingest_usage_job(
+    mut msg_receiver: mpsc::Receiver<UsageMessage>,
+    batch_size: usize,
+    timeout: time::Duration,
+) {
+    let mut usage_report_runner = UsageReportRunner::new(batch_size, timeout);
+    let mut interval = time::interval(timeout);
+
     loop {
-        log::debug!("Usage ingestion loop running");
-        usage_interval.tick().await;
-        publish_existing_usage().await;
-        publish_existing_triggers_usage().await;
+        tokio::select! {
+            msg = msg_receiver.recv() => {
+                match msg {
+                    Some(UsageMessage::Data(usage_buf)) => {
+                        usage_report_runner.push(usage_buf);
+                        if usage_report_runner.should_process() {
+                            let buffered = usage_report_runner.take_batch();
+                            ingest_buffered_usage(buffered).await;
+                        }
+                    }
+                    Some(UsageMessage::Shutdown(res_sender)) => {
+                        log::debug!("Received shutdown signal");
+                        // process any remaining data before shutting down
+                        if !usage_report_runner.pending.is_empty() {
+                            let buffered = usage_report_runner.take_batch();
+                            ingest_buffered_usage(buffered).await;
+                        }
+                        res_sender.send(()).ok();
+                        break;
+                    }
+                    Some(UsageMessage::Ping(ping_sender)) => {
+                        log::debug!("Received initialization ping");
+                        ping_sender.send(()).ok();
+                    }
+                    None => break, // channel closed
+                }
+            }
+            _ = interval.tick() => {
+                if usage_report_runner.should_process() {
+                    let buffered = usage_report_runner.take_batch();
+                    ingest_buffered_usage(buffered).await;
+                }
+            }
+        }
+    }
+}
+
+async fn ingest_buffered_usage(usage_buffer: Vec<UsageBuffer>) {
+    log::debug!("Ingest {} buffered usage data", usage_buffer.len());
+    let (mut usage_data, mut trigger_data) = (Vec::new(), Vec::new());
+    for item in usage_buffer {
+        match item {
+            UsageBuffer::Usage(usage) => usage_data.push(*usage),
+            UsageBuffer::Trigger(trigger) => trigger_data.push(*trigger),
+        }
+    }
+    if !usage_data.is_empty() {
+        ingest_usages(usage_data).await;
+    }
+    if !trigger_data.is_empty() {
+        ingest_trigger_usages(trigger_data).await;
     }
 }
 

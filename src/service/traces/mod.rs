@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{collections::HashMap, io::Error, sync::Arc, time::Instant};
 
 use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
@@ -22,6 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::alert::Alert,
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -40,14 +41,15 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
+use super::{logs::O2IngestJsonData, pipeline::batch_execution::ExecutablePipelineTraceInputs};
 use crate::{
     common::meta::{
-        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
     service::{
+        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
         metadata::{
@@ -176,18 +178,19 @@ pub async fn handle_trace_request(
             .expect("configuration error: too large ingest_allowed_upto"))
     .timestamp_micros();
 
-    // Start Register Transforms for stream
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+    // Start retrieving associated pipeline and construct pipeline params
+    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
         org_id,
-        &StreamType::Traces,
         &traces_stream_name,
-    );
-    // End Register Transforms for stream
+        &StreamType::Traces,
+    )
+    .await;
+    let mut stream_pipeline_inputs = ExecutablePipelineTraceInputs::new();
+    // End pipeline params construction
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
-    let mut json_data = Vec::with_capacity(res_spans.len());
+    let mut json_data_by_stream = HashMap::new();
     let mut span_metrics = Vec::with_capacity(res_spans.len());
     let mut partial_success = ExportTracePartialSuccess::default();
     for res_span in res_spans {
@@ -212,13 +215,6 @@ pub async fn handle_trace_request(
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
-                if span.span_id.len() != SPAN_ID_BYTES_COUNT {
-                    log::error!("[TRACE] skipping span with invalid span id");
-                    partial_success.rejected_spans += 1;
-                    continue;
-                }
-                let span_id: String =
-                    SpanId::from_bytes(span.span_id.try_into().unwrap()).to_string();
                 if span.trace_id.len() != TRACE_ID_BYTES_COUNT {
                     log::error!("[TRACE] skipping span with invalid trace id");
                     partial_success.rejected_spans += 1;
@@ -226,6 +222,16 @@ pub async fn handle_trace_request(
                 }
                 let trace_id: String =
                     TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
+                if span.span_id.len() != SPAN_ID_BYTES_COUNT {
+                    log::error!(
+                        "[TRACE] skipping span with invalid span id, trace_id: {}",
+                        trace_id
+                    );
+                    partial_success.rejected_spans += 1;
+                    continue;
+                }
+                let span_id: String =
+                    SpanId::from_bytes(span.span_id.try_into().unwrap()).to_string();
                 let mut span_ref = HashMap::new();
                 if !span.parent_span_id.is_empty()
                     && span.parent_span_id.len() == SPAN_ID_BYTES_COUNT
@@ -277,13 +283,19 @@ pub async fn handle_trace_request(
                         link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
                     }
                     if link.span_id.len() != SPAN_ID_BYTES_COUNT {
-                        log::error!("[TRACE] skipping link with invalid span id");
+                        log::error!(
+                            "[TRACE] skipping link with invalid span id, trace_id: {}",
+                            trace_id
+                        );
                         continue;
                     }
                     let span_id: String =
                         SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
                     if link.trace_id.len() != TRACE_ID_BYTES_COUNT {
-                        log::error!("[TRACE] skipping link with invalid trace id");
+                        log::error!(
+                            "[TRACE] skipping link with invalid trace id, trace_id: {}",
+                            trace_id
+                        );
                         continue;
                     }
                     let trace_id: String =
@@ -303,7 +315,8 @@ pub async fn handle_trace_request(
                 let timestamp = (start_time / 1000) as i64;
                 if timestamp < min_ts {
                     log::error!(
-                        "[TRACE] skipping span with timestamp older than allowed retention period"
+                        "[TRACE] skipping span with timestamp older than allowed retention period, trace_id: {}",
+                        trace_id
                     );
                     partial_success.rejected_spans += 1;
                     continue;
@@ -330,90 +343,166 @@ pub async fn handle_trace_request(
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
 
-                // JSON Flattening
-                value = flatten::flatten(value).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                })?;
-
-                // Start row based transform
-                if !local_trans.is_empty() {
-                    value = crate::service::ingestion::apply_stream_functions(
-                        &local_trans,
+                if executable_pipeline.is_some() {
+                    stream_pipeline_inputs.add_input(
                         value,
-                        &stream_vrl_map,
-                        org_id,
-                        &traces_stream_name,
-                        &mut runtime,
-                    )
-                    .map_err(|e| {
+                        timestamp,
+                        service_name.to_owned(),
+                        span.name,
+                        span_status_for_spanmetric,
+                        span.kind.to_string(),
+                        ((end_time - start_time) / 1_000_000) as f64,
+                    );
+                } else {
+                    // JSON Flattening
+                    value = flatten::flatten(value).map_err(|e| {
                         std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                     })?;
+
+                    // get json object
+                    let mut record_val = match value.take() {
+                        json::Value::Object(mut v) => {
+                            // build span metrics item
+                            let sm = crate::job::metrics::TraceMetricsItem {
+                                organization: org_id.to_string(),
+                                traces_stream_name: traces_stream_name.clone(),
+                                service_name: service_name.clone(),
+                                span_name: v
+                                    .remove("o2_span_metrics_name")
+                                    .map_or(span.name.clone(), |name| {
+                                        name.as_str().unwrap().to_string()
+                                    }),
+                                span_status: span_status_for_spanmetric,
+                                span_kind: span.kind.to_string(),
+                                duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
+                                span_id: v["span_id"].to_string(),
+                            };
+                            span_metrics.push(sm);
+                            v
+                        }
+                        _ => {
+                            log::error!(
+                                "[TRACE] stream did not receive a valid json object, trace_id: {}",
+                                trace_id
+                            );
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    "stream did not receive a valid json objectt".into(),
+                                ),
+                            ));
+                        }
+                    };
+
+                    // add timestamp
+                    record_val.insert(
+                        cfg.common.column_timestamp.clone(),
+                        json::Value::Number(timestamp.into()),
+                    );
+                    let (ts_data, _) = json_data_by_stream
+                        .entry(traces_stream_name.to_string())
+                        .or_insert((Vec::new(), None));
+                    ts_data.push((timestamp, record_val));
                 }
-                // End row based transform
+            }
+        }
+    }
 
-                // get json object
-                let mut record_val = match value.take() {
-                    json::Value::Object(mut v) => {
-                        // build span metrics item
-                        let sm = crate::job::metrics::TraceMetricsItem {
-                            organization: org_id.to_string(),
-                            traces_stream_name: traces_stream_name.clone(),
-                            service_name: service_name.clone(),
-                            span_name: v
-                                .remove("o2_span_metrics_name")
-                                .map_or(span.name.clone(), |name| {
-                                    name.as_str().unwrap().to_string()
-                                }),
-                            span_status: span_status_for_spanmetric,
-                            span_kind: span.kind.to_string(),
-                            duration: ((end_time - start_time) / 1_000_000) as f64, // milliseconds
-                            span_id: v["span_id"].to_string(),
-                        };
-                        span_metrics.push(sm);
-                        v
-                    }
-                    _ => {
-                        log::error!("[TRACE] stream functions did not return valid json object");
-                        return Ok(HttpResponse::InternalServerError().json(
-                            MetaHttpResponse::error(
-                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                "stream functions did not return valid json object".into(),
-                            ),
-                        ));
-                    }
-                };
-
-                // add timestamp
-                record_val.insert(
-                    cfg.common.column_timestamp.clone(),
-                    json::Value::Number(timestamp.into()),
+    // batch process records through pipeline
+    if let Some(exec_pl) = &executable_pipeline {
+        let (
+            records,
+            timestamps,
+            services,
+            span_names,
+            span_status_for_spanmetrics,
+            span_kinds,
+            span_durations,
+        ) = stream_pipeline_inputs.into_parts();
+        let records_count = records.len();
+        match exec_pl.process_batch(org_id, records).await {
+            Err(e) => {
+                log::error!(
+                    "[Trace] pipeline({}/{}) batch execution error: {}.",
+                    org_id,
+                    traces_stream_name,
+                    e
                 );
-                json_data.push((timestamp, record_val));
+                partial_success.rejected_spans += records_count as i64;
+                partial_success.error_message = format!("Pipeline batch execution error: {}", e);
+            }
+            Ok(pl_results) => {
+                for (stream_params, stream_pl_results) in pl_results {
+                    if stream_params.stream_type != StreamType::Traces {
+                        continue;
+                    }
+
+                    for (idx, mut res) in stream_pl_results {
+                        // get json object
+                        let mut record_val = match res.take() {
+                            json::Value::Object(mut v) => {
+                                // build span metrics item
+                                let sm = crate::job::metrics::TraceMetricsItem {
+                                    organization: org_id.to_string(),
+                                    traces_stream_name: stream_params.stream_name.to_string(),
+                                    service_name: services[idx].to_owned(),
+                                    span_name: v
+                                        .remove("o2_span_metrics_name")
+                                        .map_or(span_names[idx].to_owned(), |name| {
+                                            name.as_str().unwrap().to_string()
+                                        }),
+                                    span_status: span_status_for_spanmetrics[idx].to_owned(),
+                                    span_kind: span_kinds[idx].to_owned(),
+                                    duration: span_durations[idx], // milliseconds
+                                    span_id: v["span_id"].to_string(),
+                                };
+                                span_metrics.push(sm);
+                                v
+                            }
+                            _ => {
+                                log::error!("[TRACE] stream did not receive a valid json object");
+                                return Ok(HttpResponse::InternalServerError().json(
+                                    MetaHttpResponse::error(
+                                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                        "stream did not receive a valid json object".into(),
+                                    ),
+                                ));
+                            }
+                        };
+
+                        // add timestamp
+                        let timestamp = timestamps[idx];
+                        record_val.insert(
+                            cfg.common.column_timestamp.clone(),
+                            json::Value::Number(timestamp.into()),
+                        );
+                        let (ts_data, _) = json_data_by_stream
+                            .entry(traces_stream_name.to_string())
+                            .or_insert((Vec::new(), None));
+                        ts_data.push((timestamp, record_val));
+                    }
+                }
             }
         }
     }
 
     // if no data, fast return
-    if json_data.is_empty() {
-        log::error!("[TRACE] no data to write");
+    if json_data_by_stream.is_empty() {
         return format_response(partial_success, req_type);
     }
 
-    let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error while writing traces: {}", e);
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("error while writing trace data: {e}",),
-                )),
-            );
-        }
-    };
-    let time = start.elapsed().as_secs_f64();
-    req_stats.response_time = time;
+    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    {
+        log::error!("Error while writing traces: {}", e);
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("error while writing trace data: {e}",),
+            )),
+        );
+    }
 
+    let time = start.elapsed().as_secs_f64();
     let ep = match req_type {
         RequestType::Grpc => "/grpc/otlp/traces",
         _ => "/api/otlp/v1/traces",
@@ -436,7 +525,7 @@ pub async fn handle_trace_request(
 
         // send to metrics job
         if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
-            log::error!("traces metrics item send to job fail : {e}")
+            log::error!("traces metrics item send to job fail: {e}")
         }
     }
 
@@ -458,18 +547,6 @@ pub async fn handle_trace_request(
             StreamType::Traces.to_string().as_str(),
         ])
         .inc();
-
-    // metric + data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        &traces_stream_name,
-        StreamType::Traces,
-        UsageType::Traces,
-        0,
-        started_at,
-    )
-    .await;
 
     format_response(partial_success, req_type)
 }
@@ -517,6 +594,35 @@ fn format_response(
                 .body(out))
         }
     }
+}
+
+async fn write_traces_by_stream(
+    org_id: &str,
+    time_stats: (i64, &Instant),
+    json_data_by_stream: HashMap<String, O2IngestJsonData>,
+) -> Result<(), Error> {
+    for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        let time = time_stats.1.elapsed().as_secs_f64();
+        req_stats.response_time = time;
+        // metric + data usage
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+            UsageType::Traces,
+            fn_num.map_or(0, |cnt| cnt as u16),
+            time_stats.0,
+        )
+        .await;
+    }
+    Ok(())
 }
 
 async fn write_traces(

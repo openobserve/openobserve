@@ -25,9 +25,10 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{
+        alerts::alert::Alert,
+        function::{VRLResultResolver, VRLRuntimeConfig},
         stream::{
-            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
-            StreamType,
+            PartitionTimeLevel, PartitioningDetails, StreamParams, StreamPartition, StreamType,
         },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
@@ -38,27 +39,21 @@ use futures::future::try_join_all;
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
 use tokio::sync::Semaphore;
-use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
     prelude::state,
 };
 
-use super::usage::publish_triggers_usage;
+use super::{
+    db::pipeline, pipeline::batch_execution::ExecutablePipeline, usage::publish_triggers_usage,
+};
 use crate::{
     common::{
-        infra::config::{
-            REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
-        },
-        meta::{
-            alerts::alert::Alert,
-            functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            ingestion::IngestionRequest,
-            stream::SchemaRecords,
-        },
+        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
+        meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::db,
+    service::{alerts::alert::AlertExt, db},
 };
 
 pub mod grpc;
@@ -101,13 +96,13 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
 pub fn apply_vrl_fn(
     runtime: &mut Runtime,
     vrl_runtime: &VRLResultResolver,
-    row: &Value,
+    row: Value,
     org_id: &str,
     stream_name: &[String],
 ) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut vrl::value::Value::from(row),
+        value: &mut vrl::value::Value::from(&row),
         metadata: &mut metadata,
         secrets: &mut vrl::value::Secrets::new(),
     };
@@ -127,7 +122,7 @@ pub fn apply_vrl_fn(
                     stream_name,
                     err,
                 );
-                row.clone()
+                row
             }
         },
         Err(err) => {
@@ -137,40 +132,8 @@ pub fn apply_vrl_fn(
                 stream_name,
                 err,
             );
-            row.clone()
+            row
         }
-    }
-}
-
-pub async fn get_stream_functions<'a>(
-    streams: &[StreamParams],
-    stream_before_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
-    stream_after_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
-    stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
-) {
-    for stream in streams {
-        let key = format!(
-            "{}/{}/{}",
-            stream.org_id, stream.stream_type, stream.stream_name
-        );
-        if stream_after_functions_map.contains_key(&key)
-            || stream_before_functions_map.contains_key(&key)
-        {
-            // functions for this stream already fetched
-            continue;
-        }
-        //   let mut _local_trans: Vec<StreamTransform> = vec![];
-        // let local_stream_vrl_map;
-        let (before_local_trans, after_local_trans, local_stream_vrl_map) =
-            crate::service::ingestion::register_stream_functions(
-                &stream.org_id,
-                &stream.stream_type,
-                &stream.stream_name,
-            );
-        stream_vrl_map.extend(local_stream_vrl_map);
-
-        stream_before_functions_map.insert(key.clone(), before_local_trans);
-        stream_after_functions_map.insert(key, after_local_trans);
     }
 }
 
@@ -186,6 +149,15 @@ pub async fn get_stream_partition_keys(
         partition_keys: stream_settings.partition_keys,
         partition_time_level: stream_settings.partition_time_level,
     }
+}
+
+pub async fn get_stream_executable_pipeline(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: &StreamType,
+) -> Option<ExecutablePipeline> {
+    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
+    pipeline::get_executable_pipeline(&stream_params).await
 }
 
 pub async fn get_stream_alerts(
@@ -353,74 +325,6 @@ pub fn get_write_partition_key(
     time_key
 }
 
-pub fn register_stream_functions(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
-) -> (
-    Vec<StreamTransform>,
-    Vec<StreamTransform>,
-    HashMap<String, VRLResultResolver>,
-) {
-    let mut before_local_trans = vec![];
-    let mut after_local_trans = vec![];
-    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-
-    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        (before_local_trans, after_local_trans) = (*transforms.list)
-            .iter()
-            .cloned()
-            .partition(|elem| elem.apply_before_flattening);
-        before_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
-        after_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
-        for trans in before_local_trans.iter().chain(after_local_trans.iter()) {
-            let func_key = format!("{}/{}", &stream_name, trans.transform.name);
-            if let Ok(vrl_runtime_config) = compile_vrl_function(&trans.transform.function, org_id)
-            {
-                let registry = vrl_runtime_config
-                    .config
-                    .get_custom::<TableRegistry>()
-                    .unwrap();
-                registry.finish_load();
-                stream_vrl_map.insert(
-                    func_key,
-                    VRLResultResolver {
-                        program: vrl_runtime_config.program,
-                        fields: vrl_runtime_config.fields,
-                    },
-                );
-            }
-        }
-    }
-
-    (before_local_trans, after_local_trans, stream_vrl_map)
-}
-
-pub fn apply_stream_functions(
-    local_trans: &[StreamTransform],
-    mut value: Value,
-    stream_vrl_map: &HashMap<String, VRLResultResolver>,
-    org_id: &str,
-    stream_name: &str,
-    runtime: &mut Runtime,
-) -> Result<Value> {
-    for trans in local_trans {
-        let func_key = format!("{stream_name}/{}", trans.transform.name);
-        if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
-            let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
-            value = apply_vrl_fn(
-                runtime,
-                vrl_runtime,
-                &value,
-                org_id,
-                &[stream_name.to_string()],
-            );
-        }
-    }
-    flatten::flatten_with_level(value, get_config().limit.ingest_flatten_level)
-}
-
 pub fn init_functions_runtime() -> Runtime {
     crate::common::utils::functions::init_vrl_runtime()
 }
@@ -475,7 +379,7 @@ pub async fn write_file(
     for task in task_results {
         match task {
             Ok((entry_records, entry_size)) => {
-                req_stats.size += entry_size as f64 / SIZE_IN_MB;
+                req_stats.size += (entry_size as i64 / SIZE_IN_MB) as f64;
                 req_stats.records += entry_records as i64;
             }
             Err(e) => {
@@ -592,30 +496,6 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
         Value::Null => Value::Null,
     }
 }
-
-pub async fn get_stream_routing(
-    stream_params: StreamParams,
-    stream_routing_map: &mut HashMap<String, Vec<Routing>>,
-) {
-    if let Some(pipeline) = STREAM_PIPELINES.get(&format!(
-        "{}/{}/{}",
-        &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
-    )) {
-        let Some(routing) = pipeline.routing.as_ref() else {
-            return;
-        };
-        let res: Vec<Routing> = routing
-            .iter()
-            .map(|(k, v)| Routing {
-                destination: k.to_string(),
-                routing: v.clone(),
-            })
-            .collect();
-
-        stream_routing_map.insert(stream_params.stream_name.to_string(), res);
-    }
-}
-
 pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, HashSet<String>>,

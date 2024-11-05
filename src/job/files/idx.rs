@@ -22,8 +22,10 @@ use arrow::array::{
 use arrow_schema::{DataType, Schema};
 use config::{
     ider,
-    meta::stream::{FileMeta, StreamPartition, StreamType},
-    utils::parquet::new_parquet_writer,
+    meta::stream::{FileMeta, StreamPartition, StreamPartitionType, StreamType},
+    utils::{
+        parquet::new_parquet_writer, record_batch_ext::concat_batches, schema::format_partition_key,
+    },
     FILE_EXT_PARQUET,
 };
 use hashbrown::HashMap;
@@ -46,15 +48,19 @@ fn generate_index_file_name_from_compacted_file(
         file_columns[4], file_columns[5], file_columns[6], file_columns[7]
     );
     let file_name = ider::generate();
-    format!("files/{stream_key}/{file_date}/{prefix}/{file_name}{FILE_EXT_PARQUET}")
+    if prefix.is_empty() {
+        format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+    } else {
+        format!("files/{stream_key}/{file_date}/{prefix}/{file_name}{FILE_EXT_PARQUET}")
+    }
 }
 
 pub(crate) async fn write_parquet_index_to_disk(
     batches: Vec<arrow::record_batch::RecordBatch>,
     file_size: u64,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     file_name: &str,
     caller: &str,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
@@ -64,23 +70,31 @@ pub(crate) async fn write_parquet_index_to_disk(
         return Err(anyhow::anyhow!("No record batches found"));
     };
 
-    println!(
+    log::debug!(
         "write_parquet_index_to_disk: batches row counts: {:?}",
         batches.iter().map(|b| b.num_rows()).sum::<usize>()
     );
 
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let term_prefix_partition = stream_settings.partition_keys.iter().any(|partition| {
+        partition.field == "term"
+            && partition.types == StreamPartitionType::Prefix
+            && !partition.disabled
+    });
+
     // partition the record batches
-    let partitioned_batches = generate_prefixed_batches(schema.clone(), batches)?;
+    let partitioned_batches = if term_prefix_partition {
+        generate_prefixed_batches(schema.clone(), batches)?
+    } else {
+        let mut partitioned_batches = HashMap::new();
+        let batch = concat_batches(schema.clone(), batches)?;
+        partitioned_batches.insert("".to_string(), batch);
+        partitioned_batches
+    };
 
-    for (prefix, batch) in partitioned_batches.iter() {
-        println!(
-            "write_parquet_index_to_disk: prefix: {}, row count: {}",
-            prefix,
-            batch.num_rows()
-        );
-    }
     let mut ret = Vec::new();
-
     for (prefix, batch) in partitioned_batches.into_iter() {
         // write metadata
         let mut file_meta = FileMeta {
@@ -140,7 +154,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     Ok(ret)
 }
 
-/// Generate prefix batches from   record batches
+/// Generate prefix batches from record batches
 fn generate_prefixed_batches(
     schema: Arc<Schema>,
     batches: Vec<RecordBatch>,
@@ -174,7 +188,7 @@ fn generate_prefixed_batches(
                         let prefix = if term.is_empty() {
                             String::new()
                         } else {
-                            partition.get_partition_key(term)
+                            format_partition_key(&partition.get_partition_key(term))
                         };
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
@@ -198,7 +212,7 @@ fn generate_prefixed_batches(
                         let prefix = if term.is_empty() {
                             String::new()
                         } else {
-                            partition.get_partition_key(term)
+                            format_partition_key(&partition.get_partition_key(term))
                         };
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
@@ -219,7 +233,7 @@ fn generate_prefixed_batches(
                         let prefix = if term.is_empty() {
                             String::new()
                         } else {
-                            partition.get_partition_key(term)
+                            format_partition_key(&partition.get_partition_key(term))
                         };
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry
@@ -243,7 +257,7 @@ fn generate_prefixed_batches(
                         let prefix = if term.is_empty() {
                             String::new()
                         } else {
-                            partition.get_partition_key(term)
+                            format_partition_key(&partition.get_partition_key(term))
                         };
                         let entry = partition_buf.entry(prefix).or_default();
                         let builder = entry

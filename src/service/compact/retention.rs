@@ -51,6 +51,15 @@ pub async fn delete_by_stream(
         return Ok(()); // created_at is after lifecycle_end, just skip
     }
 
+    log::debug!(
+        "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
+        org_id,
+        stream_type,
+        stream_name,
+        lifecycle_start,
+        lifecycle_end
+    );
+
     // Hack for 1970-01-01
     if lifecycle_start.le("1970-01-01") {
         let lifecycle_end = created_at + Duration::try_days(1).unwrap();
@@ -83,7 +92,7 @@ pub async fn delete_all(
     let locker = dist_lock::lock(&lock_key, 0, None).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
+        log::warn!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
@@ -179,7 +188,7 @@ pub async fn delete_by_date(
         db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))
             .await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::error!(
+        log::warn!(
             "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
         );
