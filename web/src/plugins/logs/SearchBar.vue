@@ -613,7 +613,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         size="10px"
         round
-        class="field-list-collapse-btn"
         color="primary"
         @click="isFocused = !isFocused"
         style="position: absolute; top: 42px; right: 10px; z-index: 20;"
