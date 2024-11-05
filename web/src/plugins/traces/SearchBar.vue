@@ -131,7 +131,7 @@ export default defineComponent({
   components: {
     DateTime,
     QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+      () => import("@/components/QueryEditor.vue"),
     ),
     SyntaxGuide,
     AppTabs,
@@ -195,14 +195,14 @@ export default defineComponent({
       await nextTick();
       if (searchObj.data.datetime.type === "relative") {
         dateTimeRef.value.setRelativeTime(
-          searchObj.data.datetime.relativeTimePeriod
+          searchObj.data.datetime.relativeTimePeriod,
         );
 
         dateTimeRef.value.refresh();
       } else {
         dateTimeRef.value.setAbsoluteTime(
           searchObj.data.datetime.startTime,
-          searchObj.data.datetime.endTime
+          searchObj.data.datetime.endTime,
         );
       }
     });
@@ -218,7 +218,7 @@ export default defineComponent({
       (fields) => {
         if (fields.length) updateFieldKeywords(fields);
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
 
     const updateAutoComplete = (value) => {
@@ -256,7 +256,7 @@ export default defineComponent({
                     name: field.name,
                   });
                 });
-              }
+              },
             );
 
             if (streamFound == false) {
@@ -563,11 +563,11 @@ export default defineComponent({
     font-size: 22px;
     height: 29px;
 
-    ::v-deep .block {
+    :deep(.block) {
       font-size: 12px;
     }
 
-    ::v-deep .q-icon {
+    :deep(.q-icon) {
       margin-right: 4px;
     }
   }
