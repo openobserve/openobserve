@@ -831,14 +831,14 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .running-queries-page {
-  ::v-deep .q-table th,
-  ::v-deep .q-table td {
+  :deep(.q-table th),
+  :deep(.q-table td) {
     padding: 0px 16px;
     height: 32px;
   }
 }
 .query-management-tabs {
-  ::v-deep .q-btn:before {
+  :deep(.q-btn:before) {
     border: none !important;
   }
 }
