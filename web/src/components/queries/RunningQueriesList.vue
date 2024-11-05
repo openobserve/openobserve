@@ -119,6 +119,8 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 
+// TODO OK : Define types and interfaces for data properties.
+
 export default defineComponent({
   name: "RunningQueriesList",
   components: { QueryList, QTablePagination, NoData },
