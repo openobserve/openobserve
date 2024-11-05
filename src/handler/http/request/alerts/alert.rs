@@ -582,7 +582,11 @@ async fn show_all_alert_history(
     let status = match query.get("status") {
         Some(v) => {
             let v = v.to_lowercase();
-            if v.eq("completed") || v.eq("failed") || v.eq("condition_not_satisfied") {
+            if v.eq("completed")
+                || v.eq("failed")
+                || v.eq("condition_not_satisfied")
+                || v.eq("skipped")
+            {
                 Some(v)
             } else {
                 None

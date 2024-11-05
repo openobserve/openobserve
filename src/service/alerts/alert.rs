@@ -380,12 +380,15 @@ pub async fn history(
     } else {
         filters.from
     };
-    let key = format!("{}/{}/{}", stream_type, stream_name, name);
+    let key: String = format!("{}/{}/{}", stream_type, stream_name, name);
+    let key = key.replace('\'', "''");
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: format!(
                 "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert' AND key = '{}'",
-                TRIGGERS_USAGE_STREAM, org_id, key
+                TRIGGERS_USAGE_STREAM,
+                org_id.replace('\'', "''"),
+                key
             ),
             size: filters.limit,
             from: filters.offset,
