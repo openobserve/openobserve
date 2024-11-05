@@ -204,7 +204,7 @@ impl super::FileList for MysqlFileList {
         Ok(())
     }
 
-    #[tracing::instrument(name = "file_list::db::batch_remove_deleted", skip_all,field(file_count=file.len()))]
+    #[tracing::instrument(name = "file_list::db::batch_remove_deleted", skip_all,field(file_count=files.len()))]
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -1240,7 +1240,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
 }
 
 impl MysqlFileList {
-    #[tracing::instrument(name = "file_list::db::add", skip(self))]
+    #[tracing::instrument(name = "file_list::db::add", skip(self, meta))]
     async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
