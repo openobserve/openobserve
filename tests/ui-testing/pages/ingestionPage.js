@@ -1,36 +1,28 @@
 
 import logsdata from "../../test-data/logs_data.json";
-
 export class IngestionPage {
-    constructor(page) {
-      this.page = page;
-    }
-  
-    async ingestion() {
-      const orgId = process.env["ORGNAME"];
-      const streamName = "e2e_automate";
-      const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-      const headers = {
-        "Authorization": `Basic ${basicAuthCredentials}`,
-        "Content-Type": "application/json",
-      };
-  
-      const fetchResponse = await fetch(
-        `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-        {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(logsdata),
-        }
-      );
-  
-     // const response = await fetchResponse.json();
-
-     try {
-      //const response = await fetchResponse;
-      const response =  fetchResponse;
+  constructor(page) {
+    this.page = page;
+  }
+  async ingestion() {
+    const orgId = process.env["ORGNAME"];
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+    const fetchResponse = await fetch(
+      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(logsdata),
+      }
+    );
+    try {
+      const response = await fetchResponse;
       const contentType = response.headers.get("content-type");
-    
       if (contentType && contentType.includes("application/json")) {
         const jsonData = await response.json();
         // Process JSON data here
@@ -42,9 +34,5 @@ export class IngestionPage {
     } catch (error) {
       console.error("Failed to parse JSON response:", error);
     }
-    
-
-      //console.log(response);
-    }
   }
-  
+}
