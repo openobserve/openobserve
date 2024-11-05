@@ -464,7 +464,7 @@ pub async fn delete_stream(
     };
 
     // delete associated pipelines
-    if let Ok(pipeline) =
+    if let Some(pipeline) =
         db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
     {
         if let Err(e) = db::pipeline::delete(&pipeline.id).await {
