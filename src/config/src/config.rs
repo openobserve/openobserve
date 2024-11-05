@@ -890,6 +890,8 @@ pub struct Limit {
     pub file_merge_thread_num: usize,
     #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
     pub mem_dump_thread_num: usize,
+    #[env_config(name = "ZO_USAGE_REPORTING_THREAD_NUM", default = 0)]
+    pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
@@ -1404,6 +1406,14 @@ pub fn init() -> Config {
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
         cfg.limit.mem_dump_thread_num = cpu_num;
+    }
+    // HACK for usage_reporting_thread_num equal to half of CPU core
+    if cfg.limit.usage_reporting_thread_num == 0 {
+        if cfg.common.local_mode {
+            cfg.limit.usage_reporting_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.usage_reporting_thread_num = cpu_num;
+        }
     }
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
