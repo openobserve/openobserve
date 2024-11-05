@@ -400,6 +400,7 @@ pub async fn history(
         timeout: 0,
         search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
+        search_event_context: None,
     };
 
     let trace_id = ider::uuid();
@@ -510,6 +511,7 @@ pub async fn all_history(
         timeout: 0,
         search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
+        search_event_context: None,
     };
 
     let trace_id = ider::uuid();

@@ -22,8 +22,8 @@ use o2_enterprise::enterprise::{
     openfga::{
         authorizer::authz::{
             add_tuple_for_pipeline, get_history_creation_tuples, get_index_creation_tuples,
-            get_org_creation_tuples, get_ownership_all_org_tuple, get_user_role_tuple,
-            update_tuples,
+            get_org_creation_tuples, get_ownership_all_org_tuple, get_tuple_for_new_alert_history,
+            get_user_role_tuple, update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
@@ -229,7 +229,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     log::info!("[Alert History:Migration]: Listing all alerts");
                     let data = db.list(&db_key_prefix).await?;
 
-                    for (key, val) in data {
+                    for (key, _) in data {
                         let db_key = key;
                         let key = db_key.strip_prefix(&db_key_prefix).unwrap();
                         log::info!(
