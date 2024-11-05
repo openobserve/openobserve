@@ -718,15 +718,9 @@ pub async fn get_tantivy_directory(
     trace_id: &str,
     file_name: &str,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    // if file_data::disk::exist(file_name).await {
-    //     Ok(Box::new(
-    //         StdFsReader::from_dir(&PathBuf::from(file_name)).await?,
-    //     ))
-    // } else {
     let index_file_bytes = fetch_file(trace_id, &file_name).await?;
     let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
     Ok(Box::new(puffin_dir))
-    // }
 }
 
 async fn search_tantivy_index(

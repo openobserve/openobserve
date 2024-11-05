@@ -889,8 +889,8 @@ pub async fn merge_files(
                             inverted_idx_batch,
                             &new_file_key,
                             &mut new_file_meta,
-                            &index_fields,
                             &full_text_search_fields,
+                            &index_fields,
                             Some(retain_file_list.as_slice()),
                         )
                         .await?;

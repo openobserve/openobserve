@@ -61,6 +61,7 @@ use config::{
 use hashbrown::HashSet;
 use infra::{
     cache::tmpfs,
+    file_list,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
@@ -1381,6 +1382,10 @@ pub(crate) async fn create_tantivy_index(
     // delete corresponding tantivy files in .ttv folder
     if let Some(file_list) = file_list_to_invalidate {
         for old_parquet_file in file_list {
+            // the parquet file has no index
+            if old_parquet_file.meta.index_file_size == 0 {
+                continue;
+            }
             // get directory of the parquet file
             if let Some(ttv_idx_file) =
                 convert_parquet_idx_file_name_to_tantivy_file(&old_parquet_file.key)
@@ -1457,11 +1462,19 @@ pub(crate) fn generate_tantivy_index<D: Directory>(
     let mut _all_field = None;
     for column in schema.fields() {
         let column_name = column.name();
-        let index_col_name = match (
+        let (index_col_name, field_options) = match (
             index_fields.contains(column_name),
             full_text_search_fields.contains(column_name),
         ) {
-            (true, false) => column_name.to_string(),
+            (true, false) => (
+                column_name.to_string(),
+                TextOptions::default().set_indexing_options(
+                    TextFieldIndexing::default()
+                        .set_index_option(IndexRecordOption::Basic)
+                        .set_tokenizer("raw")
+                        .set_fieldnorms(false),
+                ),
+            ),
             // This is the field name for all full text search fields
             (false, true) => {
                 // we do not want to add the same field to the schema again hence
@@ -1471,7 +1484,14 @@ pub(crate) fn generate_tantivy_index<D: Directory>(
                     cols.push((field, Some(column_data)));
                     continue;
                 }
-                "_all".to_string()
+                (
+                    "_all".to_string(),
+                    TextOptions::default().set_indexing_options(
+                        TextFieldIndexing::default()
+                            .set_index_option(IndexRecordOption::Basic)
+                            .set_fieldnorms(false),
+                    ),
+                )
             }
             (false, false) => continue,
             _ => {
@@ -1483,19 +1503,11 @@ pub(crate) fn generate_tantivy_index<D: Directory>(
             }
         };
 
-        let custom_options = TextOptions::default().set_indexing_options(
-            TextFieldIndexing::default()
-                .set_index_option(IndexRecordOption::Basic)
-                .set_fieldnorms(false),
-        );
-
         // for each column which is supposed to be considered as full_text_search_fields or
         // index_fields, we create a tantivy field
         let field = match column.data_type() {
             // currently we only support indexing utf8 columns
-            DataType::Utf8 => {
-                tantivy_schema_builder.add_text_field(&index_col_name, custom_options)
-            }
+            DataType::Utf8 => tantivy_schema_builder.add_text_field(&index_col_name, field_options),
             _ => {
                 log::warn!("Unsupported data type for indexing: {}", column.data_type());
                 continue;
