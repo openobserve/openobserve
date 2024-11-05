@@ -562,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               editor-id="logsQueryEditor"
               ref="queryEditorRef"
               class="monaco-editor"
-
+              :style="editorWidthToggleFunction"
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
@@ -948,7 +948,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard } from "quasar";
+import { useQuasar, copyToClipboard, is } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
@@ -2593,9 +2593,30 @@ export default defineComponent({
       return searchIds.flat() as string[];
     });
     const backgroundColorStyle = computed(() => {
+      const isDarkMode = store.state.theme === 'dark';
       return {
-        backgroundColor: (searchObj.meta.toggleFunction == true && isFocused.value == true) ? '#575A5A' : '' // Yellow if true, white if false
+        backgroundColor: (searchObj.meta.toggleFunction && isFocused.value)
+          ? (isDarkMode ? '#575A5A' : '#E0E0E0')  // Dark mode: grey, Light mode: yellow (or any color)
+          : '',
+          borderBottom: (searchObj.meta.toggleFunction && isFocused.value) ?
+          (isDarkMode ? '2px solid #575A5A ' : '2px solid #E0E0E0') : 'none',
       };
+    });
+    const editorWidthToggleFunction = computed(() => {
+      const isDarkMode = store.state.theme === 'dark';
+
+      if(!searchObj.meta.toggleFunction && isFocused.value){
+        return {
+          width: `calc(100 - ${searchObj.config.fnSplitterModel})%`,
+          borderBottom: (isDarkMode ? '2px solid #575A5A' : '2px solid #E0E0E0'),
+        };
+      }
+      else{
+        return {
+          width: '100%',
+          borderBottom: 'none'
+        }
+      }
     });
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
@@ -2698,6 +2719,7 @@ export default defineComponent({
       cancelVisualizeQueries,
       isFocused,
       backgroundColorStyle,
+      editorWidthToggleFunction,
     };
   },
   computed: {
