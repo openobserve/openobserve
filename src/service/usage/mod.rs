@@ -49,7 +49,9 @@ fn initialize_usage_queuer() -> UsageQueuer {
     let timeout = time::Duration::from_secs(cfg.common.usage_publish_interval.try_into().unwrap());
     let batch_size = cfg.common.usage_batch_size;
 
-    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(batch_size * 2);
+    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(
+        batch_size * std::cmp::max(2, cfg.limit.usage_reporting_thread_num),
+    );
     let msg_receiver = Arc::new(Mutex::new(msg_receiver));
 
     // configurable number of threads for usage_reporting
