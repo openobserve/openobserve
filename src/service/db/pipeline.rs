@@ -86,7 +86,7 @@ pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<Exe
     if let Some(exec_pl) = STREAM_EXECUTABLE_PIPELINES.read().await.get(stream_params) {
         return Some(exec_pl.clone());
     }
-    let pipeline = infra_pipeline::get_by_stream(stream_params).await.ok();
+    let pipeline = get_by_stream(stream_params).await.ok();
     match pipeline {
         Some(pl) if pl.enabled => match ExecutablePipeline::new(&pl).await {
             Ok(exec_pl) => {
@@ -105,6 +105,26 @@ pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<Exe
         },
         _ => None,
     }
+}
+
+/// Returns the pipeline by id.
+///
+/// Used to get the pipeline associated with the ID when scheduled job is ran.
+pub async fn get_by_stream(stream_params: &StreamParams) -> Result<Pipeline> {
+    infra_pipeline::get_by_stream(stream_params)
+        .await
+        .map_err(|e| {
+            log::error!(
+                "Error getting pipeline associated with {}: {}",
+                stream_params,
+                e
+            );
+            anyhow::anyhow!(
+                "Error getting pipeline associated with {}: {}",
+                stream_params,
+                e
+            )
+        })
 }
 
 /// Returns the pipeline by id.

@@ -218,6 +218,19 @@ impl Pipeline {
             .filter(|node| node.is_function_node())
             .count()
     }
+
+    /// Checks if any of the FunctionNode uses the given function identified by name.
+    ///
+    /// Used for function deletion api
+    pub fn contains_function(&self, func_name: &str) -> bool {
+        self.nodes.iter().any(|node| {
+            if let NodeData::Function(func) = &node.data {
+                func.name == func_name
+            } else {
+                false
+            }
+        })
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline

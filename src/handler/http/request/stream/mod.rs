@@ -47,6 +47,7 @@ use crate::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Stream),
@@ -86,6 +87,7 @@ async fn schema(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
     ),
     request_body(content = StreamSettings, description = "Stream settings", content_type = "application/json"),
     responses(
@@ -145,6 +147,7 @@ async fn settings(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
     ),
     request_body(content = UpdateStreamSettings, description = "Stream settings", content_type = "application/json"),
     responses(
@@ -252,6 +255,7 @@ async fn update_settings(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
     ),
     request_body(content = StreamDeleteFields, description = "Stream delete fields", content_type = "application/json"),
     responses(
@@ -308,6 +312,7 @@ async fn delete_fields(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
@@ -346,6 +351,7 @@ async fn delete(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("type" = String, Query, description = "Stream type"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListStream),
@@ -423,6 +429,23 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     Ok(HttpResponse::Ok().json(ListStream { list: indices }))
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteCache",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[delete("/{org_id}/streams/{stream_name}/cache/results")]
 async fn delete_stream_cache(
     path: web::Path<(String, String)>,

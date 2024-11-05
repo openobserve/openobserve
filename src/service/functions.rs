@@ -145,7 +145,11 @@ pub async fn list_functions(
     }
 }
 
-pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
+pub async fn delete_function(
+    org_id: String,
+    fn_name: String,
+    force_delete: bool,
+) -> Result<HttpResponse, Error> {
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
         None => {
@@ -155,6 +159,8 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             )));
         }
     };
+    // TODO(taiming): Function Stream Association to be deprecated starting v0.13.1.
+    // remove this check after migrating functions to its dedicated table
     if let Some(val) = existing_fn.streams {
         if !val.is_empty() {
             let names = val
@@ -172,6 +178,40 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     StatusCode::BAD_REQUEST.into(),
                     format!("{} {}", FN_IN_USE, names),
+                )));
+            }
+        }
+    }
+    if let Ok(mut pipelines) = db::pipeline::list_by_org(&org_id).await {
+        pipelines.retain(|pipeline| pipeline.contains_function(&fn_name));
+        if !pipelines.is_empty() {
+            if force_delete {
+                for pl in pipelines {
+                    match super::pipeline::delete_pipeline(&pl.id).await {
+                        Ok(resp) if resp.status().as_u16() != 200 => {
+                            return Ok(resp);
+                        }
+                        Err(e) => {
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    e.to_string(),
+                                ),
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
+                    http::StatusCode::CONFLICT.into(),
+                    format!(
+                        "Caution: Function '{}' has {} pipeline dependencies. \
+                        This deletion operation will cascade to all dependent pipelines. \
+                        Confirm to proceed.",
+                        fn_name,
+                        pipelines.len()
+                    ),
                 )));
             }
         }
@@ -264,7 +304,7 @@ mod tests {
         assert!(list_resp.is_ok());
 
         assert!(
-            delete_function("nexus".to_string(), "dummyfn".to_owned())
+            delete_function("nexus".to_string(), "dummyfn".to_owned(), true)
                 .await
                 .is_ok()
         );

@@ -106,6 +106,7 @@ async fn list_functions(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name" = String, Path, description = "Function name"),
+        ("force" = bool, Query, description = "Force delete function regardless pipeline dependencies"),
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
@@ -113,9 +114,18 @@ async fn list_functions(
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
-async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+async fn delete_function(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    crate::service::functions::delete_function(org_id, name).await
+    let query =
+        web::Query::<ahash::HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let force_del = match query.get("force") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    crate::service::functions::delete_function(org_id, name, force_del).await
 }
 
 /// UpdateFunction
