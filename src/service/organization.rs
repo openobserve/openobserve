@@ -308,6 +308,7 @@ pub async fn generate_invitation(
     }
     if let Some(mut org) = get_org(org_id).await {
         let invite_token = config::ider::generate();
+
         if let Some(invites_map) = org.invites.as_mut() {
             invites_map.insert(invite_token, invites);
         } else {

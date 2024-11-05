@@ -872,6 +872,12 @@ pub struct Common {
         help = "If true, new org can be automatically created through ingestion for root user. Default is true."
     )]
     pub create_org_through_ingestion: bool,
+    #[env_config(
+        name = "ZO_CREATE_ORG_THROUGH_INGESTION",
+        default = 7,
+        help = "The number of days an invitation token will be valid for. This can be changed in the runtime."
+    )]
+    pub org_invite_expiry: u32,
 }
 
 #[derive(EnvConfig)]
