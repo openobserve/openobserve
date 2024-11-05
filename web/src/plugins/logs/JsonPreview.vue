@@ -296,7 +296,7 @@ export default {
       },
       {
         value: "unflattened",
-        label: t("search.unflattened"),
+        label: t("search.original"),
       },
     ];
 
