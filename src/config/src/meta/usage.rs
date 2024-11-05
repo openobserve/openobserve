@@ -86,7 +86,7 @@ pub struct UsageData {
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: i64,
-    #[serde[default]]
+    #[serde(default)]
     pub dropped_records: i64,
     pub stream_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
