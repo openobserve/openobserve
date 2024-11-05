@@ -108,7 +108,6 @@ fn default_span_id_field_name() -> String {
     "span_id".to_string()
 }
 
-
 fn default_toggle_ingestion_logs() -> bool {
     false
 }
