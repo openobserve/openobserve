@@ -21,7 +21,13 @@ export enum ColorModeWithoutMinMax {
   FIXED = "fixed",
 }
 
-export const classicColorPalette = [
+declare global {
+  interface Window {
+    _o2_setDashboardColors: () => any;
+  }
+}
+
+const defaultColors = [
   // "#a2b6ff",
   // "#889ef9",
   // "#6e87df",
@@ -149,6 +155,10 @@ export const classicColorPalette = [
   "#304FFF",
 ];
 
+export const getClassicColorPalette = () => {
+  return window._o2_setDashboardColors || defaultColors;
+};
+
 const isValidHexColor = (color: string): boolean => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
   return result !== null;
@@ -253,9 +263,7 @@ export const getSQLMinMaxValue = (
 const getSeriesHash = (seriesName: string) => {
   // Initialize a hash variable
   let hash = 0;
-
-  const classicColorPaletteLength = classicColorPalette.length;
-
+  const classicColorPaletteLength = getClassicColorPalette().length;
   // If the seriesName is empty, return 1 as a default hash value
   if (seriesName.length === 0) return 1;
 
@@ -331,8 +339,9 @@ export const getSeriesColor = (
   chartMin: number,
   chartMax: number,
 ): string | null => {
+  const palette: any = getClassicColorPalette();
   if (!colorCfg) {
-    return classicColorPalette[getSeriesHash(seriesName)];
+    return palette[getSeriesHash(seriesName)];
   } else if (colorCfg.mode === "fixed") {
     return colorCfg?.fixedColor?.[0] ?? "#53ca53";
   } else if (colorCfg.mode === "shades") {
@@ -343,17 +352,17 @@ export const getSeriesColor = (
       chartMax,
     );
   } else if (colorCfg.mode === "palette-classic-by-series") {
-    return classicColorPalette[getSeriesHash(seriesName)];
+    return palette[getSeriesHash(seriesName)];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {
-    const d3ColorObj = scaleLinear(
+    const d3ColorObj: any = scaleLinear(
       getDomainPartitions(
         chartMin,
         chartMax,
-        colorCfg?.fixedColor?.length ?? classicColorPalette.length,
+        colorCfg?.fixedColor?.length ?? palette.length,
       ),
-      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : classicColorPalette,
+      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : palette,
     );
     return d3ColorObj(
       getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last"),
