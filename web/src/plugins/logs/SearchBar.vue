@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
       <q-btn
-        data-test="logs-search-field-list-collapse-btn"
+        data-test="logs-query-editor-full_screen-btn"
         :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
         :title="isFocused ? 'Collapse' : 'Expand'"
         dense
