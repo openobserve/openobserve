@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::{alerts::alert::Alert, function::Transform};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use super::{alerts::alert::Alert, functions::Transform};
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
@@ -102,11 +101,11 @@ fn default_scrape_interval() -> u32 {
 }
 
 fn default_trace_id_field_name() -> String {
-    "traceId".to_string()
+    "trace_id".to_string()
 }
 
 fn default_span_id_field_name() -> String {
-    "spanId".to_string()
+    "span_id".to_string()
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]

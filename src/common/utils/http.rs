@@ -23,7 +23,10 @@ use actix_web::{http::header::HeaderName, web::Query};
 use awc::http::header::HeaderMap;
 use config::{
     get_config,
-    meta::{search::SearchEventType, stream::StreamType},
+    meta::{
+        search::{SearchEventContext, SearchEventType},
+        stream::StreamType,
+    },
 };
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -77,6 +80,28 @@ pub(crate) fn get_search_type_from_request(
     };
 
     Ok(event_type)
+}
+
+#[inline(always)]
+pub(crate) fn get_search_event_context_from_request(
+    search_event_type: &SearchEventType,
+    query: &Query<HashMap<String, String>>,
+) -> Option<SearchEventContext> {
+    match search_event_type {
+        SearchEventType::Dashboards => Some(SearchEventContext::with_dashboard(
+            query.get("dashboard_id").map(String::from),
+            query.get("dashboard_name").map(String::from),
+            query.get("folder_id").map(String::from),
+            query.get("folder_name").map(String::from),
+        )),
+        SearchEventType::Alerts => Some(SearchEventContext::with_alert(
+            query.get("alert_key").map(String::from),
+        )),
+        SearchEventType::Reports => Some(SearchEventContext::with_report(
+            query.get("report_id").map(String::from),
+        )),
+        _ => None,
+    }
 }
 
 /// Index type for a search can be either `parquet` or `fst`. It's only effective when env

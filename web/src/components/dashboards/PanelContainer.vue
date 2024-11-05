@@ -237,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :searchType="searchType"
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
+      :report-id="props.reportId"
       @metadata-update="metaDataValue"
       @result-metadata-update="handleResultMetadataUpdate"
       @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -324,6 +325,7 @@ export default defineComponent({
     "forceLoad",
     "searchType",
     "folderId",
+    "reportId"
   ],
   components: {
     PanelSchemaRenderer,

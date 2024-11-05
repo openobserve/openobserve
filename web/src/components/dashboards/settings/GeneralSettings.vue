@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
+          data-test="dashboard-general-setting-name"
         />
         <span>&nbsp;</span>
         <q-input
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
+          data-test="dashboard-general-setting-description"
         />
         <div v-if="dateTimeValue">
           <label>Default Duration</label>
@@ -68,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             text-color="light-text"
             padding="sm md"
             no-caps
+            data-test="dashboard-general-setting-cancel-btn"
           />
           <q-btn
             :disable="dashboardData.title.trim() === ''"
@@ -78,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             no-caps
             :loading="saveDashboardApi.isLoading.value"
+            data-test="dashboard-general-setting-save-btn"
           />
         </div>
       </q-form>

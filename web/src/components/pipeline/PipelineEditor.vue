@@ -31,7 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-icon name="arrow_back_ios_new" size="14px" />
       </div>
-      <div class="text-h6">{{ pipeline.name }}</div>
+      <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
+        {{ pipelineObj.currentSelectedPipeline.name }}
+      </div>
+      <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
+        <q-input
+          v-model="pipelineObj.currentSelectedPipeline.name"
+          :label="t('pipeline.pipelineName')"
+          style="border: 1px solid #eaeaea"
+          filled
+          dense
+        />
+      </div>
     </div>
 
     <div class="flex justify-end">
@@ -69,79 +80,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator class="q-mb-md" />
 
-      <template v-for="nodeType in nodeTypes" :key="nodeType.value">
-        <div
-          :data-test="`pipeline-editor-${nodeType.value}-node`"
-          :id="nodeType.value + '_node'"
-          :draggable="true"
-          @dragstart="(ev) => onNodeDragStart(ev, nodeType.value)"
-          class="flex items-center node-type-row q-mt-sm q-mx-sm"
-        >
-          <img width="30" :src="symbolMapping[nodeType.value]" />
-          <div
-            :data-test="`pipeline-editor-${nodeType.value}-node-title`"
-            class="q-px-sm"
-          >
-            {{ nodeType.label }}
-          </div>
-        </div>
-      </template>
+      <div class="flex q-mt-sm">
+        <NodeSidebar :nodeTypes="nodeTypes" />
+      </div>
     </div>
     <div
       id="pipelineChartContainer"
       ref="chartContainerRef"
-      class="relative-position pipeline-chart-container"
+      class="relative-position pipeline-chart-container o2vf_node"
       :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
     >
-      <div
-        class="q-pl-sm q-pt-xs"
-        :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'"
-        data-test="pipeline-editor-execution-note"
-      >
-        Note: During execution of pipeline, routes will get executed before
-        functions
-      </div>
-      <ChartRenderer
-        data-test="pipeline-editor-pipeline-chart"
-        :data="plotChart"
-        render-type="svg"
-        style="height: calc(100vh - 165px)"
-        @click="onChartClick"
-        @mouseout="onMouseOut"
-        @drop="onNodeDrop"
-        @dragover="onNodeDragOver"
-      />
-
-      <!-- <div ref="nodeActions" id="node-actions" class="node-actions absolute">
-      <q-icon name="delete" class="q-mr-xs cursor-pointer" />
-      <q-icon name="add" class="cursor-pointer" size="16px" />
-    </div> -->
+      <PipelineFlow />
     </div>
   </div>
 
-  <q-dialog v-model="dialog.show" position="right" full-height maximized>
+  <q-dialog
+    v-model="pipelineObj.dialog.show"
+    position="right"
+    full-height
+    maximized
+  >
     <div class="stream-routing-dialog-container full-height">
-      <StreamRouting
-        v-if="dialog.name === 'streamRouting'"
+      <QueryForm
+        v-if="pipelineObj.dialog.name === 'query'"
         :stream-name="pipeline.stream_name"
         :stream-type="pipeline.stream_type"
-        :editing-route="streamRoutes[editingStreamRouteName]"
         :stream-routes="streamRoutes"
-        @update:node="addStreamNode"
         @cancel:hideform="resetDialog"
-        @delete:node="deleteNode"
+      />
+
+      <ConditionForm
+        v-if="pipelineObj.dialog.name === 'condition'"
+        @cancel:hideform="resetDialog"
       />
 
       <AssociateFunction
-        v-if="dialog.name === 'associateFunction'"
-        :loading="isFetchingFunctions"
-        :function-data="functions[editingFunctionName]"
+        v-if="pipelineObj.dialog.name === 'function'"
         :functions="functionOptions"
         :associated-functions="associatedFunctions"
-        @update:node="addFunctionNode"
-        @delete:node="deleteNode"
         @cancel:hideform="resetDialog"
-        @add:function="updateNewFunction"
+       @add:function = "refreshFunctionList"
+      />
+
+      <StreamNode
+        v-if="pipelineObj.dialog.name === 'stream'"
+        @cancel:hideform="resetDialog"
       />
     </div>
   </q-dialog>
@@ -159,13 +142,14 @@ import {
   computed,
   defineAsyncComponent,
   onBeforeMount,
+  onMounted,
   ref,
   type Ref,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
-import StreamRouting from "./StreamRouting.vue";
-import AssociateFunction from "./AssociateFunction.vue";
+import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
+
 import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
 import { useRouter } from "vue-router";
@@ -173,15 +157,26 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import jstransform from "@/services/jstransform";
+import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
+import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
+import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
+import {MarkerType} from "@vue-flow/core";
+
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
+const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
+const queryImage = getImageURL("images/pipeline/query.svg");
 
-const ChartRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/panels/ChartRenderer.vue")
+const PipelineFlow = defineAsyncComponent(
+  () => import("@/plugins/pipelines/PipelineFlow.vue"),
+
 );
+
 
 interface Routing {
   [key: string]: RouteCondition[];
@@ -201,6 +196,7 @@ interface Function {
 }
 
 interface Pipeline {
+  pipeline_id: string;
   name: string;
   description: string;
   stream_name: string;
@@ -239,7 +235,7 @@ const plotChart: any = ref({
           position: "bottom",
         },
         draggable: true,
-        edgeSymbol: ["circle", "arrow"],
+        edgeSymbol: [ "arrow"],
         edgeSymbolSize: [10, 10],
         edgeLabel: {
           fontSize: 20,
@@ -257,6 +253,7 @@ const plotChart: any = ref({
 });
 
 const pipeline = ref<Pipeline>({
+  pipeline_id: "",
   name: "",
   stream_type: "",
   description: "",
@@ -267,7 +264,6 @@ const pipeline = ref<Pipeline>({
 });
 
 const router = useRouter();
-
 const store = useStore();
 
 const confirmDialogMeta: any = ref({
@@ -278,17 +274,84 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 
-const nodeTypes = [
-  { label: "Function", value: "function" },
-  { label: "Route", value: "streamRoute" },
+
+const nodeTypes: any = [
+  {
+    label: "Source",
+    icon: "input",
+    isSectionHeader: true,
+  },
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "input",
+    icon: "img:" + streamImage,
+    tooltip: "Source: Stream Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Query",
+    subtype: "query",
+    io_type: "input",
+    icon: "img:" + queryImage,
+    tooltip: "Source: Query Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Transform",
+    icon: "processing",
+    isSectionHeader: true,
+  },
+  {
+    label: "Function",
+    subtype: "function",
+    io_type: "default",
+    icon: "img:" + functionImage,
+    tooltip: "Function Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Condition",
+    subtype: "condition",
+    io_type: "default",
+    icon: "img:" + conditionImage,
+    tooltip: "Condition Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Destination",
+    icon: "input",
+    isSectionHeader: true,
+  },
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "output",
+    icon: "img:" + streamOutputImage,
+    tooltip: "Destination: Stream Node",
+    isSectionHeader: false,
+  },
 ];
+const functions = ref<{ [key: string]: Function }>({});
+
+
+const { pipelineObj, resetPipelineData } = useDragAndDrop();
+pipelineObj.nodeTypes = nodeTypes;
+pipelineObj.functions = functions;
 
 const nodes: Ref<Node[]> = ref([]);
 
+const hasInputType = computed(() => {
+  return pipelineObj.currentSelectedPipeline.nodes.some(
+    (node : any) => node.io_type === "input",
+  );
+});
+
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
-const functions = ref<{ [key: string]: Function }>({});
-
+const refreshFunctionList = () =>{
+  getFunctions();
+}
 const functionOptions = ref<string[]>([]);
 
 const streamRoutes = ref<{ [key: string]: any }>({});
@@ -317,31 +380,25 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const onChartClick = (params: any) => {
-  const { type, name } = params.data;
-
-  resetDialog();
-
-  if (type === "streamRoute" || type === "condition") {
-    if (type === "condition") editingStreamRouteName.value = name.split(":")[0];
-    else editingStreamRouteName.value = name;
-    dialog.value.show = true;
-    dialog.value.name = "streamRouting";
-  }
-
-  if (type === "function") {
-    getFunctions();
-    editingFunctionName.value = name;
-    dialog.value.show = true;
-    dialog.value.name = "associateFunction";
-  }
-};
-
 onBeforeMount(() => {
-  getPipeline();
+  const route = router.currentRoute.value;
+  if (route.name == "pipelineEditor") {
+    getPipeline();
+    pipelineObj.isEditPipeline = true;
+  } else {
+    pipelineObj.isEditPipeline = false;
+    resetPipelineData();
 
-  updateGraph();
+  }
+  getFunctions();
 });
+
+onMounted(()=>{
+
+})
+
+
+
 
 const getPipeline = () => {
   const route = router.currentRoute.value;
@@ -349,14 +406,33 @@ const getPipeline = () => {
   pipelineService
     .getPipelines(store.state.selectedOrganization.identifier)
     .then(async (response) => {
-      await getFunctions();
-
       const _pipeline = response.data.list.find(
-        (pipeline: Pipeline) =>
-          pipeline.name === route.query.name &&
-          pipeline.stream_name === route.query.stream &&
-          pipeline.stream_type === route.query.stream_type
+        (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
+
+      _pipeline.edges.forEach((edge: any) => {
+        edge.markerEnd = {
+          type: MarkerType.ArrowClosed,
+          width: 20,  // Increase arrow width
+          height: 20, // Increase arrow height
+        };
+        edge.style = {
+          ...edge.style, // Preserve existing styles
+          strokeWidth: 2,
+        };
+        edge.type = 'button';
+        edge.animated = true;
+      });
+
+
+
+      _pipeline.nodes.forEach((node : any) => {
+        node.type = node.io_type;
+      });
+
+      _pipeline.nodes.forEach((node : any) => {
+        node.type = node.io_type;
+      });
 
       if (!_pipeline) {
         q.notify({
@@ -374,392 +450,15 @@ const getPipeline = () => {
         return;
       }
 
-      pipeline.value = {
-        ..._pipeline,
-        functions: _pipeline?.functions?.list || [],
-      };
-
-      setupNodes();
-    });
-};
-
-const setupNodes = () => {
-  nodeRows.value = [null, pipeline.value.stream_name, null];
-
-  // set the base stream node
-  const node: Node = {
-    name: pipeline.value.stream_name,
-    x: 0,
-    y: 300,
-    type: "stream",
-    fixed: true,
-  };
-
-  nodes.value.push(node);
-
-  nodeLinks.value[pipeline.value.stream_name] = {
-    from: [],
-    to: [],
-  };
-
-  // set functions nodes
-  pipeline.value?.functions
-    ?.sort((a, b) => a.order - b.order)
-    .forEach((_function) => {
-      createFunctionNode(
-        _function.name,
-        pipeline.value.stream_name,
-        _function.order
-      );
-
-      functions.value[_function.name] = _function;
-
-      associatedFunctions.value.push(_function.name);
-    });
-
-  updateFunctionNodesOrder();
-
-  if (pipeline.value?.routing)
-    Object.keys(pipeline.value?.routing).forEach((stream: string) => {
-      createStreamRouteNode({
-        name: stream,
-      });
-      streamRoutes.value[stream] = {
-        name: stream,
-        conditions: pipeline.value?.routing[stream],
-        is_real_time: true,
-      };
-    });
-
-  (pipeline.value.derived_streams || []).forEach((stream: any) => {
-    createStreamRouteNode({
-      name: stream.name,
-    });
-    streamRoutes.value[stream.name] = { ...stream };
-  });
-
-  updateGraph();
-};
-
-const onMouseMove = (params: any) => {};
-
-const onMouseOut = (params: any) => {};
-
-const addFunction = () => {
-  getFunctions();
-  resetDialog();
-  dialog.value.show = true;
-  dialog.value.name = "associateFunction";
-};
-
-const addStream = () => {
-  resetDialog();
-  dialog.value.show = true;
-  dialog.value.name = "streamRouting";
-};
-
-const getFunctionFrom = (stream: string) => {
-  let fromNodeName = stream;
-
-  const functions = nodes.value.filter(
-    (node) => node.type === "function" && node.stream === stream
-  );
-
-  if (functions.length) {
-    fromNodeName = functions[functions.length - 1].name;
-  }
-
-  return fromNodeName;
-};
-
-// TODO OK : create separate functions for each type node i.e. function, streamRoute, stream
-const getNodePosition = (type: string, node?: any) => {
-  let lastNode = nodes.value.filter((node) => node.type === type).pop();
-
-  // If this if first function node, adding offset to left from the main stream node
-  const nodeGap = !lastNode ? 130 : 50;
-
-  if (type === "function" && !lastNode) lastNode = nodes.value[0];
-
-  if (type === "function") {
-    if (lastNode?.x?.toString() && lastNode?.y?.toString())
-      return {
-        x: lastNode.x + nodeGap,
-        y: lastNode.y,
-      };
-    else console.log("Error while getting last node position");
-  }
-
-  const isAnyNull = nodeRows.value.every((row) => row !== null);
-  if (isAnyNull) {
-    nodeRows.value.push(null);
-    nodeRows.value.unshift(null);
-  }
-
-  if (type === "streamRoute") {
-    const centerIndex = Math.ceil(nodeRows.value.length / 2) - 1;
-
-    for (let i = centerIndex - 1; i >= 0; i--) {
-      if (nodeRows.value[i] === null) {
-        const refRow = nodeRows.value[i + 1];
-        const refNode = nodes.value.find((node) => node.name === refRow);
-
-        nodeRows.value[i] = node.name;
-
-        if (refNode?.y?.toString())
-          return {
-            x: 50,
-            y: refNode.y - 50,
-          };
-        else
-          console.log("Error while getting last node position for streamRoute");
-      }
-    }
-
-    for (let i = centerIndex + 1; i < nodeRows.value.length; i++) {
-      if (nodeRows.value[i] === null) {
-        const refRow = nodeRows.value[i - 1];
-        const refNode = nodes.value.find((node) => node.name === refRow);
-
-        nodeRows.value[i] = node.name;
-
-        if (refNode?.y?.toString())
-          return {
-            x: 50,
-            y: refNode.y + 50,
-          };
-        else
-          console.log("Error while getting last node position for streamRoute");
-      }
-    }
-  }
-};
-
-const addFunctionNode = (data: { data: Function }) => {
-  const nodeName = data.data.name;
-
-  // TODO OK: Optimize this function node creation
-  // Get all function nodes
-  // Get the editing node
-  // Remove function nodes from the nodes state
-  // Create functions nodes again and sort function nodes by order
-
-  const functionNodes = nodes.value.filter((node) => node.type === "function");
-
-  if (editingFunctionName.value) {
-    const editedNode = nodes.value.find(
-      (node) => node.name === editingFunctionName.value
-    );
-
-    if (editedNode) editedNode.order = data.data.order;
-
-    editingFunctionName.value = "";
-  } else {
-    functionNodes.push(
-      createFunctionNode(
-        nodeName,
-        pipeline.value.stream_name,
-        data.data.order
-      ) as Node
-    );
-  }
-
-  nodes.value = nodes.value.filter((node) => node.type !== "function");
-
-  functionNodes
-    .sort((a, b) =>
-      a.order?.toString() && b.order?.toString()
-        ? Number(a.order) - Number(b.order)
-        : 0
-    )
-    .forEach((node) => {
-      createFunctionNode(
-        node.name,
-        node.stream as string,
-        node.order as number
+      pipelineObj.currentSelectedPipeline = _pipeline;
+      pipelineObj.pipelineWithoutChange = JSON.parse(
+        JSON.stringify(_pipeline),
       );
     });
-
-  if (!functions.value[nodeName]) {
-    functions.value[nodeName] = data.data;
-    functionOptions.value.push(nodeName);
-  }
-
-  functions.value[nodeName].order = data.data.order;
-
-  associatedFunctions.value.push(nodeName);
-
-  // reorder function nodes with order key and its links too
-  updateFunctionNodesOrder();
-
-  updateGraph();
-};
-
-const createFunctionNode = (
-  nodeName: string,
-  streamName: string,
-  order: number
-) => {
-  const position = getNodePosition("function");
-
-  if (position?.x === undefined || position?.y === undefined) {
-    console.log("Error in getting node position");
-    return;
-  }
-
-  const node = {
-    name: nodeName,
-    x: position.x,
-    y: position.y,
-    type: "function",
-    fixed: true,
-    order: order || 1,
-    stream: streamName,
-  };
-
-  nodes.value.push(node);
-
-  nodeLinks.value[nodeName] = { from: [], to: [] };
-
-  return node;
-};
-
-const updateFunctionNodesOrder = () => {
-  const sortedFunctionNodes = nodes.value
-    .filter((node) => node.type === "function")
-    .sort((a, b) =>
-      a.order?.toString() && b.order?.toString()
-        ? Number(a.order) - Number(b.order)
-        : 0
-    );
-
-  sortedFunctionNodes.forEach((node, index) => {
-    nodeLinks.value[node.name] = { from: [], to: [] };
-
-    if (index === 0) {
-      nodeLinks.value[node.name].from = [nodes.value[0].name];
-      nodeLinks.value[nodes.value[0].name].to = [node.name];
-    } else {
-      nodeLinks.value[node.name].from = [sortedFunctionNodes[index - 1].name];
-      nodeLinks.value[sortedFunctionNodes[index - 1].name].to = [node.name];
-    }
-  });
-};
-
-const addStreamNode = (data: { data: Node }) => {
-  const nodeName = data.data.name;
-
-  streamRoutes.value[nodeName] = data.data;
-
-  if (editingStreamRouteName.value) {
-    editingStreamRouteName.value = "";
-  } else {
-    createStreamRouteNode(data.data);
-  }
-
-  updateGraph();
-};
-
-const createStreamRouteNode = (streamRouteData: { name: string }) => {
-  const position = getNodePosition("streamRoute", streamRouteData);
-
-  const nodeName = streamRouteData.name;
-
-  if (position?.x === undefined || position?.y === undefined) {
-    console.log("Error in getting node position");
-    return;
-  }
-
-  const condition = nodes.value.push({
-    name: nodeName + ":condition",
-    x: position.x,
-    y: position.y,
-    type: "condition",
-    fixed: true,
-  });
-
-  const stream = nodes.value.push({
-    name: nodeName,
-    x: position.x + 50,
-    y: position.y,
-    type: "streamRoute",
-    fixed: true,
-  });
-
-  nodeLinks.value[nodeName + ":condition"] = {
-    from: [nodes.value[0].name],
-    to: [nodeName],
-  };
-
-  nodeLinks.value[nodeName] = { from: [nodeName + ":condition"], to: [] };
-
-  return {
-    condition,
-    stream,
-  };
-};
-
-const symbolMapping: { [key: string]: string } = {
-  stream: streamImage,
-  function: functionImage,
-  streamRoute: streamRouteImage,
-  condition: conditionImage,
-};
-
-const getNodeSymbol = (type: string) => {
-  return (
-    "image://" +
-    window.location.origin +
-    (symbolMapping[type].startsWith("/")
-      ? symbolMapping[type]
-      : "/" + symbolMapping[type])
-  );
-};
-
-const updateGraph = () => {
-  const data = nodes.value.map((node) => ({
-    name: node.name,
-    x: node.x, // You may want to adjust these manually if needed (like x: 100 for 'k8s_event')
-    y: node.y,
-    symbol: getNodeSymbol(node.type),
-    fixed: node.fixed,
-    type: node.type,
-    label: {
-      show: true,
-      position: "bottom",
-      fontSize: 12,
-      formatter: (params: any) => {
-        if (params.data.type === "condition") return "Condition";
-        else return params.data.name;
-      },
-    },
-  }));
-
-  // Prepare links from 'nodeLinks'
-  const links: any[] = [];
-  for (const nodeName in nodeLinks.value) {
-    const { to, from } = nodeLinks.value[nodeName];
-    from.forEach((source) => {
-      links.push({
-        source: source,
-        target: nodeName,
-      });
-    });
-
-    to.forEach((target) => {
-      links.push({
-        source: nodeName,
-        target: target,
-      });
-    });
-  }
-
-  plotChart.value.options.series[0].data = data;
-  plotChart.value.options.series[0].links = links;
 };
 
 const getFunctions = () => {
-  if (Object.keys(functions.value).length) return;
+  // if (Object.keys(functions.value).length) return;
   isFetchingFunctions.value = true;
   return functionsService
     .list(
@@ -783,110 +482,87 @@ const getFunctions = () => {
     });
 };
 
-const deleteNode = (node: { data: Node; type: string }) => {
-  nodes.value = nodes.value.filter((n) => n.name !== node.data.name);
-
-  delete nodeLinks.value[node.data.name];
-
-  if (node.type === "function") {
-    associatedFunctions.value = associatedFunctions.value.filter(
-      (func) => func !== node.data.name
-    );
-    editingFunctionName.value = "";
-  }
-
-  if (node.type === "streamRoute") {
-    delete streamRoutes.value[node.data.name];
-    editingStreamRouteName.value = "";
-  }
-
-  nodeRows.value.forEach((row, index) => {
-    if (row === node.data.name) nodeRows.value[index] = null;
-  });
-
-  updateFunctionNodesOrder();
-
-  updateGraph();
-};
-
 const resetDialog = () => {
-  dialog.value.show = false;
-  dialog.value.name = "";
+
+  pipelineObj.dialog.show = false;
+  pipelineObj.dialog.name = "";
   editingFunctionName.value = "";
   editingStreamRouteName.value = "";
 };
 
-const getPipelinePayload = () => {
-  const payload = {
-    name: pipeline.value.name,
-    description: pipeline.value.description,
-    stream_name: pipeline.value.stream_name,
-    stream_type: pipeline.value.stream_type,
-    routing: {} as Routing,
-    derived_streams: [] as any[],
-  };
-
-  Object.values(streamRoutes.value).forEach((route: any) => {
-    if (!route.is_real_time) {
-      payload.derived_streams.push(route);
-      return;
-    } else {
-      payload.routing[route.name] = route.conditions;
-    }
-  });
-
-  return payload;
-};
-
-const associateFunctions = async () => {
-  const associateFunctionPromises = [];
-
-  const previousAssociatedFunctions = pipeline.value.functions.map(
-    (func) => func.name
-  );
-
-  for (let i = 0; i < associatedFunctions.value.length; i++) {
-    const functionIndex = previousAssociatedFunctions.indexOf(
-      associatedFunctions.value[i]
-    );
-
-    // If function is already associated with the pipeline and order is same, skip.
-    // If there is no change in associated function name and order, skip.
-    if (functionIndex > -1) {
-      if (
-        pipeline.value.functions[i].name === associatedFunctions.value[i] &&
-        pipeline.value.functions[i].order ===
-          functions.value[associatedFunctions.value[i]].order
-      )
-        continue;
-    }
-
-    associateFunctionPromises.push(
-      jstransform.apply_stream_function(
-        store.state.selectedOrganization.identifier,
-        pipeline.value.stream_name,
-        pipeline.value.stream_type,
-        associatedFunctions.value[i],
-        {
-          order: Number(functions.value[associatedFunctions.value[i]].order),
-        }
-      )
-    );
-  }
-  return Promise.all(associateFunctionPromises);
-};
-
-const deleteFunctionAssociation = (name: string) => {
-  return jstransform.remove_stream_function(
-    store.state.selectedOrganization.identifier,
-    pipeline.value.stream_name,
-    pipeline.value.stream_type,
-    name
-  );
-};
-
 const savePipeline = async () => {
-  const payload = getPipelinePayload();
+  if (pipelineObj.currentSelectedPipeline.name === "") {
+    q.notify({
+      message: "Pipeline name is required",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
+
+  // Find the input node
+  const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
+    (node:any) =>
+      node?.io_type === "input" &&
+      (node.data?.node_type === "stream" || node.data?.node_type === "query")
+  );
+
+  const outputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
+    (node:any) =>
+      node?.io_type === "output"
+  );
+
+  if (inputNodeIndex === -1) {
+    q.notify({
+      message: "Source node is required",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
+  
+  
+
+  else if(outputNodeIndex === -1){
+    q.notify({
+      message: "Destination node is required",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
+  
+  else {
+    pipelineObj.currentSelectedPipeline.nodes.map((node : any) => {
+      if (node.data.node_type === "stream" && node.data.stream_name && node.data.stream_name.hasOwnProperty("value")) {
+        node.data.stream_name = node.data.stream_name.value;
+      }
+    });
+    const nodes = pipelineObj.currentSelectedPipeline.nodes as any[];
+
+    const inputNode : any = nodes.splice(inputNodeIndex, 1)[0];
+    nodes.unshift(inputNode);
+    if (inputNode.data.node_type === "stream") {
+      pipelineObj.currentSelectedPipeline.source.source_type = "realtime";
+    } else {
+      pipelineObj.currentSelectedPipeline.source.source_type = "scheduled";
+    }
+  }
+
+  pipelineObj.currentSelectedPipeline.org =
+    store.state.selectedOrganization.identifier;
+    if(findMissingEdges()){
+    q.notify({
+      message: "Please connect all nodes before saving",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
 
   const dismiss = q.notify({
     message: "Saving pipeline...",
@@ -894,45 +570,67 @@ const savePipeline = async () => {
     spinner: true,
   });
 
-  if (pipeline.value.functions.length) {
-    const deleteFunctionPromises = [];
-    for (let i = 0; i < pipeline.value.functions.length; i++) {
-      if (!associatedFunctions.value.includes(pipeline.value.functions[i].name))
-        deleteFunctionPromises.push(
-          deleteFunctionAssociation(pipeline.value.functions[i].name)
-        );
-    }
 
-    await Promise.all(deleteFunctionPromises);
-  }
+  const saveOperation = pipelineObj.isEditPipeline
+    ? pipelineService.updatePipeline({
+        data: pipelineObj.currentSelectedPipeline,
+        org_identifier: store.state.selectedOrganization.identifier,
+      })
+    : pipelineService.createPipeline({
+        data: pipelineObj.currentSelectedPipeline,
+        org_identifier: store.state.selectedOrganization.identifier,
+      });
+      
 
-  await associateFunctions();
-
-  pipelineService
-    .updatePipeline({
-      data: payload,
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
+  saveOperation
     .then(() => {
+      if(pipelineObj.isEditPipeline){
+        pipelineObj.isEditPipeline = false;
+      }
       q.notify({
         message: "Pipeline saved successfully",
         color: "positive",
         position: "bottom",
         timeout: 3000,
       });
+      router.push({
+        name: "pipelines",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     })
     .catch((error) => {
-      q.notify({
-        message: error.response?.data?.message || "Error while saving pipeline",
+      if(pipelineObj.isEditPipeline){
+        pipelineObj.isEditPipeline = true;
+      }
+       
+
+
+      if(error.response?.data?.message === "Invalid Pipeline: empty edges list"){
+        q.notify({
+          message: "Please connect all nodes",
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        });
+      }
+      else{
+        q.notify({
+        message:
+          error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      }
     })
     .finally(() => {
       dismiss();
     });
 };
+
+
 
 const openCancelDialog = () => {
   confirmDialogMeta.value.show = true;
@@ -949,6 +647,35 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
+const findMissingEdges = () => {
+  const nodes = pipelineObj.currentSelectedPipeline.nodes;
+  const edges = pipelineObj.currentSelectedPipeline.edges;
+
+  // Collect node IDs that are part of edges (either source or target)
+  const outgoingConnections = new Set(edges.map((edge:any) => edge.source));
+  const incomingConnections = new Set(edges.map((edge:any) => edge.target));
+
+  // Find nodes that are not connected properly
+  const unconnectedNodes = nodes.filter((node:any) => {
+    if (node.type === 'default') {
+      // Check for both incoming and outgoing edges
+      return !incomingConnections.has(node.id) || !outgoingConnections.has(node.id);
+    } else {
+      // Check for at least one connection (incoming or outgoing)
+      return !incomingConnections.has(node.id) && !outgoingConnections.has(node.id);
+    }
+  });
+
+  if (unconnectedNodes.length > 0) {
+    console.log(unconnectedNodes, "unconnectedNodes");
+    return true; // There are unconnected nodes
+  }
+
+  return false; // All nodes are properly connected
+};
+
+
+
 // Drag n Drop methods
 
 const onNodeDragStart = (event: any, data: any) => {
@@ -958,14 +685,6 @@ const onNodeDragStart = (event: any, data: any) => {
 const onNodeDrop = (event: any) => {
   event.preventDefault();
   const nodeType = event.dataTransfer.getData("text");
-
-  if (nodeType === "function") {
-    addFunction();
-  }
-
-  if (nodeType === "streamRoute") {
-    addStream();
-  }
 };
 
 const onNodeDragOver = (event: any) => {
@@ -990,6 +709,7 @@ const updateNewFunction = (_function: Function) => {
 }
 
 .pipeline-chart-container {
+height: 80vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }
@@ -1010,5 +730,35 @@ const updateNewFunction = (_function: Function) => {
 <style lang="scss">
 .stream-routing-dialog-container {
   min-width: 540px !important;
+}
+
+.o2vf_node {
+  width: auto;
+
+  .vue-flow__node {
+    padding: 0px;
+    width: auto;
+  }
+
+  .o2vf_node_input,
+  .vue-flow__node-input {
+    background-color: #c8d6f5;
+    border-color: 1px solid #2c6b2f;
+    color: black;
+  }
+
+  .o2vf_node_output,
+  .vue-flow__node-output {
+    background-color: #8fd4b8;
+    border-color: 1px solid #3b6f3f;
+    color: black;
+  }
+
+  .o2vf_node_default,
+  .vue-flow__node-default {
+    background-color: #efefef;
+    border-color: 1px solid #171e25;
+    color: black;
+  }
 }
 </style>

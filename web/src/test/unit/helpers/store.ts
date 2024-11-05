@@ -2,7 +2,6 @@ import { createStore } from "vuex";
 
 const store = createStore({
   state: {
-    organizationPasscode: 11,
     API_ENDPOINT: "http://localhost:8080",
     selectedOrganization: {
       label: "default Organization",
@@ -33,6 +32,7 @@ const store = createStore({
       commit_hash: "dc2b38c0f8be27bde395922d61134f09a3b4c",
       build_date: "2023-03-11T03:55:28Z",
       default_fts_keys: ["log", "message", "msg", "content", "data"],
+      show_stream_stats_doc_num: true,
       default_functions: [
         {
           name: "match_all_raw",
@@ -63,6 +63,23 @@ const store = createStore({
           text: "re_not_match(field, 'pattern')",
         },
       ],
+    },
+    organizationData: {
+      organizationPasscode: "",
+      allDashboardList: {},
+      rumToken: {
+        rum_token: "",
+      },
+      quotaThresholdMsg: "",
+      functions: [],
+      streams: {},
+      folders: [],
+      organizationSettings: {
+        scrape_interval: 15,
+        trace_id_field_name: "traceId",
+        span_id_field_name: "spanId",
+      },
+      isDataIngested: false,
     },
   },
 });

@@ -19,10 +19,19 @@ use std::{
 };
 
 use actix_web::http;
+use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config,
-    meta::stream::{StreamParams, StreamType},
+    meta::{
+        alerts::{
+            alert::{Alert, AlertListFilter},
+            destinations::{DestinationType, DestinationWithTemplate, HTTPType},
+            FrequencyType, Operator, QueryType,
+        },
+        search::{SearchEventContext, SearchEventType},
+        stream::StreamType,
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -34,18 +43,11 @@ use lettre::{message::SinglePart, AsyncTransport, Message};
 
 use crate::{
     common::{
-        meta::{
-            alerts::{
-                alert::{Alert, AlertListFilter},
-                destinations::{DestinationType, DestinationWithTemplate, HTTPType},
-                FrequencyType, Operator, QueryType,
-            },
-            authz::Authz,
-        },
+        meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{
-        alerts::{build_sql, destinations},
+        alerts::{build_sql, destinations, QueryConditionExt},
         db,
         search::sql::RE_ONLY_SELECT,
         short_url,
@@ -343,10 +345,29 @@ pub async fn trigger(
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
-impl Alert {
+#[async_trait]
+pub trait AlertExt: Sync + Send + 'static {
     /// Returns the evaluated row data and the end time of the search timerange,
     /// for realtime this is 0. `start_time` is the start time of the search timerange.
-    pub async fn evaluate(
+    async fn evaluate(
+        &self,
+        row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+
+    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
+    /// and the error message if any
+    async fn send_notification(
+        &self,
+        rows: &[Map<String, Value>],
+        rows_end_time: i64,
+        start_time: Option<i64>,
+    ) -> Result<(String, String), anyhow::Error>;
+}
+
+#[async_trait]
+impl AlertExt for Alert {
+    async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
         start_time: Option<i64>,
@@ -354,19 +375,25 @@ impl Alert {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
+            let search_event_ctx = SearchEventContext::with_alert(Some(format!(
+                "/alerts/{}/{}/{}/{}",
+                self.org_id, self.stream_type, self.stream_name, self.name
+            )));
             self.query_condition
                 .evaluate_scheduled(
-                    &self.get_stream_params(),
+                    &self.org_id,
+                    Some(&self.stream_name),
+                    self.stream_type,
                     &self.trigger_condition,
                     start_time,
+                    Some(SearchEventType::Alerts),
+                    Some(search_event_ctx),
                 )
                 .await
         }
     }
 
-    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
-    /// and the error message if any
-    pub async fn send_notification(
+    async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
@@ -404,14 +431,6 @@ impl Alert {
             Err(anyhow::anyhow!(err_message))
         } else {
             Ok((success_message, err_message))
-        }
-    }
-
-    pub fn get_stream_params(&self) -> StreamParams {
-        StreamParams {
-            org_id: self.org_id.clone().into(),
-            stream_name: self.stream_name.clone().into(),
-            stream_type: self.stream_type,
         }
     }
 }
@@ -811,7 +830,9 @@ async fn process_dest_template(
             QueryType::Custom => {
                 if let Some(conditions) = &alert.query_condition.conditions {
                     if let Ok(v) = build_sql(
-                        &alert.get_stream_params(),
+                        &alert.org_id,
+                        &alert.stream_name,
+                        alert.stream_type,
                         &alert.query_condition,
                         conditions,
                     )

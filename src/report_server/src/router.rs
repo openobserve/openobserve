@@ -79,6 +79,7 @@ pub async fn send_report(
         &report.email_details.dashb_url,
         timezone,
         report_type.clone(),
+        &report_name,
     )
     .await
     {

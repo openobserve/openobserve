@@ -207,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <AddStream
+        :is-in-pipeline="false"
         @close="addStreamDialog.show = false"
         @streamAdded="getLogStream"
       />
@@ -769,8 +770,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .org-streams-table {
-  ::v-deep .q-table th,
-  ::v-deep .q-table td {
+  :deep(.q-table th),
+  :deep(.q-table td) {
     padding: 0px 16px;
     height: 32px;
   }

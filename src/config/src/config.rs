@@ -663,7 +663,7 @@ pub struct Common {
     pub usage_batch_size: usize,
     #[env_config(
         name = "ZO_USAGE_PUBLISH_INTERVAL",
-        default = 600,
+        default = 60,
         help = "duration in seconds after last reporting usage will be published"
     )]
     // in seconds
@@ -891,6 +891,8 @@ pub struct Limit {
     pub file_merge_thread_num: usize,
     #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
     pub mem_dump_thread_num: usize,
+    #[env_config(name = "ZO_USAGE_REPORTING_THREAD_NUM", default = 0)]
+    pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
@@ -1045,18 +1047,6 @@ pub struct Limit {
         help = "Maximum size of a single enrichment table in mb"
     )]
     pub max_enrichment_table_size: usize,
-    #[env_config(
-        name = "ZO_USE_UPPER_BOUND_FOR_MAX_TS",
-        default = false,
-        help = "use upper bound for max tx"
-    )]
-    pub use_upper_bound_for_max_ts: bool,
-    #[env_config(
-        name = "ZO_BUFFER_FOR_MAX_TS",
-        default = 60,
-        help = "buffer for upper bound in mins"
-    )]
-    pub upper_bound_for_max_ts: i64,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
 }
@@ -1067,18 +1057,22 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
+    pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time
     pub strategy: String,
-    #[env_config(name = "ZO_COMPACT_LOOKBACK_HOURS", default = 0)] // hours
-    pub lookback_hours: i64,
-    #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
-    pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
+    pub old_data_max_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
+    pub old_data_min_records: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
+    pub old_data_min_files: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
@@ -1099,7 +1093,7 @@ pub struct Compact {
     pub job_run_timeout: i64,
     #[env_config(
         name = "ZO_COMPACT_JOB_CLEAN_WAIT_TIME",
-        default = 86400, // 1 day
+        default = 7200, // 2 hours
         help = "Clean the jobs which are finished more than this time"
     )]
     pub job_clean_wait_time: i64,
@@ -1355,7 +1349,7 @@ pub struct RUM {
 
 pub fn init() -> Config {
     dotenv_override().ok();
-    let mut cfg = Config::init().unwrap();
+    let mut cfg = Config::init().expect("config init error");
 
     // set local mode
     if cfg.common.local_mode {
@@ -1414,6 +1408,14 @@ pub fn init() -> Config {
     if cfg.limit.mem_dump_thread_num == 0 {
         cfg.limit.mem_dump_thread_num = cpu_num;
     }
+    // HACK for usage_reporting_thread_num equal to half of CPU core
+    if cfg.limit.usage_reporting_thread_num == 0 {
+        if cfg.common.local_mode {
+            cfg.limit.usage_reporting_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.usage_reporting_thread_num = cpu_num;
+        }
+    }
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
     }
@@ -1457,6 +1459,11 @@ pub fn init() -> Config {
     // check disk cache
     if let Err(e) = check_disk_cache_config(&mut cfg) {
         panic!("disk cache config error: {e}");
+    }
+
+    // check compact config
+    if let Err(e) = check_compact_config(&mut cfg) {
+        panic!("compact config error: {e}");
     }
 
     // check etcd config
@@ -1560,34 +1567,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
         ));
-    }
-
-    // check compact_max_file_size to MB
-    cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.interval == 0 {
-        cfg.compact.interval = 60;
-    }
-    if cfg.compact.pending_jobs_metric_interval == 0 {
-        cfg.compact.pending_jobs_metric_interval = 300;
-    }
-    // check compact_step_secs, min value is 600s
-    if cfg.compact.step_secs == 0 {
-        cfg.compact.step_secs = 3600;
-    } else if cfg.compact.step_secs <= 600 {
-        cfg.compact.step_secs = 600;
-    }
-    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
-        return Err(anyhow::anyhow!(
-            "Data retention is not allowed to be less than 3 days."
-        ));
-    }
-    if cfg.compact.delete_files_delay_hours < 1 {
-        return Err(anyhow::anyhow!(
-            "Delete files delay is not allowed to be less than 1 hour."
-        ));
-    }
-    if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
     }
 
     // If the default scrape interval is less than 5s, raise an error
@@ -1869,6 +1848,48 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
+
+    Ok(())
+}
+
+fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
+        return Err(anyhow::anyhow!(
+            "Data retention is not allowed to be less than 3 days."
+        ));
+    }
+    if cfg.compact.interval < 1 {
+        cfg.compact.interval = 60;
+    }
+
+    // check compact_max_file_size to MB
+    if cfg.compact.max_file_size < 1 {
+        cfg.compact.max_file_size = 512;
+    }
+    cfg.compact.max_file_size *= 1024 * 1024;
+    if cfg.compact.delete_files_delay_hours < 1 {
+        cfg.compact.delete_files_delay_hours = 2;
+    }
+
+    if cfg.compact.old_data_interval < 1 {
+        cfg.compact.old_data_interval = 3600;
+    }
+    if cfg.compact.old_data_max_days < 1 {
+        cfg.compact.old_data_max_days = 7;
+    }
+    if cfg.compact.old_data_min_records < 1 {
+        cfg.compact.old_data_min_records = 100;
+    }
+    if cfg.compact.old_data_min_files < 1 {
+        cfg.compact.old_data_min_files = 10;
+    }
+
+    if cfg.compact.batch_size < 1 {
+        cfg.compact.batch_size = 100;
+    }
+    if cfg.compact.pending_jobs_metric_interval == 0 {
+        cfg.compact.pending_jobs_metric_interval = 300;
+    }
 
     Ok(())
 }

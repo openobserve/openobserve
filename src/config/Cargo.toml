@@ -59,6 +59,7 @@ serde.workspace = true
 serde_json.workspace = true
 segment.workspace = true
 sqlparser.workspace = true
+sqlx.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
 tantivy.workspace = true
@@ -68,6 +69,7 @@ tracing-log.workspace = true
 tracing-subscriber.workspace = true
 urlencoding.workspace = true
 utoipa.workspace = true
+vrl.workspace = true
 zstd.workspace = true
 tokio-util = { version = "0.7.12", features = ["compat"] }
 async-trait = "0.1.83"
