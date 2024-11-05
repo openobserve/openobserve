@@ -190,7 +190,7 @@ const getSession = () => {
           query: req,
           page_type: "logs",
         },
-        "RUM"
+        "RUM",
       )
       .then((res) => {
         if (res.data.hits.length === 0) {
@@ -206,6 +206,9 @@ const getSession = () => {
         };
 
         getSessionDetails();
+      })
+      .catch((error) => {
+        console.error("Failed to fetch session:", error);
       })
       .finally(() => {
         isLoading.value.pop();
@@ -243,7 +246,7 @@ const getSessionSegments = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       // const segmentsCopy = [];
@@ -266,6 +269,9 @@ const getSessionSegments = () => {
       // });
 
       // segments.value = segmentsCopy.flat();
+    })
+    .catch((error) => {
+      console.error("Failed to fetch session events:", error);
     })
     .finally(() => isLoading.value.pop());
 };
@@ -296,7 +302,7 @@ const getSessionEvents = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       const events = ["action", "view", "error"];
@@ -317,6 +323,9 @@ const getSessionEvents = () => {
         return formatEvent(hit);
       });
       getSessionErrorLogs();
+    })
+    .catch((error) => {
+      console.error("Failed to fetch sesion events:", error);
     })
     .finally(() => isLoading.value.pop());
 };
@@ -347,7 +356,7 @@ const getSessionErrorLogs = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       const events = res.data.hits.filter((hit: any) => {
@@ -363,6 +372,9 @@ const getSessionErrorLogs = () => {
 
       segmentEvents.value.sort((a, b) => a.timestamp - b.timestamp);
     })
+    .catch((error) => {
+      console.error("Failed to fetch sesion error logs:", error);
+    })
     .finally(() => isLoading.value.pop());
 };
 
@@ -374,7 +386,7 @@ const getDefaultEvent = (event: any) => {
   _event.timestamp = event.date;
   const relativeTime = formatTimeDifference(
     _event.timestamp,
-    Number(sessionState.data.selectedSession.start_time)
+    Number(sessionState.data.selectedSession.start_time),
   );
   _event.relativeTime = relativeTime[0] as number;
   _event.displayTime = relativeTime[1] as string;
@@ -428,10 +440,10 @@ function formatTimeDifference(start_time: number, end_time: number) {
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
   let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60)
+    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
   );
   let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000
+    (milliSeconds % (1000 * 60)) / 1000,
   );
 
   // Add leading zeros if needed
@@ -456,7 +468,7 @@ const getFormattedDate = (timestamp: number) =>
 const handleSidebarEvent = (event: string, payload: any) => {
   videoPlayerRef.value.goto(
     payload.relativeTime,
-    !!videoPlayerRef.value.playerState?.isPlaying
+    !!videoPlayerRef.value.playerState?.isPlaying,
   );
 };
 </script>

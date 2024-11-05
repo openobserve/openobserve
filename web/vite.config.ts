@@ -176,9 +176,9 @@ export default defineConfig({
   test: {
     enable: true,
     global: true,
-    setupFiles: "src/test/unit/helpers/setupTests.ts",
+    setupFiles: "test/unit/helpers/setupTests.ts",
     deps: {
-      inline: ["monaco-editor"],
+      inline: ["monaco-editor", "vitest-canvas-mock"],
     },
     coverage: {
       reporter: ["text", "json", "html"],
@@ -200,9 +200,15 @@ export default defineConfig({
         "env.d.ts",
       ],
     },
+    threads: false,
     environment: "jsdom",
     cache: false,
     maxConcurrency: 20,
     update: false,
+    environmentOptions: {
+      jsdom: {
+        resources: "usable",
+      },
+    },
   },
 });
