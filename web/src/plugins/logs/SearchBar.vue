@@ -1193,16 +1193,6 @@ export default defineComponent({
       },
       { immediate: true, deep: true }
     );
-
-    watch(
-     [ () => searchObj.meta.functionEditorPlaceholderFlag, () => searchObj.meta.queryEditorPlaceholderFlag],
-      (values) => {
-        if(values[0] == true && values[1] == true){
-          //this is for non focus mode
-          isFocused.value = false;
-        }
-      }
-    );
     watch(
       () => searchObj.data.stream.functions,
       (funs) => {
