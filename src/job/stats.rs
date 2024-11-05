@@ -16,32 +16,13 @@
 use config::{cluster::LOCAL_NODE, get_config};
 use tokio::time;
 
-use crate::service::{compact::stats::update_stats_from_file_list, db, usage};
+use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // tokio::task::spawn(async move { usage_report_stats().await });
     tokio::task::spawn(async move { file_list_update_stats().await });
     tokio::task::spawn(async move { cache_stream_stats().await });
     Ok(())
-}
-
-async fn _usage_report_stats() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    if !LOCAL_NODE.is_compactor() || !cfg.common.usage_enabled {
-        return Ok(());
-    }
-
-    // should run it every 10 minutes
-    let mut interval = time::interval(time::Duration::from_secs(
-        cfg.limit.calculate_stats_interval,
-    ));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = usage::stats::publish_stats().await {
-            log::error!("[STATS] run publish stats error: {}", e);
-        }
-    }
 }
 
 // get stats from file_list to update stream_stats
