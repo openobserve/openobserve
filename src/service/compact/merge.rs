@@ -459,14 +459,7 @@ pub async fn merge_by_stream(
                 let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
 
                 if new_file_name.is_empty() {
-                    if new_file_list.is_empty() {
-                        // no file need to merge
-                        break;
-                    } else {
-                        // delete files from file_list and continue
-                        files_with_size.retain(|f| !&new_file_list.contains(f));
-                        continue;
-                    }
+                    continue;
                 }
 
                 // delete small files keys & write big files keys, use transaction
