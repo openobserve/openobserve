@@ -363,7 +363,14 @@ async fn validate_user_from_db(
                 if user.password_ext.is_none() {
                     let password_ext = get_hash(user_password, password_ext_salt);
                     user.password_ext = Some(password_ext);
-                    let _ = db::user::set(&user).await;
+                    let _ = db::user::update(
+                        &user.email,
+                        &user.first_name,
+                        &user.last_name,
+                        &user.password,
+                        user.password_ext.clone(),
+                    )
+                    .await;
                 }
                 let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                 Ok(resp)
@@ -402,7 +409,9 @@ pub async fn validate_user(
     user_id: &str,
     user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
-    let db_user = db::user::get_db_user(user_id).await;
+    let db_user = db::user::get_user_record(user_id)
+        .await
+        .map(|user| DBUser::from(&user));
     let config = get_config();
     validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
 }

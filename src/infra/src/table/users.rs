@@ -27,43 +27,30 @@ use crate::{
 // define the organizations type
 #[derive(Debug, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
-pub enum OrganizationType {
-    Default = 0,
-    Custom = 1,
-}
-
-impl Into<String> for OrganizationType {
-    fn into(self) -> String {
-        match self {
-            OrganizationType::Default => "default".to_string(),
-            OrganizationType::Custom => "custom".to_string(),
-        }
-    }
-}
-
-impl From<&str> for OrganizationType {
-    fn from(s: &str) -> Self {
-        match s {
-            "default" => OrganizationType::Default,
-            "custom" => OrganizationType::Custom,
-            _ => OrganizationType::Default,
-        }
-    }
+pub enum UserType {
+    Internal = 0,
+    /// Is the user authenticated and created via LDAP
+    External = 1,
 }
 
 // define the organizations table
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "organizations")]
+#[sea_orm(table_name = "users")]
 pub struct Model {
-    #[sea_orm(
-        primary_key,
-        auto_increment = false,
-        column_type = "String(StringLen::N(255))"
-    )]
-    pub identifier: String,
+    #[sea_orm(primary_key, auto_increment = true)]
+    pub id: i64,
     #[sea_orm(column_type = "String(StringLen::N(255))")]
-    pub org_name: String,
-    pub org_type: OrganizationType,
+    pub email: String,
+    #[sea_orm(column_type = "String(StringLen::N(50))")]
+    pub first_name: String,
+    #[sea_orm(column_type = "String(StringLen::N(50))")]
+    pub last_name: String,
+    #[sea_orm(column_type = "Text")]
+    pub password: String,
+    pub salt: String,
+    pub is_root: bool,
+    pub password_ext: Option<String>,
+    pub user_type: UserType,
     pub created_ts: i64,
 }
 
@@ -79,18 +66,39 @@ impl RelationTrait for Relation {
 impl ActiveModelBehavior for ActiveModel {}
 
 #[derive(FromQueryResult, Debug)]
-pub struct OrganizationRecord {
-    pub identifier: String,
-    pub org_name: String,
-    pub org_type: OrganizationType,
+pub struct UserRecord {
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub password: String,
+    pub salt: String,
+    pub is_root: bool,
+    pub password_ext: Option<String>,
+    pub user_type: UserType,
+    pub created_ts: i64,
 }
 
-impl OrganizationRecord {
-    pub fn new(identifier: &str, org_name: &str, org_type: OrganizationType) -> Self {
+impl UserRecord {
+    pub fn new(
+        email: &str,
+        first_name: &str,
+        last_name: &str,
+        password: &str,
+        salt: &str,
+        is_root: bool,
+        password_ext: Option<String>,
+        user_type: UserType,
+    ) -> Self {
         Self {
-            identifier: identifier.to_string(),
-            org_name: org_name.to_string(),
-            org_type,
+            email: email.to_string(),
+            first_name: first_name.to_string(),
+            last_name: last_name.to_string(),
+            password: password.to_string(),
+            salt: salt.to_string(),
+            is_root,
+            password_ext,
+            user_type,
+            created_ts: chrono::Utc::now().timestamp_micros(),
         }
     }
 }
@@ -125,46 +133,33 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table_index() -> Result<(), errors::Error> {
-    let index1 = IndexStatement::new(
-        "organizations_id_idx",
-        "organizations",
-        true,
-        &["identifier"],
-    );
-    let index2 = IndexStatement::new(
-        "organizations_created_ts_idx",
-        "organizations",
-        false,
-        &["created_ts"],
-    );
+    let index1 = IndexStatement::new("users_email_idx", "users", true, &["email"]);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match client.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
-            mysql::create_index(index2).await?;
         }
         DatabaseBackend::Postgres => {
             postgres::create_index(index1).await?;
-            postgres::create_index(index2).await?;
         }
         _ => {
             sqlite::create_index(index1).await?;
-            sqlite::create_index(index2).await?;
         }
     }
     Ok(())
 }
 
-pub async fn add(
-    org_id: &str,
-    org_name: &str,
-    org_type: OrganizationType,
-) -> Result<(), errors::Error> {
+pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        identifier: Set(org_id.to_string()),
-        org_name: Set(org_name.to_string()),
-        org_type: Set(org_type),
+        email: Set(user.email),
+        first_name: Set(user.first_name.to_string()),
+        last_name: Set(user.last_name.to_string()),
+        password: Set(user.password.to_string()),
+        salt: Set(user.salt.to_string()),
+        is_root: Set(user.is_root),
+        password_ext: Set(user.password_ext),
+        user_type: Set(user.user_type),
         created_ts: Set(chrono::Utc::now().timestamp_micros()),
         ..Default::default()
     };
@@ -181,13 +176,24 @@ pub async fn add(
     Ok(())
 }
 
-pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
+pub async fn update(
+    email: &str,
+    first_name: &str,
+    last_name: &str,
+    password: &str,
+    password_ext: Option<String>,
+) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete_many()
-        .filter(Column::Identifier.eq(org_id))
+    let record = ActiveModel {
+        first_name: Set(first_name.to_string()),
+        last_name: Set(last_name.to_string()),
+        password: Set(password.to_string()),
+        password_ext: Set(password_ext),
+        ..Default::default()
+    };
+
+    Entity::update(record)
+        .filter(Column::Email.eq(email))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -195,50 +201,62 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
+pub async fn remove(email: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Email.eq(email))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
+pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .select_only()
-        .column(Column::Identifier)
-        .column(Column::OrgName)
-        .column(Column::OrgType)
-        .filter(Column::Identifier.eq(org_id))
-        .into_model::<OrganizationRecord>()
+        .column(Column::Email)
+        .column(Column::FirstName)
+        .column(Column::LastName)
+        .column(Column::Password)
+        .column(Column::Salt)
+        .column(Column::IsRoot)
+        .column(Column::PasswordExt)
+        .column(Column::UserType)
+        .column(Column::CreatedTs)
+        .filter(Column::Email.eq(email))
+        .into_model::<UserRecord>()
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .ok_or_else(|| {
-            Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
-        })?;
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("User not found".to_string())))?;
 
     Ok(record)
 }
 
-pub async fn list(limit: Option<i64>) -> Result<Vec<OrganizationRecord>, errors::Error> {
+pub async fn list(limit: Option<i64>) -> Result<Vec<UserRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut res = Entity::find()
         .select_only()
-        .column(Column::Identifier)
-        .column(Column::OrgName)
-        .column(Column::OrgType)
+        .column(Column::Email)
+        .column(Column::FirstName)
+        .column(Column::LastName)
+        .column(Column::Password)
+        .column(Column::Salt)
+        .column(Column::IsRoot)
+        .column(Column::PasswordExt)
+        .column(Column::UserType)
+        .column(Column::CreatedTs)
         .order_by(Column::CreatedTs, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
     let records = res
-        .into_model::<OrganizationRecord>()
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(records)
-}
-
-pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let records = Entity::find()
-        .filter(Column::OrgName.eq(org_name))
-        .into_model::<OrganizationRecord>()
+        .into_model::<UserRecord>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -253,7 +271,7 @@ pub async fn len() -> usize {
     match len {
         Ok(len) => len as usize,
         Err(e) => {
-            log::error!("organizations len error: {}", e);
+            log::error!("users len error: {}", e);
             0
         }
     }
@@ -276,13 +294,13 @@ pub async fn is_empty() -> bool {
     len().await == 0
 }
 
-pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
+pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
-        .filter(Column::Identifier.is_in(org_ids))
+        .filter(Column::Email.is_in(emails))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;

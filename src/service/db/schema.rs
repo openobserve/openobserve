@@ -554,9 +554,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let stream: Vec<&str> = item_key.split('/').collect::<Vec<&str>>();
         let org_id = stream[0];
 
-        if super::organization::get(org_id).await.is_none() {
+        if super::organization::get_org(org_id).await.is_err() {
             log::info!("Creating org: {}", org_id);
-            let _ = super::organization::set(&Organization {
+            let _ = super::organization::save_org(&Organization {
                 identifier: org_id.to_owned(),
                 name: org_id.to_owned(),
                 org_type: if org_id.eq(DEFAULT_ORG) {

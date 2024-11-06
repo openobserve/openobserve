@@ -16,7 +16,10 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::errors::{self, Error};
+use infra::{
+    errors::{self, Error},
+    table::organizations,
+};
 
 use crate::{
     common::{
@@ -181,60 +184,50 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     }
 }
 
-pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
-    let key = format!("{ORG_KEY_PREFIX}/{}", org.identifier);
-    match db::put(
-        &key,
-        json::to_vec(org).unwrap().into(),
-        db::NEED_WATCH,
-        None,
+pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
+    // TODO: Handle caching
+    if let Err(e) = organizations::add(
+        &entry.identifier,
+        &entry.name,
+        entry.org_type.as_str().into(),
     )
     .await
     {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Error saving function: {}", e);
-            return Err(anyhow::anyhow!("Error saving function: {}", e));
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn get(org_id: &str) -> Option<Organization> {
-    if ORGANIZATIONS.read().await.contains_key(org_id) {
-        return ORGANIZATIONS.read().await.get(org_id).cloned();
-    }
-
-    match db::get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await {
-        Ok(v) => {
-            let org: Organization = json::from_slice(&v).unwrap();
-            Some(org)
-        }
-        Err(_) => {
-            log::error!("Org Not found");
-            None
-        }
-    }
-}
-
-pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
-    let key = format!("{ORG_KEY_PREFIX}/{}", org_id);
-    match db::delete(&key, false, db::NEED_WATCH, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Error deleting function: {}", e);
-            return Err(anyhow::anyhow!("Error deleting function: {}", e));
-        }
+        log::error!("Error saving org: {}", e);
+        return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
     Ok(())
 }
 
-pub(crate) async fn list() -> Result<Vec<Organization>, anyhow::Error> {
-    let db_key = format!("{ORG_KEY_PREFIX}/");
-    db::list(&db_key)
-        .await?
-        .into_values()
-        .map(|val| json::from_slice(&val).map_err(|e| anyhow::anyhow!(e)))
-        .collect()
+pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
+    let org = organizations::get(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error getting org: {}", e))?;
+    Ok(Organization {
+        identifier: org.identifier,
+        name: org.org_name,
+        org_type: org.org_type.into(),
+    })
+}
+
+pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if let Err(e) = organizations::remove(org_id).await {
+        log::error!("Error deleting org: {}", e);
+        return Err(anyhow::anyhow!("Error deleting org: {}", e));
+    }
+    Ok(())
+}
+
+pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
+    let orgs = organizations::list(limit)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
+    Ok(orgs
+        .into_iter()
+        .map(|org| Organization {
+            identifier: org.identifier,
+            name: org.org_name,
+            org_type: org.org_type.into(),
+        })
+        .collect())
 }

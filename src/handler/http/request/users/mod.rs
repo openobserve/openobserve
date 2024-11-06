@@ -634,6 +634,7 @@ pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
         })
         .collect::<Vec<RolesResponse>>();
 
+    // TODO: Return custom roles here
     Ok(HttpResponse::Ok().json(roles))
 }
 
@@ -651,6 +652,34 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     audit_message.response_code = 401;
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
+}
+
+/// ListUserInvitations
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserInvitations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[get("/invites")]
+pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
+    let user_id = user_email.user_id.as_str();
+    users::list_user_invites(user_id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/invites")]
+pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(test)]
