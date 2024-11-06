@@ -31,7 +31,10 @@ use config::{
     metrics,
     utils::{
         json,
-        parquet::{parse_file_key_columns, read_recordbatch_from_bytes, read_schema_from_bytes},
+        parquet::{
+            get_recordbatch_reader_from_bytes, parse_file_key_columns, read_recordbatch_from_bytes,
+            read_schema_from_bytes,
+        },
         record_batch_ext::{concat_batches, merge_record_batches},
         schema_ext::SchemaExt,
         time::hour_micros,
@@ -428,7 +431,8 @@ pub async fn merge_by_stream(
             let cfg = get_config();
             // sort by file size
             let mut files_with_size = files_with_size.to_owned();
-            match MergeStrategy::from(&cfg.compact.strategy) {
+            let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
+            match job_strategy {
                 MergeStrategy::FileSize => {
                     files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
                 }
@@ -450,7 +454,12 @@ pub async fn merge_by_stream(
             for file in files_with_size.iter() {
                 if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
                     if new_file_list.len() <= 1 {
-                        break; // no files need to merge
+                        if job_strategy == MergeStrategy::FileSize {
+                            break;
+                        }
+                        new_file_size = 0;
+                        new_file_list.clear();
+                        continue; // this batch don't need to merge, skip
                     }
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
@@ -648,7 +657,6 @@ pub async fn merge_files(
     let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
     let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
     let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
-
     let mut new_file_meta = FileMeta {
         min_ts,
         max_ts,
@@ -658,13 +666,16 @@ pub async fn merge_files(
         flattened: false,
     };
     if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+        return Err(anyhow::anyhow!("merge_files error: records is 0"));
     }
 
-    // convert the file to the latest version of schema
+    // get latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
-    let (defined_schema_fields, need_original) = match stream_setting {
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
+    let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
+    let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let (defined_schema_fields, need_original) = match stream_settings {
         Some(s) => (
             s.defined_schema_fields.unwrap_or_default(),
             s.store_original_data,
@@ -682,17 +693,6 @@ pub async fn merge_files(
     } else {
         Arc::new(schema_latest)
     };
-
-    let schema_settings = unwrap_stream_settings(&schema_latest);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_settings);
-    let full_text_search_fields = get_stream_setting_fts_fields(&schema_settings);
-    let index_fields = get_stream_setting_index_fields(&schema_settings);
-
-    // New Logic:
-    // 3. give schema and schema diff to datafusion
-    // 4. streaming read from datafusion
-    // 5. write batch to parquet file on local disk
-    // 6. read parquet bytes and upload to s3
 
     // read schema from parquet file and group files by schema
     let mut schemas = HashMap::new();
@@ -792,91 +792,83 @@ pub async fn merge_files(
         start.elapsed().as_millis(),
     );
 
+    // upload file to storage
     let buf = Bytes::from(buf);
-    // upload file
-    match storage::put(&new_file_key, buf.clone()).await {
-        Ok(_) => {
-            // TODO: remove this line
-            let new_batches = Vec::new();
-            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
-                // generate inverted index RecordBatch
-                if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
-                    schema_latest.clone(),
-                    &new_batches,
-                    stream_type,
-                    &full_text_search_fields,
-                    &index_fields,
-                )? {
-                    let index_format =
-                        InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
-                    if matches!(
-                        index_format,
-                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
-                    ) {
-                        let files = generate_index_on_compactor(
-                            &retain_file_list,
-                            inverted_idx_batch.clone(),
-                            new_file_key.clone(),
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            &full_text_search_fields,
-                            &index_fields,
-                        )
-                        .await
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "generate_index_on_compactor error: {}, need delete files: {:?}",
-                                e,
-                                retain_file_list
-                            )
-                        })?;
-                        for (file_name, filemeta) in files {
-                            log::info!(
-                                "Created parquet index file during compaction {}",
-                                file_name
-                            );
-                            // Notify that we wrote the index file to the db.
-                            if let Err(e) = write_file_list(
-                                org_id,
-                                &[FileKey {
-                                    key: file_name.clone(),
-                                    meta: filemeta,
-                                    deleted: false,
-                                    segment_ids: None,
-                                }],
-                            )
-                            .await
-                            {
-                                log::error!(
-                                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
-                                    file_name,
-                                    e.to_string(),
-                                    retain_file_list
-                                );
-                            }
-                        }
-                    }
-                    if matches!(
-                        index_format,
-                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
-                    ) {
-                        // generate fst inverted index and write to storage
-                        generate_fst_inverted_index(
-                            inverted_idx_batch,
-                            &new_file_key,
-                            &full_text_search_fields,
-                            &index_fields,
-                            Some(&retain_file_list),
-                        )
-                        .await?;
-                    }
-                }
-            }
-            Ok((new_file_key, new_file_meta, retain_file_list))
-        }
-        Err(e) => Err(e),
+    storage::put(&new_file_key, buf.clone()).await?;
+
+    if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+        return Ok((new_file_key, new_file_meta, retain_file_list));
     }
+
+    // generate parquet format inverted index
+    let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
+    if matches!(
+        index_format,
+        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+    ) {
+        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        let files = generate_index_on_compactor(
+            &retain_file_list,
+            &new_file_key,
+            org_id,
+            stream_type,
+            stream_name,
+            &full_text_search_fields,
+            &index_fields,
+            schema,
+            &mut reader,
+        )
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "generate_index_on_compactor error: {}, need delete files: {:?}",
+                e,
+                retain_file_list
+            )
+        })?;
+        for (file_name, filemeta) in files {
+            log::info!("Created parquet index file during compaction {}", file_name);
+            // Notify that we wrote the index file to the db.
+            if let Err(e) = write_file_list(
+                org_id,
+                &[FileKey {
+                    key: file_name.clone(),
+                    meta: filemeta,
+                    deleted: false,
+                    segment_ids: None,
+                }],
+            )
+            .await
+            {
+                log::error!(
+                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                    file_name,
+                    e.to_string(),
+                    retain_file_list
+                );
+            }
+        }
+    }
+
+    // generate fst format inverted index
+    if matches!(
+        index_format,
+        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+    ) {
+        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        // generate fst inverted index and write to storage
+        generate_fst_inverted_index(
+            &new_file_key,
+            &full_text_search_fields,
+            &index_fields,
+            Some(&retain_file_list),
+            schema,
+            &mut reader,
+        )
+        .await?;
+    }
+
+    Ok((new_file_key, new_file_meta, retain_file_list))
 }
 
 async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
@@ -1119,21 +1111,12 @@ pub fn generate_inverted_idx_recordbatch(
     if inverted_idx_batches.is_empty() {
         Ok(None)
     } else {
-        let mut new_batch = if inverted_idx_batches.len() == 1 {
+        let new_batch = if inverted_idx_batches.len() == 1 {
             inverted_idx_batches.remove(0)
         } else {
             let new_schema = inverted_idx_batches.first().unwrap().schema();
             concat_batches(new_schema, inverted_idx_batches).map_err(anyhow::Error::from)?
         };
-
-        let mut null_columns = 0;
-        for i in 0..new_batch.num_columns() {
-            let ni = i - null_columns;
-            if new_batch.column(ni).null_count() == new_batch.num_rows() {
-                new_batch.remove_column(ni);
-                null_columns += 1;
-            }
-        }
 
         if matches!(
             new_batch.schema().fields().len(),
