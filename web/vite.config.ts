@@ -92,6 +92,9 @@ console.log(
   "Vite Coverage =====",
   process.env.VITE_COVERAGE,
   process.env.VITE_COVERAGE === "true",
+  `env: ${process.env} .`,
+  `env Previx: ${process.envPrefix} .`,
+  `env Previx: ${process.env.envPrefix}`,
 );
 
 // https://vitejs.dev/config/
