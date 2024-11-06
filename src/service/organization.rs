@@ -13,11 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::str::FromStr;
 
-use config::{ider, meta::stream::StreamType, utils::rand::generate_random_string};
+use chrono::{Duration, Utc};
+use config::{
+    get_config, ider, meta::stream::StreamType, utils::rand::generate_random_string, SMTP_CLIENT,
+};
+use lettre::{message::SinglePart, AsyncTransport, Message};
 
-use super::users::{add_admin_to_org, get_user};
+use super::{
+    db::{org_invites, org_users},
+    users::{add_admin_to_org, get_user},
+};
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
@@ -26,7 +33,7 @@ use crate::{
                 IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
                 OrganizationInvites, RumIngestionToken, CUSTOM, DEFAULT_ORG,
             },
-            user::{UserOrg, UserRole},
+            user::UserRole,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
@@ -114,8 +121,8 @@ async fn update_passcode_inner(
     user_id: &str,
     is_rum_update: bool,
 ) -> Result<IngestionTokensContainer, anyhow::Error> {
-    let mut local_org_id = "dummy";
-    let Ok(mut db_user) = db::user::get_db_user(user_id).await else {
+    let mut local_org_id = "";
+    let Ok(db_user) = db::user::get_db_user(user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
 
@@ -125,60 +132,14 @@ async fn update_passcode_inner(
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
 
-    let updated_org = |existing_org: &UserOrg| {
-        if is_rum_update {
-            UserOrg {
-                rum_token: Some(rum_token.clone()),
-                ..existing_org.clone()
-            }
-        } else {
-            UserOrg {
-                token: token.clone(),
-                ..existing_org.clone()
-            }
-        }
-    };
-
-    let mut orgs = db_user.clone().organizations;
-    let new_orgs = if !is_root_user(user_id) {
-        let mut existing_org = orgs.clone();
-
-        // Find the org which we need to update
-        existing_org.retain(|org| org.name.eq(&local_org_id));
-
-        // Filter out the org which needs to be updated, so that we can modify and
-        // insert it back.
-        orgs.retain(|org| !org.name.eq(&local_org_id));
-
-        // Invalidate the local cache
-        let org_to_update = &existing_org[0];
-        USERS_RUM_TOKEN.clone().remove(&format!(
-            "{}/{}",
-            org_to_update.name,
-            org_to_update.rum_token.as_deref().unwrap_or_default()
-        ));
-
-        let updated_org = updated_org(&existing_org[0]);
-        orgs.push(updated_org);
-        orgs
+    // Update the org with the new token
+    if is_rum_update {
+        org_users::update_rum_token(local_org_id, user_id, &rum_token).await?;
     } else {
-        // This is a root-user, so pick up the first/default org.
-        let existing_org = orgs.first().unwrap().clone();
+        org_users::update_token(local_org_id, user_id, &token).await?;
+    }
 
-        let org_to_update = &existing_org;
-        USERS_RUM_TOKEN.clone().remove(&format!(
-            "{}/{}",
-            org_to_update.name,
-            org_to_update.rum_token.as_deref().unwrap_or_default()
-        ));
-
-        let updated_org = updated_org(&existing_org);
-        vec![updated_org]
-    };
-
-    db_user.organizations = new_orgs;
-    let _ = db::user::set(&db_user).await;
-
+    // TODO : Fix for root users
     let ret = if is_rum_update {
         IngestionTokensContainer::RumToken(RumIngestionToken {
             user: db_user.email,
@@ -193,8 +154,20 @@ async fn update_passcode_inner(
     Ok(ret)
 }
 
-pub async fn list_all_orgs() -> Result<Vec<Organization>, anyhow::Error> {
-    db::organization::list().await
+pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
+    db::organization::list(limit).await
+}
+
+pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, anyhow::Error> {
+    let records = db::org_users::list_orgs_by_user(user_email).await?;
+    Ok(records
+        .into_iter()
+        .map(|record| Organization {
+            identifier: record.org_id.clone(),
+            name: record.org_name.clone(),
+            org_type: record.org_type.into(),
+        })
+        .collect())
 }
 
 /// Always creates a new org. Also, makes the user an admin of the org
@@ -203,7 +176,7 @@ pub async fn create_org(
     user_email: &str,
 ) -> Result<Organization, anyhow::Error> {
     org.identifier = format!("{}_{}", org.name, ider::generate());
-    match db::organization::set(org).await {
+    match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
             add_admin_to_org(&org.identifier, user_email).await?;
@@ -231,9 +204,8 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
         } else {
             CUSTOM.to_owned()
         },
-        invites: None,
     };
-    match db::organization::set(org).await {
+    match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
             Ok(org.clone())
@@ -266,7 +238,7 @@ pub async fn rename_org(
     }
     let mut org = get_org(org_id).await.unwrap();
     org.name = name.to_owned();
-    match db::organization::set(&org).await {
+    match db::organization::save_org(&org).await {
         Ok(_) => Ok(org),
         Err(e) => {
             log::error!("Error creating org: {}", e);
@@ -279,7 +251,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if get_org(org_id).await.is_none() {
         return Err(anyhow::anyhow!("Organization does not exist"));
     }
-    match db::organization::delete(org_id).await {
+    match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
             Ok(())
@@ -296,6 +268,7 @@ pub async fn generate_invitation(
     user_email: &str,
     invites: OrganizationInvites,
 ) -> Result<String, anyhow::Error> {
+    let cfg = get_config();
     if !is_root_user(user_email) {
         match get_user(Some(org_id), user_email).await {
             Some(user) => {
@@ -306,24 +279,52 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
-    if let Some(mut org) = get_org(org_id).await {
+    if get_org(org_id).await.is_some() {
         let invite_token = config::ider::generate();
+        let expires_at = Utc::now().timestamp_micros()
+            + Duration::days(cfg.common.org_invite_expiry as i64)
+                .num_microseconds()
+                .unwrap();
 
-        if let Some(invites_map) = org.invites.as_mut() {
-            invites_map.insert(invite_token, invites);
-        } else {
-            let mut invites_map = HashMap::new();
-            invites_map.insert(invite_token, invites);
-            org.invites = Some(invites_map);
-        }
-        match db::organization::set(&org).await {
-            Ok(_) => Ok(invite_token.clone()),
-            Err(e) => {
-                log::error!("Error creating org member invitation: {}", e);
-                Err(anyhow::anyhow!("Error creating invitation: {}", e))
+        org_invites::add_many(
+            &invites.role.to_string(),
+            user_email,
+            org_id,
+            &invite_token,
+            expires_at,
+            invites.invites.clone(),
+        )
+        .await?;
+
+        if cfg.smtp.smtp_enabled {
+            // TODO: Use an env to decide whether to send email or not
+            let mut email = Message::builder()
+                .from(cfg.smtp.smtp_from_email.parse()?)
+                .subject(format!("Invitation to join organization"));
+            for invite in invites.invites.iter() {
+                email = email.to(invite.parse()?);
+            }
+            if !cfg.smtp.smtp_reply_to.is_empty() {
+                email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
+            }
+            // TODO: Decide the endpoint to be used
+            let msg = format!(
+                "You have been invited to join the organization. Click on the link to accept the invitation: <a href=\"{}/{}/accept-invitation?invite_token={}\">Click Here<a>",
+                cfg.common.base_uri, org_id, invite_token
+            );
+            let email = email.singlepart(SinglePart::html(msg)).unwrap();
+
+            // Send the email
+            match SMTP_CLIENT.as_ref().unwrap().send(email).await {
+                Ok(resp) => {
+                    log::info!("sent invite email response code: {}", resp.code());
+                }
+                Err(e) => {
+                    log::error!("Error sending email for invitation: {}", e);
+                }
             }
         }
-        Ok("".to_string())
+        Ok(invite_token)
     } else {
         Err(anyhow::anyhow!("Organization doesn't exist"))
     }
@@ -334,30 +335,39 @@ pub async fn accept_invitation(
     user_email: &str,
     invite_token: &str,
 ) -> Result<(), anyhow::Error> {
-    if let Some(mut org) = get_org(org_id).await {
-        let invite_token = config::ider::generate();
-        if let Some(invites_map) = org.invites.as_mut() {
-            invites_map.insert(invite_token, invites);
-        } else {
-            let mut invites_map = HashMap::new();
-            invites_map.insert(invite_token, invites);
-            org.invites = Some(invites_map);
+    if get_org(org_id).await.is_some() {
+        let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
+
+        let now = chrono::Utc::now().timestamp_micros();
+        if invite.org_id.ne(org_id) || invite.expires_at < now {
+            return Err(anyhow::anyhow!("Invalid token"));
         }
-        match db::organization::set(&org).await {
-            Ok(_) => Ok(invite_token.clone()),
-            Err(e) => {
-                log::error!("Error creating org member invitation: {}", e);
-                Err(anyhow::anyhow!("Error creating invitation: {}", e))
-            }
+
+        let invite_role = UserRole::from_str(&invite.role)
+            .map_err(|_| anyhow::anyhow!("Invalid role: {}", invite.role))?;
+        org_users::add(
+            org_id,
+            user_email,
+            invite_role.into(),
+            &generate_random_string(16),
+            Some(format!("rum{}", generate_random_string(16))),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
+
+        if let Err(e) = org_invites::remove(&invite.token, user_email).await {
+            // No need to return http error, as the user
+            // has already been added to the org
+            log::error!("Error removing invite: {}", e);
         }
-        Ok("".to_string())
+        Ok(())
     } else {
         Err(anyhow::anyhow!("Organization doesn't exist"))
     }
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {
-    db::organization::get(org).await
+    db::organization::get_org(org).await.ok()
 }
 
 #[cfg(test)]

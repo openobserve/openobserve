@@ -35,7 +35,7 @@ use crate::{
 // created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
 // define the organizations type
-#[derive(EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum OrgInviteStatus {
     Pending = 0,
@@ -78,8 +78,6 @@ impl ActiveModelBehavior for ActiveModel {}
 pub struct InvitationRecord {
     pub org_id: String,
     pub token: String,
-    pub inviter_id: String,
-    pub invitee_id: String,
     pub role: String,
     pub status: OrgInviteStatus,
     pub expires_at: i64,
@@ -90,8 +88,6 @@ impl InvitationRecord {
     pub fn new(
         org_id: &str,
         token: &str,
-        inviter_id: &str,
-        invitee_id: &str,
         role: &str,
         status: OrgInviteStatus,
         expires_at: i64,
@@ -99,8 +95,6 @@ impl InvitationRecord {
         Self {
             org_id: org_id.to_string(),
             token: token.to_string(),
-            inviter_id: inviter_id.to_string(),
-            invitee_id: invitee_id.to_string(),
             role: role.to_string(),
             status,
             expires_at,
@@ -140,7 +134,12 @@ pub async fn create_table() -> Result<(), errors::Error> {
 
 pub async fn create_table_index() -> Result<(), errors::Error> {
     // TODO: Revisit to see if token index should be unique or not
-    let index1 = IndexStatement::new("org_invites_idx", "org_invites", true, &["token"]);
+    let index1 = IndexStatement::new(
+        "org_invites_token_invitee_id_idx",
+        "org_invites",
+        true,
+        &["token", "invitee_id"],
+    );
     let index2 = IndexStatement::new(
         "org_invites_created_ts_idx",
         "org_invites",
@@ -179,6 +178,7 @@ pub async fn add(
         token: Set(token.to_string()),
         inviter_id: Set(inviter_id.to_string()),
         invitee_id: Set(invitee_id.to_string()),
+        expires_at: Set(expires_at),
         role: Set(role.to_string()),
         status: Set(OrgInviteStatus::Pending),
         created_ts: Set(chrono::Utc::now().timestamp_micros()),
@@ -197,13 +197,36 @@ pub async fn add(
     Ok(())
 }
 
-pub async fn remove(token: &str) -> Result<(), errors::Error> {
+pub async fn add_many(
+    role: &str,
+    inviter_id: &str,
+    org_id: &str,
+    token: &str,
+    expires_at: i64,
+    invitee_ids: Vec<String>,
+) -> Result<(), errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let mut entries = vec![];
+
+    for invitee_id in invitee_ids {
+        entries.push(ActiveModel {
+            org_id: Set(org_id.to_string()),
+            token: Set(token.to_string()),
+            inviter_id: Set(inviter_id.to_string()),
+            invitee_id: Set(invitee_id),
+            role: Set(role.to_string()),
+            status: Set(OrgInviteStatus::Pending),
+            expires_at: Set(expires_at),
+            created_ts: Set(now),
+            ..Default::default()
+        });
+    }
+
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete_many()
-        .filter(Column::Token.eq(token))
+    Entity::insert_many(entries)
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -211,28 +234,94 @@ pub async fn remove(token: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn get(token: &str) -> Result<InvitationRecord, errors::Error> {
+pub async fn remove(token: &str, user: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Token.eq(token))
+        .filter(Column::InviteeId.eq(user))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
+pub async fn get(token: &str) -> Result<Vec<InvitationRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .select_only()
-        // .column(Column::ShortId)
-        // .column(Column::OriginalUrl)
+        .column(Column::OrgId)
+        .column(Column::Token)
+        .column(Column::Role)
+        .column(Column::Status)
+        .column(Column::ExpiresAt)
+        .column(Column::CreatedTs)
         .filter(Column::Token.eq(token))
+        .into_model::<InvitationRecord>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(record)
+}
+
+pub async fn get_by_token_user(token: &str, user: &str) -> Result<InvitationRecord, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Token)
+        .column(Column::Role)
+        .column(Column::Status)
+        .column(Column::ExpiresAt)
+        .column(Column::CreatedTs)
+        .filter(Column::Token.eq(token))
+        .filter(Column::InviteeId.eq(user))
         .into_model::<InvitationRecord>()
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Short URL not found".to_string())))?;
+        .ok_or_else(|| {
+            Error::DbError(DbError::SeaORMError(
+                "Invititation token not found".to_string(),
+            ))
+        })?;
 
     Ok(record)
+}
+
+pub async fn list_by_invitee(user: &str) -> Result<Vec<InvitationRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let records = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Token)
+        .column(Column::Role)
+        .column(Column::Status)
+        .column(Column::ExpiresAt)
+        .column(Column::CreatedTs)
+        .filter(Column::InviteeId.eq(user))
+        .into_model::<InvitationRecord>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records)
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<InvitationRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut res = Entity::find()
         .select_only()
-        // .column(Column::ShortId)
-        // .column(Column::OriginalUrl)
+        .column(Column::OrgId)
+        .column(Column::Token)
+        .column(Column::Role)
+        .column(Column::Status)
+        .column(Column::ExpiresAt)
+        .column(Column::CreatedTs)
         .order_by(Column::CreatedTs, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);

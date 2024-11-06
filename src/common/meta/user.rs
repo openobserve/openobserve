@@ -277,6 +277,24 @@ impl FromStr for UserRole {
     }
 }
 
+impl Into<infra::table::org_users::UserRole> for UserRole {
+    fn into(self) -> infra::table::org_users::UserRole {
+        match self {
+            UserRole::Admin => infra::table::org_users::UserRole::Admin,
+            UserRole::Member => infra::table::org_users::UserRole::Admin,
+            UserRole::Root => infra::table::org_users::UserRole::Root,
+            #[cfg(feature = "enterprise")]
+            UserRole::Viewer => infra::table::org_users::UserRole::Viewer,
+            #[cfg(feature = "enterprise")]
+            UserRole::Editor => infra::table::org_users::UserRole::Editor,
+            #[cfg(feature = "enterprise")]
+            UserRole::User => infra::table::org_users::UserRole::User,
+            #[cfg(feature = "enterprise")]
+            UserRole::ServiceAccount => infra::table::org_users::UserRole::ServiceAccount,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
     pub email: String,
@@ -292,6 +310,43 @@ pub struct UserResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserList {
     pub data: Vec<UserResponse>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub enum InviteStatus {
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "accepted")]
+    Accepted,
+    #[serde(rename = "rejected")]
+    Rejected,
+    #[serde(rename = "expired")]
+    Expired,
+}
+
+impl From<&infra::table::org_invites::OrgInviteStatus> for InviteStatus {
+    fn from(status: &infra::table::org_invites::OrgInviteStatus) -> Self {
+        match status {
+            infra::table::org_invites::OrgInviteStatus::Pending => InviteStatus::Pending,
+            infra::table::org_invites::OrgInviteStatus::Accepted => InviteStatus::Accepted,
+            infra::table::org_invites::OrgInviteStatus::Rejected => InviteStatus::Rejected,
+            infra::table::org_invites::OrgInviteStatus::Expired => InviteStatus::Expired,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserInvite {
+    pub org_id: String,
+    pub token: String,
+    pub role: String,
+    pub status: InviteStatus,
+    pub expires_at: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserInviteList {
+    pub data: Vec<UserInvite>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

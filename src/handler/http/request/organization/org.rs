@@ -13,18 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, io::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+};
 
-use actix_web::{get, http, post, put, web, HttpResponse, Result};
+use actix_web::{get, http, post, put, web, HttpRequest, HttpResponse, Result};
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::organization::OrganizationInvites;
 use crate::{
     common::{
-        infra::config::USERS,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                OrgDetails, OrgUser, Organization, OrganizationInvites, OrganizationResponse,
-                PasscodeResponse, RumIngestionResponse, THRESHOLD,
+                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
+                RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{is_root_user, UserEmail},
@@ -45,9 +49,10 @@ use crate::{
     )
 )]
 #[get("/organizations")]
-pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error> {
+pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
     let mut id = 0;
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
     let mut orgs: Vec<OrgDetails> = vec![];
     let mut org_names = HashSet::new();
@@ -57,45 +62,46 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
         email: user_id.to_string(),
     };
 
-    let all_orgs = organization::list_all_orgs().await.unwrap();
+    let limit = query
+        .get("limit")
+        .unwrap_or(&"100".to_string())
+        .parse::<i64>()
+        .ok();
     let is_root_user = is_root_user(user_id);
-    if is_root_user {
-        for org in all_orgs {
-            id += 1;
-            let org = OrgDetails {
-                id,
-                identifier: org.identifier.clone(),
-                name: org.name,
-                user_email: user_id.to_string(),
-                ingest_threshold: THRESHOLD,
-                search_threshold: THRESHOLD,
-                org_type: org.org_type,
-                user_obj: user_detail.clone(),
-            };
-            if !org_names.contains(&org.identifier) {
-                org_names.insert(org.identifier.clone());
-                orgs.push(org)
-            }
-        }
+    let all_orgs = if is_root_user {
+        let Ok(records) = organization::list_all_orgs(limit).await else {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    "Something went wrong".to_string(),
+                )),
+            );
+        };
+        records
     } else {
-        for org in all_orgs {
-            if USERS.contains_key(&format!("{}/{user_id}", org.identifier)) {
-                id += 1;
-                let org = OrgDetails {
-                    id,
-                    identifier: org.identifier.clone(),
-                    name: org.name,
-                    user_email: user_id.to_string(),
-                    ingest_threshold: THRESHOLD,
-                    search_threshold: THRESHOLD,
-                    org_type: org.org_type,
-                    user_obj: user_detail.clone(),
-                };
-                if !org_names.contains(&org.identifier) {
-                    org_names.insert(org.identifier.clone());
-                    orgs.push(org)
-                }
-            }
+        let Ok(records) = organization::list_orgs_by_user(user_id).await else {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Something went wrong".to_string(),
+            )));
+        };
+        records
+    };
+    for org in all_orgs {
+        id += 1;
+        let org = OrgDetails {
+            id,
+            identifier: org.identifier.clone(),
+            name: org.name,
+            user_email: user_id.to_string(),
+            ingest_threshold: THRESHOLD,
+            search_threshold: THRESHOLD,
+            org_type: org.org_type,
+            user_obj: user_detail.clone(),
+        };
+        if !org_names.contains(&org.identifier) {
+            org_names.insert(org.identifier.clone());
+            orgs.push(org)
         }
     }
     orgs.sort_by(|a, b| a.name.cmp(&b.name));
@@ -372,6 +378,7 @@ async fn rename_org(
 }
 
 /// InviteOrganizationMembers
+#[cfg(feature = "enterprise")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -387,7 +394,7 @@ async fn rename_org(
     )
 )]
 #[put("/{org_id}/generate_invite")]
-async fn generate_org_invite(
+pub async fn generate_org_invite(
     user_email: UserEmail,
     path: web::Path<String>,
     invites: web::Json<OrganizationInvites>,
@@ -405,16 +412,27 @@ async fn generate_org_invite(
     }
 }
 
-/// InviteOrganizationMembers
+#[cfg(not(feature = "enterprise"))]
+#[put("/{org_id}/generate_invite")]
+pub async fn generate_org_invite() -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        http::StatusCode::NOT_FOUND.into(),
+        "Feature not available".to_string(),
+    )))
+}
+
+/// AcceptOrganizationInvite
+#[cfg(feature = "enterprise")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
-    operation_id = "InviteOrganizationMembers",
+    operation_id = "AcceptOrganizationInvite",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("invite_token" = String, Path, description = "The token sent to the user"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Organization),
@@ -436,4 +454,13 @@ async fn accept_org_invite(
             err.to_string(),
         ))),
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[put("/{org_id}/accept_invite/{invite_token}")]
+async fn accept_org_invite() -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        http::StatusCode::NOT_FOUND.into(),
+        "Feature not available".to_string(),
+    )))
 }

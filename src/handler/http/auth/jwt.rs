@@ -58,6 +58,8 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
+    use crate::service::users;
+
     let o2cfg = get_o2_config();
     let dec_token = res.1.unwrap();
 
@@ -152,7 +154,7 @@ pub async fn process_token(
             password_ext: Some("".to_owned()),
         };
 
-        match users::update_db_user(updated_db_user).await {
+        match users::create_new_user(updated_db_user).await {
             Ok(_) => {
                 log::info!("User added to the database");
                 if o2cfg.openfga.enabled {
@@ -363,6 +365,8 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
 
 #[cfg(feature = "enterprise")]
 async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Vec<String>) {
+    use crate::service::users;
+
     let o2cfg = get_o2_config();
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
@@ -404,7 +408,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             password_ext: Some("".to_owned()),
         };
 
-        match users::update_db_user(updated_db_user).await {
+        match users::create_new_user(updated_db_user).await {
             Ok(_) => {
                 log::info!("group_to_custom_role: User added to the database");
                 if o2cfg.openfga.enabled {

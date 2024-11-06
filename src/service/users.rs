@@ -27,7 +27,8 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
             user::{
-                DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
+                DBUser, InviteStatus, UpdateUser, User, UserInvite, UserInviteList, UserList,
+                UserOrg, UserRequest, UserResponse, UserRole,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
@@ -43,9 +44,8 @@ pub async fn post_user(
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
     let cfg = get_config();
     if is_root_user(initiator_id)
-        || (initiator_user.is_ok()
-            && initiator_user.as_ref().unwrap().is_some()
-            && initiator_user.unwrap().unwrap().role.eq(&UserRole::Admin))
+        || (initiator_user.is_ok() && initiator_user.as_ref().unwrap().is_some())
+    // && initiator_user.unwrap().unwrap().role.eq(&UserRole::Admin))
     {
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await
@@ -67,7 +67,16 @@ pub async fn post_user(
                 usr_req.is_external,
                 password_ext,
             );
-            db::user::set(&user).await.unwrap();
+
+            // Save the user in the database
+            if db::user::add(&user).await.is_err() {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        "Failed to save user".to_string(),
+                    )),
+                );
+            }
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
@@ -113,7 +122,7 @@ pub async fn post_user(
     }
 }
 
-pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
+pub async fn create_new_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
     if db_user.password.is_empty() {
         let salt = ider::uuid();
         let generated_pass = generate_random_string(8);
@@ -131,7 +140,8 @@ pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
             org.rum_token = Some(rum_token);
         };
     }
-    db::user::set(&db_user).await
+    db::user::add(&db_user).await?;
+    Ok(())
 }
 
 pub async fn update_user(
@@ -163,7 +173,7 @@ pub async fn update_user(
                 if local_user.is_external {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                         http::StatusCode::BAD_REQUEST.into(),
-                        "Updates not allowed in OpenObserve, please update with source system"
+                        "Updates not allowed with external users, please update with source system"
                             .to_string(),
                     )));
                 }
@@ -248,93 +258,102 @@ pub async fn update_user(
                     new_user.token = user.token.unwrap();
                     is_org_updated = true;
                 }
-                if is_updated || is_org_updated {
-                    let user = db::user::get_db_user(email).await;
-                    match user {
-                        Ok(mut db_user) => {
-                            db_user.password = new_user.password;
-                            db_user.password_ext = new_user.password_ext;
-                            db_user.first_name = new_user.first_name;
-                            db_user.last_name = new_user.last_name;
-                            if is_org_updated {
-                                let mut orgs = db_user.clone().organizations;
-                                let new_orgs = if orgs.is_empty() {
-                                    vec![UserOrg {
-                                        name: org_id.to_string(),
-                                        token: new_user.token,
-                                        rum_token: new_user.rum_token,
-                                        role: new_user.role,
-                                    }]
-                                } else {
-                                    orgs.retain(|org| !org.name.eq(org_id));
-                                    orgs.push(UserOrg {
-                                        name: org_id.to_string(),
-                                        token: new_user.token,
-                                        rum_token: new_user.rum_token,
-                                        role: new_user.role,
-                                    });
-                                    orgs
-                                };
-                                db_user.organizations = new_orgs;
-                            }
 
-                            db::user::set(&db_user).await.unwrap();
+                if is_updated
+                    && db::user::update(
+                        email,
+                        &new_user.first_name,
+                        &new_user.last_name,
+                        &new_user.password,
+                        new_user.password_ext,
+                    )
+                    .await
+                    .is_err()
+                {
+                    return Ok(
+                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            "Failed to update user".to_string(),
+                        )),
+                    );
+                }
 
-                            #[cfg(feature = "enterprise")]
-                            {
-                                use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
+                // Update the organization membership
+                if is_org_updated {
+                    if db::org_users::get(org_id, email).await.is_ok() {
+                        if let Err(e) = db::org_users::update(
+                            org_id,
+                            email,
+                            new_user.role.into(),
+                            &new_user.token,
+                            new_user.rum_token,
+                        )
+                        .await
+                        {
+                            log::error!("Error updating org user relation: {}", e);
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    "Failed to update organization membership for user".to_string(),
+                                ),
+                            ));
+                        }
+                    } else {
+                        if let Err(e) = db::org_users::add(
+                            org_id,
+                            email,
+                            new_user.role.into(),
+                            &new_user.token,
+                            new_user.rum_token,
+                        )
+                        .await
+                        {
+                            log::error!("Error adding org user relation: {}", e);
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    "Failed to add organization membership for user".to_string(),
+                                ),
+                            ));
+                        }
+                    }
 
-                                if get_o2_config().openfga.enabled
-                                    && old_role.is_some()
-                                    && new_role.is_some()
-                                {
-                                    let old = old_role.unwrap();
-                                    let new = new_role.unwrap();
-                                    if !old.eq(&new) {
-                                        let mut old_str = old.to_string();
-                                        let mut new_str = new.to_string();
-                                        if old.eq(&UserRole::User)
-                                            || old.eq(&UserRole::ServiceAccount)
-                                        {
-                                            old_str = "allowed_user".to_string();
-                                        }
-                                        if new.eq(&UserRole::User)
-                                            || new.eq(&UserRole::ServiceAccount)
-                                        {
-                                            new_str = "allowed_user".to_string();
-                                        }
-                                        if old_str != new_str {
-                                            log::debug!(
-                                                "updating openfga role for {email} from {old_str} to {new_str}"
-                                            );
-                                            update_user_role(&old_str, &new_str, email, org_id)
-                                                .await;
-                                        }
-                                    }
+                    #[cfg(feature = "enterprise")]
+                    {
+                        use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
+
+                        if get_o2_config().openfga.enabled
+                            && old_role.is_some()
+                            && new_role.is_some()
+                        {
+                            let old = old_role.unwrap();
+                            let new = new_role.unwrap();
+                            if !old.eq(&new) {
+                                let mut old_str = old.to_string();
+                                let mut new_str = new.to_string();
+                                if old.eq(&UserRole::User) || old.eq(&UserRole::ServiceAccount) {
+                                    old_str = "allowed_user".to_string();
+                                }
+                                if new.eq(&UserRole::User) || new.eq(&UserRole::ServiceAccount) {
+                                    new_str = "allowed_user".to_string();
+                                }
+                                if old_str != new_str {
+                                    log::debug!(
+                                        "updating openfga role for {email} from {old_str} to {new_str}"
+                                    );
+                                    update_user_role(&old_str, &new_str, email, org_id).await;
                                 }
                             }
-
-                            #[cfg(not(feature = "enterprise"))]
-                            log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
-                            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                                http::StatusCode::OK.into(),
-                                "User updated successfully".to_string(),
-                            )))
                         }
-                        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                            http::StatusCode::NOT_FOUND.into(),
-                            "User not found".to_string(),
-                        ))),
                     }
-                } else {
-                    if message.is_empty() {
-                        message = "Not allowed to update";
-                    }
-                    Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        message.to_string(),
-                    )))
                 }
+
+                #[cfg(not(feature = "enterprise"))]
+                log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    http::StatusCode::OK.into(),
+                    "User updated successfully".to_string(),
+                )))
             }
             None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                 http::StatusCode::NOT_FOUND.into(),
@@ -354,47 +373,46 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         // user is already a root user
         Ok(())
     } else {
-        let existing_user = db::user::get_db_user(user_email).await;
-        if let Ok(mut user) = existing_user {
-            let token = generate_random_string(16);
-            let rum_token = format!("rum{}", generate_random_string(16));
-            user.organizations.push(UserOrg {
-                name: org_id.to_string(),
-                token,
-                rum_token: Some(rum_token),
-                role: UserRole::Admin,
-            });
-            db::user::set(&user).await?;
+        if db::user::get_user_record(user_email).await.is_err() {
+            return Err(anyhow::anyhow!("User not found"));
+        }
+        let token = generate_random_string(16);
+        let rum_token = format!("rum{}", generate_random_string(16));
+        // Add user to the organization
+        db::org_users::add(
+            org_id,
+            user_email,
+            UserRole::Admin.into(),
+            &token,
+            Some(rum_token),
+        )
+        .await?;
 
-            // Update OFGA
-            #[cfg(feature = "enterprise")]
-            {
-                use o2_enterprise::enterprise::openfga::authorizer::authz::{
-                    get_user_role_tuple, update_tuples,
-                };
-                if O2_CONFIG.openfga.enabled {
-                    let mut tuples = vec![];
-                    get_user_role_tuple(
-                        &UserRole::Admin.to_string(),
-                        user_email,
-                        org_id,
-                        &mut tuples,
-                    );
-                    match update_tuples(tuples, vec![]).await {
-                        Ok(_) => {
-                            log::info!("User added to org successfully in openfga");
-                        }
-                        Err(e) => {
-                            log::error!("Error adding user to the org in openfga: {}", e);
-                        }
+        // Update OFGA
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                get_user_role_tuple, update_tuples,
+            };
+            if O2_CONFIG.openfga.enabled {
+                let mut tuples = vec![];
+                get_user_role_tuple(
+                    &UserRole::Admin.to_string(),
+                    user_email,
+                    org_id,
+                    &mut tuples,
+                );
+                match update_tuples(tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("User added to org successfully in openfga");
+                    }
+                    Err(e) => {
+                        log::error!("Error adding user to the org in openfga: {}", e);
                     }
                 }
             }
-
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("User does not exist"))
         }
+        Ok(())
     }
 }
 
@@ -404,58 +422,49 @@ pub async fn add_user_to_org(
     role: UserRole,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let existing_user = db::user::get_db_user(email).await;
+    let existing_user = db::user::get_user_record(email).await;
     let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
-        let mut db_user = existing_user.unwrap();
-        let local_org;
         let initiating_user = if is_root_user(initiator_id) {
-            local_org = org_id.replace(' ', "_");
+            let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
             let _ = organization::check_and_create_org(&local_org).await;
             root_user.get("root").unwrap().clone()
         } else {
-            local_org = org_id.to_owned();
-            db::user::get(Some(org_id), initiator_id)
-                .await
-                .unwrap()
-                .unwrap()
+            match db::user::get(Some(org_id), initiator_id).await {
+                Ok(user) => user.unwrap(),
+                Err(e) => {
+                    log::error!("Error fetching user: {}", e);
+                    return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                        http::StatusCode::NOT_FOUND.into(),
+                        "User not found".to_string(),
+                    )));
+                }
+            }
         };
         let role = get_role(role);
         if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
-            let mut orgs = db_user.clone().organizations;
-            let new_orgs = if orgs.is_empty() {
-                vec![UserOrg {
-                    name: local_org.to_string(),
-                    token,
-                    rum_token: Some(rum_token),
-                    role: role.clone(),
-                }]
-            } else {
-                if db_user.is_external {
-                    for org in orgs.iter() {
-                        if org.name.eq(org_id) {
-                            // External user is already part of this org
-                            return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
-                                http::StatusCode::CONFLICT.into(),
-                                "User is already part of the org".to_string(),
-                            )));
-                        }
-                    }
-                }
-                orgs.retain(|org| !org.name.eq(&local_org));
-                orgs.push(UserOrg {
-                    name: local_org.to_string(),
-                    token,
-                    rum_token: Some(rum_token),
-                    role: role.clone(),
-                });
-                orgs
-            };
-            db_user.organizations = new_orgs;
-            db::user::set(&db_user).await.unwrap();
+            let is_member = db::org_users::get(org_id, email).await.is_ok();
+            if is_member {
+                return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
+                    http::StatusCode::CONFLICT.into(),
+                    "User is already part of the org".to_string(),
+                )));
+            }
+
+            if db::org_users::add(org_id, email, role.into(), &token, Some(rum_token))
+                .await
+                .is_err()
+            {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        "Failed to add user to org".to_string(),
+                    )),
+                );
+            }
 
             // Update OFGA
             #[cfg(feature = "enterprise")]
@@ -631,7 +640,7 @@ pub async fn remove_user_from_org(
                         }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                         user.organizations = orgs;
-                        let resp = db::user::set(&user).await;
+                        let resp = db::org_users::remove(org_id, email_id).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
                             USERS.remove(&format!("{org_id}/{email_id}"));
@@ -714,6 +723,29 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     }
 }
 
+pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
+    let result = db::user::list_user_invites(user_id).await;
+    match result {
+        Ok(res) => {
+            let result = res
+                .into_iter()
+                .map(|invite| UserInvite {
+                    role: invite.role,
+                    org_id: invite.org_id,
+                    token: invite.token,
+                    status: InviteStatus::from(&invite.status),
+                    expires_at: invite.expires_at,
+                })
+                .collect();
+            Ok(HttpResponse::Ok().json(UserInviteList { data: result }))
+        }
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
+}
+
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
     let cfg = get_config();
     let salt = ider::uuid();
@@ -730,7 +762,7 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
         usr_req.is_external,
         password_ext,
     );
-    db::user::set(&user).await.unwrap();
+    db::user::add(&user).await.unwrap();
     Ok(())
 }
 
