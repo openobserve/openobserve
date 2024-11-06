@@ -1,6 +1,6 @@
 ## Pyroscope for profiling
 
-Pyroscope can be used for basic profiling of `Openobserve`.
+Pyroscope can be used for basic profiling of `OpenObserve`.
 The following steps can be followed:
 - Setup a local `pyroscope` server from `benchmarks/pyroscope` directory:
   - `docker-compose up docker-compose.yml`
