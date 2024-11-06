@@ -202,9 +202,30 @@ impl ExecutablePipeline {
         // task to collect results
         let result_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts result collecting job");
+            let dynamic_stream_name_regex = regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap();
             let mut count: usize = 0;
             let mut results = HashMap::new();
-            while let Some((idx, stream_params, record)) = result_receiver.recv().await {
+            while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
+                if stream_params.stream_name.starts_with("{{") {
+                    // if present, resolve dynamic stream_name in stream_params based on record
+                    let resolved_name = dynamic_stream_name_regex
+                        .captures(&stream_params.stream_name)
+                        .and_then(|caps| caps.get(1))
+                        .and_then(|field_name| record.get(field_name.as_str()))
+                        .and_then(|val| val.as_str());
+                    match resolved_name {
+                        Some(stream_name) => {
+                            stream_params.stream_name = stream_name.to_string().into();
+                        }
+                        None => {
+                            log::error!(
+                                "[Pipeline]: dynamic stream name detected in destination, \
+                                but failed to resolve to a concrete stream from the record. Record dropped"
+                            );
+                            continue;
+                        }
+                    }
+                }
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
