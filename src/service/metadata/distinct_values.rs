@@ -180,21 +180,6 @@ impl Metadata for DistinctValues {
                 .await
                 .map_err(|v| Error::Message(v.to_string()))?;
         }
-        #[cfg(feature = "enterprise")]
-        {
-            use o2_enterprise::enterprise::{
-                common::infra::config::get_config as get_o2_config,
-                openfga::authorizer::authz::set_ownership_if_not_exists,
-            };
-
-            if get_o2_config().openfga.enabled {
-                set_ownership_if_not_exists(
-                    org_id,
-                    &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
-                )
-                .await;
-            }
-        }
         Ok(())
     }
 
@@ -217,7 +202,9 @@ impl Metadata for DistinctValues {
             let db_schema = infra::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
                 .await
                 .unwrap();
+            let mut _is_new = false;
             if db_schema.fields().is_empty() {
+                _is_new = true;
                 let schema = schema.as_ref().clone();
                 if let Err(e) = service::db::schema::merge(
                     &org_id,
@@ -267,6 +254,22 @@ impl Metadata for DistinctValues {
             _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
             if let Err(e) = writer.sync().await {
                 log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                use o2_enterprise::enterprise::{
+                    common::infra::config::get_config as get_o2_config,
+                    openfga::authorizer::authz::set_ownership_if_not_exists,
+                };
+
+                // set ownership only in the first time
+                if _is_new && get_o2_config().openfga.enabled {
+                    set_ownership_if_not_exists(
+                        &org_id,
+                        &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
+                    )
+                    .await;
+                }
             }
         }
         Ok(())
