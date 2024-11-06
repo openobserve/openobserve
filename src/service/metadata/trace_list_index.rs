@@ -83,8 +83,9 @@ impl Metadata for TraceListIndex {
         let timestamp = chrono::Utc::now().timestamp_micros();
         let schema_key = self.schema.hash_key();
 
+        let mut is_new = false;
         if !self.db_schema_init.load(Ordering::Relaxed) {
-            self.set_db_schema(org_id).await?
+            is_new = self.set_db_schema(org_id).await?
         }
 
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
@@ -133,7 +134,8 @@ impl Metadata for TraceListIndex {
                 openfga::authorizer::authz::set_ownership_if_not_exists,
             };
 
-            if get_o2_config().openfga.enabled {
+            // set ownership only in the first time
+            if is_new && get_o2_config().openfga.enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
@@ -175,12 +177,14 @@ impl TraceListIndex {
         res
     }
 
-    async fn set_db_schema(&self, org_id: &str) -> infra::errors::Result<()> {
+    async fn set_db_schema(&self, org_id: &str) -> infra::errors::Result<bool> {
         // check for schema
         let db_schema = infra::schema::get(org_id, STREAM_NAME, StreamType::Metadata)
             .await
             .unwrap();
+        let mut is_new = false;
         if db_schema.fields().is_empty() {
+            is_new = true;
             let timestamp = chrono::Utc::now().timestamp_micros();
             let schema = self.schema.as_ref().clone();
             if let Err(e) = db::schema::merge(
@@ -215,7 +219,7 @@ impl TraceListIndex {
 
         self.db_schema_init.store(true, Ordering::Release);
 
-        Ok(())
+        Ok(is_new)
     }
 }
 
