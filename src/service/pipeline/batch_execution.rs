@@ -325,6 +325,10 @@ impl ExecutablePipeline {
             .count()
     }
 
+    pub fn get_pipeline_id(&self) -> &str {
+        &self.id
+    }
+
     fn get_source_stream_params(&self) -> StreamParams {
         // source_node_id must exist in node_map
         match &self.node_map.get(&self.source_node_id).unwrap().node_data {
