@@ -88,6 +88,12 @@ function monacoEditorTestResolver() {
 // const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
 // const srcPath = path.resolve(process.cwd(), 'src');
 
+console.log(
+  "Vite Coverage =====",
+  process.env.VITE_COVERAGE,
+  process.env.VITE_COVERAGE === "true",
+);
+
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
