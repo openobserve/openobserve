@@ -202,9 +202,9 @@ impl Metadata for DistinctValues {
             let db_schema = infra::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
                 .await
                 .unwrap();
-            let mut is_new = false;
+            let mut _is_new = false;
             if db_schema.fields().is_empty() {
-                is_new = true;
+                _is_new = true;
                 let schema = schema.as_ref().clone();
                 if let Err(e) = service::db::schema::merge(
                     &org_id,
@@ -263,7 +263,7 @@ impl Metadata for DistinctValues {
                 };
 
                 // set ownership only in the first time
-                if is_new && get_o2_config().openfga.enabled {
+                if _is_new && get_o2_config().openfga.enabled {
                     set_ownership_if_not_exists(
                         &org_id,
                         &format!("{}:{}", StreamType::Metadata, STREAM_NAME),

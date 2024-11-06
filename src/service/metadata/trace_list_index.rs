@@ -83,9 +83,9 @@ impl Metadata for TraceListIndex {
         let timestamp = chrono::Utc::now().timestamp_micros();
         let schema_key = self.schema.hash_key();
 
-        let mut is_new = false;
+        let mut _is_new = false;
         if !self.db_schema_init.load(Ordering::Relaxed) {
-            is_new = self.set_db_schema(org_id).await?
+            _is_new = self.set_db_schema(org_id).await?
         }
 
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
@@ -135,7 +135,7 @@ impl Metadata for TraceListIndex {
             };
 
             // set ownership only in the first time
-            if is_new && get_o2_config().openfga.enabled {
+            if _is_new && get_o2_config().openfga.enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
