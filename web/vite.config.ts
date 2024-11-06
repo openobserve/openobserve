@@ -88,15 +88,6 @@ function monacoEditorTestResolver() {
 // const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
 // const srcPath = path.resolve(process.cwd(), 'src');
 
-console.log(
-  "Vite Coverage =====",
-  process.env.VITE_COVERAGE,
-  process.env.VITE_COVERAGE === "true",
-  `env: ${process.env} .`,
-  `env Previx: ${process.envPrefix} .`,
-  `env Previx: ${process.env.envPrefix}`,
-);
-
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
@@ -125,7 +116,8 @@ export default defineConfig({
         include: "src/**/*",
         exclude: ["node_modules", "test/"],
         extension: [".js", ".ts", ".vue"],
-        requireEnv: true,
+        requireEnv: false,
+        forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
     vueJsx(),
