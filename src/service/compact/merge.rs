@@ -389,7 +389,9 @@ pub async fn merge_by_stream(
             for file in files_with_size.iter() {
                 if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
                     if new_file_list.len() <= 1 {
-                        break; // no files need to merge
+                        new_file_size = 0;
+                        new_file_list.clear();
+                        continue; // this batch don't need to merge, skip
                     }
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
