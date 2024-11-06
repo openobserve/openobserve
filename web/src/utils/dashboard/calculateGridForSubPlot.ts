@@ -75,10 +75,12 @@ export function getTrellisGrid(
   }
 
   const spaceBetweenCharts = 4;
+  const verticalSpacingBetweenCharts = 30;
 
   // How many cols
   const xSpacingBetween = ((spaceBetweenCharts * (numCols - 1)) / width) * 100;
-  const ySpacingBetween = ((30 * (numRows - 1)) / height) * 100;
+  const ySpacingBetween =
+    ((verticalSpacingBetweenCharts * (numRows - 1)) / height) * 100;
   const topPadding = (20 / height) * 100;
   const bottomPadding = (52 / height) * 100;
 
@@ -91,22 +93,12 @@ export function getTrellisGrid(
   const cellHeight =
     (100 - (ySpacingBetween + topPadding + bottomPadding)) / numRows;
 
-  // console.log(
-  //   "cellWidth",
-  //   width,
-  //   numCols,
-  //   numRows,
-  //   xSpacingBetween + rightPadding + leftPadding,
-  //   cellWidth,
-  // );
-  // console.log("cellHeight", height, cellHeight);
-
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {
     for (let col = 0; col < numCols; col++) {
       const grid = {
         left: `${col * cellWidth + col * ((spaceBetweenCharts / width) * 100) + leftPadding}%`,
-        top: `${row * cellHeight + row * ySpacingBetween + topPadding}%`,
+        top: `${row * cellHeight + row * ((verticalSpacingBetweenCharts / height) * 100) + topPadding}%`,
         width: `${cellWidth}%`,
         height: `${cellHeight}%`,
       };

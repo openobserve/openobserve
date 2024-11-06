@@ -561,6 +561,329 @@ export const convertSQLData = async (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
+  const updateTrellisForPieTypeChart = () => {
+    // console.log(processedData, breakDownKeys, options);
+
+    options.xAxis[0].data = Array.from(
+      new Set(getAxisDataFromKey(xAxisKeys[0])),
+    );
+
+    options.xAxis = options.xAxis.slice(0, 1);
+
+    // stacked with xAxis's second value
+    // allow 2 xAxis and 1 yAxis value for stack chart
+    // get second x axis key
+    // get the unique value of the second xAxis's key
+    const key1 = yAxisKeys[0];
+    const key2 = xAxisKeys[0];
+
+    const yAxisValue = getAxisDataFromKey(key1);
+
+    const xAxisValue = getAxisDataFromKey(key2);
+
+    options.yAxis = [options.yAxis];
+
+    const gridData = getTrellisGrid(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      yAxisValue.length,
+      8,
+    );
+
+    options.grid = gridData.gridArray;
+
+    options.title = [];
+
+    options.series = yAxisValue?.map((key: any, index: number) => {
+      // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+      const seriesObj: any = {
+        name: key,
+        ...defaultSeriesProps,
+        gridIndex: index,
+        // markLine if exist
+        data: [
+          {
+            // gauge name may have or may not have
+            name: xAxisValue[index] ?? "",
+            value: key,
+            detail: {
+              formatter: function (value: any) {
+                const unitValue = getUnitValue(
+                  value,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                );
+                return unitValue.value + unitValue.unit;
+              },
+            },
+          },
+        ],
+        label: {
+          show: true,
+          formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+          position: "inside", // You can adjust the position of the labels
+          fontSize: 10,
+        },
+        percentPrecision: panelSchema.config?.decimals ?? 2,
+        center: [
+          `${
+            parseFloat(options.grid[index].left) +
+            parseFloat(options.grid[index].width) / 2
+          }%`,
+          `${
+            parseFloat(options.grid[index].top) +
+            parseFloat(options.grid[index].height) / 2
+          }%`,
+        ],
+        radius: `${
+          Math.min(gridData.gridWidth, gridData.gridHeight) / 2 - 5
+        }px`,
+      };
+
+      // //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
+      // const width =
+      //   (calculateWidthText(seriesObj.name) /
+      //     chartPanelRef.value.offsetWidth) *
+      //   100;
+      // const titleLeft = parseInt(gridData.gridArray[index].left);
+
+      // const whiteSpace = parseInt(gridData.gridArray[index].width) - width;
+
+      // if (whiteSpace > 0) {
+      //   titleLeft =
+      //     titleLeft +
+      //     (parseInt(gridData.gridArray[index].width) - width) / 2;
+      // } else {
+      //   titleLeft =
+      //     titleLeft + (10 / chartPanelRef.value.offsetWidth) * 100;
+      // }
+
+      options.title.push({
+        text: seriesObj.name,
+        textStyle: {
+          fontSize: 12,
+          width:
+            parseInt(gridData.gridArray[index].width) *
+              (chartPanelRef.value.offsetWidth / 100) -
+            8,
+          overflow: "truncate",
+          ellipsis: "...",
+        },
+        top:
+          parseInt(gridData.gridArray[index].top) -
+          (18 / chartPanelRef.value.offsetHeight) * 100 +
+          "%",
+        left: gridData.gridArray[index].left,
+      });
+
+      return seriesObj;
+    });
+
+    options.legend.show = false;
+  };
+
+  const updateTrellisChartOptions = () => {
+    // console.log(processedData, breakDownKeys, options);
+
+    const isHorizontalChart =
+      panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
+
+    options.xAxis[0].data = Array.from(
+      new Set(getAxisDataFromKey(xAxisKeys[0])),
+    );
+
+    options.xAxis = options.xAxis.slice(0, 1);
+
+    // stacked with xAxis's second value
+    // allow 2 xAxis and 1 yAxis value for stack chart
+    // get second x axis key
+    const breakDownkey1 = breakDownKeys[0];
+
+    // get the unique value of the second xAxis's key
+    const stackedXAxisUniqueValue = [
+      ...new Set(processedData.map((obj: any) => obj[breakDownkey1])),
+    ].filter((it) => it);
+
+    options.yAxis = [options.yAxis];
+
+    const yAxisLabel = isHorizontalChart ? xAxisKeys[0] : yAxisKeys[0];
+
+    const yAxisNameGap =
+      calculateWidthText(
+        formatUnitValue(
+          getUnitValue(
+            largestLabel(getAxisDataFromKey(yAxisLabel)),
+            panelSchema.config?.unit,
+            panelSchema.config?.unit_custom,
+            panelSchema.config?.decimals,
+          ),
+        ),
+      ) + 8;
+
+    const maxYValue = formatUnitValue(
+      getUnitValue(
+        Math.max(...getAxisDataFromKey(yAxisKeys[0])),
+        panelSchema.config?.unit,
+        panelSchema.config?.unit_custom,
+        panelSchema.config?.decimals,
+      ),
+    );
+
+    const gridData = getTrellisGrid(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      stackedXAxisUniqueValue.length,
+      yAxisNameGap,
+    );
+
+    options.grid = gridData.gridArray;
+
+    options.title = [];
+
+    options.series = stackedXAxisUniqueValue?.map((key: any, index: number) => {
+      // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+      const data = processedData.filter((it: any) => it[breakDownkey1] == key);
+
+      const seriesObj: any = {
+        name: key,
+        ...defaultSeriesProps,
+        // markLine if exist
+        markLine: {
+          silent: true,
+          animation: false,
+          data: getMarkLineData(panelSchema),
+        },
+        data: options.xAxis[0].data.map((it: any) => {
+          return (
+            data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxisKeys[0]] ??
+            null
+          );
+        }),
+        barMinHeight: 1,
+      };
+
+      if (index > 0) {
+        options.xAxis.push({
+          ...JSON.parse(JSON.stringify(options.xAxis[0])),
+          gridIndex: index,
+        });
+        options.yAxis.push({
+          ...JSON.parse(JSON.stringify(options.yAxis[0])),
+          gridIndex: index,
+        });
+
+        seriesObj.xAxisIndex = index;
+        seriesObj.yAxisIndex = index;
+      }
+
+      // //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
+      // const width =
+      //   (calculateWidthText(seriesObj.name) /
+      //     chartPanelRef.value.offsetWidth) *
+      //   100;
+      // const titleLeft = parseInt(gridData.gridArray[index].left);
+
+      // const whiteSpace = parseInt(gridData.gridArray[index].width) - width;
+
+      // if (whiteSpace > 0) {
+      //   titleLeft =
+      //     titleLeft +
+      //     (parseInt(gridData.gridArray[index].width) - width) / 2;
+      // } else {
+      //   titleLeft =
+      //     titleLeft + (10 / chartPanelRef.value.offsetWidth) * 100;
+      // }
+
+      options.title.push({
+        text: seriesObj.name,
+        textStyle: {
+          fontSize: 12,
+          width:
+            parseInt(gridData.gridArray[index].width) *
+              (chartPanelRef.value.offsetWidth / 100) -
+            8,
+          overflow: "truncate",
+          ellipsis: "...",
+        },
+        top:
+          parseInt(gridData.gridArray[index].top) -
+          (18 / chartPanelRef.value.offsetHeight) * 100 +
+          "%",
+        left: gridData.gridArray[index].left,
+      });
+
+      return seriesObj;
+    });
+
+    options.yAxis.forEach((it: any, index: number) => {
+      it.max = maxYValue;
+      it.axisLabel = {
+        formatter: function (value: number) {
+          // Force two decimal places for all charts
+          return value.toFixed(2);
+        },
+      };
+
+      let showAxisLabel = true;
+
+      if (isHorizontalChart) {
+        showAxisLabel =
+          index >=
+          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+      } else {
+        showAxisLabel = index % gridData.gridNoOfCol === 0;
+      }
+
+      if (showAxisLabel) {
+        it.nameGap = yAxisNameGap;
+
+        it.axisLabel.margin = 5;
+        it.axisLabel.fontSize = 12;
+        it.nameTextStyle.fontSize = 12;
+        it.axisLabel.show = true;
+        return;
+      }
+      it.nameGap = 0;
+      it.axisLabel.margin = 0;
+      it.axisLabel.fontSize = 10;
+      it.nameTextStyle.fontSize = 12;
+      it.axisLabel.show = false;
+      it.name = "";
+    });
+
+    options.xAxis.forEach((it: any, index: number) => {
+      let showAxisLabel = true;
+
+      if (isHorizontalChart) {
+        showAxisLabel = index % gridData.gridNoOfCol === 0;
+      } else {
+        showAxisLabel =
+          index >=
+          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+      }
+
+      if (showAxisLabel) {
+        it.axisTick.length = 5;
+        it.nameGap = isHorizontalChart ? yAxisNameGap : 25;
+        it.axisLabel.margin = 8;
+        it.axisLabel.fontSize = 12;
+        it.nameTextStyle.fontSize = 12;
+        it.axisLabel.show = true;
+      } else {
+        it.axisTick.length = 0;
+        it.nameGap = 0;
+        it.axisLabel.margin = 0;
+        it.axisLabel.fontSize = 10;
+        it.nameTextStyle.fontSize = 12;
+        it.axisLabel.show = false;
+        it.name = "";
+      }
+    });
+
+    options.legend.show = false;
+  };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -1117,6 +1440,11 @@ export const convertSQLData = async (
           return seriesObj;
         });
       }
+
+      if (panelSchema.config.enable_trellis_chart) {
+        updateTrellisChartOptions();
+      }
+
       break;
     }
     case "bar": {
@@ -1164,9 +1492,20 @@ export const convertSQLData = async (
           20 * (xAxisKeys.length + breakDownKeys.length - index);
       });
 
+      if (panelSchema.config.enable_trellis_chart) {
+        updateTrellisChartOptions();
+      }
+
       break;
     }
     case "h-bar": {
+      if (panelSchema.config.enable_trellis_chart) {
+        updateTrellisChartOptions();
+        const temp = options.xAxis;
+        options.xAxis = options.yAxis;
+        options.yAxis = temp;
+        break;
+      }
       //generate trace based on the y axis keys
       options.series = yAxisKeys?.map((key: any) => {
         const seriesLabel = panelSchema?.queries[0]?.fields?.y.find(
@@ -1239,9 +1578,19 @@ export const convertSQLData = async (
           ? panelSchema.queries[0]?.fields?.y[0]?.label
           : ""),
         (options.xAxis.nameGap = 20);
+
       break;
     }
     case "pie": {
+      // if (panelSchema.config.enable_trellis_chart) {
+      //   updateTrellisForPieTypeChart();
+      //   options.xAxis = [];
+      //   options.yAxis = [];
+
+      //   console.log(options);
+      //   break;
+      // }
+
       options.tooltip = {
         trigger: "item",
         textStyle: {
@@ -1460,6 +1809,9 @@ export const convertSQLData = async (
         };
         return seriesObj;
       });
+      if (panelSchema.config.enable_trellis_chart) {
+        updateTrellisChartOptions();
+      }
       break;
     }
     case "heatmap": {
@@ -1635,6 +1987,15 @@ export const convertSQLData = async (
       break;
     }
     case "h-stacked": {
+      if (panelSchema.config.enable_trellis_chart) {
+        updateTrellisChartOptions();
+        const temp = options.xAxis;
+        options.xAxis = options.yAxis;
+        options.yAxis = temp;
+
+        break;
+      }
+
       options.xAxis[0].data = Array.from(
         new Set(getAxisDataFromKey(xAxisKeys[0])),
       );
@@ -1893,191 +2254,6 @@ export const convertSQLData = async (
         };
       });
       break;
-    }
-    case "trellis": {
-      // console.log(processedData, breakDownKeys, options);
-      options.xAxis[0].data = Array.from(
-        new Set(getAxisDataFromKey(xAxisKeys[0])),
-      );
-
-      options.xAxis = options.xAxis.slice(0, 1);
-
-      // stacked with xAxis's second value
-      // allow 2 xAxis and 1 yAxis value for stack chart
-      // get second x axis key
-      const breakDownkey1 = breakDownKeys[0];
-
-      // get the unique value of the second xAxis's key
-      const stackedXAxisUniqueValue = [
-        ...new Set(processedData.map((obj: any) => obj[breakDownkey1])),
-      ].filter((it) => it);
-
-      options.yAxis = [options.yAxis];
-
-      const yAxisNameGap =
-        calculateWidthText(
-          formatUnitValue(
-            getUnitValue(
-              largestLabel(getAxisDataFromKey(yAxisKeys[0])),
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          ),
-        ) + 8;
-
-      const maxYValue = formatUnitValue(
-        getUnitValue(
-          Math.max(...getAxisDataFromKey(yAxisKeys[0])),
-          panelSchema.config?.unit,
-          panelSchema.config?.unit_custom,
-          panelSchema.config?.decimals,
-        ),
-      );
-
-      const gridData = getTrellisGrid(
-        chartPanelRef.value.offsetWidth,
-        chartPanelRef.value.offsetHeight,
-        stackedXAxisUniqueValue.length,
-        yAxisNameGap,
-      );
-
-      options.grid = gridData.gridArray;
-
-      options.title = [];
-
-      options.series = stackedXAxisUniqueValue?.map(
-        (key: any, index: number) => {
-          // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-          const data = processedData.filter(
-            (it: any) => it[breakDownkey1] == key,
-          );
-
-          const seriesObj: any = {
-            name: key,
-            ...defaultSeriesProps,
-            // markLine if exist
-            markLine: {
-              silent: true,
-              animation: false,
-              data: getMarkLineData(panelSchema),
-            },
-            data: options.xAxis[0].data.map((it: any) => {
-              return (
-                data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
-                  yAxisKeys[0]
-                ] ?? null
-              );
-            }),
-            barMinHeight: 1,
-            type: "line",
-          };
-
-          if (index > 0) {
-            options.xAxis.push({
-              ...JSON.parse(JSON.stringify(options.xAxis[0])),
-              gridIndex: index,
-            });
-            options.yAxis.push({
-              ...JSON.parse(JSON.stringify(options.yAxis[0])),
-              gridIndex: index,
-            });
-
-            seriesObj.xAxisIndex = index;
-            seriesObj.yAxisIndex = index;
-          }
-
-          // //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
-          // const width =
-          //   (calculateWidthText(seriesObj.name) /
-          //     chartPanelRef.value.offsetWidth) *
-          //   100;
-          // const titleLeft = parseInt(gridData.gridArray[index].left);
-
-          // const whiteSpace = parseInt(gridData.gridArray[index].width) - width;
-
-          // if (whiteSpace > 0) {
-          //   titleLeft =
-          //     titleLeft +
-          //     (parseInt(gridData.gridArray[index].width) - width) / 2;
-          // } else {
-          //   titleLeft =
-          //     titleLeft + (10 / chartPanelRef.value.offsetWidth) * 100;
-          // }
-
-          options.title.push({
-            text: seriesObj.name,
-            textStyle: {
-              fontSize: 12,
-              width:
-                parseInt(gridData.gridArray[index].width) *
-                  (chartPanelRef.value.offsetWidth / 100) -
-                8,
-              overflow: "truncate",
-              ellipsis: "...",
-            },
-            top:
-              parseInt(gridData.gridArray[index].top) -
-              (18 / chartPanelRef.value.offsetHeight) * 100 +
-              "%",
-            left: gridData.gridArray[index].left,
-          });
-
-          return seriesObj;
-        },
-      );
-
-      options.yAxis.forEach((it: any, index: number) => {
-        it.max = maxYValue;
-        it.axisLabel = {
-          formatter: function (value: number) {
-            // Force two decimal places for all charts
-            return value.toFixed(2);
-          },
-        };
-        if ((index / gridData.gridNoOfCol) % 1 === 0) {
-          it.nameGap = yAxisNameGap;
-
-          it.axisLabel.margin = 5;
-          it.axisLabel.fontSize = 12;
-          it.nameTextStyle.fontSize = 12;
-          it.axisLabel.show = true;
-          return;
-        }
-        it.nameGap = 0;
-        it.axisLabel.margin = 0;
-        it.axisLabel.fontSize = 10;
-        it.nameTextStyle.fontSize = 12;
-        it.axisLabel.show = false;
-        it.name = "";
-      });
-
-      options.xAxis.forEach((it: any, index: number) => {
-        if (
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol
-        ) {
-          it.axisTick.length = 5;
-          it.nameGap = 25;
-          it.axisLabel.margin = 8;
-          it.axisLabel.fontSize = 12;
-          it.nameTextStyle.fontSize = 12;
-          it.axisLabel.show = true;
-        } else {
-          it.axisTick.length = 0;
-          it.nameGap = 0;
-          it.axisLabel.margin = 0;
-          it.axisLabel.fontSize = 10;
-          it.nameTextStyle.fontSize = 12;
-          it.axisLabel.show = false;
-          it.name = "";
-        }
-      });
-
-      options.legend.show = false;
-
-      console.log("options", JSON.parse(JSON.stringify(options)));
-      console.log("options", options);
     }
 
     // eslint-disable-next-line no-fallthrough

@@ -32,6 +32,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <div
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'geomap' &&
+        dashboardPanelData.data.type != 'sankey'
+      "
+      class="q-mb-sm"
+    >
+      <q-select
+        :label="t('dashboard.trellisLayout')"
+        data-test="dashboard-trellis-chart"
+        outlined
+        v-model="dashboardPanelData.data.config.enable_trellis_chart"
+        :options="trellisOptions"
+        dense
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.enable_trellis_chart ?? 'None'
+        }`"
+      >
+      </q-select>
+
+      <template
+        v-if="dashboardPanelData.data.config.enable_trellis_chart === 'custom'"
+      >
+        <div class="q-mb-sm q-mt-sm" style="font-weight: 600">
+          {{ t("dashboard.numOfColumns") }}
+        </div>
+        <q-input
+          outlined
+          v-model="dashboardPanelData.data.config.num_of_columns"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-mr-sm"
+          stack-label
+          filled
+          dense
+          :type="'number'"
+          placeholder="Auto"
+          data-test="trellis-chart-num-of-columns"
+        />
+      </template>
+    </div>
+
     <q-toggle
       v-if="
         dashboardPanelData.data.type != 'table' &&
@@ -1297,6 +1346,10 @@ export default defineComponent({
         };
       }
 
+      if (!dashboardPanelData.data.config.enable_trellis_chart) {
+        dashboardPanelData.data.config.enable_trellis_chart = null;
+      }
+
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
       }
@@ -1421,6 +1474,26 @@ export default defineComponent({
         value: "by Value",
       },
     ];
+
+    const trellisOptions = [
+      {
+        label: t("common.none"),
+        value: null,
+      },
+      {
+        label: t("common.auto"),
+        value: "auto",
+      },
+      {
+        label: t("common.vertical"),
+        value: "vertical",
+      },
+      {
+        label: t("common.custom"),
+        value: "custom",
+      },
+    ];
+
     // options for legends position
     const legendsPositionOptions = [
       {
@@ -1699,6 +1772,7 @@ export default defineComponent({
       addTimeShift,
       removeTimeShift,
       showColorPalette,
+      trellisOptions,
     };
   },
 });

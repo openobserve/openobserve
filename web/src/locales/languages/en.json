@@ -60,7 +60,12 @@
     "addCondition": "Add condition",
     "required": "A value is required",
     "valueMustBeGreaterThanZero": "Value must be greater than zero",
-    "links": "Links"
+    "links": "Links",
+    "vertical": "Vertical",
+    "horizontal": "Horizontal",
+    "custom": "Custom",
+    "none": "None",
+    "auto": "Auto"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -708,7 +713,9 @@
     "searchSelf": "Switch to Search across the current Folder",
     "searchAll": "Switch to Search Across all Folders",
     "folder": "Folder",
-    "searchMsg": "Search for Dashboards across Folders"
+    "searchMsg": "Search for Dashboards across Folders",
+    "trellisLayout": "Trellis Layout",
+    "numOfColumns": "Number of Columns per Row"
   },
   "panel": {
     "header": "Panel",
