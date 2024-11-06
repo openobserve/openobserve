@@ -388,7 +388,7 @@ pub async fn send_email(
 
     let mut email = Message::builder()
         .from(config.from_email.parse()?)
-        .subject(format!("Openobserve Report - {}", &email_details.title));
+        .subject(format!("{}", &email_details.title));
 
     for recipient in recipients {
         email = email.to(recipient.parse()?);
