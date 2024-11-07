@@ -516,13 +516,13 @@ async fn filter_file_list_by_inverted_index(
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let file_name = file.clone();
-        let trace_id_clone = query.trace_id.to_string();
+        let trace_id = query.trace_id.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
         let task = tokio::task::spawn(async move {
             let res = inverted_index_search_in_file(
-                trace_id_clone.as_str(),
+                &trace_id,
                 &file_name,
                 full_text_term_clone,
                 index_terms_clone,
