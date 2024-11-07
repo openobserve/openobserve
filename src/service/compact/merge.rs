@@ -32,10 +32,9 @@ use config::{
     utils::{
         json,
         parquet::{
-            get_recordbatch_reader_from_bytes, parse_file_key_columns, read_recordbatch_from_bytes,
-            read_schema_from_bytes,
+            get_recordbatch_reader_from_bytes, parse_file_key_columns, read_schema_from_bytes,
         },
-        record_batch_ext::{concat_batches, merge_record_batches},
+        record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::hour_micros,
     },
@@ -1127,61 +1126,6 @@ pub fn generate_inverted_idx_recordbatch(
             Ok(Some(new_batch))
         }
     }
-}
-
-pub async fn merge_parquet_files(
-    thread_id: usize,
-    trace_id: &str,
-    schema: Arc<Schema>,
-) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
-    let start = std::time::Instant::now();
-
-    // get record batches from tmpfs
-    let temp_files = infra::cache::tmpfs::list(trace_id, "parquet").map_err(|e| {
-        log::error!(
-            "[MERGE:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
-            e
-        );
-        DataFusionError::Execution(e.to_string())
-    })?;
-
-    let mut record_batches = Vec::new();
-    let mut shared_fields = HashSet::new();
-    for file in temp_files {
-        let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
-            log::error!(
-                "[MERGE:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
-                e
-            );
-            DataFusionError::Execution(e.to_string())
-        })?;
-
-        let (file_schema, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
-            log::error!("[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error");
-            log::error!(
-                "[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
-                file.location,
-                e
-            );
-            DataFusionError::Execution(e.to_string())
-        })?;
-        record_batches.extend(batches);
-        shared_fields.extend(file_schema.fields().iter().map(|f| f.name().to_string()));
-    }
-
-    // create new schema with the shared fields
-    let schema = Arc::new(schema.retain(shared_fields));
-
-    // merge record batches, the record batch have same schema
-    let (schema, new_record_batches) =
-        merge_record_batches("MERGE", thread_id, schema, record_batches)?;
-
-    log::info!(
-        "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok((schema, vec![new_record_batches]))
 }
 
 async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Error> {

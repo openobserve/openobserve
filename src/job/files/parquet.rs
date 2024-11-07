@@ -1050,10 +1050,8 @@ pub(crate) async fn generate_index_on_compactor(
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
 
-    let original_file_size = 0; // The file never existed before this function was called
     let files = write_parquet_index_to_disk(
         record_batches,
-        original_file_size,
         org_id,
         StreamType::Index,
         &index_stream_name,

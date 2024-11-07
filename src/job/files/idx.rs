@@ -24,7 +24,9 @@ use config::{
     ider,
     meta::stream::{FileMeta, StreamPartition, StreamPartitionType, StreamType},
     utils::{
-        parquet::new_parquet_writer, record_batch_ext::concat_batches, schema::format_partition_key,
+        parquet::new_parquet_writer,
+        record_batch_ext::{concat_batches, RecordBatchExt},
+        schema::format_partition_key,
     },
     FILE_EXT_PARQUET,
 };
@@ -57,7 +59,6 @@ fn generate_index_file_name_from_compacted_file(
 
 pub(crate) async fn write_parquet_index_to_disk(
     batches: Vec<arrow::record_batch::RecordBatch>,
-    file_size: u64,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -96,22 +97,12 @@ pub(crate) async fn write_parquet_index_to_disk(
     let mut ret = Vec::new();
     for (prefix, batch) in partitioned_batches.into_iter() {
         // write metadata
+        let batch_size = batch.size();
         let mut file_meta = FileMeta {
-            min_ts: 0,
-            max_ts: 0,
-            records: 0,
-            original_size: file_size as i64,
-            compressed_size: 0,
-            flattened: false,
+            original_size: batch_size as i64,
+            ..Default::default()
         };
-        populate_file_meta(
-            schema.clone(),
-            vec![vec![batch.clone()]],
-            &mut file_meta,
-            Some("min_ts"),
-            Some("max_ts"),
-        )
-        .await?;
+        populate_file_meta(&[&batch], &mut file_meta, Some("min_ts"), Some("max_ts")).await?;
 
         // write parquet file
         let mut buf_parquet = Vec::new();
