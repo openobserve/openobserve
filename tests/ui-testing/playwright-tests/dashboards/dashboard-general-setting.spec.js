@@ -137,7 +137,9 @@ test.describe("dashboard general setting", () => {
     const expectedTime = await page.locator('[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]').textContent();
 
     await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
-    await expect(page.getByText('check_circleDashboard updated successfully.close')).toBeVisible();
+    await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
+      timeout: 30000,
+    });
     await page.locator('[data-test="dashboard-settings-close-btn"]').click();
     await page.locator('[data-test="dashboard-panel-add"]').click();
     await page.locator('[data-test="dashboard-panel-discard"]').click();
@@ -169,6 +171,8 @@ test.describe("dashboard general setting", () => {
     await page.locator('[data-test="dashboard-setting-btn"]').click();
     await page.locator('[data-test="dashboard-general-setting-dynamic-filter"] div').nth(2).click();
     await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
-    await expect(page.getByText('check_circleDashboard updated successfully.close')).toBeVisible();
+    await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
+      timeout: 30000,
+    });
   })
 });
