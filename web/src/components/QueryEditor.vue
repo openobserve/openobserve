@@ -161,7 +161,7 @@ export default defineComponent({
       if (editorElement && editorElement?.hasChildNodes()) return;
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
-        value: props.query,
+        value: props.query?.trim(),
         language: props.language,
         theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
@@ -194,8 +194,8 @@ export default defineComponent({
 
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
-          emit("update-query", e, editorObj.getValue());
-          emit("update:query", editorObj.getValue());
+          emit("update-query", e, editorObj.getValue()?.trim());
+          emit("update:query", editorObj.getValue()?.trim());
         }, props.debounceTime)
       );
 
@@ -215,6 +215,7 @@ export default defineComponent({
       });
 
       editorObj.onDidBlurEditorWidget(() => {
+        setValue(editorObj.getValue()?.trim());
         emit("blur");
       });
 

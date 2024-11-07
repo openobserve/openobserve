@@ -423,7 +423,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(100);
     await page
       .locator('[data-test="add-template-name-input"]')
-      .fill("sanitytemplates");
+      .fill("sanitytemp1");
     const jsonString = '{"text": "{alert_name} is active"}';
     await page.click(".view-line");
     await page.keyboard.type(jsonString);
@@ -434,6 +434,7 @@ test.describe("Sanity testcases", () => {
     await expect(
       page
         .locator(".q-notification__message")
+
         .getByText(/Template Saved Successfully/)
         .first()
     ).toBeVisible();
@@ -448,9 +449,9 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .locator('[data-test="add-destination-name-input"]')
-      .fill("sanitydestinations");
+      .fill("sanitydest1");
     await page.locator('[data-test="add-destination-template-select"]').click();
-    await page.getByText("sanitytemplate").click();
+    await page.getByText("sanitytemp1").click();
     await page.locator('[data-test="add-destination-url-input"]').click();
     await page
       .locator('[data-test="add-destination-url-input"]')
@@ -469,7 +470,7 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="add-alert-name-input"]')
       .getByLabel("Name *")
-      .fill("sanityalerts");
+      .fill("sanityalert1");
     await page
       .locator('[data-test="add-alert-stream-type-select"]')
       .getByText("arrow_drop_down")
@@ -491,17 +492,43 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator(
-        '[data-test="add-alert-destination-sanitydestinations-select-item"]'
+        '[data-test="add-alert-destination-sanitydest1-select-item"]'
       )
       .click();
     await page.locator('[data-test="add-alert-submit-btn"]').click();
+
+    // Clone the alert
+    await page.locator('[data-test="alert-clone"]').click(); // Ensure this selector is correct
+    await page.getByLabel('Alert Name').click();
+    await page.getByLabel('Alert Name').fill('test-clone');
+    await page.locator('[data-test="to-be-clone-alert-name"]').click()
+    await page.locator('[data-test="to-be-clone-alert-name"]').fill('test-clone');
+    await page.locator('[data-test="to-be-clone-stream-type"]').click();
+    
+    await page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+    await page.locator('[data-test="to-be-clone-stream-name"]').click();
+    await page.locator('[data-test="to-be-clone-stream-name"]').fill('e2e_automate');
+    await page.waitForTimeout(2000);
+    await page.getByRole('option', { name: 'e2e_automate' }).click({force:true});
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="clone-alert-submit-btn"]').click();
+    await page.getByText('Alert Cloned Successfully').click();
+ 
+  
+    // Delete the cloned alert
+    await page.getByRole('cell', { name: 'test-clone' }).click();
+    await page.locator('[data-test="alert-list-test-clone-delete-alert"]').click(); // Adjust the selector if necessary
+    await page.locator('[data-test="confirm-button"]').click();
+  
+    // Delete the original alert
     await page.locator('[data-test="alert-list-search-input"]').click();
     await page.locator('[data-test="alert-list-search-input"]').fill("sani");
     await page.waitForTimeout(2000);
     await page
-      .locator('[data-test="alert-list-sanityalerts-delete-alert"]')
+      .locator('[data-test="alert-list-sanityalert1-delete-alert"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-destinations-tab"]').click();
     await page.locator('[data-test="destination-list-search-input"]').click();
     await page
@@ -510,7 +537,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="alert-destination-list-sanitydestinations-delete-destination"]'
+        '[data-test="alert-destination-list-sanitydest1-delete-destination"]'
       )
       .click();
     await page.locator('[data-test="confirm-button"]').click();
@@ -522,7 +549,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="alert-template-list-sanitytemplates-delete-template"]'
+        '[data-test="alert-template-list-sanitytemp1-delete-template"]'
       )
       .click();
     await page.locator('[data-test="confirm-button"]').click();
@@ -965,6 +992,8 @@ test.describe("Sanity testcases", () => {
     // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element
     await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click();
 });
-  
+
+
+
 
 });

@@ -19,18 +19,11 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::stream::StreamType;
+use config::meta::function::{FunctionList, Transform};
 
 use crate::{
     common::{
-        infra::config::STREAM_FUNCTIONS,
-        meta::{
-            authz::Authz,
-            functions::{
-                FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform,
-            },
-            http::HttpResponse as MetaHttpResponse,
-        },
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::{db, ingestion::compile_vrl_function},
@@ -38,8 +31,6 @@ use crate::{
 
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
-const FN_ADDED: &str = "Function applied to stream";
-const FN_REMOVED: &str = "Function removed from stream";
 const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
@@ -100,10 +91,6 @@ pub async fn update_function(
     if func == existing_fn {
         return Ok(HttpResponse::Ok().json(func));
     }
-
-    // UI mostly like in 1st version won't send streams, so we need to add them back
-    // from existing function
-    func.streams = existing_fn.streams;
 
     if !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
@@ -206,118 +193,6 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     }
 }
 
-pub async fn list_stream_functions(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Result<HttpResponse, Error> {
-    if let Some(val) = STREAM_FUNCTIONS.get(&format!("{}/{}/{}", org_id, stream_type, stream_name))
-    {
-        Ok(HttpResponse::Ok().json(val.value()))
-    } else {
-        Ok(HttpResponse::Ok().json(StreamFunctionsList { list: vec![] }))
-    }
-}
-
-pub async fn delete_stream_function(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    fn_name: &str,
-) -> Result<HttpResponse, Error> {
-    let mut existing_fn = match check_existing_fn(org_id, fn_name).await {
-        Some(function) => function,
-        None => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                FN_NOT_FOUND.to_string(),
-            )));
-        }
-    };
-
-    if let Some(ref mut val) = existing_fn.streams {
-        for stream in val.iter_mut() {
-            if stream.stream == stream_name && stream.stream_type == stream_type {
-                stream.is_removed = true;
-                stream.order = 0;
-                break;
-            }
-        }
-        if let Err(error) = db::functions::set(org_id, fn_name, &existing_fn).await {
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    error.to_string(),
-                )),
-            )
-        } else {
-            // can't be removed from watcher of function as stream name & type won't be
-            // available , hence being removed here
-            // let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-            // remove_stream_fn_from_cache(&key, fn_name);
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                FN_REMOVED.to_string(),
-            )))
-        }
-    } else {
-        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            FN_NOT_FOUND.to_string(),
-        )))
-    }
-}
-
-pub async fn add_function_to_stream(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    fn_name: &str,
-    mut stream_order: StreamOrder,
-) -> Result<HttpResponse, Error> {
-    let mut existing_fn = match check_existing_fn(org_id, fn_name).await {
-        Some(function) => function,
-        None => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                FN_NOT_FOUND.to_string(),
-            )));
-        }
-    };
-
-    stream_order.stream = stream_name.to_owned();
-    stream_order.stream_type = stream_type;
-
-    if let Some(mut val) = existing_fn.streams {
-        if let Some(existing) = val.iter_mut().find(|x| {
-            x.stream == stream_order.stream && x.stream_type.eq(&stream_order.stream_type)
-        }) {
-            existing.is_removed = false;
-            existing.order = stream_order.order;
-            existing.apply_before_flattening = stream_order.apply_before_flattening;
-        } else {
-            val.push(stream_order);
-        }
-        existing_fn.streams = Some(val);
-    } else {
-        existing_fn.streams = Some(vec![stream_order]);
-    }
-
-    if let Err(error) = db::functions::set(org_id, fn_name, &existing_fn).await {
-        Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        )
-    } else {
-        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            FN_ADDED.to_string(),
-        )))
-    }
-}
-
 fn extract_num_args(func: &mut Transform) {
     if func.trans_type.unwrap() == 1 {
         let src: String = func.function.to_owned();
@@ -342,24 +217,10 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
     }
 }
 
-fn _remove_stream_fn_from_cache(key: &str, fn_name: &str) {
-    if let Some(val) = STREAM_FUNCTIONS.clone().get(key) {
-        if val.list.len() > 1 {
-            let final_list = val
-                .clone()
-                .list
-                .into_iter()
-                .filter(|x| x.transform.name != fn_name)
-                .collect::<Vec<StreamTransform>>();
-            STREAM_FUNCTIONS.insert(key.to_string(), StreamFunctionsList { list: final_list });
-        } else {
-            STREAM_FUNCTIONS.remove(key);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use config::meta::{function::StreamOrder, stream::StreamType};
+
     use super::*;
 
     #[tokio::test]

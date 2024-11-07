@@ -29,7 +29,7 @@ use sqlx::{
 };
 use tokio::sync::{mpsc, OnceCell};
 
-use super::DBIndex;
+use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
@@ -293,7 +293,7 @@ impl super::Db for MysqlDb {
         } else {
             DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY id DESC;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC, id DESC;"#
             )
             .bind(&module)
             .bind(&key1)
@@ -682,14 +682,26 @@ CREATE TABLE IF NOT EXISTS meta
     }
 
     // create table index
-    create_index("meta_module_idx", "meta", false, &["module"]).await?;
-    create_index("meta_module_key1_idx", "meta", false, &["module", "key1"]).await?;
-    create_index(
+    create_index(IndexStatement::new(
+        "meta_module_idx",
+        "meta",
+        false,
+        &["module"],
+    ))
+    .await?;
+    create_index(IndexStatement::new(
+        "meta_module_key1_idx",
+        "meta",
+        false,
+        &["module", "key1"],
+    ))
+    .await?;
+    create_index(IndexStatement::new(
         "meta_module_start_dt_idx",
         "meta",
         true,
         &["module", "key1", "key2", "start_dt"],
-    )
+    ))
     .await?;
 
     Ok(())
@@ -720,12 +732,12 @@ async fn add_start_dt_column() -> Result<()> {
     };
 
     // create new index meta_module_start_dt_idx
-    create_index(
+    create_index(IndexStatement::new(
         "meta_module_start_dt_idx",
         "meta",
         true,
         &["module", "key1", "key2", "start_dt"],
-    )
+    ))
     .await?;
     // delete old index meta_module_key2_idx
     delete_index("meta_module_key2_idx", "meta").await?;
@@ -788,37 +800,38 @@ async fn create_meta_backup() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_index(
-    idx_name: &str,
-    table: &str,
-    unique: bool,
-    fields: &[&str],
-) -> Result<()> {
+pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
     let client = CLIENT.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
-        name: idx_name.into(),
-        table: table.into(),
+        name: index.idx_name.into(),
+        table: index.table.into(),
     }) {
         return Ok(());
     }
-    let unique_str = if unique { "UNIQUE" } else { "" };
-    log::info!("[MYSQL] creating index {} on table {}", idx_name, table);
-    DB_QUERY_NUMS.with_label_values(&["create", table]).inc();
+    let unique_str = if index.unique { "UNIQUE" } else { "" };
+    log::info!(
+        "[MYSQL] creating index {} on table {}",
+        index.idx_name,
+        index.table
+    );
+    DB_QUERY_NUMS
+        .with_label_values(&["create", index.table])
+        .inc();
     let sql = format!(
         "CREATE {} INDEX {} ON {} ({});",
         unique_str,
-        idx_name,
-        table,
-        fields.join(",")
+        index.idx_name,
+        index.table,
+        index.fields.join(",")
     );
     let start = std::time::Instant::now();
     sqlx::query(&sql).execute(&client).await?;
     let time = start.elapsed().as_secs_f64();
     DB_QUERY_TIME
-        .with_label_values(&["create_index", table])
+        .with_label_values(&["create_index", index.table])
         .observe(time);
-    log::info!("[MYSQL] index {} created successfully", idx_name);
+    log::info!("[MYSQL] index {} created successfully", index.idx_name);
     Ok(())
 }
 

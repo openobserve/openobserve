@@ -41,8 +41,7 @@ const useManagementRoutes = () => {
         {
           path: "query_management",
           name: "query_management",
-          component: () =>
-            import("@/components/queries/RunningQueriesList.vue"),
+          component: () => import("@/components/queries/RunningQueries.vue"),
           meta: {
             keepAlive: true,
           },
@@ -50,7 +49,7 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
-      ]
+      ],
     );
   }
   return routes;

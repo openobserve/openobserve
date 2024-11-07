@@ -18,7 +18,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::Role,
+        cluster::{CompactionJobType, Role},
         stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
@@ -63,10 +63,12 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                     continue; // not this node
                 }
 
-                let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
-                let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
-                let stream_data_retention_end = if stream.settings.data_retention > 0 {
-                    let date = now - Duration::try_days(stream.settings.data_retention).unwrap();
+                let stream_settings =
+                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                        .await
+                        .unwrap_or_default();
+                let stream_data_retention_end = if stream_settings.data_retention > 0 {
+                    let date = now - Duration::try_days(stream_settings.data_retention).unwrap();
                     date.format("%Y-%m-%d").to_string()
                 } else {
                     data_lifecycle_end.clone()
@@ -137,7 +139,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 }
 
 /// Generate job for compactor
-pub async fn run_generate_job() -> Result<(), anyhow::Error> {
+pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
@@ -191,16 +193,37 @@ pub async fn run_generate_job() -> Result<(), anyhow::Error> {
                     continue;
                 }
 
-                if let Err(e) =
-                    merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
-                {
-                    log::error!(
-                        "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        e
-                    );
+                match job_type {
+                    CompactionJobType::Current => {
+                        if let Err(e) =
+                            merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
+                        {
+                            log::error!(
+                                "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
+                                org_id,
+                                stream_type,
+                                stream_name,
+                                e
+                            );
+                        }
+                    }
+                    CompactionJobType::Historical => {
+                        if let Err(e) = merge::generate_old_data_job_by_stream(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "[COMPACTOR] generate_old_data_job_by_stream [{}/{}/{}] error: {}",
+                                org_id,
+                                stream_type,
+                                stream_name,
+                                e
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -234,7 +257,7 @@ pub async fn run_merge(
             .unwrap_or_default();
         let partition_time_level =
             unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
-        if partition_time_level == PartitionTimeLevel::Daily || cfg.compact.step_secs < 3600 {
+        if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await

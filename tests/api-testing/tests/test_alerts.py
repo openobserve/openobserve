@@ -249,3 +249,318 @@ def test_e2e_createdestination(create_session, base_url):
     assert (
         resp_delete_template.status_code == 200
     ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
+
+
+def test_e2e_createalertsql(create_session, base_url):
+    """Running an E2E test for create a new destination."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    skip_tls_verify_value = False
+
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "name": "pytesttemplate",
+        "body": """
+            {{
+                "text": "{alert_name} is active"
+            }}
+        """.format(
+            alert_name="pytestautomate"
+        ),
+    }
+
+    # createtemplate
+    resp_create_destinations = session.post(
+        f"{url}api/{org_id}/alerts/templates",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_destinations.content)
+    
+    destination_name = "py-destinations"
+    payload = {
+        "url": "www",
+        "method": "post",
+        "skip_tls_verify": skip_tls_verify_value,
+        "template": "pytesttemplate",
+        "headers": {"test": "test"},
+        "name":"py-destinations"
+    }
+   
+    # create destination
+    resp_create_destinations = session.post(
+        f"{url}api/{org_id}/alerts/destinations",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_destinations.content)
+    # get destination
+    resp_create_destinations = session.get(
+        f"{url}api/{org_id}/alerts/destinations/{destination_name}",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_destinations.content)
+    assert (
+        resp_create_destinations.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_create_destinations.status_code} {resp_create_destinations.content}"
+
+    # ingest logs
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    stream_name = "newpy_tests"
+    payload = [
+        {
+            "Athlete": "newtemp",
+            "City": "Athens",
+            "Country": "HUN",
+            "Discipline": "Swimming",
+            "Sport": "Aquatics",
+            "Year": 1896,
+        },
+        {
+            "Athlete": "HERSCHMANN",
+            "City": "Athens",
+            "Country": "CHN",
+            "Discipline": "Swimming",
+            "Sport": "Aquatics",
+            "Year": 1896,
+
+        },
+    ]
+
+    resp_create_logstream = session.post(
+        f"{url}api/{org_id}/{stream_name}/_json", json=payload
+    )
+
+    print(resp_create_logstream.content)
+    assert (
+        resp_create_logstream.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+
+    stream_name = "newpy_tests"
+    alert_name = "py-alert"
+    is_real_time = False
+    payload = {
+        "name": alert_name,
+        "stream_type": "logs",
+        "stream_name": "newpy_tests",
+        "is_real_time": is_real_time,
+       "query_condition": {
+            "type": "sql",
+            "conditions": [],
+            "sql": "SELECT kubernetes_container_name,code FROM \"stream_pytest_data\" ",
+            "promql": "",
+            "promql_condition":None,
+            "aggregation": None,
+            "vrl_function": None,
+            "search_event_type": None,
+            "multi_time_range": None
+        },
+        "trigger_condition": {
+            "period": 10,
+            "operator": ">=",
+            "threshold": 3,
+            "silence": 10,
+        },
+        "destinations": ["py-destinations"],
+        "context_attributes": {},
+        "enabled": True,
+        "description": "",
+    }
+    resp_create_alert = session.post(
+        f"{url}api/{org_id}/{stream_name}/alerts",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_alert.content)
+    assert (
+        resp_create_alert.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_create_alert.status_code} {resp_create_alert.content}"
+    resp_delete_alert = session.delete(
+        f"{url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs"
+    )
+    assert (
+        resp_delete_alert.status_code == 200
+    ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
+
+    resp_delete_destination = session.delete(
+        f"{url}api/{org_id}/alerts/destinations/{destination_name}"
+    )
+    assert (
+        resp_delete_destination.status_code == 200
+    ), f"Deleting this function, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
+
+    resp_delete_template = session.delete(
+        f"{url}api/{org_id}/alerts/templates/pytesttemplate"
+    )
+    assert (
+        resp_delete_template.status_code == 200
+    ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
+
+
+
+def test_e2e_createalertfloat(create_session, base_url):
+    """Running an E2E test for create a new destination."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    skip_tls_verify_value = False
+
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "name": "pytesttemplate",
+        "body": """
+            {{
+                "text": "{alert_name} is active"
+            }}
+        """.format(
+            alert_name="pytestautomate"
+        ),
+    }
+
+    # createtemplate
+    resp_create_destinations = session.post(
+        f"{url}api/{org_id}/alerts/templates",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_destinations.content)
+    
+    destination_name = "py-destinations"
+    payload = {
+        "url": "www",
+        "method": "post",
+        "skip_tls_verify": skip_tls_verify_value,
+        "template": "pytesttemplate",
+        "headers": {"test": "test"},
+        "name":"py-destinations"
+    }
+   
+    # create destination
+    resp_create_destinations = session.post(
+        f"{url}api/{org_id}/alerts/destinations",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_destinations.content)
+    # get destination
+    resp_create_destinations = session.get(
+        f"{url}api/{org_id}/alerts/destinations/{destination_name}",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_destinations.content)
+    assert (
+        resp_create_destinations.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_create_destinations.status_code} {resp_create_destinations.content}"
+
+    # ingest logs
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    stream_name = "newpy_tests"
+    payload = [
+          {
+        "Athlete": "Michael Phelps",
+        "City": "Beijing",
+        "Country": "USA",
+        "Discipline": "Swimming",
+        "Sport": "Aquatics",
+        "Year": 2008,
+        "FloatValue": 23.45
+    },
+    {
+        "Athlete": "Katie Ledecky",
+        "City": "Rio de Janeiro",
+        "Country": "USA",
+        "Discipline": "Swimming",
+        "Sport": "Aquatics",
+        "Year": 2016,
+        "FloatValue": 16.8
+    },
+    ]
+
+    resp_create_logstream = session.post(
+        f"{url}api/{org_id}/{stream_name}/_json", json=payload
+    )
+
+    print(resp_create_logstream.content)
+    assert (
+        resp_create_logstream.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+
+    stream_name = "newpy_tests"
+    alert_name = "py-alert"
+    is_real_time = False
+    payload = {
+        "name": alert_name,
+        "stream_type": "logs",
+        "stream_name": "newpy_tests",
+        "is_real_time": is_real_time,
+       "query_condition": {
+            "type": "sql",
+            "conditions": [],
+            "sql": "SELECT athlete,city FROM \"newpy_tests\" where floatvalue = 16.8",
+            "promql": "",
+            "promql_condition":None,
+            "aggregation": None,
+            "vrl_function": None,
+            "search_event_type": None,
+            "multi_time_range": None
+        },
+        "trigger_condition": {
+            "period": 10,
+            "operator": ">=",
+            "threshold": 3,
+            "silence": 10,
+        },
+        "destinations": ["py-destinations"],
+        "context_attributes": {},
+        "enabled": True,
+        "description": "",
+    }
+    resp_create_alert = session.post(
+        f"{url}api/{org_id}/{stream_name}/alerts",
+        json=payload,
+        headers=headers,
+    )
+    print(resp_create_alert.content)
+    assert (
+        resp_create_alert.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_create_alert.status_code} {resp_create_alert.content}"
+    resp_delete_alert = session.delete(
+        f"{url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs"
+    )
+    assert (
+        resp_delete_alert.status_code == 200
+    ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
+
+    resp_delete_destination = session.delete(
+        f"{url}api/{org_id}/alerts/destinations/{destination_name}"
+    )
+    assert (
+        resp_delete_destination.status_code == 200
+    ), f"Deleting this function, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
+
+    resp_delete_template = session.delete(
+        f"{url}api/{org_id}/alerts/templates/pytesttemplate"
+    )
+    assert (
+        resp_delete_template.status_code == 200
+    ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
+
+
+
+
+
+
+
+
+

@@ -35,6 +35,7 @@ mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
 mod prom;
+mod prom_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
@@ -89,6 +90,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { usage::run_audit_publish().await });
 
+    tokio::task::spawn(async move { prom_self_consume::run().await });
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() {
         return Ok(());
@@ -120,9 +122,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
-    if LOCAL_NODE.is_ingester() {
-        tokio::task::spawn(async move { db::pipelines::watch().await });
-    }
 
     #[cfg(feature = "enterprise")]
     if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
@@ -166,9 +165,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
-    if LOCAL_NODE.is_ingester() {
-        db::pipelines::cache().await.expect("syslog cache failed");
-    }
+
+    // cache pipeline
+    db::pipeline::cache().await.expect("Pipeline cache failed");
 
     // cache file list
     if !cfg.common.meta_store_external {

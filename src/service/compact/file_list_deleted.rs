@@ -16,7 +16,8 @@
 use std::io::{BufRead, BufReader};
 
 use bytes::Buf;
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use config::utils::time::hour_micros;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
@@ -201,7 +202,7 @@ async fn query_deleted_from_s3(
             let entry = files.entry(file).or_insert_with(Vec::new);
             entry.extend(records);
         }
-        cur_time += Duration::try_hours(1).unwrap().num_microseconds().unwrap();
+        cur_time += hour_micros(1);
     }
     Ok(files)
 }

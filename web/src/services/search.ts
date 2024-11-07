@@ -24,11 +24,15 @@ const search = {
       query,
       page_type = "logs",
       traceparent,
+      dashboard_id,
+      folder_id,
     }: {
       org_identifier: string;
       query: any;
       page_type: string;
       traceparent?: string;
+      dashboard_id?: string;
+      folder_id?: string;
     },
     search_type: string = "UI"
   ) => {
@@ -39,6 +43,8 @@ const search = {
         : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (folder_id) url += `&folder_id=${folder_id}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (query.hasOwnProperty("aggs")) {

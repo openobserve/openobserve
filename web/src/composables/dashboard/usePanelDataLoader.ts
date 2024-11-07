@@ -49,6 +49,13 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
  */
 const PANEL_DATA_LOADER_DEBOUNCE_TIME = 50;
 
+const adjustTimestampByTimeRangeGap = (
+  timestamp: number,
+  timeRangeGapSeconds: number,
+) => {
+  return timestamp - timeRangeGapSeconds * 1000;
+};
+
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
@@ -57,7 +64,8 @@ export const usePanelDataLoader = (
   forceLoad: any,
   searchType: any,
   dashboardId: any,
-  folderId: any
+  folderId: any,
+  reportId: any
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -446,11 +454,14 @@ export const usePanelDataLoader = (
             if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
               // convert time shift to milliseconds
               const timeShiftInMilliSecondsArray = it.config?.time_shift?.map(
-                (it: any) => convertOffsetToSeconds(it.offSet)
+                (it: any) => convertOffsetToSeconds(it.offSet, endISOTimestamp),
               );
 
               // append 0 seconds to the timeShiftInMilliSecondsArray at 0th index
-              timeShiftInMilliSecondsArray.unshift(0);
+              timeShiftInMilliSecondsArray.unshift({
+                seconds: 0,
+                periodAsStr: "",
+              });
 
               const timeShiftQueries: any[] = [];
 
@@ -460,9 +471,15 @@ export const usePanelDataLoader = (
                 const { query: query1, metadata: metadata1 } =
                   replaceQueryValue(
                     it.query,
-                    startISOTimestamp - timeRangeGap * 1000,
-                    endISOTimestamp - timeRangeGap * 1000,
-                    panelSchema.value.queryType
+                    adjustTimestampByTimeRangeGap(
+                      startISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    adjustTimestampByTimeRangeGap(
+                      endISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    panelSchema.value.queryType,
                   );
 
                 const { query: query2, metadata: metadata2 } =
@@ -474,8 +491,14 @@ export const usePanelDataLoader = (
                 const metadata: any = {
                   originalQuery: it.query,
                   query: query,
-                  startTime: startISOTimestamp - timeRangeGap * 1000,
-                  endTime: endISOTimestamp - timeRangeGap * 1000,
+                  startTime: adjustTimestampByTimeRangeGap(
+                    startISOTimestamp,
+                    timeRangeGap.seconds,
+                  ),
+                  endTime: adjustTimestampByTimeRangeGap(
+                    endISOTimestamp,
+                    timeRangeGap.seconds,
+                  ),
                   queryType: panelSchema.value.queryType,
                   variables: [...(metadata1 || []), ...(metadata2 || [])],
                   timeRangeGap: timeRangeGap,
@@ -486,8 +509,14 @@ export const usePanelDataLoader = (
                   metadata,
                   searchRequestObj: {
                     sql: query,
-                    start_time: startISOTimestamp - timeRangeGap * 1000,
-                    end_time: endISOTimestamp - timeRangeGap * 1000,
+                    start_time: adjustTimestampByTimeRangeGap(
+                      startISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
+                    end_time: adjustTimestampByTimeRangeGap(
+                      endISOTimestamp,
+                      timeRangeGap.seconds,
+                    ),
                     query_fn: null,
                   },
                 });
@@ -519,7 +548,7 @@ export const usePanelDataLoader = (
                             query: {
                               sql: searchQueries,
                               query_fn: it.vrlFunctionQuery
-                                ? b64EncodeUnicode(it.vrlFunctionQuery)
+                                ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                 : null,
                               sql_mode: "full",
                               start_time: startISOTimestamp,
@@ -527,9 +556,12 @@ export const usePanelDataLoader = (
                               per_query_response: true,
                               size: -1,
                             },
+                          
                           },
                           page_type: pageType,
                           traceparent,
+                          dashboard_id: dashboardId?.value,
+                          folder_id: folderId?.value,
                         },
                         searchType.value ?? "Dashboards"
                       ),
@@ -629,7 +661,10 @@ export const usePanelDataLoader = (
                 endTime: endISOTimestamp,
                 queryType: panelSchema.value.queryType,
                 variables: [...(metadata1 || []), ...(metadata2 || [])],
-                timeRangeGap: 0,
+                timeRangeGap: {
+                  seconds: 0,
+                  periodAsStr: "",
+                },
               };
               const { traceparent, traceId } = generateTraceContext();
               addTraceId(traceId);
@@ -643,7 +678,7 @@ export const usePanelDataLoader = (
                       query: {
                         sql: query,
                         query_fn: it.vrlFunctionQuery
-                          ? b64EncodeUnicode(it.vrlFunctionQuery)
+                          ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                           : null,
                         sql_mode: "full",
                         start_time: startISOTimestamp,
@@ -707,6 +742,7 @@ export const usePanelDataLoader = (
                   addTraceId(traceId);
 
                   try {
+
                     const searchRes = await callWithAbortController(
                       async () =>
                         await queryService.search(
@@ -720,7 +756,7 @@ export const usePanelDataLoader = (
                                   histogramInterval
                                 ),
                                 query_fn: it.vrlFunctionQuery
-                                  ? b64EncodeUnicode(it.vrlFunctionQuery)
+                                  ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                   : null,
                                 sql_mode: "full",
                                 // if i == 0 ? then do gap of 7 days
@@ -728,9 +764,12 @@ export const usePanelDataLoader = (
                                 end_time: partition[1],
                                 size: -1,
                               },
+                            
                             },
                             page_type: pageType,
                             traceparent,
+                            dashboard_id: dashboardId?.value,
+                            folder_id: folderId?.value,
                           },
                           searchType.value ?? "Dashboards"
                         ),
@@ -1507,6 +1546,7 @@ export const usePanelDataLoader = (
   };
 
   onMounted(async () => {
+    console.log("report",reportId.value);
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
       rootMargin: "0px",

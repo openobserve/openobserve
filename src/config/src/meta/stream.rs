@@ -63,6 +63,18 @@ impl StreamType {
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
         )
     }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            StreamType::Logs => "logs",
+            StreamType::Metrics => "metrics",
+            StreamType::Traces => "traces",
+            StreamType::EnrichmentTables => "enrichment_tables",
+            StreamType::Filelist => "file_list",
+            StreamType::Metadata => "metadata",
+            StreamType::Index => "index",
+        }
+    }
 }
 
 impl From<&str> for StreamType {
@@ -106,6 +118,53 @@ impl std::fmt::Display for StreamType {
             StreamType::Index => write!(f, "index"),
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(default)]
+pub struct StreamParams {
+    pub org_id: faststr::FastStr,
+    pub stream_name: faststr::FastStr,
+    pub stream_type: StreamType,
+}
+
+impl Default for StreamParams {
+    fn default() -> Self {
+        Self {
+            org_id: String::default().into(),
+            stream_name: String::default().into(),
+            stream_type: StreamType::default(),
+        }
+    }
+}
+
+impl std::fmt::Display for StreamParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}/{}/{}",
+            self.org_id, self.stream_name, self.stream_type
+        )
+    }
+}
+
+impl StreamParams {
+    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
+        Self {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type,
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !(self.org_id.is_empty() || self.stream_name.is_empty())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ListStreamParams {
+    pub list: Vec<StreamParams>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -247,15 +306,15 @@ impl From<&String> for MergeStrategy {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamStats {
     pub created_at: i64,
     pub doc_time_min: i64,
     pub doc_time_max: i64,
     pub doc_num: i64,
     pub file_num: i64,
-    pub storage_size: f64,
-    pub compressed_size: f64,
+    pub storage_size: i64,
+    pub compressed_size: i64,
 }
 
 impl StreamStats {
@@ -292,16 +351,16 @@ impl StreamStats {
         self.doc_num = max(0, self.doc_num + meta.records);
         self.doc_time_min = self.doc_time_min.min(meta.min_ts);
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
-        self.storage_size += meta.original_size as f64;
-        self.compressed_size += meta.compressed_size as f64;
+        self.storage_size += meta.original_size;
+        self.compressed_size += meta.compressed_size;
         if self.doc_time_min == 0 {
             self.doc_time_min = meta.min_ts;
         }
-        if self.storage_size < 0.0 {
-            self.storage_size = 0.0;
+        if self.storage_size < 0 {
+            self.storage_size = 0;
         }
-        if self.compressed_size < 0.0 {
-            self.compressed_size = 0.0;
+        if self.compressed_size < 0 {
+            self.compressed_size = 0;
         }
     }
 
@@ -344,8 +403,8 @@ impl From<Stats> for StreamStats {
             doc_time_max: meta.max_ts,
             doc_num: meta.records,
             file_num: 0,
-            storage_size: meta.original_size,
-            compressed_size: meta.compressed_size.unwrap_or_default(),
+            storage_size: meta.original_size as i64,
+            compressed_size: meta.compressed_size.unwrap_or_default() as i64,
         }
     }
 }
@@ -360,8 +419,8 @@ impl std::ops::Sub<FileMeta> for StreamStats {
             doc_num: self.doc_num - rhs.records,
             doc_time_min: self.doc_time_min.min(rhs.min_ts),
             doc_time_max: self.doc_time_max.max(rhs.max_ts),
-            storage_size: self.storage_size - rhs.original_size as f64,
-            compressed_size: self.compressed_size - rhs.compressed_size as f64,
+            storage_size: self.storage_size - rhs.original_size,
+            compressed_size: self.compressed_size - rhs.compressed_size,
         };
         if ret.doc_time_min == 0 {
             ret.doc_time_min = rhs.min_ts;
@@ -494,6 +553,8 @@ pub struct UpdateStreamSettings {
     pub max_query_range: Option<i64>,
     #[serde(default)]
     pub store_original_data: Option<bool>,
+    #[serde(default)]
+    pub approx_partition: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -521,6 +582,8 @@ pub struct StreamSettings {
     pub max_query_range: i64,
     #[serde(default)]
     pub store_original_data: bool,
+    #[serde(default)]
+    pub approx_partition: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -544,6 +607,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
+        state.serialize_field("approx_partition", &self.approx_partition)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -654,6 +718,11 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let approx_partition = settings
+            .get("approx_partition")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         Self {
             partition_time_level,
             partition_keys,
@@ -665,6 +734,7 @@ impl From<&str> for StreamSettings {
             flatten_level,
             defined_schema_fields,
             store_original_data,
+            approx_partition,
         }
     }
 }
@@ -715,12 +785,19 @@ impl StreamPartition {
                 let bucket = h % n;
                 bucket.to_string()
             }
-            StreamPartitionType::Prefix => value
-                .to_ascii_lowercase()
-                .chars()
-                .next()
-                .unwrap_or('_')
-                .to_string(),
+            StreamPartitionType::Prefix => {
+                let c = value
+                    .to_ascii_lowercase()
+                    .chars()
+                    .next()
+                    .unwrap_or('_')
+                    .to_string();
+                if c.is_ascii() {
+                    c
+                } else {
+                    urlencoding::encode(&c).into_owned()
+                }
+            }
         }
     }
 }
@@ -751,11 +828,6 @@ pub struct PartitioningDetails {
     pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
-pub struct Routing {
-    pub destination: String,
-    pub routing: Vec<RoutingCondition>,
-}
-
 // Code Duplicated from alerts
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RoutingCondition {
@@ -768,7 +840,7 @@ pub struct RoutingCondition {
 }
 // Code Duplicated from alerts
 impl RoutingCondition {
-    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {
@@ -872,45 +944,6 @@ impl std::fmt::Display for Operator {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StreamParams {
-    pub org_id: faststr::FastStr,
-    pub stream_name: faststr::FastStr,
-    pub stream_type: StreamType,
-}
-
-impl PartialEq for StreamParams {
-    fn eq(&self, other: &Self) -> bool {
-        self.org_id == other.org_id
-            && self.stream_name == other.stream_name
-            && self.stream_type == other.stream_type
-    }
-}
-
-impl Default for StreamParams {
-    fn default() -> Self {
-        Self {
-            org_id: String::default().into(),
-            stream_name: String::default().into(),
-            stream_type: StreamType::default(),
-        }
-    }
-}
-
-impl StreamParams {
-    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
-        Self {
-            org_id: org_id.to_string().into(),
-            stream_name: stream_name.to_string().into(),
-            stream_type,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        !(self.org_id.is_empty() || self.stream_name.is_empty())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -992,8 +1025,15 @@ mod tests {
     #[test]
     fn test_stream_params() {
         let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        let param2 = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        let param3 = StreamParams::new("org_id", "stream_name", StreamType::Index);
         assert_eq!(params.org_id, "org_id");
         assert_eq!(params.stream_name, "stream_name");
         assert_eq!(params.stream_type, StreamType::Logs);
+        let mut map = HashMap::new();
+        map.insert(params, 1);
+        map.insert(param2, 2);
+        map.insert(param3, 2);
+        assert_eq!(map.len(), 2);
     }
 }

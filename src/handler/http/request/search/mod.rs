@@ -39,7 +39,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_index_type_from_request, get_or_create_trace_id, get_search_type_from_request,
+                get_index_type_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
         },
@@ -150,6 +151,10 @@ pub async fn search(
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    req.search_event_context = req
+        .search_type
+        .as_ref()
+        .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
 
     // set index_type
     req.index_type = match get_index_type_from_request(&query) {
@@ -469,6 +474,7 @@ pub async fn around(
         clusters: clusters.clone(),
         timeout,
         search_type: Some(SearchEventType::UI),
+        search_event_context: None,
         index_type: "".to_string(),
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
@@ -520,6 +526,7 @@ pub async fn around(
         clusters,
         timeout,
         search_type: Some(SearchEventType::UI),
+        search_event_context: None,
         index_type: "".to_string(),
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
@@ -898,6 +905,7 @@ async fn values_v1(
         clusters,
         timeout,
         search_type: Some(SearchEventType::Values),
+        search_event_context: None,
         index_type: "".to_string(),
     };
 
@@ -1218,6 +1226,7 @@ async fn values_v2(
         clusters,
         timeout,
         search_type: Some(SearchEventType::Values),
+        search_event_context: None,
         index_type: "".to_string(),
     };
     let search_res = SearchService::search(
@@ -1420,7 +1429,7 @@ pub async fn search_partition(
         })
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchHistoryResponse, example = json ! ({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json ! ({
             "took": 40,
             "took_detail": {
                 "total": 0,

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::metrics;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_server::MetricsService, ExportMetricsServiceRequest,
     ExportMetricsServiceResponse,
@@ -28,7 +29,9 @@ impl MetricsService for MetricsIngester {
         &self,
         request: tonic::Request<ExportMetricsServiceRequest>,
     ) -> Result<tonic::Response<ExportMetricsServiceResponse>, tonic::Status> {
+        let start = std::time::Instant::now();
         let cfg = config::get_config();
+
         let metadata = request.metadata().clone();
         let msg = format!(
             "Please specify organization id with header key '{}' ",
@@ -51,6 +54,14 @@ impl MetricsService for MetricsIngester {
         )
         .await;
         if resp.is_ok() {
+            // metrics
+            let time = start.elapsed().as_secs_f64();
+            metrics::GRPC_RESPONSE_TIME
+                .with_label_values(&["/otlp/v1/metrics", "200", "", "", ""])
+                .observe(time);
+            metrics::GRPC_INCOMING_REQUESTS
+                .with_label_values(&["/otlp/v1/metrics", "200", "", "", ""])
+                .inc();
             return Ok(Response::new(ExportMetricsServiceResponse {
                 partial_success: None,
             }));

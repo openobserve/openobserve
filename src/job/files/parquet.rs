@@ -38,9 +38,7 @@ use config::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
-        stream::{
-            FileKey, FileMeta, PartitionTimeLevel, StreamPartition, StreamSettings, StreamType,
-        },
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,
     utils::{
@@ -155,19 +153,19 @@ async fn scan_wal_files(
         }
     });
     let mut files_num = 0;
-    let mut last_time = start.elapsed().as_millis();
+    // let mut last_time = start.elapsed().as_millis();
     loop {
         match rx.recv().await {
             None => {
                 break;
             }
             Some(files) => {
-                log::debug!(
-                    "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
-                    files.len(),
-                    start.elapsed().as_millis() - last_time
-                );
-                last_time = start.elapsed().as_millis();
+                // log::debug!(
+                //     "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
+                //     files.len(),
+                //     start.elapsed().as_millis() - last_time
+                // );
+                // last_time = start.elapsed().as_millis();
                 files_num += files.len();
                 match prepare_files(files).await {
                     Err(e) => {
@@ -270,16 +268,21 @@ async fn prepare_files(
             continue;
         }
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
+        // remove thread_id from prefix
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+        let mut columns = prefix.split('/').collect::<Vec<&str>>();
+        columns.remove(4);
+        let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(&file_key, parquet_meta, false));
         // mark the file as processing
         // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
-    log::debug!(
-        "[INGESTER:JOB] move files get partitions: {}",
-        partition_files_with_size.len()
-    );
+    // log::debug!(
+    //     "[INGESTER:JOB] move files get partitions: {}",
+    //     partition_files_with_size.len()
+    // );
 
     Ok(partition_files_with_size)
 }
@@ -293,13 +296,15 @@ async fn move_files(
         return Ok(());
     }
 
-    let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
-    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-    // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
+    let columns = prefix.split('/').collect::<Vec<&str>>();
+    // removed thread_id from prefix, so there is no thread_id in the path
+    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
+    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
     // let _ = columns[0].to_string(); // files/
     let org_id = columns[1].to_string();
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
+    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
 
     // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
@@ -374,6 +379,42 @@ async fn move_files(
         return Ok(());
     }
 
+    // check data retention
+    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let mut stream_data_retention_days = cfg.compact.data_retention_days;
+    if stream_settings.data_retention > 0 {
+        stream_data_retention_days = stream_settings.data_retention;
+    }
+    if stream_data_retention_days > 0 {
+        let date =
+            config::utils::time::now() - Duration::try_days(stream_data_retention_days).unwrap();
+        let stream_data_retention_end = date.format("%Y-%m-%d").to_string();
+        if prefix_date < stream_data_retention_end {
+            for file in files {
+                log::warn!(
+                    "[INGESTER:JOB:{thread_id}] the file [{}/{}/{}] was exceed the data retention, just delete file: {}",
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    file.key,
+                );
+                if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                    log::error!(
+                        "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
+                        file.key,
+                        e
+                    );
+                }
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Ok(());
+        }
+    }
+
     // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
     let wal_dir = wal_dir.clone();
@@ -424,10 +465,10 @@ async fn move_files(
         }
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
-        prefix
-    );
+    // log::debug!(
+    //     "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
+    //     prefix
+    // );
 
     // start merge files and upload to s3
     loop {
@@ -556,11 +597,14 @@ async fn merge_files(
     let mut total_records = 0;
 
     let stream_fields_num = latest_schema.fields().len();
+    let max_file_size = std::cmp::min(
+        cfg.limit.max_file_size_on_disk as i64,
+        cfg.compact.max_file_size as i64,
+    );
     for file in files_with_size.iter() {
         if new_file_size > 0
-            && (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-                || new_compressed_file_size + file.meta.compressed_size
-                    > cfg.compact.max_file_size as i64
+            && (new_file_size + file.meta.original_size > max_file_size
+                || new_compressed_file_size + file.meta.compressed_size > max_file_size
                 || (cfg.limit.file_move_fields_limit > 0
                     && stream_fields_num >= cfg.limit.file_move_fields_limit))
         {
@@ -742,8 +786,8 @@ async fn merge_files(
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
                             &org_id,
-                            &stream_name,
                             stream_type,
+                            &stream_name,
                             &full_text_search_fields,
                             &index_fields,
                         )
@@ -780,8 +824,8 @@ pub(crate) async fn generate_index_on_ingester(
     inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
@@ -794,6 +838,7 @@ pub(crate) async fn generate_index_on_ingester(
     let record_batches = prepare_index_record_batches(
         inverted_idx_batch,
         org_id,
+        stream_type,
         stream_name,
         &new_file_key,
         full_text_search_fields,
@@ -832,10 +877,9 @@ pub(crate) async fn generate_index_on_ingester(
                 "generate_index_on_ingester create schema error: schema not found"
             ));
         };
-        // update schema to enable bloomfilter for field: term, file_name
+        // update schema to enable bloomfilter for field: term
         let settings = StreamSettings {
             bloom_filter_fields: vec!["term".to_string()],
-            partition_keys: vec![StreamPartition::new_prefix("term")],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
@@ -872,23 +916,24 @@ pub(crate) async fn generate_index_on_ingester(
             };
         }
 
+        // TODO: disable it, because the prefix partition key will cause the file_list much bigger
         // add prefix partition for index <= v0.12.1
-        if let Some(settings) = stream_setting.as_mut() {
-            let term_partition_exists = settings
-                .partition_keys
-                .iter()
-                .any(|partition| partition.field == "term");
-            if !term_partition_exists {
-                settings
-                    .partition_keys
-                    .push(StreamPartition::new_prefix("term"));
+        // if let Some(settings) = stream_setting.as_mut() {
+        //     let term_partition_exists = settings
+        //         .partition_keys
+        //         .iter()
+        //         .any(|partition| partition.field == "term");
+        //     if !term_partition_exists {
+        //         settings
+        //             .partition_keys
+        //             .push(StreamPartition::new_prefix("term"));
 
-                let mut metadata = schema.schema().metadata().clone();
-                metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
-                db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata)
-                    .await?;
-            }
-        }
+        //         let mut metadata = schema.schema().metadata().clone();
+        //         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+        //         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index,
+        // metadata)             .await?;
+        //     }
+        // }
     }
 
     let schema_key = idx_schema.hash_key();
@@ -949,8 +994,8 @@ pub(crate) async fn generate_index_on_compactor(
     inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
@@ -963,6 +1008,7 @@ pub(crate) async fn generate_index_on_compactor(
     let mut record_batches = prepare_index_record_batches(
         inverted_idx_batch,
         org_id,
+        stream_type,
         stream_name,
         &new_file_key,
         full_text_search_fields,
@@ -973,7 +1019,7 @@ pub(crate) async fn generate_index_on_compactor(
     }
     let schema = record_batches.first().unwrap().schema();
 
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
 
     let _timestamp: ArrayRef = Arc::new(Int64Array::from(
@@ -1034,8 +1080,8 @@ pub(crate) async fn generate_index_on_compactor(
         record_batches,
         original_file_size,
         org_id,
-        &index_stream_name,
         StreamType::Index,
+        &index_stream_name,
         &new_file_key,
         "index_creator",
     )
@@ -1048,6 +1094,7 @@ pub(crate) async fn generate_index_on_compactor(
 fn prepare_index_record_batches(
     inverted_idx_batch: RecordBatch,
     org_id: &str,
+    stream_type: StreamType,
     stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
@@ -1068,7 +1115,7 @@ fn prepare_index_record_batches(
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
 

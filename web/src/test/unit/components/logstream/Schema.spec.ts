@@ -60,7 +60,7 @@ describe("Streams", async () => {
 
   it("Should have Update Settings button", () => {
     const updateSettingsButton = wrapper.find(
-      '[data-test="schema-update-settings-button"]'
+      '[data-test="schema-update-settings-button"]',
     );
     expect(updateSettingsButton.exists()).toBeTruthy();
     expect(updateSettingsButton.text()).toBe("Update Settings");
@@ -72,11 +72,13 @@ describe("Streams", async () => {
   });
 
   it("Should display stream meta data table header", () => {
+    store.state.zoConfig.show_stream_stats_doc_num = true;
     const tableHeaders = wrapper
       .find('[data-test="schema-stream-meta-data-table"]')
       .find("thead")
       .find("tr")
       .findAll("th");
+
     expect(tableHeaders[0].text()).toBe("Docs Count");
     expect(tableHeaders[1].text()).toBe("Ingested Data");
     expect(tableHeaders[2].text()).toBe("Compressed Size");
@@ -90,26 +92,26 @@ describe("Streams", async () => {
       .find("tr")
       .findAll("td");
     expect(tableHeaders[0].text()).toBe("400");
-    expect(tableHeaders[1].text()).toBe("0 MB");
-    expect(tableHeaders[2].text()).toBe("0 MB");
+    expect(tableHeaders[1].text()).toBe("0.74 MB");
+    expect(tableHeaders[2].text()).toBe("0.03 MB");
     expect(tableHeaders[3].text()).toBe(
-      "2023-03-10T17:13:48:63+05:30  to  2023-03-10T17:13:48:65+05:30"
+      "2023-03-10T17:13:48:63+05:30  to  2023-03-10T17:13:48:65+05:30",
     );
   });
 
   it("Should display stream fields mapping table", () => {
     const table = wrapper.find(
-      '[data-test="schema-log-stream-field-mapping-table"]'
+      '[data-test="schema-log-stream-field-mapping-table"]',
     );
     expect(table.exists()).toBeTruthy();
   });
 
   it("Should display stream fields mapping title", () => {
     const table = wrapper.find(
-      '[data-test="schema-log-stream-mapping-title-text"]'
+      '[data-test="schema-log-stream-mapping-title-text"]',
     );
     expect(table.text()).toBe(
-      "Mapping - Using default fts keys, as no fts keys are set for stream."
+      "Mapping - Using default fts keys, as no fts keys are set for stream.Store Original Data",
     );
   });
 
@@ -119,10 +121,11 @@ describe("Streams", async () => {
       .find("thead")
       .find("tr")
       .findAll("th");
-    expect(tableHeaders[0].text()).toBe("Property Name");
-    expect(tableHeaders[1].text()).toBe("Property Type");
-    expect(tableHeaders[2].text()).toBe("Full Text Search Key");
-    expect(tableHeaders[3].text()).toBe("Partition Key");
+
+    expect(tableHeaders[0].text()).toBe("");
+    expect(tableHeaders[1].text()).toBe("Fieldarrow_upward");
+    expect(tableHeaders[2].text()).toBe("Typearrow_upward");
+    expect(tableHeaders[3].text()).toBe("Index Type");
   });
 
   it("Should display stream fields mapping table data", () => {
@@ -131,10 +134,15 @@ describe("Streams", async () => {
       .find("tbody")
       .findAll("tr")[0]
       .findAll("td");
-    expect(tableData[0].text()).toBe("_timestamp");
-    expect(tableData[1].text()).toBe("Int64");
+
+    expect(tableData[0].text()).toBe("");
+    expect(tableData[1].text()).toBe("_timestamp");
+    expect(tableData[2].text()).toBe("Int64");
   });
 
+  // TODO : Check if we can update this test case
+  // - expect(logCheckbox.find(".q-checkbox__inner--truthy").exists()).toBeTruthy();
+  // + expect(wrapper.vm.ftsKeys.includes('log')).toBeTruthy();
   it("Should check if log and message full text search checkbox is active in field mapping table", () => {
     const logCheckbox = wrapper
       .find('[data-test="schema-log-stream-field-mapping-table"]')
@@ -144,10 +152,10 @@ describe("Streams", async () => {
       .find("tbody")
       .find('[data-test="schema-stream-log-field-fts-key-checkbox"]');
     expect(
-      logCheckbox.find(".q-checkbox__inner--truthy").exists()
+      logCheckbox.find(".q-checkbox__inner--truthy").exists(),
     ).toBeTruthy();
     expect(
-      messageCheckbox.find(".q-checkbox__inner--truthy").exists()
+      messageCheckbox.find(".q-checkbox__inner--truthy").exists(),
     ).toBeTruthy();
   });
 
@@ -159,13 +167,13 @@ describe("Streams", async () => {
       .find('[data-test="schema-log-stream-field-mapping-table"]')
       .find("tbody")
       .find(
-        '[data-test="schema-stream-kubernetes.container_hash-field-fts-key-checkbox"]'
+        '[data-test="schema-stream-kubernetes.container_hash-field-fts-key-checkbox"]',
       );
     expect(
-      timeStampCheckbox.find(".q-checkbox__inner--truthy").exists()
+      timeStampCheckbox.find(".q-checkbox__inner--truthy").exists(),
     ).toBeFalsy();
     expect(
-      KubHashCheckbox.find(".q-checkbox__inner--truthy").exists()
+      KubHashCheckbox.find(".q-checkbox__inner--truthy").exists(),
     ).toBeFalsy();
   });
 
@@ -180,7 +188,7 @@ describe("Streams", async () => {
         .find('[data-test="schema-log-stream-field-mapping-table"]')
         .find('[data-test="schema-stream-_timestamp-field-fts-key-checkbox"]');
       updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]'
+        '[data-test="schema-update-settings-button"]',
       );
 
       await logPartition.trigger("click");
@@ -193,8 +201,8 @@ describe("Streams", async () => {
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/settings`,
           (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
-          }
-        )
+          },
+        ),
       );
       await updateSettingsButton.trigger("submit");
       expect(updateStream).toHaveBeenCalledTimes(1);

@@ -35,6 +35,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
+    cache::stats,
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
@@ -61,7 +62,7 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta, utils::functions},
+    common::{infra::cluster as infra_cluster, utils},
     handler::grpc::request::search::Searcher,
 };
 
@@ -168,7 +169,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in functions::get_all_transform_keys(org_id).await {
+        for fn_name in utils::functions::get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -233,7 +234,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let mut runtime = utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
@@ -255,11 +256,11 @@ pub async fn search_multi(
                 if apply_over_hits {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        &meta::functions::VRLResultResolver {
+                        &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
                             fields: program.fields.clone(),
                         },
-                        &json::Value::Array(multi_res.hits),
+                        json::Value::Array(multi_res.hits),
                         org_id,
                         &[stream_name.clone()],
                     );
@@ -291,11 +292,11 @@ pub async fn search_multi(
                         .filter_map(|hit| {
                             let ret_val = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
-                                &meta::functions::VRLResultResolver {
+                                &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
                                     fields: program.fields.clone(),
                                 },
-                                &hit,
+                                hit,
                                 org_id,
                                 &[stream_name.clone()],
                             );
@@ -335,8 +336,8 @@ pub async fn search_multi(
             max_ts: None,
             cached_ratio: None,
             trace_id: None,
-            // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
+            search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
         report_request_usage_stats(
@@ -381,6 +382,9 @@ pub async fn search(
         let sql = Some(in_req.query.sql.clone());
         let start_time = Some(in_req.query.start_time);
         let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
         // set search task
         SEARCH_SERVER
             .insert(
@@ -394,6 +398,7 @@ pub async fn search(
                     sql,
                     start_time,
                     end_time,
+                    s_event_type,
                 ),
             )
             .await;
@@ -457,18 +462,24 @@ pub async fn search(
         Ok(mut res) => {
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
-            let (report_usage, search_type) = match in_req.search_type {
-                Some(search_type) => match search_type {
-                    search::SearchEventType::UI => (false, None),
-                    search::SearchEventType::Dashboards => (true, in_req.search_type),
-                    search::SearchEventType::Reports => (true, in_req.search_type),
-                    search::SearchEventType::Alerts => (true, in_req.search_type),
-                    search::SearchEventType::DerivedStream => (true, in_req.search_type),
-                    search::SearchEventType::RUM => (true, in_req.search_type),
-                    search::SearchEventType::Values => (false, None),
-                    search::SearchEventType::Other => (false, None),
-                },
-                None => (false, None),
+            let (report_usage, search_type, search_event_context) = match in_req.search_type {
+                Some(search_type) => {
+                    if matches!(
+                        search_type,
+                        search::SearchEventType::UI
+                            | search::SearchEventType::Values
+                            | search::SearchEventType::Other
+                    ) {
+                        (false, None, None)
+                    } else {
+                        (
+                            true,
+                            in_req.search_type,
+                            in_req.search_event_context.clone(),
+                        )
+                    }
+                }
+                None => (false, None, None),
             };
 
             if report_usage {
@@ -494,6 +505,7 @@ pub async fn search(
                     max_ts: Some(req_query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    search_event_context,
                     trace_id: Some(trace_id),
                     took_wait_in_queue: if res.took_detail.is_some() {
                         let resp_took = res.took_detail.as_ref().unwrap();
@@ -561,14 +573,17 @@ pub async fn search_partition(
     let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     let mut files = Vec::new();
+
     let mut max_query_range = 0;
-    for (stream, schema) in sql.schemas.iter() {
+    for (stream_name, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        if !skip_get_file_list {
+        let use_stream_stats_for_partition = stream_settings.approx_partition;
+
+        if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
                 &sql.org_id,
                 stream_type,
-                stream,
+                stream_name,
                 sql.time_range,
             )
             .await?;
@@ -577,6 +592,34 @@ pub async fn search_partition(
                 stream_settings.max_query_range * 3600 * 1_000_000,
             );
             files.extend(stream_files);
+        } else {
+            // data retention in seconds
+            let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+            // data duration in seconds
+            let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
+            let stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+            let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+            let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+            if data_retention_based_on_stats > 0 {
+                data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
+            };
+            if data_retention == 0 {
+                log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
+                data_retention = 1;
+            }
+            let records = (stats.doc_num as i64 * query_duration) / data_retention;
+            let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
+            log::info!(
+                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {}",
+                stream_name,
+                records,
+                original_size,
+            );
+            files.push(infra::file_list::FileId {
+                id: Utc::now().timestamp_micros(),
+                records,
+                original_size,
+            });
         }
     }
 
@@ -694,6 +737,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
+
+    use std::str::FromStr;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -829,6 +874,9 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
+        let search_type: Option<search::SearchEventType> = result
+            .search_type
+            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -840,6 +888,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             query,
             scan_stats,
             work_group: work_group.to_string(),
+            search_type,
         });
     }
 

@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::{alerts::alert::Alert, function::Transform};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use super::{alerts::alert::Alert, functions::Transform};
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
@@ -64,8 +63,8 @@ pub struct OrgSummary {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
-    pub total_storage_size: f64,
-    pub total_compressed_size: f64,
+    pub total_storage_size: i64,
+    pub total_compressed_size: i64,
 }
 
 /// A container for passcodes and rumtokens
@@ -102,11 +101,23 @@ fn default_scrape_interval() -> u32 {
 }
 
 fn default_trace_id_field_name() -> String {
-    "traceId".to_string()
+    "trace_id".to_string()
 }
 
 fn default_span_id_field_name() -> String {
-    "spanId".to_string()
+    "span_id".to_string()
+}
+
+#[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
+pub struct OrganizationSettingPayload {
+    /// Ideally this should be the same as prometheus-scrape-interval (in
+    /// seconds).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scrape_interval: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id_field_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_id_field_name: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]

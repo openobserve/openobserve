@@ -298,6 +298,7 @@ pub async fn search(
         max_ts: Some(req.query.end_time),
         cached_ratio: Some(res.cached_ratio),
         search_type: req.search_type,
+        search_event_context: req.search_event_context.clone(),
         trace_id: Some(trace_id.to_string()),
         took_wait_in_queue: if res.took_detail.is_some() {
             let resp_took = res.took_detail.as_ref().unwrap();

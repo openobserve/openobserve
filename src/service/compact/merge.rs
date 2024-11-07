@@ -34,6 +34,7 @@ use config::{
         },
         record_batch_ext::{concat_batches, merge_record_batches},
         schema_ext::SchemaExt,
+        time::hour_micros,
     },
     FILE_EXT_PARQUET,
 };
@@ -143,26 +144,18 @@ pub async fn generate_job_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-    // 1. if step_secs less than 1 hour, must wait for at least max_file_retention_time
-    // 2. if step_secs greater than 1 hour, must wait for at least 3 * max_file_retention_time
+    // must wait for at least 3 * max_file_retention_time
     // -- first period: the last hour local file upload to storage, write file list
     // -- second period, the last hour file list upload to storage
     // -- third period, we can do the merge, so, at least 3 times of
     // max_file_retention_time
-    if (cfg.compact.step_secs < 3600
-        && time_now.timestamp_micros() - offset
+    if offset >= time_now_hour
+        || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                 .unwrap()
                 .num_microseconds()
-                .unwrap())
-        || (cfg.compact.step_secs >= 3600
-            && (offset >= time_now_hour
-                || time_now.timestamp_micros() - offset
-                    <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                        * 3))
+                .unwrap()
+                * 3
     {
         return Ok(()); // the time is future, just wait
     }
@@ -184,11 +177,9 @@ pub async fn generate_job_by_stream(
     }
 
     // write new offset
-    let offset = offset
-        + Duration::try_seconds(cfg.compact.step_secs)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+    let offset = offset + hour_micros(1);
+    // format to hour with zero minutes, seconds
+    let offset = offset - offset % hour_micros(1);
     db::compact::files::set_offset(
         org_id,
         stream_type,
@@ -197,6 +188,113 @@ pub async fn generate_job_by_stream(
         Some(&LOCAL_NODE.uuid.clone()),
     )
     .await?;
+
+    Ok(())
+}
+
+/// Generate merging job by stream
+/// 1. get old data by hour
+/// 2. check if other node is processing
+/// 3. create job or return
+pub async fn generate_old_data_job_by_stream(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), anyhow::Error> {
+    // get last compacted offset
+    let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        return Ok(()); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = dist_lock::lock(&lock_key, 0, None).await?;
+        // check the working node again, maybe other node locked it first
+        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(()); // other node is processing
+        }
+        // set to current node
+        let ret = db::compact::files::set_offset(
+            org_id,
+            stream_type,
+            stream_name,
+            offset,
+            Some(&LOCAL_NODE.uuid.clone()),
+        )
+        .await;
+        dist_lock::unlock(&locker).await?;
+        drop(locker);
+        ret?;
+    }
+
+    if offset == 0 {
+        return Ok(()); // no data
+    }
+
+    let cfg = get_config();
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let mut stream_data_retention_days = cfg.compact.data_retention_days;
+    if stream_settings.data_retention > 0 {
+        stream_data_retention_days = stream_settings.data_retention;
+    }
+    if stream_data_retention_days > cfg.compact.old_data_max_days {
+        stream_data_retention_days = cfg.compact.old_data_max_days;
+    }
+    if stream_data_retention_days == 0 {
+        return Ok(()); // no need to check old data
+    }
+
+    // get old data by hour, `offset - 2 hours` as old data
+    let end_time = offset - hour_micros(2);
+    let start_time = end_time
+        - Duration::try_days(stream_data_retention_days as i64)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+    let hours = infra_file_list::query_old_data_hours(
+        org_id,
+        stream_type,
+        stream_name,
+        Some((start_time, end_time)),
+    )
+    .await?;
+
+    // generate merging job
+    for hour in hours {
+        let column = hour.split('/').collect::<Vec<_>>();
+        if column.len() != 4 {
+            return Err(anyhow::anyhow!(
+                "Unexpected hour format in {}, Expected format YYYY/MM/DD/HH",
+                hour
+            ));
+        }
+        let offset = DateTime::parse_from_rfc3339(&format!(
+            "{}-{}-{}T{}:00:00Z",
+            column[0], column[1], column[2], column[3]
+        ))?
+        .with_timezone(&Utc);
+        let offset = offset.timestamp_micros();
+        log::debug!(
+            "[COMPACTOR] generate_old_data_job_by_stream [{}/{}/{}] hours: {}, offset: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            hour,
+            offset
+        );
+        if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
+            return Err(anyhow::anyhow!(
+                "[COMAPCT] add file_list_jobs for old data failed: {}",
+                e
+            ));
+        }
+    }
 
     Ok(())
 }
@@ -277,17 +375,11 @@ pub async fn merge_by_stream(
     // get current hour(day) all files
     let (partition_offset_start, partition_offset_end) =
         if partition_time_level == PartitionTimeLevel::Daily {
-            (
-                offset_time_day,
-                offset_time_day + Duration::try_hours(24).unwrap().num_microseconds().unwrap() - 1,
-            )
+            (offset_time_day, offset_time_day + hour_micros(24) - 1)
         } else {
-            (
-                offset_time_hour,
-                offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap() - 1,
-            )
+            (offset_time_hour, offset_time_hour + hour_micros(1) - 1)
         };
-    let mut files = file_list::query(
+    let files = file_list::query(
         org_id,
         stream_name,
         stream_type,
@@ -297,31 +389,6 @@ pub async fn merge_by_stream(
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
-
-    // check lookback files
-    if cfg.compact.lookback_hours > 0 {
-        let lookback_offset = Duration::try_hours(cfg.compact.lookback_hours)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let lookback_offset_start = partition_offset_start - lookback_offset;
-        let mut lookback_offset_end = partition_offset_end - lookback_offset;
-        if lookback_offset_end > partition_offset_start {
-            // the lookback period is overlap with current period
-            lookback_offset_end = partition_offset_start;
-        }
-        let lookback_files = file_list::query(
-            org_id,
-            stream_name,
-            stream_type,
-            partition_time_level,
-            lookback_offset_start,
-            lookback_offset_end,
-        )
-        .await
-        .map_err(|e| anyhow::anyhow!("query lookback file list failed: {}", e))?;
-        files.extend(lookback_files);
-    }
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] time range: [{},{}], files: {}",
@@ -349,9 +416,6 @@ pub async fn merge_by_stream(
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(file.to_owned());
     }
-
-    // collect stream stats
-    let mut stream_stats = StreamStats::default();
 
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
@@ -402,13 +466,6 @@ pub async fn merge_by_stream(
                 }
                 new_file_size += file.meta.original_size;
                 new_file_list.push(file.clone());
-                // metrics
-                metrics::COMPACT_MERGED_FILES
-                    .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                    .inc();
-                metrics::COMPACT_MERGED_BYTES
-                    .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                    .inc_by(file.meta.original_size as u64);
             }
             if new_file_list.len() > 1 {
                 batch_groups.push(MergeBatch {
@@ -453,26 +510,21 @@ pub async fn merge_by_stream(
                 let new_file_name = std::mem::take(&mut new_file.key);
                 let new_file_meta = std::mem::take(&mut new_file.meta);
                 let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
-
                 if new_file_name.is_empty() {
-                    if new_file_list.is_empty() {
-                        // no file need to merge
-                        break;
-                    } else {
-                        // delete files from file_list and continue
-                        files_with_size.retain(|f| !&new_file_list.contains(f));
-                        continue;
-                    }
+                    continue;
                 }
 
                 // delete small files keys & write big files keys, use transaction
                 let mut events = Vec::with_capacity(new_file_list.len() + 1);
                 events.push(FileKey {
-                    key: new_file_name.clone(),
+                    key: new_file_name,
                     meta: new_file_meta,
                     deleted: false,
                     segment_ids: None,
                 });
+
+                // collect stream stats
+                let mut stream_stats: StreamStats = StreamStats::default();
                 for file in new_file_list.iter() {
                     stream_stats = stream_stats - file.meta.clone();
                     events.push(FileKey {
@@ -486,7 +538,24 @@ pub async fn merge_by_stream(
 
                 // write file list to storage
                 match write_file_list(&org_id, &events).await {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        // update stream stats
+                        if stream_stats.doc_num != 0 {
+                            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+                            if let Err(e) = infra_file_list::set_stream_stats(
+                                &org_id,
+                                &[(stream_key.clone(), stream_stats)],
+                            )
+                            .await
+                            {
+                                log::error!(
+                                    "[COMPACT] set_stream_stats failed: {}, err: {}",
+                                    stream_key,
+                                    e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => {
                         log::error!("[COMPACT] write file list failed: {}", e);
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -512,18 +581,6 @@ pub async fn merge_by_stream(
         log::error!("[COMPACT] set_job_done failed: {e}");
     }
 
-    // update stream stats
-    if stream_stats.doc_num != 0 {
-        infra_file_list::set_stream_stats(
-            org_id,
-            &[(
-                format!("{org_id}/{stream_type}/{stream_name}"),
-                stream_stats,
-            )],
-        )
-        .await?;
-    }
-
     // metrics
     let time = start.elapsed().as_secs_f64();
     metrics::COMPACT_USED_TIME
@@ -531,16 +588,12 @@ pub async fn merge_by_stream(
         .inc_by(time);
     metrics::COMPACT_DELAY_HOURS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .set(
-            (time_now_hour - offset_time_hour)
-                / Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
-        );
+        .set((time_now_hour - offset_time_hour) / hour_micros(1));
 
     Ok(())
 }
 
-/// merge some small files into one big file, upload to storage, returns the big
-/// file key and merged files
+/// merge small files into big file, upload to storage, returns the big file key and merged files
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -820,8 +873,8 @@ pub async fn merge_files(
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
                             org_id,
-                            stream_name,
                             stream_type,
+                            stream_name,
                             &full_text_search_fields,
                             &index_fields,
                         )
