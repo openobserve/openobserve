@@ -44,8 +44,10 @@ const getDefaultDashboardPanelData: any = () => ({
     title: "",
     description: "",
     config: {
-      enable_trellis_chart: null,
-      num_of_columns: 1,
+      trellis: {
+        layout: null,
+        num_of_columns: 1,
+      },
       show_legends: true,
       legends_position: null,
       unit: null,

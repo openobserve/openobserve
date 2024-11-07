@@ -39,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type != 'metric' &&
         dashboardPanelData.data.type != 'gauge' &&
         dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'sankey'
+        dashboardPanelData.data.type != 'sankey' &&
+        dashboardPanelData.data.type != 'pie' &&
+        dashboardPanelData.data.type != 'donut'
       "
       class="q-mb-sm"
     >
@@ -47,27 +49,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.trellisLayout')"
         data-test="dashboard-trellis-chart"
         outlined
-        v-model="dashboardPanelData.data.config.enable_trellis_chart"
+        v-model="dashboardPanelData.data.config.trellis.layout"
         :options="trellisOptions"
         dense
         class="showLabelOnTop"
         stack-label
         emit-value
         :display-value="`${
-          dashboardPanelData.data.config.enable_trellis_chart ?? 'None'
+          dashboardPanelData.data.config.trellis?.layout ?? 'None'
         }`"
       >
       </q-select>
 
       <template
-        v-if="dashboardPanelData.data.config.enable_trellis_chart === 'custom'"
+        v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
       >
         <div class="q-mb-sm q-mt-sm" style="font-weight: 600">
           {{ t("dashboard.numOfColumns") }}
         </div>
         <q-input
           outlined
-          v-model="dashboardPanelData.data.config.num_of_columns"
+          v-model.number="dashboardPanelData.data.config.trellis.num_of_columns"
           color="input-border"
           bg-color="input-bg"
           class="q-mr-sm"
@@ -1346,8 +1348,11 @@ export default defineComponent({
         };
       }
 
-      if (!dashboardPanelData.data.config.enable_trellis_chart) {
-        dashboardPanelData.data.config.enable_trellis_chart = null;
+      if (!dashboardPanelData.data.config.trellis) {
+        dashboardPanelData.data.config.trellis = {
+          layout: null,
+          num_of_columns: 1,
+        };
       }
 
       if (!dashboardPanelData.data.config.axis_border_show) {
