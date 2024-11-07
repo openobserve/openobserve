@@ -54,7 +54,7 @@ pub const SIZE_IN_GB: i64 = 1024 * 1024 * 1024;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
-pub const INDEX_SEGMENT_LENGTH: usize = 1; // this can't be change, it will cause segment matching error
+pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
@@ -728,7 +728,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "parquet",
-        help = "InvertedIndex store format, parquet(default), fst, Tantivy, all"
+        help = "InvertedIndex store format, parquet(default), Tantivy, both"
     )]
     pub inverted_index_store_format: String,
     #[env_config(
@@ -1586,14 +1586,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.inverted_index_store_format.is_empty() {
         cfg.common.inverted_index_search_format = "parquet".to_string();
     }
-    if !["all", "parquet", "fst", "tantivy"]
-        .contains(&cfg.common.inverted_index_store_format.as_str())
-    {
+    if !["both", "parquet", "tantivy"].contains(&cfg.common.inverted_index_store_format.as_str()) {
         return Err(anyhow::anyhow!(
             "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet."
         ));
     }
-    if cfg.common.inverted_index_store_format != "all" {
+    if cfg.common.inverted_index_store_format != "both" {
         cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
     }
 

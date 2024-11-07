@@ -117,17 +117,9 @@ pub async fn search(
 
     // check inverted index
     let cfg = get_config();
-    let inverted_index_type = if query.inverted_index_type.is_none()
-        || query.inverted_index_type.as_ref().unwrap().is_empty()
-    {
-        cfg.common.inverted_index_search_format.clone()
-    } else {
-        query.inverted_index_type.as_ref().unwrap().to_string()
-    };
+    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = query.use_inverted_index
-        && (inverted_index_type == "fst"
-            || inverted_index_type == "all"
-            || inverted_index_type == "tantivy");
+        && (inverted_index_type == "both" || inverted_index_type == "tantivy");
     log::info!(
         "[trace_id {}] flight->search: use_inverted_index with fst format {}",
         query.trace_id,
@@ -455,6 +447,7 @@ async fn filter_file_list_by_inverted_index(
     match_terms: &[String],
 ) -> Result<usize, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
 
     // construct partition filters
     let equal_terms: Vec<(String, String)> = equal_terms
@@ -468,11 +461,7 @@ async fn filter_file_list_by_inverted_index(
     let index_terms_orig = super::super::filter_index_fields(&equal_terms, &index_fields);
     let index_terms = generate_filter_from_equal_items(&index_terms_orig);
 
-    let use_tantivy = if let Some(index_type) = query.inverted_index_type.as_ref() {
-        if index_type == "fst" { false } else { true }
-    } else {
-        false
-    };
+    let use_tantivy = cfg.common.inverted_index_search_format.eq("tantivy");
     log::info!(
         "[trace_id {}] search->storage: query using tantivy: {}",
         query.trace_id,
@@ -480,7 +469,6 @@ async fn filter_file_list_by_inverted_index(
     );
 
     // Cache the corresponding Index files
-    let cfg = get_config();
     let mut scan_stats = ScanStats::new();
     let mut file_list_map = file_list.drain(..).into_group_map_by(|f| f.key.clone());
     let index_file_names = file_list_map

@@ -93,22 +93,20 @@ const fn default_min_len() -> usize {
 
 /// Currently supports two InvertedIndexFormat
 /// Parquet -> v2
-/// FST     -> v3
+/// Tantivy     -> v3
 /// BOTH    -> use both
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum InvertedIndexFormat {
     #[default]
     Parquet,
-    FST,
-    All,
+    Both,
     Tantivy,
 }
 
 impl From<&String> for InvertedIndexFormat {
     fn from(s: &String) -> Self {
         match s.to_lowercase().as_str() {
-            "fst" => InvertedIndexFormat::FST,
-            "all" => InvertedIndexFormat::All,
+            "both" => InvertedIndexFormat::Both,
             "tantivy" => InvertedIndexFormat::Tantivy,
             _ => InvertedIndexFormat::Parquet,
         }
@@ -119,8 +117,7 @@ impl std::fmt::Display for InvertedIndexFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InvertedIndexFormat::Parquet => write!(f, "parquet"),
-            InvertedIndexFormat::FST => write!(f, "fst"),
-            InvertedIndexFormat::All => write!(f, "all"),
+            InvertedIndexFormat::Both => write!(f, "both"),
             InvertedIndexFormat::Tantivy => write!(f, "tantivy"),
         }
     }

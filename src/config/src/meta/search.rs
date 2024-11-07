@@ -59,8 +59,6 @@ pub struct Request {
     #[serde(default, flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
-    #[serde(default)]
-    pub index_type: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -439,7 +437,6 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
-            index_type: "".to_string(),
         };
         Ok(search_req)
     }
@@ -651,7 +648,6 @@ impl From<Request> for cluster_rpc::SearchRequest {
             work_group: "".to_string(),
             user_id: None,
             search_event_type: req.search_type.map(|event| event.to_string()),
-            index_type: req.index_type.clone(),
         }
     }
 }
@@ -961,7 +957,6 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
-                index_type: self.index_type.clone(),
             });
         }
         res
@@ -1047,7 +1042,6 @@ mod tests {
             timeout: 0,
             search_type: None,
             search_event_context: None,
-            index_type: "".to_string(),
         };
 
         let rpc_req = cluster_rpc::SearchRequest::from(req.clone());

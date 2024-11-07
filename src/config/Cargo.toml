@@ -76,7 +76,7 @@ async-trait = "0.1.83"
 
 [dev-dependencies]
 criterion.workspace = true
-pprof = { version = "0.4.2", features = ["criterion", "flamegraph"] }
+pprof = { version = "0.13", features = ["criterion", "flamegraph"] }
 
 [[bench]]
 name = "test_puffin"

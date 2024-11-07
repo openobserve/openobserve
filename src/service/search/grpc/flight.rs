@@ -138,7 +138,6 @@ pub async fn search(
         time_range: Some((req.start_time, req.end_time)),
         work_group: work_group.clone(),
         use_inverted_index: req.use_inverted_index,
-        inverted_index_type: req.index_type.clone(),
     });
 
     // get all tables

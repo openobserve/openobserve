@@ -36,7 +36,6 @@ pub struct QueryParams {
     pub time_range: Option<(i64, i64)>,
     pub work_group: Option<String>,
     pub use_inverted_index: bool,
-    pub inverted_index_type: Option<String>,
 }
 
 fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Result<()> {

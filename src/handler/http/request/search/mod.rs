@@ -39,9 +39,9 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_index_type_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request, get_work_group,
             },
         },
     },
@@ -155,12 +155,6 @@ pub async fn search(
         .search_type
         .as_ref()
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
-
-    // set index_type
-    req.index_type = match get_index_type_from_request(&query) {
-        Ok(typ) => typ,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
@@ -475,7 +469,6 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        index_type: "".to_string(),
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
@@ -527,7 +520,6 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        index_type: "".to_string(),
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)
@@ -906,7 +898,6 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        index_type: "".to_string(),
     };
 
     // skip fields which aren't part of the schema
@@ -1227,7 +1218,6 @@ async fn values_v2(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        index_type: "".to_string(),
     };
     let search_res = SearchService::search(
         &trace_id,

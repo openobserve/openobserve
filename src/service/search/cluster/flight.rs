@@ -348,7 +348,7 @@ pub async fn run_datafusion(
 
     // check inverted index prefix search
     if sql.stream_type == StreamType::Index
-        && cfg.common.inverted_index_search_format.to_lowercase() != "contains"
+        && cfg.common.full_text_search_type.to_lowercase() != "contains"
     {
         for (stream, items) in sql.prefix_items.iter() {
             equal_keys
@@ -767,20 +767,12 @@ async fn get_inverted_index_file_lists(
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
-    let inverted_index_type = if req.inverted_index_type.is_none()
-        || req.inverted_index_type.as_ref().unwrap().is_empty()
-    {
-        cfg.common.inverted_index_search_format.clone()
-    } else {
-        req.inverted_index_type.as_ref().unwrap().to_string()
-    };
+    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_parquet_inverted_index =
-        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "all");
-    let use_fst_inverted_index = use_inverted_index
-        && (inverted_index_type == "fst"
-            || inverted_index_type == "all"
-            || inverted_index_type == "tantivy");
+        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    let use_fst_inverted_index =
+        use_inverted_index && (inverted_index_type == "both" || inverted_index_type == "tantivy");
     log::info!(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
         use_parquet_inverted_index

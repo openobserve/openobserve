@@ -61,7 +61,6 @@ use config::{
 use hashbrown::HashSet;
 use infra::{
     cache::tmpfs,
-    file_list,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
@@ -787,7 +786,7 @@ async fn merge_files(
                         InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
                     if matches!(
                         index_format,
-                        InvertedIndexFormat::Parquet | InvertedIndexFormat::All
+                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
                     ) {
                         generate_index_on_ingester(
                             inverted_idx_batch.clone(),
@@ -803,23 +802,23 @@ async fn merge_files(
                             anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e)
                         })?;
                     }
+                    // if matches!(
+                    //     index_format,
+                    //     InvertedIndexFormat::FST | InvertedIndexFormat::All
+                    // ) {
+                    //     // generate fst inverted index and write to storage
+                    //     generate_fst_inverted_index(
+                    //         inverted_idx_batch.clone(),
+                    //         &new_file_key,
+                    //         &full_text_search_fields,
+                    //         &index_fields,
+                    //         None,
+                    //     )
+                    //     .await?;
+                    // }
                     if matches!(
                         index_format,
-                        InvertedIndexFormat::FST | InvertedIndexFormat::All
-                    ) {
-                        // generate fst inverted index and write to storage
-                        generate_fst_inverted_index(
-                            inverted_idx_batch.clone(),
-                            &new_file_key,
-                            &full_text_search_fields,
-                            &index_fields,
-                            None,
-                        )
-                        .await?;
-                    }
-                    if matches!(
-                        index_format,
-                        InvertedIndexFormat::Tantivy | InvertedIndexFormat::All
+                        InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
                     ) {
                         // generate fst inverted index and write to storage
                         create_tantivy_index(
@@ -1359,6 +1358,7 @@ fn prepare_index_record_batches(
 /// Creates fst inverted index bytes and writes to storage.
 /// Called by both ingester and compactor. Compactor needs to provide `file_list_to_invalidate`
 /// to delete previously created small index files
+#[allow(dead_code)]
 pub(crate) async fn generate_fst_inverted_index(
     inverted_idx_batch: RecordBatch,
     parquet_file_name: &str,
