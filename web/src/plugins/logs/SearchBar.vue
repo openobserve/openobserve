@@ -74,210 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         ></syntax-guide>
-        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
-          <q-btn-dropdown
-            data-test="logs-search-saved-views-btn"
-            v-model="savedViewDropdownModel"
-            size="12px"
-            icon="save"
-            icon-right="saved_search"
-            :title="t('search.savedViewsLabel')"
-            @click="fnSavedView"
-            @show="loadSavedView"
-            split
-            class="no-outline saved-views-dropdown no-border"
-          >
-            <q-list
-              :style="
-                localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
-              "
-              data-test="logs-search-saved-view-list"
-            >
-              <q-item style="padding: 0px 0px 0px 0px">
-                <q-item-section
-                  class="column"
-                  style="width: 60%; border-right: 1px solid lightgray"
-                >
-                  <q-table
-                    data-test="log-search-saved-view-list-fields-table"
-                    :visible-columns="['view_name']"
-                    :rows="searchObj.data.savedViews"
-                    :row-key="(row) => 'saved_view_' + row.view_id"
-                    :filter="searchObj.data.savedViewFilterFields"
-                    :filter-method="filterSavedViewFn"
-                    :pagination="{ rowsPerPage }"
-                    hide-header
-                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                    class="saved-view-table full-height"
-                    id="savedViewList"
-                    :rows-per-page-options="[]"
-                    :hide-bottom="
-                      searchObj.data.savedViews.length <= rowsPerPage ||
-                      searchObj.data.savedViews.length == 0
-                    "
-                  >
-                    <template #top-right>
-                      <div class="full-width">
-                        <q-input
-                          data-test="log-search-saved-view-field-search-input"
-                          v-model="searchObj.data.savedViewFilterFields"
-                          data-cy="index-field-search-input"
-                          filled
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          :placeholder="t('search.searchSavedView')"
-                        >
-                          <template #prepend>
-                            <q-icon name="search" />
-                          </template>
-                        </q-input>
-                      </div>
-                      <div
-                        v-if="searchObj.loadingSavedView == true"
-                        class="full-width float-left"
-                      >
-                        <div class="text-subtitle2 text-weight-bold float-left">
-                          <q-spinner-hourglass size="20px" />
-                          {{ t("confirmDialog.loading") }}
-                        </div>
-                      </div>
-                      <q-tr>
-                        <q-td
-                          v-if="
-                            searchObj.data.savedViews.length == 0 &&
-                            searchObj.loadingSavedView == false
-                          "
-                        >
-                          <q-item-label class="q-pl-sm q-pt-sm">{{
-                            t("search.savedViewsNotFound")
-                          }}</q-item-label>
-                        </q-td>
-                      </q-tr>
-                    </template>
-                    <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list">
-                        <q-item
-                          class="q-pa-sm saved-view-item"
-                          clickable
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="applySavedView(props.row)"
-                            v-close-popup
-                            :title="props.row.view_name"
-                          >
-                            <q-item-label
-                              class="ellipsis"
-                              style="max-width: 188px"
-                              >{{ props.row.view_name }}</q-item-label
-                            >
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                props.row,
-                                favoriteViews.includes(props.row.view_id)
-                              )
-                            "
-                          >
-                            <q-icon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              color="grey"
-                              size="xs"
-                            />
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="handleDeleteSavedView(props.row)"
-                          >
-                            <q-icon name="delete" color="grey" size="xs" />
-                          </q-item-section>
-                        </q-item> </q-td
-                    ></template>
-                  </q-table>
-                </q-item-section>
-
-                <q-item-section
-                  class="column"
-                  style="width: 40%; margin-left: 0px"
-                  v-if="localSavedViews.length > 0"
-                >
-                  <q-table
-                    data-test="log-search-saved-view-favorite-list-fields-table"
-                    :visible-columns="['view_name']"
-                    :rows="localSavedViews"
-                    :row-key="(row) => 'favorite_saved_view_' + row.view_name"
-                    hide-header
-                    hide-bottom
-                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                    class="saved-view-table full-height"
-                    id="savedViewFavoriteList"
-                    :rows-per-page-options="[0]"
-                  >
-                    <template #top-right>
-                      <q-item style="padding: 0px"
-                        ><q-item-label
-                          header
-                          class="q-pa-sm text-bold favorite-label"
-                          >Favorite Views</q-item-label
-                        ></q-item
-                      >
-                      <q-separator horizontal inset></q-separator>
-                    </template>
-                    <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list q-pa-xs">
-                        <q-item
-                          class="q-pa-sm saved-view-item"
-                          clickable
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="applySavedView(props.row)"
-                            v-close-popup
-                          >
-                            <q-item-label
-                              class="ellipsis"
-                              style="max-width: 185px"
-                              >{{ props.row.view_name }}</q-item-label
-                            >
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                props.row,
-                                favoriteViews.includes(props.row.view_id)
-                              )
-                            "
-                          >
-                            <q-icon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              color="grey"
-                              size="xs"
-                            />
-                          </q-item-section>
-                        </q-item> </q-td
-                    ></template>
-                  </q-table>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
+        <saved-view-form
+          @on:populate-function-implementation="populateFunctionImplementation"
+          @on:populate-date-time="populateDateTime"
+          @on:refresh-interval-change="onRefreshIntervalUpdate"
+        ></saved-view-form>
         <q-toggle
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
@@ -379,7 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item"
+clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -625,31 +427,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog
-      ref="confirmSavedViewDialog"
-      v-model="confirmSavedViewDialogVisible"
-    >
-      <q-card>
-        <q-card-section>
-          {{ confirmMessageSavedView }}
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            :label="t('confirmDialog.cancel')"
-            color="primary"
-            @click="cancelConfirmDialog"
-          />
-          <q-btn
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            :label="t('confirmDialog.ok')"
-            color="positive"
-            @click="confirmDialogOK"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
     <q-dialog v-model="customDownloadDialog">
       <q-card>
         <q-card-section>
@@ -706,99 +483,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('search.btnDownload')"
             color="primary"
             @click="downloadRangeData"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="store.state.savedViewDialog">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <span>Update</span>
-          <q-toggle
-            data-test="saved-view-action-toggle"
-            v-bind:disable="searchObj.data.savedViews.length == 0"
-            name="saved_view_action"
-            v-model="isSavedViewAction"
-            true-value="create"
-            false-value="update"
-            label=""
-            @change="savedViewName = ''"
-          />
-          <span>Create</span>
-          <div v-if="isSavedViewAction == 'create'">
-            <q-input
-              data-test="add-alert-name-input"
-              v-model="savedViewName"
-              :label="t('search.savedViewName')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[
-                (val) => !!val.trim() || 'This field is required',
-                (val) =>
-                  /^[-A-Za-z0-9 /@/_]+$/.test(val) ||
-                  'Input must be alphanumeric',
-              ]"
-              tabindex="0"
-            />
-          </div>
-          <div v-else>
-            <q-select
-              data-test="saved-view-name-select"
-              v-model="savedViewSelectedName"
-              :options="searchObj.data.savedViews"
-              option-label="view_name"
-              option-value="view_id"
-              :label="t('search.savedViewName')"
-              :popup-content-style="{ textTransform: 'capitalize' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="bg-white text-teal">
-          <q-btn
-            data-test="saved-view-dialog-cancel-btn"
-            unelevated
-            no-caps
-            class="q-mr-sm text-bold"
-            :label="t('confirmDialog.cancel')"
-            color="secondary"
-            v-close-popup
-          />
-          <q-btn
-            data-test="saved-view-dialog-save-btn"
-            v-if="!saveViewLoader"
-            unelevated
-            no-caps
-            :label="t('confirmDialog.ok')"
-            color="primary"
-            class="text-bold"
-            @click="handleSavedView"
-          />
-          <q-btn
-            data-test="saved-view-dialog-loading-btn"
-            v-if="saveViewLoader"
-            unelevated
-            no-caps
-            :label="t('confirmDialog.loading')"
-            color="primary"
-            class="text-bold"
           />
         </q-card-actions>
       </q-card>
@@ -897,13 +581,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
     <ConfirmDialog
-      title="Delete Saved View"
-      message="Are you sure you want to delete saved view?"
-      @update:ok="confirmDeleteSavedViews"
-      @update:cancel="confirmDelete = false"
-      v-model="confirmDelete"
-    />
-    <ConfirmDialog
       title="Reset Changes"
       message="Navigating away from visualize will reset your changes. Are you sure you want to proceed?"
       @update:ok="changeLogsVisualizeToggle"
@@ -939,6 +616,7 @@ import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
 import shortURLService from "@/services/short_url";
+import SavedViewForm from "@/plugins/logs/SavedViewForm.vue";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -954,7 +632,6 @@ import {
   queryIndexSplit,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
-import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
@@ -981,6 +658,7 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
+    SavedViewForm,
   },
   emits: [
     "searchdata",
@@ -1015,14 +693,6 @@ export default defineComponent({
         this.functionOptions.push(this.functionModel);
       }
     },
-    handleDeleteSavedView(item: any) {
-      this.savedViewDropdownModel = false;
-      this.deleteViewID = item.view_id;
-      this.confirmDelete = true;
-    },
-    confirmDeleteSavedViews() {
-      this.deleteSavedViews();
-    },
     toggleCustomDownloadDialog() {
       this.customDownloadDialog = true;
     },
@@ -1048,7 +718,7 @@ export default defineComponent({
             query: this.searchObj.data.customDownloadQueryObj,
             page_type: this.searchObj.data.stream.streamType,
           },
-          "UI"
+          "UI",
         )
         .then((res) => {
           this.customDownloadDialog = false;
@@ -1125,28 +795,11 @@ export default defineComponent({
     const confirmLogsVisualizeModeChangeDialog = ref(false);
 
     const confirmDialogVisible: boolean = ref(false);
-    const confirmSavedViewDialogVisible: boolean = ref(false);
     let confirmCallback;
     let streamName = "";
 
     let parser: any;
     const dateTimeRef = ref(null);
-    const saveViewLoader = ref(false);
-    const favoriteViews = ref([]);
-
-    const localSavedViews = ref([]);
-    let savedViews = useLocalSavedView();
-    if (savedViews.value != null) {
-      const favoriteValues = [];
-      Object.values(savedViews.value).forEach((view) => {
-        if (view.org_id === store.state.selectedOrganization.identifier) {
-          favoriteViews.value.push(view.view_id);
-          favoriteValues.push(view);
-        }
-      });
-
-      localSavedViews.value.push(...favoriteValues);
-    }
 
     const {
       autoCompleteData,
@@ -1161,19 +814,12 @@ export default defineComponent({
       searchObj.meta.refreshInterval = Number(item.value);
     };
 
-    const isSavedViewAction = ref("create");
-    const savedViewName = ref("");
-    const savedViewSelectedName = ref("");
-    const confirmDelete = ref(false);
-    const deleteViewID = ref("");
-    const savedViewDropdownModel = ref(false);
-
     watch(
       () => searchObj.data.stream.selectedStreamFields,
       (fields) => {
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
 
     watch(
@@ -1181,7 +827,7 @@ export default defineComponent({
       (funs) => {
         if (funs.length) updateFunctionKeywords(funs);
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
 
     onBeforeMount(async () => {
@@ -1291,7 +937,7 @@ export default defineComponent({
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
               !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table
+                searchObj.data.parsedQuery.from[0].table,
               ) &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
@@ -1367,12 +1013,12 @@ export default defineComponent({
           value.selectedDate.from = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "yyyy/MM/DD"
+            "yyyy/MM/DD",
           );
           value.selectedTime.startTime = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "HH:mm"
+            "HH:mm",
           );
 
           dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
@@ -1558,7 +1204,7 @@ export default defineComponent({
       if (isSavedFunctionAction.value == "create") {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
-          formData.value
+          formData.value,
         );
 
         callTransform
@@ -1600,7 +1246,7 @@ export default defineComponent({
           saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
-            formData.value
+            formData.value,
           );
 
           callTransform
@@ -1611,7 +1257,7 @@ export default defineComponent({
               });
 
               const transformIndex = searchObj.data.transforms.findIndex(
-                (obj) => obj.name === formData.value.name
+                (obj) => obj.name === formData.value.name,
               );
               if (transformIndex !== -1) {
                 searchObj.data.transforms[transformIndex].name =
@@ -1693,13 +1339,7 @@ export default defineComponent({
       confirmCallback = callback;
     };
 
-    const showSavedViewConfirmDialog = (callback) => {
-      confirmSavedViewDialogVisible.value = true;
-      confirmCallback = callback;
-    };
-
     const cancelConfirmDialog = () => {
-      confirmSavedViewDialogVisible.value = false;
       confirmDialogVisible.value = false;
       confirmCallback = null;
     };
@@ -1719,7 +1359,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           functionOptions.value = searchObj.data.transforms.filter(
-            (v) => v.name?.toLowerCase().indexOf(needle) > -1
+            (v) => v.name?.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
@@ -1729,599 +1369,12 @@ export default defineComponent({
       emit("onChangeInterval");
     };
 
-    const fnSavedView = () => {
-      if (searchObj.data.stream.selectedStream.length == 0) {
-        $q.notify({
-          type: "negative",
-          message: "No stream available to save view.",
-        });
-        return;
-      }
-      store.dispatch("setSavedViewDialog", true);
-      isSavedViewAction.value = "create";
-      savedViewName.value = "";
-      saveViewLoader.value = false;
-      savedViewSelectedName.value = "";
-      savedViewDropdownModel.value = false;
-    };
-
-    const applySavedView = (item) => {
-      searchObj.shouldIgnoreWatcher = true;
-      searchObj.meta.sqlMode = false;
-      savedviewsService
-        .getViewDetail(
-          store.state.selectedOrganization.identifier,
-          item.view_id
-        )
-        .then(async (res) => {
-          if (res.status == 200) {
-            store.dispatch("setSavedViewFlag", true);
-            const extractedObj = res.data.data;
-
-            // Resetting columns as its not required in searchObj
-            // As we reassign columns from selectedFields and search results
-            extractedObj.data.resultGrid.columns = [];
-
-            // As in saved view, we observed field getting duplicated in selectedFields
-            // So, we are removing duplicates before applying saved view
-            if (extractedObj.data.stream.selectedFields?.length) {
-              extractedObj.data.stream.selectedFields = [
-                ...new Set(extractedObj.data.stream.selectedFields),
-              ];
-            }
-
-            if (extractedObj.data?.timezone) {
-              store.dispatch("setTimezone", extractedObj.data.timezone);
-            }
-
-            if (!extractedObj.data.stream.hasOwnProperty("streamType")) {
-              extractedObj.data.stream.streamType = "logs";
-            }
-
-            delete searchObj.data.queryResults.aggs;
-
-            if (
-              searchObj.data.stream.streamType ==
-              extractedObj.data.stream.streamType
-            ) {
-              // if (
-              //   extractedObj.data.stream.selectedStream.value !=
-              //   searchObj.data.stream.selectedStream.value
-              // ) {
-              //   extractedObj.data.stream.streamLists =
-              //     searchObj.data.stream.streamLists;
-              // }
-              // ----- Here we are explicitly handling stream change for multistream -----
-              let selectedStreams = [];
-              const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value
-              );
-              if (typeof extractedObj.data.stream.selectedStream == "object") {
-                if (
-                  extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value"
-                  )
-                ) {
-                  selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value
-                  );
-                } else {
-                  selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream
-                  );
-                }
-              } else {
-                selectedStreams.push(extractedObj.data.stream.selectedStream);
-              }
-              const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str)
-              );
-              if (streamNotExist.length > 0) {
-                let errMsg = t("search.streamNotExist").replace(
-                  "[STREAM_NAME]",
-                  streamNotExist
-                );
-                throw new Error(errMsg);
-                return;
-              }
-              // extractedObj.data.stream.selectedStream = [];
-              // extractedObj.data.stream.selectedStream = selectedStreams;
-              delete extractedObj.data.stream.streamLists;
-              delete extractedObj.data.stream.selectedStream;
-              delete searchObj.data.stream.selectedStream;
-              delete searchObj.meta.regions;
-              if (extractedObj.meta.hasOwnProperty("regions")) {
-                searchObj.meta["regions"] = extractedObj.meta.regions;
-              } else {
-                searchObj.meta["regions"] = [];
-              }
-              delete searchObj.data.queryResults.aggs;
-              delete searchObj.data.stream.interestingFieldList;
-              searchObj.data.stream.selectedStream = [];
-              extractedObj.data.transforms = searchObj.data.transforms;
-              extractedObj.data.stream.functions =
-                searchObj.data.stream.functions;
-              extractedObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {},
-              };
-              extractedObj.data.savedViews = searchObj.data.savedViews;
-              extractedObj.data.queryResults = [];
-              extractedObj.meta.scrollInfo = {};
-              searchObj.value = mergeDeep(searchObj, extractedObj);
-              searchObj.shouldIgnoreWatcher = true;
-              // await nextTick();
-              if (extractedObj.data.tempFunctionContent != "") {
-                populateFunctionImplementation(
-                  {
-                    name: "",
-                    function: searchObj.data.tempFunctionContent,
-                  },
-                  false
-                );
-                searchObj.data.tempFunctionContent =
-                  extractedObj.data.tempFunctionContent;
-                searchObj.meta.functionEditorPlaceholderFlag = false;
-              } else {
-                populateFunctionImplementation(
-                  {
-                    name: "",
-                    function: "",
-                  },
-                  false
-                );
-                searchObj.data.tempFunctionContent = "";
-                searchObj.meta.functionEditorPlaceholderFlag = true;
-              }
-              dateTimeRef.value.setSavedDate(searchObj.data.datetime);
-              if (searchObj.meta.refreshInterval != "0") {
-                onRefreshIntervalUpdate();
-              } else {
-                clearInterval(store.state.refreshIntervalID);
-              }
-              searchObj.data.stream.selectedStream.push(...selectedStreams);
-              await updatedLocalLogFilterField();
-              await getStreams("logs", true);
-            } else {
-              // ----- Here we are explicitly handling stream change -----
-              resetStreamData();
-              searchObj.data.stream.streamType =
-                extractedObj.data.stream.streamType;
-
-              delete searchObj.meta.regions;
-              if (extractedObj.meta.hasOwnProperty("regions")) {
-                searchObj.meta["regions"] = extractedObj.meta.regions;
-              } else {
-                searchObj.meta["regions"] = [];
-              }
-              // Here copying selected stream object, as in loadStreamLists() we are setting selected stream object to empty object
-              // After loading stream list, we are setting selected stream object to copied object
-              // const selectedStream = cloneDeep(
-              //   extractedObj.data.stream.selectedStream
-              // );
-              let selectedStreams = [];
-              if (typeof extractedObj.data.stream.selectedStream == "object") {
-                if (
-                  extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value"
-                  )
-                ) {
-                  selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value
-                  );
-                } else {
-                  selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream
-                  );
-                }
-              } else {
-                selectedStreams.push(extractedObj.data.stream.selectedStream);
-              }
-
-              extractedObj.data.transforms = searchObj.data.transforms;
-              extractedObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {},
-              };
-              extractedObj.data.savedViews = searchObj.data.savedViews;
-              extractedObj.data.queryResults = [];
-              extractedObj.meta.scrollInfo = {};
-              delete searchObj.data.queryResults.aggs;
-
-              searchObj.value = mergeDeep(searchObj, extractedObj);
-              searchObj.data.streamResults = {};
-
-              const streamData = await getStreams(
-                searchObj.data.stream.streamType,
-                true
-              );
-              searchObj.data.streamResults = streamData;
-              await loadStreamLists();
-              searchObj.data.stream.selectedStream = [selectedStreams];
-              // searchObj.value = mergeDeep(searchObj, extractedObj);
-
-              const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value
-              );
-              const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str)
-              );
-              if (streamNotExist.length > 0) {
-                let errMsg = t("search.streamNotExist").replace(
-                  "[STREAM_NAME]",
-                  streamNotExist
-                );
-                throw new Error(errMsg);
-                return;
-              }
-              // await nextTick();
-              if (extractedObj.data.tempFunctionContent != "") {
-                populateFunctionImplementation(
-                  {
-                    name: "",
-                    function: searchObj.data.tempFunctionContent,
-                  },
-                  false
-                );
-                searchObj.data.tempFunctionContent =
-                  extractedObj.data.tempFunctionContent;
-                searchObj.meta.functionEditorPlaceholderFlag = false;
-              } else {
-                populateFunctionImplementation(
-                  {
-                    name: "",
-                    function: "",
-                  },
-                  false
-                );
-                searchObj.data.tempFunctionContent = "";
-                searchObj.meta.functionEditorPlaceholderFlag = true;
-              }
-              dateTimeRef.value.setSavedDate(searchObj.data.datetime);
-              if (searchObj.meta.refreshInterval != "0") {
-                onRefreshIntervalUpdate();
-              } else {
-                clearInterval(store.state.refreshIntervalID);
-              }
-              await updatedLocalLogFilterField();
-            }
-            $q.notify({
-              message: `${item.view_name} view applied successfully.`,
-              color: "positive",
-              position: "bottom",
-              timeout: 1000,
-            });
-            setTimeout(async () => {
-              try {
-                searchObj.loading = true;
-                searchObj.meta.refreshHistogram = true;
-                await extractFields();
-                await getQueryData();
-                store.dispatch("setSavedViewFlag", false);
-                updateUrlQueryParams();
-                searchObj.shouldIgnoreWatcher = false;
-              } catch (e) {
-                searchObj.shouldIgnoreWatcher = false;
-                console.log(e);
-              }
-            }, 1000);
-
-            if (
-              extractedObj.data.resultGrid.colOrder &&
-              extractedObj.data.resultGrid.colOrder.hasOwnProperty(
-                searchObj.data.stream.selectedStream
-              )
-            ) {
-              searchObj.data.stream.selectedFields =
-                extractedObj.data.resultGrid.colOrder[
-                  searchObj.data.stream.selectedStream
-                ];
-            } else {
-              searchObj.data.stream.selectedFields =
-                extractedObj.data.stream.selectedFields;
-            }
-
-            if (
-              extractedObj.data.resultGrid.colSizes &&
-              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
-                searchObj.data.stream.selectedStream
-              )
-            ) {
-              searchObj.data.resultGrid.colSizes[
-                searchObj.data.stream.selectedStream
-              ] =
-                extractedObj.data.resultGrid.colSizes[
-                  searchObj.data.stream.selectedStream
-                ];
-            }
-
-            // } else {
-            //   searchObj.value = mergeDeep(searchObj, extractedObj);
-            //   await nextTick();
-            //   updatedLocalLogFilterField();
-            //   handleRunQuery();
-            // }
-          } else {
-            searchObj.shouldIgnoreWatcher = false;
-            store.dispatch("setSavedViewFlag", false);
-            $q.notify({
-              message: err.message || `Error while applying saved view.`,
-              color: "negative",
-              position: "bottom",
-              timeout: 3000,
-            });
-          }
-        })
-        .catch((err) => {
-          searchObj.shouldIgnoreWatcher = false;
-          store.dispatch("setSavedViewFlag", false);
-          $q.notify({
-            message: `Error while applying saved view.`,
-            color: "negative",
-            position: "bottom",
-            timeout: 1000,
-          });
-          console.log(err);
-        });
-      // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
-      // searchObj.value = mergeDeep(searchObj, extractedObj);
-      // await nextTick();
-      // updatedLocalLogFilterField();
-      // handleRunQuery();
-    };
-
-    const handleSavedView = () => {
-      if (isSavedViewAction.value == "create") {
-        if (
-          savedViewName.value == "" ||
-          /^[A-Za-z0-9 \-\_]+$/.test(savedViewName.value) == false
-        ) {
-          $q.notify({
-            message: `Please provide valid view name.`,
-            color: "negative",
-            position: "bottom",
-            timeout: 1000,
-          });
-        } else {
-          saveViewLoader.value = true;
-          createSavedViews(savedViewName.value);
-        }
-      } else {
-        if (savedViewSelectedName.value.view_id) {
-          saveViewLoader.value = false;
-          showSavedViewConfirmDialog(() => {
-            saveViewLoader.value = true;
-            updateSavedViews(
-              savedViewSelectedName.value.view_id,
-              savedViewSelectedName.value.view_name
-            );
-          });
-        } else {
-          $q.notify({
-            message: `Please select saved view to update.`,
-            color: "negative",
-            position: "bottom",
-            timeout: 1000,
-          });
-        }
-      }
-    };
-
-    const deleteSavedViews = async () => {
-      try {
-        savedviewsService
-          .delete(
-            store.state.selectedOrganization.identifier,
-            deleteViewID.value
-          )
-          .then((res) => {
-            if (res.status == 200) {
-              $q.notify({
-                message: `View deleted successfully.`,
-                color: "positive",
-                position: "bottom",
-                timeout: 1000,
-              });
-              getSavedViews();
-            } else {
-              $q.notify({
-                message: `Error while deleting saved view. ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
-                timeout: 1000,
-              });
-            }
-          })
-          .catch((err) => {
-            $q.notify({
-              message: `Error while deleting saved view.`,
-              color: "negative",
-              position: "bottom",
-              timeout: 1000,
-            });
-            console.log(err);
-          });
-      } catch (e: any) {
-        console.log("Error while getting saved views", e);
-      }
-    };
-
-    const getSearchObj = () => {
-      try {
-        delete searchObj.meta.scrollInfo;
-        delete searchObj?.value;
-        let savedSearchObj = toRaw(searchObj);
-        savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
-
-        delete savedSearchObj.data.queryResults;
-        delete savedSearchObj.data.histogram;
-        delete savedSearchObj.data.sortedQueryResults;
-        delete savedSearchObj.data.stream.streamLists;
-        delete savedSearchObj.data.stream.functions;
-        delete savedSearchObj.data.streamResults;
-        delete savedSearchObj.data.savedViews;
-        delete savedSearchObj.data.transforms;
-
-        savedSearchObj.data.timezone = store.state.timezone;
-        delete savedSearchObj.value;
-
-        return savedSearchObj;
-        // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
-      } catch (e) {
-        console.log("Error while encoding search obj", e);
-      }
-    };
-
-    const createSavedViews = (viewName: string) => {
-      try {
-        if (viewName.trim() == "") {
-          $q.notify({
-            message: `Please provide valid view name.`,
-            color: "negative",
-            position: "bottom",
-            timeout: 1000,
-          });
-          saveViewLoader.value = false;
-          return;
-        }
-
-        const viewObj: any = {
-          data: getSearchObj(),
-          view_name: viewName,
-        };
-
-        savedviewsService
-          .post(store.state.selectedOrganization.identifier, viewObj)
-          .then((res) => {
-            if (res.status == 200) {
-              store.dispatch("setSavedViewDialog", false);
-              if (searchObj.data.hasOwnProperty("savedViews") == false) {
-                searchObj.data.savedViews = [];
-              }
-              searchObj.data.savedViews.push({
-                org_id: res.data.org_id,
-                payload: viewObj.data,
-                view_id: res.data.view_id,
-                view_name: viewName,
-              });
-              $q.notify({
-                message: `View created successfully.`,
-                color: "positive",
-                position: "bottom",
-                timeout: 1000,
-              });
-              getSavedViews();
-              isSavedViewAction.value = "create";
-              savedViewName.value = "";
-              saveViewLoader.value = false;
-            } else {
-              saveViewLoader.value = false;
-              $q.notify({
-                message: `Error while creating saved view. ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
-                timeout: 1000,
-              });
-            }
-          })
-          .catch((err) => {
-            saveViewLoader.value = false;
-            $q.notify({
-              message: `Error while creating saved view.`,
-              color: "negative",
-              position: "bottom",
-              timeout: 1000,
-            });
-            console.log(err);
-          });
-      } catch (e: any) {
-        isSavedViewAction.value = "create";
-        savedViewName.value = "";
-        saveViewLoader.value = false;
-        $q.notify({
-          message: `Error while saving view: ${e}`,
-          color: "negative",
-          position: "bottom",
-          timeout: 1000,
-        });
-        console.log("Error while saving view", e);
-      }
-    };
-
-    const updateSavedViews = (viewID: string, viewName: string) => {
-      try {
-        const viewObj: any = {
-          data: getSearchObj(),
-          view_name: viewName,
-        };
-
-        savedviewsService
-          .put(store.state.selectedOrganization.identifier, viewID, viewObj)
-          .then((res) => {
-            if (res.status == 200) {
-              store.dispatch("setSavedViewDialog", false);
-              //update the payload and view_name in savedViews object based on id
-              searchObj.data.savedViews.forEach(
-                (item: { view_id: string }, index: string | number) => {
-                  if (item.view_id == viewID) {
-                    searchObj.data.savedViews[index].payload = viewObj.data;
-                    searchObj.data.savedViews[index].view_name = viewName;
-                  }
-                }
-              );
-
-              $q.notify({
-                message: `View updated successfully.`,
-                color: "positive",
-                position: "bottom",
-                timeout: 1000,
-              });
-              isSavedViewAction.value = "create";
-              savedViewSelectedName.value = "";
-              saveViewLoader.value = false;
-              confirmSavedViewDialogVisible.value = false;
-            } else {
-              saveViewLoader.value = false;
-              $q.notify({
-                message: `Error while updating saved view. ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
-                timeout: 1000,
-              });
-            }
-          })
-          .catch((err) => {
-            saveViewLoader.value = false;
-            $q.notify({
-              message: `Error while updating saved view.`,
-              color: "negative",
-              position: "bottom",
-              timeout: 1000,
-            });
-            console.log(err);
-          });
-      } catch (e: any) {
-        isSavedViewAction.value = "create";
-        savedViewSelectedName.value = "";
-        saveViewLoader.value = false;
-        $q.notify({
-          message: `Error while saving view: ${e}`,
-          color: "negative",
-          position: "bottom",
-          timeout: 1000,
-        });
-        console.log("Error while saving view", e);
-      }
-    };
-
     const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true);
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
         )
         .join("&");
 
@@ -2374,12 +1427,12 @@ export default defineComponent({
         ) {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(",")
+            searchObj.data.stream.interestingFieldList.join(","),
           );
         } else {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            "*"
+            "*",
           );
         }
       } else {
@@ -2396,96 +1449,6 @@ export default defineComponent({
     const downloadCustomInitialNumber = ref(1);
     const downloadCustomRange = ref(100);
     const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
-
-    const loadSavedView = () => {
-      if (searchObj.data.savedViews.length == 0) {
-        getSavedViews();
-      }
-    };
-
-    const handleFavoriteSavedView = (row: any, flag: boolean) => {
-      let localSavedView: any = {};
-      let savedViews = useLocalSavedView();
-
-      if (savedViews.value != null) {
-        localSavedView = savedViews.value;
-      }
-
-      Object.keys(localSavedView).forEach((item, key) => {
-        if (item == row.view_id) {
-          if (flag) {
-            delete localSavedView[item];
-            useLocalSavedView(localSavedView);
-            const index = favoriteViews.value.indexOf(row.view_id);
-            if (index > -1) {
-              favoriteViews.value.splice(index, 1);
-            }
-
-            let favoriteViewsList = localSavedViews.value;
-            if (favoriteViewsList.length > 0) {
-              favoriteViewsList = favoriteViewsList.filter(
-                (item) => item.view_id != row.view_id
-              );
-              // for (const [key, item] of favoriteViewsList.entries()) {
-              //   console.log(item, key);
-              //   if (item.view_id == row.view_id) {
-              //     delete favoriteViewsList[key];
-              //   }
-              // }
-              console.log(favoriteViewsList);
-              localSavedViews.value = favoriteViewsList;
-            }
-          }
-        }
-      });
-
-      if (!flag) {
-        if (favoriteViews.value.length >= 10) {
-          $q.notify({
-            message: "You can only save 10 views.",
-            color: "info",
-            position: "bottom",
-            timeout: 2000,
-          });
-          return;
-        }
-        localSavedView[row.view_id] = JSON.parse(JSON.stringify(row));
-        favoriteViews.value.push(row.view_id);
-        localSavedViews.value.push(row);
-
-        // moveItemsToTop(localSavedView, favoriteViews.value);
-
-        useLocalSavedView(localSavedView);
-        $q.notify({
-          message: "View added to favorites.",
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
-        });
-      } else {
-        // alert(favoriteViews.value.length)
-        // moveItemsToTop(localSavedView, favoriteViews.value);
-        $q.notify({
-          message: "View removed from favorites.",
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
-        });
-      }
-    };
-
-    const filterSavedViewFn = (rows: any, terms: any) => {
-      var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["view_name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      }
-      return filtered;
-    };
 
     const regionFilterMethod = (node, filter) => {
       const filt = filter.toLowerCase();
@@ -2532,7 +1495,7 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs"
+      "logs",
     );
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -2556,12 +1519,12 @@ export default defineComponent({
 
     const variablesAndPanelsDataLoadingState = inject(
       "variablesAndPanelsDataLoadingState",
-      {}
+      {},
     );
 
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState?.searchRequestTraceIds
+        variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
       ).filter((item: any) => item.length > 0);
 
       return searchIds.flat() as string[];
@@ -2577,12 +1540,16 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
     // [END] cancel running queries
+
+    const populateDateTime = () => {
+      dateTimeRef.value.setSavedDate(searchObj.data.datetime);
+    };
 
     return {
       t,
@@ -2598,7 +1565,6 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       showConfirmDialog,
-      showSavedViewConfirmDialog,
       cancelConfirmDialog,
       confirmDialogOK,
       updateQuery,
@@ -2618,17 +1584,6 @@ export default defineComponent({
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,
-      fnSavedView,
-      applySavedView,
-      isSavedViewAction,
-      savedViewName,
-      savedViewSelectedName,
-      handleSavedView,
-      deleteSavedViews,
-      deleteViewID,
-      confirmDelete,
-      saveViewLoader,
-      savedViewDropdownModel,
       fnSavedFunctionDialog,
       isSavedFunctionAction,
       savedFunctionName,
@@ -2643,13 +1598,7 @@ export default defineComponent({
       downloadCustomRange,
       downloadCustomRangeOptions,
       buildSearch,
-      confirmSavedViewDialogVisible,
       rowsPerPage,
-      handleFavoriteSavedView,
-      favoriteViews,
-      localSavedViews,
-      loadSavedView,
-      filterSavedViewFn,
       config,
       handleRegionsSelection,
       handleQuickMode,
@@ -2665,6 +1614,7 @@ export default defineComponent({
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,
+      populateDateTime,
     };
   },
   computed: {
@@ -2676,9 +1626,6 @@ export default defineComponent({
     },
     confirmMessage() {
       return "Are you sure you want to update the function?";
-    },
-    confirmMessageSavedView() {
-      return "Are you sure you want to update the saved view?";
     },
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
@@ -2737,7 +1684,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by"
+                  "order by",
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2748,7 +1695,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit"
+                  "limit",
                 );
                 query =
                   beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
@@ -2759,7 +1706,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by"
+                  "order by",
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2770,7 +1717,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit"
+                  "limit",
                 );
                 query =
                   beforeLimit.trim() +
