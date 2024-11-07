@@ -119,17 +119,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-input full-width"
             style="padding-top: 0"
           >
+          <span>
+            <label class="q-mb-xs q-mt-none text-bold" style="color: #BABABA;">
+            {{ t('alerts.stream_name') + ' *' }}
+          </label>
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              :label="'hello'"
+            >
+              <span style="font-size: 14px">To pass Dynamic Stream Name you need to surround stream name with &#123;&#123;  &#125;&#125; <br> Eg: &#123;&#123; Stream Name  &#125;&#125;</span>
+            </q-tooltip>
+          </q-icon>
+          </span>
           <q-select
             v-model="stream_name"
             :options="filteredStreams"
              option-label="label"
               option-value="value"
-            :label="t('alerts.stream_name') + ' *'"
+            label=""
             :loading="isFetchingStreams"
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case full-width"
+            class="q-pb-sm showLabelOnTop no-case full-width"
             filled
             stack-label
             dense
@@ -142,8 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
             @input-value="handleDynamicStreamName"
+            style="padding-top: 4px !important;"
            
             />
+
           </div>
         </div>
 
@@ -213,6 +237,8 @@ import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+
 const emit = defineEmits(["cancel:hideform"]);
 
 
@@ -276,17 +302,20 @@ onMounted(async () => {
 watch(selected, (newValue:any) => {
       pipelineObj.userSelectedNode = newValue; 
 });
-watch(stream_type, (newValue:any) => {
-  if(newValue){
-    // pipelineObj.currentSelectedNodeData.data.stream_type = newValue;
-    stream_name.value = {label: "", value: "", isDisable: false};
-    
 
-    // pipelineObj.currentSelectedNodeData.data.stream_name = "";
+watch(() => dynamic_stream_name.value,
+()=>{
+  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== ""){
+    const regex = /\{\{.+\}\}/;
 
+// Check if there is any value between {{ stream_name }}
+      if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
+        saveDynamicStream();
+        console.log(dynamic_stream_name.value, "val");
+      }
+   
   }
-  getStreamList();
-});
+})
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;
   try {
