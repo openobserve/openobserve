@@ -136,11 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             use-input
             hide-selected
             fill-input
-            :input-debounce="400"
             @filter="filterStreams"
             behavior="menu"
+            @input-debounce="100"
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
+            @input-value="handleDynamicStreamName"
+           
             />
           </div>
         </div>
@@ -240,6 +242,8 @@ const streamTypes = ["logs", "metrics", "traces"];
 //for testing purpose but remove metrics and traces as discuessedf
 const outputStreamTypes = ["logs", "metrics", "traces"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
 onMounted(async () => {
@@ -331,11 +335,30 @@ const updateStreams = () => {
   
 };
 
+
+
+const handleDynamicStreamName = (val:any) =>{
+  val = val.replace(/-/g, '_');
+  dynamic_stream_name.value = {label: val, value: val, isDisable: false};
+}
+
+const saveDynamicStream = () =>{
+  if(typeof dynamic_stream_name.value == 'object' && dynamic_stream_name.value.hasOwnProperty('value') && dynamic_stream_name.value.hasOwnProperty('label')){
+    const{label,value} = dynamic_stream_name.value;
+    stream_name.value = {label: label, value:value, isDisable: false}; 
+  }
+  //this condition will never be true but we are keeping it for future reference
+  else{
+    stream_name.value = dynamic_stream_name.value;
+  }
+}
+
 const filteredStreamTypes = computed(() => {
       return selectedNodeType.value === 'output' ? outputStreamTypes : streamTypes;
     });
 
 const getLogStream = (data: any) =>{
+
   data.name = data.name.replace(/-/g, '_');
 
   stream_name.value = {label: data.name, value: data.name, isDisable: false};
