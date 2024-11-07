@@ -327,7 +327,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         match storage::put(&file_name, compressed_bytes.into()).await {
             Ok(_) => {
                 log::info!(
-                    "[COMPACT] file_list merge succeed, {} files into a new file: {}",
+                    "[COMPACT] file_list merge successfully, {} files into a new file: {}",
                     file_list.len(),
                     file_name
                 );
