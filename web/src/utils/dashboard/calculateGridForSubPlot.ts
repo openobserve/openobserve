@@ -54,6 +54,7 @@ export function getTrellisGrid(
   height: any,
   numGrids: any,
   leftMargin: number,
+  numOfColumns: number = -1,
 ) {
   const gridArray: any = [];
 
@@ -72,6 +73,11 @@ export function getTrellisGrid(
   while ((numRows - 1) * numCols >= numGrids) {
     numRows--;
     numCols = Math.ceil(numGrids / numRows);
+  }
+
+  if (numOfColumns > 0) {
+    numCols = numOfColumns;
+    numRows = Math.ceil(numGrids / numCols);
   }
 
   const spaceBetweenCharts = 4;

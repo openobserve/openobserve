@@ -730,11 +730,24 @@ export const convertSQLData = async (
       ),
     );
 
+    let customCols = -1;
+    if (
+      panelSchema.config.enable_trellis_chart === "custom" &&
+      panelSchema.config.num_of_columns
+    ) {
+      customCols = panelSchema.config.num_of_columns;
+    }
+
+    if (panelSchema.config.enable_trellis_chart === "vertical") {
+      customCols = 1;
+    }
+
     const gridData = getTrellisGrid(
       chartPanelRef.value.offsetWidth,
       chartPanelRef.value.offsetHeight,
       stackedXAxisUniqueValue.length,
       yAxisNameGap,
+      customCols,
     );
 
     options.grid = gridData.gridArray;
