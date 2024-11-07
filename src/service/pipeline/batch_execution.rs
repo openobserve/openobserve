@@ -28,6 +28,7 @@ use config::{
     utils::{flatten, json::Value},
 };
 use futures::future::try_join_all;
+use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{
@@ -202,7 +203,8 @@ impl ExecutablePipeline {
         // task to collect results
         let result_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts result collecting job");
-            let dynamic_stream_name_regex = regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap();
+            let dynamic_stream_name_regex =
+                Lazy::new(|| regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap());
             let mut count: usize = 0;
             let mut results = HashMap::new();
             while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
@@ -220,7 +222,7 @@ impl ExecutablePipeline {
                         None => {
                             log::error!(
                                 "[Pipeline]: dynamic stream name detected in destination, \
-                                but failed to resolve to a concrete stream from the record. Record dropped"
+                                but failed to resolve to a concrete stream name from the record. Record dropped"
                             );
                             continue;
                         }
