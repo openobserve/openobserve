@@ -206,11 +206,12 @@ pub async fn delete_function(
                 return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
                     http::StatusCode::CONFLICT.into(),
                     format!(
-                        "Caution: Function '{}' has {} pipeline dependencies. \
-                        This deletion operation will cascade to all dependent pipelines. \
-                        Confirm to proceed.",
+                        "Warning: Function '{}' has {} pipeline dependencies, \
+                        including: {:?} \
+                        Please remove these pipelines first.",
                         fn_name,
-                        pipelines.len()
+                        pipelines.len(),
+                        pipelines.iter().map(|pl| &pl.name).collect::<Vec<_>>()
                     ),
                 )));
             }
