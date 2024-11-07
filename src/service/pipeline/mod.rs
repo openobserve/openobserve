@@ -111,18 +111,18 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         )));
     }
 
-    // if the source is changed, check if the new source exists in another pipeline
+    // additional checks when the source is changed
     let prev_source_stream = if existing_pipeline.source != pipeline.source {
+        // check if the new source exists in another pipeline
         if let Ok(similar_pl) = db::pipeline::get_with_same_source_stream(&pipeline).await {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!(
-                    "The update source already exists in another pipeline with name {}, under org {}",
+                    "The updated source already exists in another pipeline with name {}, under org {}. Same source can have only one pipeline in an org",
                     similar_pl.name, similar_pl.org
                 ),
             )));
         }
-        // Pipeline source changed:
         match existing_pipeline.source {
             // realtime: remove prev. src. stream_params from cache
             PipelineSource::Realtime(stream_params) => Some(stream_params),

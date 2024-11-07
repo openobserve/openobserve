@@ -39,6 +39,9 @@ use crate::{
     },
 };
 
+static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
+    Lazy::new(|| regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap());
+
 #[async_trait]
 pub trait PipelineExt: Sync + Send + 'static {
     /// Registers the function of all the FunctionNode of this pipeline once for execution.
@@ -203,26 +206,17 @@ impl ExecutablePipeline {
         // task to collect results
         let result_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts result collecting job");
-            let dynamic_stream_name_regex =
-                Lazy::new(|| regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap());
             let mut count: usize = 0;
             let mut results = HashMap::new();
             while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
-                if stream_params.stream_name.starts_with("{{") {
-                    // if present, resolve dynamic stream_name in stream_params based on record
-                    let resolved_name = dynamic_stream_name_regex
-                        .captures(&stream_params.stream_name)
-                        .and_then(|caps| caps.get(1))
-                        .and_then(|field_name| record.get(field_name.as_str()))
-                        .and_then(|val| val.as_str());
-                    match resolved_name {
-                        Some(stream_name) => {
-                            stream_params.stream_name = stream_name.to_string().into();
+                if stream_params.stream_name.contains("{{") {
+                    match resolve_stream_name(&stream_params.stream_name, &record) {
+                        Ok(stream_name) => {
+                            stream_params.stream_name = stream_name.into();
                         }
-                        None => {
+                        Err(e) => {
                             log::error!(
-                                "[Pipeline]: dynamic stream name detected in destination, \
-                                but failed to resolve to a concrete stream name from the record. Record dropped"
+                                "[Pipeline]: dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped"
                             );
                             continue;
                         }
@@ -716,4 +710,73 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
     }
     // get from database
     crate::service::db::functions::get(org_id, fn_name).await
+}
+
+fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
+    // Fast path: if it's a complete pattern like "{{field}}", avoid regex
+    if haystack.starts_with("{{") && haystack.ends_with("}}") {
+        let field_name = &haystack[2..haystack.len() - 2];
+        return match record.get(field_name) {
+            Some(stream_name) => stream_name
+                .as_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| anyhow!("Matched stream name {stream_name} is not a string")),
+            None => Err(anyhow!("Field name {field_name} not found in record")),
+        };
+    }
+
+    // Slow path: handle partial matches using regex
+    let mut result = String::with_capacity(haystack.len());
+    let mut last_match = 0;
+    for cap in DYNAMIC_STREAM_NAME_PATTERN.captures_iter(haystack) {
+        let field_name = cap.get(1).unwrap().as_str();
+        let full_match = cap.get(0).unwrap();
+
+        // Add the text between the last match and this one
+        result.push_str(&haystack[last_match..full_match.start()]);
+
+        // Get and validate the field value
+        match record.get(field_name) {
+            Some(stream_name) => match stream_name.as_str() {
+                Some(s) => result.push_str(s),
+                None => return Err(anyhow!("Matched stream name {stream_name} is not a string")),
+            },
+            None => return Err(anyhow!("Field name {field_name} not found in record")),
+        }
+
+        last_match = full_match.end();
+    }
+    result.push_str(&haystack[last_match..]);
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::json;
+
+    use super::resolve_stream_name;
+
+    #[test]
+    fn test_my_regex() {
+        let record = json::json!({
+            "app_name": "o2",
+            "container_name": "compactor",
+            "value": 123
+        });
+        let ok_cases = vec![
+            ("container_name", "container_name"),
+            ("{{container_name}}", "compactor"),
+            ("abc-{{container_name}}", "abc-compactor"),
+            ("abc-{{container_name}}-xyz", "abc-compactor-xyz"),
+        ];
+        for (test, expected) in ok_cases {
+            let result = resolve_stream_name(test, &record);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected);
+        }
+        let err1 = resolve_stream_name("{{value}}", &record);
+        assert!(err1.is_err());
+        let err1 = resolve_stream_name("{{eulav}}", &record);
+        assert!(err1.is_err());
+    }
 }

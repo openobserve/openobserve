@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="300px"
               :label="'hello'"
             >
-              <span style="font-size: 14px">To pass Dynamic Stream Name you need to surround stream name with &#123;&#123;  &#125;&#125; <br> Eg: &#123;&#123; Stream Name  &#125;&#125;</span>
+              <span style="font-size: 14px">To set Stream Name dynamically using the value of a field, please surround the field name with &#123;&#123;  &#125;&#125; <br> Eg: &#123;&#123;kubernetes_namespace_name&#125;&#125;</span>
             </q-tooltip>
           </q-icon>
           </span>
