@@ -827,7 +827,7 @@ UPDATE stream_stats
 
         // get job id
         let ret = sqlx::query(
-            "SELECT id FROM file_list_jobs WHERE org = ? AND stream = ? AND offsets = ?;",
+            "SELECT id FROM file_list_jobs WHERE org = $1 AND stream = $2 AND offsets = $3;",
         )
         .bind(org_id)
         .bind(&stream_key)
