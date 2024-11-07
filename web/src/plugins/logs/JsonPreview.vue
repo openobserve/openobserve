@@ -98,7 +98,7 @@
         />
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened' " class="q-pl-md">
+    <div v-show="activeTab === 'unflattened'" class="q-pl-md">
       <q-spinner v-if="loading" size="lg" color="primary" />
 
       <query-editor
@@ -225,7 +225,7 @@
 </template>
 
 <script lang="ts">
-import { ref, onBeforeMount, computed, nextTick, onMounted,watch } from "vue";
+import { ref, onBeforeMount, computed, nextTick, onMounted, watch } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -240,7 +240,6 @@ import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
-
 
 export default {
   name: "JsonPreview",
@@ -287,7 +286,7 @@ export default {
     const schemaToBeSearch = ref({});
 
     const $q = useQuasar();
-    const unflattendData : any = ref("");
+    const unflattendData: any = ref("");
     const loading = ref(false);
 
     const tabs = [
@@ -297,7 +296,7 @@ export default {
       },
       {
         value: "unflattened",
-        label: t("search.unflattened"),
+        label: t("search.original"),
       },
     ];
 
@@ -307,7 +306,8 @@ export default {
         activeTab.value === "unflattened"
           ? JSON.parse(unflattendData.value)
           : props.value,
-      );    };
+      );
+    };
     const addSearchTerm = (
       field: string,
       field_value: string | number | boolean,
@@ -318,13 +318,13 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
-    const { searchObj,searchAggData } = useLogs();
+    const { searchObj, searchAggData } = useLogs();
     let multiStreamFields: any = ref([]);
 
     onBeforeMount(() => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
         if (
-          item.streams.length == searchObj.data.stream.selectedStream.length
+          item.streams?.length == searchObj.data.stream.selectedStream.length
         ) {
           multiStreamFields.value.push(item.name);
         }
@@ -333,14 +333,17 @@ export default {
       previewId.value = getUUID();
     });
 
-    onMounted(async () => {
-    });
+    onMounted(async () => {});
 
-    watch (
+    watch(
       () => props.value,
-      async () =>  {
-        if (!props.value._o2_id || searchAggData.hasAggregation || searchObj.data.stream.selectedStream.length > 1  ) {
-          return; 
+      async () => {
+        if (
+          !props.value._o2_id ||
+          searchAggData.hasAggregation ||
+          searchObj.data.stream.selectedStream.length > 1
+        ) {
+          return;
         }
 
         loading.value = true;
@@ -352,44 +355,41 @@ export default {
             {
               org_identifier: searchObj.organizationIdentifier,
               query: {
-                "query": {
-                  "start_time": props.value._timestamp - 10 * 60 * 1000,
-                  "sql": `SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
-                  "end_time": props.value._timestamp + 10 * 60 * 1000,
-                  "sql_mode": "full",
-                  "size": 1,
-                  "from": 0,
-                  "quick_mode": false,
-                }
+                query: {
+                  start_time: props.value._timestamp - 10 * 60 * 1000,
+                  sql: `SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                  end_time: props.value._timestamp + 10 * 60 * 1000,
+                  sql_mode: "full",
+                  size: 1,
+                  from: 0,
+                  quick_mode: false,
+                },
               },
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI"
+            "UI",
           );
-          unflattendData.value = res.data.hits[0]._original
-        } catch (err : any) {
-          loading.value = false
+          unflattendData.value = res.data.hits[0]._original;
+        } catch (err: any) {
+          loading.value = false;
           $q.notify({
-          message:
-            err.response?.data?.message || "Failed to get the Original data",
-          color: "negative",
-          position: "bottom",
-          timeout: 1500,
-        });
+            message:
+              err.response?.data?.message || "Failed to get the Original data",
+            color: "negative",
+            position: "bottom",
+            timeout: 1500,
+          });
         } finally {
-          loading.value = false; 
+          loading.value = false;
         }
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
-
-  
 
     const getTracesStreams = async () => {
       await getStreams("traces", false)
         .then((res: any) => {
-
           tracesStreams.value = res.list.map((option: any) => option.name);
           filteredTracesStreamOptions.value = JSON.parse(
             JSON.stringify(tracesStreams.value),
@@ -401,8 +401,6 @@ export default {
         .catch(() => Promise.reject())
         .finally(() => {});
     };
-
-
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -426,8 +424,6 @@ export default {
       );
     });
 
-
-
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
         await nextTick();
@@ -435,16 +431,18 @@ export default {
       }
     };
 
-  const filteredTabs = computed(() => {
-        return tabs.filter(tab => {
-          if (props.value._o2_id == undefined || searchAggData.hasAggregation || searchObj.data.stream.selectedStream.length > 1) {
+    const filteredTabs = computed(() => {
+      return tabs.filter((tab) => {
+        if (
+          props.value._o2_id == undefined ||
+          searchAggData.hasAggregation ||
+          searchObj.data.stream.selectedStream.length > 1
+        ) {
           return false;
         }
-          return true;
-        });
+        return true;
       });
-
-
+    });
 
     return {
       t,
@@ -474,9 +472,8 @@ export default {
 };
 </script>
 
-
 <style lang="scss" scoped>
-.monaco-editor{
+.monaco-editor {
   --vscode-focusBorder: #515151 !important;
 }
 .log_json_content {
@@ -484,11 +481,9 @@ export default {
   font-family: monospace;
   font-size: 12px;
 }
-.monaco-editor  {
-
+.monaco-editor {
   width: calc(100% - 16px) !important;
   height: calc(100vh - 250px) !important;
-
 
   &.expanded {
     height: 300px !important;

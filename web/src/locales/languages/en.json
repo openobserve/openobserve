@@ -128,6 +128,7 @@
     "viewTrace": "View Trace",
     "flattened": "Flattened",
     "unflattened": "Unflattened",
+    "original": "Original",
     "resetFilters": "Reset Filters"
   },
   "menu": {
@@ -954,7 +955,11 @@
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
     "refreshQuery": "Refresh Query",
-    "queryType": "Query Type"
+    "queryType": "Query Type",
+    "numOfQueries": "Number of Queries",
+    "totalDuration": "Total Exec. Duration",
+    "totalTimeRange": "Total Query Range",
+    "searchType": "Search Type"
   },
   "traces": {
     "viewLogs": "View Logs",

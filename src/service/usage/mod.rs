@@ -36,7 +36,7 @@ use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use reqwest::Client;
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::{mpsc, oneshot, Mutex},
     time,
 };
 
@@ -49,9 +49,18 @@ fn initialize_usage_queuer() -> UsageQueuer {
     let timeout = time::Duration::from_secs(cfg.common.usage_publish_interval.try_into().unwrap());
     let batch_size = cfg.common.usage_batch_size;
 
-    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(batch_size * 2);
+    let (msg_sender, msg_receiver) = mpsc::channel::<UsageMessage>(
+        batch_size * std::cmp::max(2, cfg.limit.usage_reporting_thread_num),
+    );
+    let msg_receiver = Arc::new(Mutex::new(msg_receiver));
 
-    tokio::task::spawn(async move { ingest_usage_job(msg_receiver, batch_size, timeout).await });
+    // configurable number of threads for usage_reporting
+    for thread_id in 0..cfg.limit.usage_reporting_thread_num {
+        let msg_receiver = msg_receiver.clone();
+        tokio::task::spawn(async move {
+            ingest_usage_job(thread_id, msg_receiver, batch_size, timeout).await
+        });
+    }
 
     UsageQueuer::new(msg_sender)
 }
@@ -69,16 +78,16 @@ pub async fn run() {
         .send(UsageMessage::Ping(ping_sender))
         .await
     {
-        log::error!("Failed to initialize usage queuer: {e}");
+        log::error!("[USAGE] Failed to initialize usage queuer: {e}");
         return;
     }
 
     if let Err(e) = ping_receiver.await {
-        log::error!("Usage queuer initialization failed: {e}");
+        log::error!("[USAGE] Usage queuer initialization failed: {e}");
         return;
     }
 
-    log::debug!("Usage queuer initialized successfully");
+    log::debug!("[USAGE] Usage queuer initialized successfully");
 }
 
 pub async fn report_request_usage_stats(
@@ -194,7 +203,7 @@ async fn publish_usage(usage: Vec<UsageData>) {
         return;
     }
 
-    match USAGE_QUEUER
+    if let Err(e) = USAGE_QUEUER
         .enqueue(
             usage
                 .into_iter()
@@ -203,13 +212,8 @@ async fn publish_usage(usage: Vec<UsageData>) {
         )
         .await
     {
-        Err(e) => {
-            log::error!("Failed to send usage data to background ingesting job: {e}")
-        }
-        Ok(()) => {
-            log::debug!("Successfully queued usage data to be ingested")
-        }
-    }
+        log::error!("[USAGE] Failed to send usage data to background ingesting job: {e}")
+    };
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
@@ -223,10 +227,12 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
         .await
     {
         Err(e) => {
-            log::error!("Failed to send trigger usage data to background ingesting job: {e}")
+            log::error!(
+                "[USAGE] Failed to send trigger usage data to background ingesting job: {e}"
+            )
         }
         Ok(()) => {
-            log::debug!("Successfully queued trigger usage data to be ingested")
+            log::debug!("[USAGE] Successfully queued trigger usage data to be ingested")
         }
     }
 }
@@ -237,17 +243,19 @@ pub async fn flush() {
     flush_audit().await;
 
     // shutdown usage_queuer
-    let (res_sender, res_receiver) = oneshot::channel();
-    if let Err(e) = USAGE_QUEUER.shutdown(res_sender).await {
-        log::error!("Error shutting down USAGE_QUEUER: {e}");
+    for _ in 0..get_config().limit.usage_reporting_thread_num {
+        let (res_sender, res_receiver) = oneshot::channel();
+        if let Err(e) = USAGE_QUEUER.shutdown(res_sender).await {
+            log::error!("[USAGE] Error shutting down USAGE_QUEUER: {e}");
+        }
+        // wait for flush ingestion job
+        res_receiver.await.ok();
     }
-    // wait for flush ingestion job
-    res_receiver.await.ok();
 }
 
 async fn ingest_usages(curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
-        log::info!(" Returning as no usages reported ");
+        log::info!("Returning as no usages reported ");
         return;
     }
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
@@ -503,36 +511,40 @@ impl UsageReportRunner {
 /// Ingestion happens when either the batch_size or the timeout is exceeded, whichever satisfies the
 /// first.
 async fn ingest_usage_job(
-    mut msg_receiver: mpsc::Receiver<UsageMessage>,
+    thread_id: usize,
+    msg_receiver: Arc<Mutex<mpsc::Receiver<UsageMessage>>>,
     batch_size: usize,
     timeout: time::Duration,
 ) {
+    log::debug!("[USAGE:JOB] thread_{thread_id} starts waiting for reporting jobs");
     let mut usage_report_runner = UsageReportRunner::new(batch_size, timeout);
     let mut interval = time::interval(timeout);
 
     loop {
+        let mut msg_receiver = msg_receiver.lock().await;
         tokio::select! {
             msg = msg_receiver.recv() => {
                 match msg {
                     Some(UsageMessage::Data(usage_buf)) => {
+                        log::debug!("[USAGE:JOB] thread_{thread_id} received and queued {} messages.", usage_buf.len());
                         usage_report_runner.push(usage_buf);
                         if usage_report_runner.should_process() {
                             let buffered = usage_report_runner.take_batch();
-                            ingest_buffered_usage(buffered).await;
+                            ingest_buffered_usage(thread_id, buffered).await;
                         }
                     }
                     Some(UsageMessage::Shutdown(res_sender)) => {
-                        log::debug!("Received shutdown signal");
+                        log::debug!("[USAGE:JOB] thread_{thread_id} received shutdown signal");
                         // process any remaining data before shutting down
                         if !usage_report_runner.pending.is_empty() {
                             let buffered = usage_report_runner.take_batch();
-                            ingest_buffered_usage(buffered).await;
+                            ingest_buffered_usage(thread_id, buffered).await;
                         }
                         res_sender.send(()).ok();
                         break;
                     }
                     Some(UsageMessage::Ping(ping_sender)) => {
-                        log::debug!("Received initialization ping");
+                        log::debug!("[USAGE:JOB] thread_{thread_id} received initialization ping");
                         ping_sender.send(()).ok();
                     }
                     None => break, // channel closed
@@ -541,15 +553,18 @@ async fn ingest_usage_job(
             _ = interval.tick() => {
                 if usage_report_runner.should_process() {
                     let buffered = usage_report_runner.take_batch();
-                    ingest_buffered_usage(buffered).await;
+                    ingest_buffered_usage(thread_id, buffered).await;
                 }
             }
         }
     }
 }
 
-async fn ingest_buffered_usage(usage_buffer: Vec<UsageBuffer>) {
-    log::debug!("Ingest {} buffered usage data", usage_buffer.len());
+async fn ingest_buffered_usage(thread_id: usize, usage_buffer: Vec<UsageBuffer>) {
+    log::debug!(
+        "[USAGE:JOB] thread_{thread_id} ingests {} buffered usage data",
+        usage_buffer.len()
+    );
     let (mut usage_data, mut trigger_data) = (Vec::new(), Vec::new());
     for item in usage_buffer {
         match item {

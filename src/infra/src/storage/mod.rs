@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use config::{get_config, is_local_disk_storage, metrics};
 use datafusion::parquet::data_type::AsBytes;
 use futures::{StreamExt, TryStreamExt};
@@ -75,6 +77,11 @@ pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
 pub async fn get(file: &str) -> Result<bytes::Bytes, anyhow::Error> {
     let data = DEFAULT.get(&file.into()).await?;
     let data = data.bytes().await?;
+    Ok(data)
+}
+
+pub async fn get_range(file: &str, range: Range<usize>) -> Result<bytes::Bytes, anyhow::Error> {
+    let data = DEFAULT.get_range(&file.into(), range).await?;
     Ok(data)
 }
 

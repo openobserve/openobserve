@@ -147,20 +147,26 @@ pub async fn search(
     }
 
     // set search event type
-    req.search_type = match get_search_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    if req.search_type.is_none() {
+        req.search_type = match get_search_type_from_request(&query) {
+            Ok(v) => v,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
     };
-    req.search_event_context = req
-        .search_type
-        .as_ref()
-        .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+    if req.search_event_context.is_none() {
+        req.search_event_context = req
+            .search_type
+            .as_ref()
+            .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+    }
 
     // set index_type
-    req.index_type = match get_index_type_from_request(&query) {
-        Ok(typ) => typ,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    if req.index_type.is_empty() {
+        req.index_type = match get_index_type_from_request(&query) {
+            Ok(typ) => typ,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
+    }
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {

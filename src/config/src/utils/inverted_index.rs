@@ -15,14 +15,12 @@
 
 use std::borrow::Cow;
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::Result;
 use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    meta::{
-        inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader, stream::StreamType,
-    },
+    meta::{inverted_index::reader::IndexReader, stream::StreamType},
     FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
 };
 
@@ -70,16 +68,7 @@ pub fn unpack_u32_pair(packed: u64) -> (u32, u32) {
 pub async fn create_index_reader_from_puffin_bytes(
     buf: Vec<u8>,
 ) -> Result<IndexReader<Cursor<Vec<u8>>>> {
-    let mut puffin_reader = PuffinBytesReader::new(Cursor::new(buf));
-    let puffin_meta = puffin_reader.get_metadata().await?;
-    ensure!(
-        puffin_meta.blob_metadata.len() == 1,
-        anyhow!("InvertedIndex should only have one blob each puffin file")
-    );
-    let blob_bytes = puffin_reader
-        .read_blob_bytes(puffin_meta.blob_metadata.first().unwrap())
-        .await?;
-    Ok(IndexReader::new(Cursor::new(blob_bytes)))
+    Ok(IndexReader::new(Cursor::new(buf)))
 }
 
 /// FST inverted index solution has a 1:1 mapping between parquet and idx files.

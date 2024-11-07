@@ -22,7 +22,7 @@ use std::{
 use anyhow::{Context, Result};
 
 use super::{
-    BlobMetadata, BlobMetadataBuilder, CompressionCodec, PuffinFooterFlags, PuffinMeta, BLOB_TYPE,
+    BlobMetadata, BlobMetadataBuilder, BlobTypes, CompressionCodec, PuffinFooterFlags, PuffinMeta,
     MAGIC, MAGIC_SIZE, MIN_FOOTER_SIZE,
 };
 
@@ -50,44 +50,53 @@ impl<W> PuffinBytesWriter<W> {
         }
     }
 
-    fn add_blob_metadata(
+    fn build_blob_metadata(
         &self,
-        blob_type: String,
+        blob_type: BlobTypes,
         compression_codec: Option<CompressionCodec>,
-        size: u64,
     ) -> BlobMetadata {
         BlobMetadataBuilder::default()
             .blob_type(blob_type)
             .compression_codec(compression_codec)
             .offset(self.written_bytes as _)
-            .length(size as _)
             .build()
             .expect("Missing required fields")
     }
 }
 
 impl<W: io::Write> PuffinBytesWriter<W> {
-    pub fn add_blob(&mut self, raw_data: Vec<u8>) -> Result<()> {
+    pub fn add_blob(&mut self, field: String, raw_data: Vec<u8>) -> Result<()> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
 
-        // compress blob raw data
-        let mut encoder = zstd::Encoder::new(vec![], 3)?;
-        encoder
-            .write_all(&raw_data)
-            .context("Error encoding blob raw data")?;
-        let compressed_bytes = encoder.finish()?;
-        let compressed_size = compressed_bytes.len() as u64;
-        self.writer.write_all(&compressed_bytes)?;
+        // build blob metadata
+        let mut metadata = self.build_blob_metadata(BlobTypes::O2FstV1, None);
 
-        // add metadata for this blob
-        let blob_metadata = self.add_blob_metadata(
-            BLOB_TYPE.to_string(),
-            Some(CompressionCodec::Zstd),
-            compressed_size,
-        );
-        self.blobs_metadata.push(blob_metadata);
-        self.written_bytes += compressed_size;
+        // compress blob raw data
+        match metadata.compression_codec {
+            None => {
+                metadata.length = raw_data.len() as u64;
+                self.writer.write_all(&raw_data)?;
+            }
+            Some(CompressionCodec::Zstd) => {
+                let mut encoder = zstd::Encoder::new(vec![], 3)?;
+                encoder
+                    .write_all(&raw_data)
+                    .context("Error encoding blob raw data")?;
+                let compressed_bytes = encoder.finish()?;
+                self.writer.write_all(&compressed_bytes)?;
+                metadata.length = compressed_bytes.len() as u64;
+            }
+            Some(CompressionCodec::Lz4) => {
+                todo!("Lz4 compression is not implemented yet")
+            }
+        };
+
+        self.written_bytes += metadata.length;
+        self.properties
+            .insert(field, self.blobs_metadata.len().to_string());
+        self.blobs_metadata.push(metadata);
+
         Ok(())
     }
 
@@ -113,7 +122,6 @@ impl<W: io::Write> PuffinBytesWriter<W> {
             mem::take(&mut self.properties),
         )
         .into_bytes()?;
-
         self.writer.write_all(&footer_bytes)?;
         self.written_bytes += footer_bytes.len() as u64;
         Ok(())
@@ -150,7 +158,7 @@ impl PuffinFooterWriter {
         buf.extend_from_slice(&(payload_size as i32).to_le_bytes());
 
         // flags
-        buf.extend_from_slice(&PuffinFooterFlags::COMPRESSED_ZSTD.bits().to_le_bytes());
+        buf.extend_from_slice(&PuffinFooterFlags::DEFAULT.bits().to_le_bytes());
 
         // FootMagic
         buf.extend_from_slice(&MAGIC);
@@ -160,12 +168,9 @@ impl PuffinFooterWriter {
 
     fn get_payload(&mut self) -> Result<Vec<u8>> {
         let file_metdadata = PuffinMeta {
-            blob_metadata: mem::take(&mut self.blob_metadata),
+            blobs: mem::take(&mut self.blob_metadata),
             properties: mem::take(&mut self.file_properties),
         };
-
-        let mut encoder = zstd::Encoder::new(vec![], 3)?;
-        serde_json::to_writer(&mut encoder, &file_metdadata)?;
-        Ok(encoder.finish()?)
+        serde_json::to_vec(&file_metdadata).context("Error serializing puffin metadata")
     }
 }

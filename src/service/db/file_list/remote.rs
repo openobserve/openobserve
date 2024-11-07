@@ -97,7 +97,7 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     stats.caching_time = start.elapsed().as_millis() as usize;
 
     log::info!(
-        "Load file_list [{prefix}] load {}:{} done, download: {}ms, caching: {}ms",
+        "Load file_list [{prefix}] load {}:{} done, download: {} ms, caching: {} ms",
         files_num,
         stats.file_count,
         stats.download_time,
