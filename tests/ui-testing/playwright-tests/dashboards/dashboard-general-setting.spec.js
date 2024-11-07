@@ -131,11 +131,44 @@ test.describe("dashboard general setting", () => {
     await page.locator('[data-test="dashboard-general-setting-description"]').click();
     await page.locator('[data-test="dashboard-general-setting-description"]').fill('test');
     await page.locator('[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
-    await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-    // await page.getByRole('cell', { name: 'test' }).click();
-    // await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-2-h-btn"]').click();
 
+    await page.waitForSelector('[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]');
+    const expectedTime = await page.locator('[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]').textContent();
+
+    await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
+    await expect(page.getByText('check_circleDashboard updated successfully.close')).toBeVisible();
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
+    await page.locator('[data-test="dashboard-panel-add"]').click();
+    await page.locator('[data-test="dashboard-panel-discard"]').click();
+    page.once('dialog', dialog => {
+      dialog.dismiss().catch(() => {});
+    });
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.waitForSelector('[data-test="date-time-btn"]'); // Wait for panel time display
+    const panelTime = await page.locator('[data-test="date-time-btn"]').textContent();    
+    expect(panelTime).toBe(expectedTime);
+  })
+
+  test("should verify that dynamic toggle is diabled", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-general-setting-name"]').click();
+    await page.locator('[data-test="dashboard-general-setting-description"]').click();
+    await page.locator('[data-test="dashboard-general-setting-description"]').fill('test');
+    await page.locator('[data-test="dashboard-general-setting-dynamic-filter"] div').nth(2).click();
+    await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-general-setting-dynamic-filter"] div').nth(2).click();
+    await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
+    await expect(page.getByText('check_circleDashboard updated successfully.close')).toBeVisible();
   })
 });
