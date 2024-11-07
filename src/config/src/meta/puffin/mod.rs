@@ -142,7 +142,7 @@ impl BlobMetadataBuilder {
             snapshot_id: self.snapshot_id,
             sequence_number: self.sequence_number,
             offset: self.offset.ok_or("offset is required")?,
-            length: self.length.ok_or("length is required")?,
+            length: self.length.unwrap_or_default(),
             compression_codec: self.compression_codec,
             properties: self.properties,
         })

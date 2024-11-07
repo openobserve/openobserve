@@ -124,7 +124,7 @@ pub(crate) async fn write_parquet_index_to_disk(
         match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
             Ok(_) => {
                 log::info!(
-                    "[JOB:IDX] index file upload succeeded: {}",
+                    "[JOB:IDX] index file upload successfully: {}",
                     &new_idx_file_name
                 );
                 ret.push((new_idx_file_name, file_meta));

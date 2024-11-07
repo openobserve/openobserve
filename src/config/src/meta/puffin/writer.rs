@@ -69,6 +69,7 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
 
+        // build blob metadata
         let mut metadata = self.build_blob_metadata(BlobTypes::O2FstV1, None);
 
         // compress blob raw data
@@ -92,9 +93,9 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         };
 
         self.written_bytes += metadata.length;
-        self.blobs_metadata.push(metadata);
         self.properties
             .insert(field, self.blobs_metadata.len().to_string());
+        self.blobs_metadata.push(metadata);
 
         Ok(())
     }

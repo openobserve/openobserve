@@ -55,7 +55,7 @@ impl ColumnIndexer {
     pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize, term_len: usize) {
         let bitmap = self.sorter.entry(value.into()).or_default();
         if segment_id >= bitmap.len() {
-            bitmap.resize(bitmap.len() * 2, false);
+            bitmap.resize(segment_id + 64, false);
         }
         bitmap.set(segment_id, true);
 

@@ -135,7 +135,7 @@ pub async fn search(
         )
         .await?;
         log::info!(
-            "[trace_id {}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
+            "[trace_id {}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {} ms",
             query.trace_id,
             query.org_id,
             query.stream_type,
@@ -535,10 +535,10 @@ async fn filter_file_list_by_inverted_index(
         tasks.push(task)
     }
 
-    for result in try_join_all(tasks)
+    let results = try_join_all(tasks)
         .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
-    {
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for result in results {
         // Each result corresponds to a file in the file list
         match result {
             Ok((file_name, bitvec)) => {
@@ -551,8 +551,8 @@ async fn filter_file_list_by_inverted_index(
                         // we expect each file name has atleast 1 file
                         .unwrap();
                     file.segment_ids = Some(res.clone().into_vec());
-                    log::info!(
-                        "[trace_id {}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} length {}",
+                    log::debug!(
+                        "[trace_id {}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} total: {}",
                         query.trace_id,
                         *full_text_terms,
                         index_terms,
@@ -560,7 +560,7 @@ async fn filter_file_list_by_inverted_index(
                     );
                 } else {
                     // if the bitmap is empty then we remove the file from the list
-                    log::info!(
+                    log::debug!(
                         "[trace_id {}] search->storage: no match found in index for file {}",
                         query.trace_id,
                         file_name

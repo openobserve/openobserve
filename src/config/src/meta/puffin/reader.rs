@@ -45,11 +45,6 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             .seek(SeekFrom::Start(blob_metadata.offset as _))
             .await?;
 
-        // decompress bytes since OpenObserve InvertedIndex compresses index data by default
-        ensure!(
-            blob_metadata.compression_codec == Some(CompressionCodec::Zstd),
-            anyhow!("Unexpected CompressionCodex found in BlobMetadata")
-        );
         let mut raw_data = vec![0u8; blob_metadata.length as usize];
         self.source.read_exact(&mut raw_data).await?;
 

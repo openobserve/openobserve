@@ -729,7 +729,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+        "[INGESTER:JOB:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -1060,7 +1060,7 @@ pub(crate) async fn generate_index_on_compactor(
     .await?;
 
     log::info!(
-        "[COMPACT:JOB] generate index succeeded, data file: {}, index files: {:?}, took: {} ms",
+        "[COMPACT:JOB] generate index successfully, data file: {}, index files: {:?}, took: {} ms",
         new_file_key,
         files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
         start.elapsed().as_millis(),
@@ -1301,6 +1301,8 @@ pub(crate) async fn generate_fst_inverted_index(
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+
     let Some((compressed_bytes, file_meta)) =
         prepare_fst_index_bytes(schema, reader, full_text_search_fields, index_fields).await?
     else {
@@ -1336,15 +1338,22 @@ pub(crate) async fn generate_fst_inverted_index(
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
             log::info!(
-                "{} Written fst index file successfully compressed size {}, original size {}",
+                "{} Written fst index file successfully: {}, compressed size {}, original size {}, took: {} ms",
                 caller,
+                idx_file_name,
                 file_meta.compressed_size,
                 file_meta.original_size,
+                start.elapsed().as_millis()
             );
             Ok(())
         }
         Err(e) => {
-            log::error!("{} Written fst index file error: {}", caller, e.to_string());
+            log::error!(
+                "{} Written fst index file: {}, error: {}",
+                caller,
+                idx_file_name,
+                e.to_string()
+            );
             Err(e)
         }
     }
@@ -1404,7 +1413,7 @@ pub(crate) async fn prepare_fst_index_bytes(
                 .flat_map(|i| {
                     split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
                         .into_iter()
-                        .map(|s| (s, i + prev_total_num_rows))
+                        .map(|s| (s, i))
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
@@ -1420,7 +1429,7 @@ pub(crate) async fn prepare_fst_index_bytes(
                 let ids = column_uniq_terms
                     .entry(term.to_string())
                     .or_insert(Vec::new());
-                ids.push(idx);
+                ids.push(idx + prev_total_num_rows);
             }
         }
 
@@ -1445,7 +1454,7 @@ pub(crate) async fn prepare_fst_index_bytes(
 
             // collect terms
             let terms = (0..num_rows)
-                .map(|i| (column_data.value(i), i + prev_total_num_rows))
+                .map(|i| (column_data.value(i), i))
                 .collect::<Vec<_>>();
             if terms.is_empty() {
                 continue;
@@ -1459,7 +1468,7 @@ pub(crate) async fn prepare_fst_index_bytes(
                 let ids = column_uniq_terms
                     .entry(term.to_string())
                     .or_insert(Vec::new());
-                ids.push(idx);
+                ids.push(idx + prev_total_num_rows);
             }
         }
     }
