@@ -55,7 +55,7 @@ impl ColumnIndexer {
     pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize, term_len: usize) {
         let bitmap = self.sorter.entry(value.into()).or_default();
         if segment_id >= bitmap.len() {
-            bitmap.resize(segment_id + 1, false);
+            bitmap.resize(segment_id + 64, false);
         }
         bitmap.set(segment_id, true);
 
@@ -75,7 +75,8 @@ impl ColumnIndexer {
         let min_val = self.sorter.keys().next().cloned();
         let max_val = self.sorter.keys().next_back().cloned();
         // 1. write bitmaps to writer
-        for (value, bitmap) in std::mem::take(&mut self.sorter) {
+        let sorter = std::mem::take(&mut self.sorter);
+        for (value, bitmap) in sorter {
             self.append_value(value, bitmap, writer)?;
         }
 
@@ -84,11 +85,18 @@ impl ColumnIndexer {
         writer.write_all(&fst_bytes)?;
 
         // update meta
-        self.meta.relative_fst_offset = self.meta.index_size as _;
-        self.meta.fst_size = fst_bytes.len() as _;
-        self.meta.index_size += self.meta.fst_size as u64;
+        self.meta.index_size = 0;
+        self.meta.fst_size = fst_bytes.len() as u32;
+        self.meta.relative_fst_offset = writer.len() as u32 - self.meta.fst_size;
         self.meta.min_val = min_val.unwrap_or_default();
         self.meta.max_val = max_val.unwrap_or_default();
+
+        // write meta into writer buffer
+        let meta_bytes = serde_json::to_vec(&self.meta)?;
+        writer.write_all(&meta_bytes)?;
+        let metas_size = meta_bytes.len() as u32;
+        writer.write_all(&metas_size.to_le_bytes())?;
+        writer.flush()?;
 
         Ok(self.meta)
     }

@@ -36,27 +36,28 @@ use config::{
     cluster, get_config,
     meta::{
         bitvec::BitVec,
-        inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
+        inverted_index::{writer::ColumnIndexer, InvertedIndexFormat},
         puffin::writer::PuffinBytesWriter,
+        search::StorageType,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
-        asynchronism::file::{get_file_contents, get_file_meta},
+        asynchronism::file::get_file_meta,
         file::scan_files_with_channel,
         inverted_index::{convert_parquet_idx_file_name, split_token},
         json,
         parquet::{
-            read_metadata_from_file, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
+            get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH,
 };
+use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::{
-    cache::tmpfs,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
@@ -65,6 +66,7 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
+use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use tokio::{
     sync::{Mutex, RwLock},
     time,
@@ -77,10 +79,11 @@ use crate::{
     },
     job::files::idx::write_parquet_index_to_disk,
     service::{
-        compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::exec::merge_parquet_files as merge_parquet_files_by_datafusion,
+        search::datafusion::exec::{
+            self, merge_parquet_files as merge_parquet_files_by_datafusion,
+        },
     },
 };
 
@@ -591,11 +594,6 @@ async fn merge_files(
     let mut new_file_size: i64 = 0;
     let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
-    let mut deleted_files = Vec::new();
-    let mut min_ts = i64::MAX;
-    let mut max_ts = i64::MIN;
-    let mut total_records = 0;
-
     let stream_fields_num = latest_schema.fields().len();
     let max_file_size = std::cmp::min(
         cfg.limit.max_file_size_on_disk as i64,
@@ -614,45 +612,33 @@ async fn merge_files(
         new_compressed_file_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
     }
-    let mut retain_file_list = new_file_list.clone();
-
-    // write parquet files into tmpfs
-    let tmp_dir = tmpfs::Directory::default();
-    for file in retain_file_list.iter_mut() {
-        log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
-        let data = match get_file_contents(&wal_dir.join(&file.key)).await {
-            Ok(body) => {
-                min_ts = std::cmp::min(min_ts, file.meta.min_ts);
-                max_ts = std::cmp::max(max_ts, file.meta.max_ts);
-                total_records += file.meta.records;
-                body
-            }
-            Err(err) => {
-                log::error!(
-                    "[INGESTER:JOB:{thread_id}] merge small file: {}, err: {}",
-                    &file.key,
-                    err
-                );
-                deleted_files.push(file.key.clone());
-                continue;
-            }
-        };
-        let file_size = data.len();
-        file.meta.compressed_size = file_size as i64;
-        tmp_dir.set(&file.key, data.into())?;
-    }
-    if !deleted_files.is_empty() {
-        new_file_list.retain(|f| !deleted_files.contains(&f.key));
-    }
+    // no files need to merge
     if new_file_list.is_empty() {
-        return Ok((String::from(""), FileMeta::default(), retain_file_list));
+        return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
 
-    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-    // 7099303408192061440f3XQ2p.parquet
-    // eg: files/default/traces/default/0/023/09/04/05/default/
-    // service_name=ingester/7104328279989026816guOA4t.parquet
-    // let _ = columns[0].to_string(); // files/
+    let retain_file_list = new_file_list.clone();
+
+    // get time range for these files
+    let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
+    let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
+    let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
+    let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
+    let mut new_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: total_records,
+        original_size: new_file_size,
+        compressed_size: 0,
+        flattened: false,
+    };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_files error: records is 0"));
+    }
+
+    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.
+    // parquet eg: files/default/traces/default/2/2023/09/04/05/default/service_name=ingester/
+    // 7104328279989026816guOA4t.parquet let _ = columns[0].to_string(); // files/
     let file = new_file_list.first().unwrap();
     let columns = file.key.splitn(5, '/').collect::<Vec<&str>>();
     let org_id = columns[1].to_string();
@@ -660,19 +646,19 @@ async fn merge_files(
     let stream_name = columns[3].to_string();
     let file_name = columns[4].to_string();
 
-    // merge files
-    let stream_setting = infra::schema::get_settings(&org_id, &stream_name, stream_type).await;
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_setting);
-    let full_text_search_fields = get_stream_setting_fts_fields(&stream_setting);
-    let index_fields = get_stream_setting_index_fields(&stream_setting);
-    let (defined_schema_fields, need_original) = match stream_setting {
+    // get latest version of schema
+    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type).await;
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
+    let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
+    let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let (defined_schema_fields, need_original) = match stream_settings {
         Some(s) => (
             s.defined_schema_fields.unwrap_or_default(),
             s.store_original_data,
         ),
         None => (Vec::new(), false),
     };
-    let schema = if !defined_schema_fields.is_empty() {
+    let _latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
             &latest_schema,
@@ -684,43 +670,39 @@ async fn merge_files(
         latest_schema.clone()
     };
 
-    let mut new_file_meta = FileMeta {
-        min_ts,
-        max_ts,
-        records: total_records,
-        original_size: new_file_size,
-        compressed_size: 0,
-        flattened: false,
+    // read schema from parquet file, there files have the same schema because they are under the
+    // same prefix
+    let schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
+    let schema_key = schema
+        .as_ref()
+        .clone()
+        .with_metadata(Default::default())
+        .hash_key();
+
+    // generate datafusion tables
+    let session = config::meta::search::Session {
+        id: format!("ingester-{schema_key}"),
+        storage_type: StorageType::Wal,
+        work_group: None,
+        target_partitions: 0,
     };
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!(
-            "merge_parquet_files error: records is 0 for org {} stream type {} stream {}",
-            org_id,
-            stream_type,
-            stream_name
-        ));
-    }
+    let rules = hashbrown::HashMap::new();
+    let table =
+        exec::create_parquet_table(&session, schema.clone(), &new_file_list, rules, true, None)
+            .await?;
+    let tables = vec![table];
 
     let start = std::time::Instant::now();
-    let mut buf = Vec::new();
-    let single_file = new_file_list.len() == 1;
-    let merge_result = if single_file {
-        move_single_file(
-            thread_id,
-            tmp_dir.name(),
-            file,
-            stream_type,
-            &stream_name,
-            &mut buf,
-        )
-        .await
-    } else if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
-    } else {
-        merge_parquet_files_by_datafusion(tmp_dir.name(), stream_type, &stream_name, schema.clone())
-            .await
-    };
-    let (new_schema, new_batches) = match merge_result {
+    let merge_result = merge_parquet_files_by_datafusion(
+        stream_type,
+        &stream_name,
+        schema,
+        tables,
+        &bloom_filter_fields,
+        &new_file_meta,
+    )
+    .await;
+    let (_new_schema, buf) = match merge_result {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -737,15 +719,7 @@ async fn merge_files(
             return Err(e.into());
         }
     };
-    if !single_file {
-        buf = write_recordbatch_to_parquet(
-            new_schema.clone(),
-            &new_batches,
-            &bloom_filter_fields,
-            &new_file_meta,
-        )
-        .await?;
-    }
+
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
@@ -755,7 +729,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+        "[INGESTER:JOB:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -765,69 +739,64 @@ async fn merge_files(
 
     // upload file
     let buf = Bytes::from(buf);
-    match storage::put(&new_file_key, buf).await {
-        Ok(_) => {
-            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
-                // generate inverted index RecordBatch
-                if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
-                    new_schema.clone(),
-                    &new_batches,
-                    stream_type,
-                    &full_text_search_fields,
-                    &index_fields,
-                )? {
-                    let index_format =
-                        InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
-                    if matches!(
-                        index_format,
-                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
-                    ) {
-                        generate_index_on_ingester(
-                            inverted_idx_batch.clone(),
-                            new_file_key.clone(),
-                            &org_id,
-                            stream_type,
-                            &stream_name,
-                            &full_text_search_fields,
-                            &index_fields,
-                        )
-                        .await
-                        .map_err(|e| {
-                            anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e)
-                        })?;
-                    }
-                    if matches!(
-                        index_format,
-                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
-                    ) {
-                        // generate fst inverted index and write to storage
-                        generate_fst_inverted_index(
-                            inverted_idx_batch,
-                            &new_file_key,
-                            &full_text_search_fields,
-                            &index_fields,
-                            None,
-                        )
-                        .await?;
-                    }
-                }
-            }
-            Ok((new_file_key, new_file_meta, retain_file_list))
-        }
-        Err(e) => Err(e),
+    storage::put(&new_file_key, buf.clone()).await?;
+
+    if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+        return Ok((new_file_key, new_file_meta, retain_file_list));
     }
+
+    // generate parquet format inverted index
+    let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
+    if matches!(
+        index_format,
+        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+    ) {
+        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        generate_index_on_ingester(
+            &new_file_key,
+            &org_id,
+            stream_type,
+            &stream_name,
+            &full_text_search_fields,
+            &index_fields,
+            schema,
+            &mut reader,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e))?;
+    }
+
+    // generate fst format inverted index
+    if matches!(
+        index_format,
+        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+    ) {
+        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        generate_fst_inverted_index(
+            &new_file_key,
+            &full_text_search_fields,
+            &index_fields,
+            None,
+            schema,
+            &mut reader,
+        )
+        .await?;
+    }
+
+    Ok((new_file_key, new_file_meta, retain_file_list))
 }
 
 /// Create an inverted index file for the given file
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_ingester(
-    inverted_idx_batch: RecordBatch,
-    new_file_key: String,
+    new_file_key: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
+    schema: Arc<Schema>,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -836,20 +805,21 @@ pub(crate) async fn generate_index_on_ingester(
             format!("{}_{}", stream_name, stream_type)
         };
     let record_batches = prepare_index_record_batches(
-        inverted_idx_batch,
         org_id,
         stream_type,
         stream_name,
-        &new_file_key,
+        new_file_key,
         full_text_search_fields,
         index_fields,
+        schema,
+        reader,
     )
-    .map_err(|e| anyhow::anyhow!("prepare_index_record_batches error: {}", e))?;
+    .await?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(());
     }
-    let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
 
+    let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
     let mut schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let schema_chk = crate::service::schema::stream_schema_exists(
         org_id,
@@ -991,14 +961,17 @@ pub(crate) async fn generate_index_on_ingester(
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    inverted_idx_batch: RecordBatch,
-    new_file_key: String,
+    new_file_key: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
+    schema: Arc<Schema>,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+    let start = std::time::Instant::now();
+
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -1006,19 +979,21 @@ pub(crate) async fn generate_index_on_compactor(
             format!("{}_{}", stream_name, stream_type)
         };
     let mut record_batches = prepare_index_record_batches(
-        inverted_idx_batch,
         org_id,
         stream_type,
         stream_name,
-        &new_file_key,
+        new_file_key,
         full_text_search_fields,
         index_fields,
-    )?;
+        schema,
+        reader,
+    )
+    .await?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(vec![(String::new(), FileMeta::default())]);
     }
-    let schema = record_batches.first().unwrap().schema();
 
+    let schema = record_batches.first().unwrap().schema();
     let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
 
@@ -1075,33 +1050,42 @@ pub(crate) async fn generate_index_on_compactor(
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
 
-    let original_file_size = 0; // The file never existed before this function was called
     let files = write_parquet_index_to_disk(
         record_batches,
-        original_file_size,
         org_id,
         StreamType::Index,
         &index_stream_name,
-        &new_file_key,
-        "index_creator",
+        new_file_key,
     )
     .await?;
 
-    log::debug!("[COMPACTOR:JOB] Written index files successfully");
+    log::info!(
+        "[COMPACT:JOB] generate index successfully, data file: {}, index files: {:?}, took: {} ms",
+        new_file_key,
+        files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+        start.elapsed().as_millis(),
+    );
+
     Ok(files)
 }
 
-fn prepare_index_record_batches(
-    inverted_idx_batch: RecordBatch,
+#[allow(clippy::too_many_arguments)]
+async fn prepare_index_record_batches(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
+    schema: Arc<Schema>,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<Vec<RecordBatch>, anyhow::Error> {
     let cfg = get_config();
-    let schema = inverted_idx_batch.schema();
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|f| (f.name(), f))
+        .collect::<HashMap<_, _>>();
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
@@ -1115,168 +1099,138 @@ fn prepare_index_record_batches(
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 
+    let mut total_num_rows = 0;
+    let mut uniq_terms: HashMap<String, BTreeMap<String, _>> = HashMap::new();
+    loop {
+        let batch = reader.try_next().await?;
+        let Some(batch) = batch else {
+            break;
+        };
+        let num_rows = batch.num_rows();
+        if num_rows == 0 {
+            continue;
+        }
+
+        // update total_num_rows
+        let prev_total_num_rows = total_num_rows;
+        total_num_rows += num_rows;
+
+        // get _timestamp column
+        let Some(time_data) = batch
+            .column_by_name(&cfg.common.column_timestamp)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Int64Array>()
+        else {
+            continue;
+        };
+
+        // process full text search fields
+        for column_name in full_text_search_fields.iter() {
+            if !schema_fields.contains_key(column_name)
+                || schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8
+            {
+                continue;
+            }
+
+            // get full text search column
+            let Some(column_data) = batch
+                .column_by_name(column_name)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+            else {
+                continue;
+            };
+
+            // split the column into terms
+            let terms = (0..num_rows)
+                .flat_map(|i| {
+                    split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
+                        .into_iter()
+                        .map(|s| (s, i))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            if terms.is_empty() {
+                continue;
+            }
+
+            // unique terms and get the min & max _timestamp
+            let column_uniq_terms = uniq_terms
+                .entry(INDEX_FIELD_NAME_FOR_ALL.to_string())
+                .or_insert(BTreeMap::new());
+            for (term, idx) in terms {
+                let term_time = time_data.value(idx);
+                let (min_ts, max_ts, ids) = column_uniq_terms.entry(term.to_string()).or_insert((
+                    term_time,
+                    term_time,
+                    Vec::new(),
+                ));
+                if *min_ts > term_time {
+                    *min_ts = term_time;
+                }
+                if *max_ts < term_time {
+                    *max_ts = term_time;
+                }
+                ids.push(idx + prev_total_num_rows);
+            }
+        }
+
+        // process index fields
+        for column_name in index_fields.iter() {
+            if !schema_fields.contains_key(column_name)
+                || schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8
+            {
+                continue;
+            }
+
+            // get index column
+            let Some(column_data) = batch
+                .column_by_name(column_name)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+            else {
+                continue;
+            };
+
+            // collect terms
+            let terms = (0..num_rows)
+                .map(|i| (column_data.value(i), i))
+                .collect::<Vec<_>>();
+            if terms.is_empty() {
+                continue;
+            }
+
+            // unique terms and get the min & max _timestamp
+            let column_uniq_terms = uniq_terms
+                .entry(column_name.to_string())
+                .or_insert(BTreeMap::new());
+            for (term, idx) in terms {
+                let term_time = time_data.value(idx);
+                let (min_ts, max_ts, ids) = column_uniq_terms.entry(term.to_string()).or_insert((
+                    term_time,
+                    term_time,
+                    Vec::new(),
+                ));
+                if *min_ts > term_time {
+                    *min_ts = term_time;
+                }
+                if *max_ts < term_time {
+                    *max_ts = term_time;
+                }
+                ids.push(idx + prev_total_num_rows);
+            }
+        }
+    }
+
+    // build record batch
     let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
-
-    // get _timestamp column
-    let Some(time_data) = inverted_idx_batch
-        .column_by_name(&cfg.common.column_timestamp)
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-    else {
-        return Ok(vec![]);
-    };
-
-    let num_rows = inverted_idx_batch.num_rows();
-    // process full text search fields
-    for column in schema.fields().iter() {
-        let column_name = column.name();
-        if !full_text_search_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
-            continue;
-        }
-
-        // get full text search column
-        let Some(column_data) = inverted_idx_batch
-            .column_by_name(column_name)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-        else {
-            continue;
-        };
-
-        // split the column into terms
-        let terms = (0..num_rows)
-            .flat_map(|i| {
-                split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
-                    .into_iter()
-                    .map(|s| (s, i))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        if terms.is_empty() {
-            continue;
-        }
-
-        // unique terms and get the min & max _timestamp
-        let mut uniq_terms = BTreeMap::new();
-        for (term, idx) in terms {
-            let term_time = time_data.value(idx);
-            let (min_ts, max_ts, ids) =
-                uniq_terms
-                    .entry(term.to_string())
-                    .or_insert((term_time, term_time, Vec::new()));
-            if *min_ts > term_time {
-                *min_ts = term_time;
-            }
-            if *max_ts < term_time {
-                *max_ts = term_time;
-            }
-            ids.push(idx);
-        }
-
-        // build record batch
-        let records_len = uniq_terms.len();
-        let mut field_timestamp = Int64Builder::with_capacity(records_len);
-        let mut field_min_ts = Int64Builder::with_capacity(records_len);
-        let mut field_max_ts = Int64Builder::with_capacity(records_len);
-        let mut field_field =
-            StringBuilder::with_capacity(records_len, INDEX_FIELD_NAME_FOR_ALL.len() * records_len);
-        let mut field_term = StringBuilder::with_capacity(
-            records_len,
-            uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
-        );
-        let mut field_file_name =
-            StringBuilder::with_capacity(records_len, file_name_without_prefix.len() * records_len);
-        let mut field_count = Int64Builder::with_capacity(records_len);
-        let mut field_deleted = BooleanBuilder::with_capacity(records_len);
-        let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
-        for (term, (min_ts, max_ts, ids)) in uniq_terms {
-            field_timestamp.append_value(min_ts);
-            field_min_ts.append_value(min_ts);
-            field_max_ts.append_value(max_ts);
-            field_field.append_value(INDEX_FIELD_NAME_FOR_ALL);
-            field_term.append_value(term);
-            field_file_name.append_value(file_name_without_prefix);
-            field_count.append_value(ids.len() as i64);
-            field_deleted.append_value(false);
-            // calculate segment ids
-            let segment_ids = ids
-                .iter()
-                .map(|i| i / INDEX_SEGMENT_LENGTH)
-                .collect::<HashSet<_>>();
-            let segment_num = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
-            let mut bv = BitVec::with_capacity(segment_num);
-            for i in 0..segment_num {
-                bv.push(segment_ids.contains(&i));
-            }
-            field_segment_ids.append_value(bv.into_vec());
-        }
-
-        let record_batch = RecordBatch::try_new(
-            new_schema.clone(),
-            vec![
-                Arc::new(field_timestamp.finish()),
-                Arc::new(field_min_ts.finish()),
-                Arc::new(field_max_ts.finish()),
-                Arc::new(field_field.finish()),
-                Arc::new(field_term.finish()),
-                Arc::new(field_file_name.finish()),
-                Arc::new(field_count.finish()),
-                Arc::new(field_deleted.finish()),
-                Arc::new(field_segment_ids.finish()),
-            ],
-        )
-        .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
-        indexed_record_batches_to_merge.push(record_batch);
-    }
-
-    // process index fields
-    for column in schema.fields().iter() {
-        let column_name = column.name();
-        if !index_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
-            continue;
-        }
-
-        // get index column
-        let Some(column_data) = inverted_idx_batch
-            .column_by_name(column_name)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-        else {
-            continue;
-        };
-
-        // split the column into terms
-        let terms = (0..num_rows)
-            .map(|i| (column_data.value(i), i))
-            .collect::<Vec<_>>();
-        if terms.is_empty() {
-            continue;
-        }
-
-        // unique terms and get the min & max _timestamp
-        let mut uniq_terms = BTreeMap::new();
-        for (term, idx) in terms {
-            let term_time = time_data.value(idx);
-            let (min_ts, max_ts, ids) =
-                uniq_terms
-                    .entry(term.to_string())
-                    .or_insert((term_time, term_time, Vec::new()));
-            if *min_ts > term_time {
-                *min_ts = term_time;
-            }
-            if *max_ts < term_time {
-                *max_ts = term_time;
-            }
-            ids.push(idx);
-        }
-
-        // build record batch
-        let records_len = uniq_terms.len();
+    for (column_name, column_uniq_terms) in uniq_terms {
+        let records_len = column_uniq_terms.len();
         let mut field_timestamp = Int64Builder::with_capacity(records_len);
         let mut field_min_ts = Int64Builder::with_capacity(records_len);
         let mut field_max_ts = Int64Builder::with_capacity(records_len);
@@ -1284,18 +1238,18 @@ fn prepare_index_record_batches(
             StringBuilder::with_capacity(records_len, column_name.len() * records_len);
         let mut field_term = StringBuilder::with_capacity(
             records_len,
-            uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
+            column_uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
         );
         let mut field_file_name =
             StringBuilder::with_capacity(records_len, file_name_without_prefix.len() * records_len);
         let mut field_count = Int64Builder::with_capacity(records_len);
         let mut field_deleted = BooleanBuilder::with_capacity(records_len);
         let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
-        for (term, (min_ts, max_ts, ids)) in uniq_terms {
+        for (term, (min_ts, max_ts, ids)) in column_uniq_terms {
             field_timestamp.append_value(min_ts);
             field_min_ts.append_value(min_ts);
             field_max_ts.append_value(max_ts);
-            field_field.append_value(column_name);
+            field_field.append_value(&column_name);
             field_term.append_value(term);
             field_file_name.append_value(file_name_without_prefix);
             field_count.append_value(ids.len() as i64);
@@ -1305,7 +1259,7 @@ fn prepare_index_record_batches(
                 .iter()
                 .map(|i| i / INDEX_SEGMENT_LENGTH)
                 .collect::<HashSet<_>>();
-            let segment_num = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+            let segment_num = (total_num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
             let mut bv = BitVec::with_capacity(segment_num);
             for i in 0..segment_num {
                 bv.push(segment_ids.contains(&i));
@@ -1338,15 +1292,19 @@ fn prepare_index_record_batches(
 /// Called by both ingester and compactor. Compactor needs to provide `file_list_to_invalidate`
 /// to delete previously created small index files
 pub(crate) async fn generate_fst_inverted_index(
-    inverted_idx_batch: RecordBatch,
     parquet_file_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
     file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
                                                   * .idx files */
+
+    schema: Arc<Schema>,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+
     let Some((compressed_bytes, file_meta)) =
-        prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
+        prepare_fst_index_bytes(schema, reader, full_text_search_fields, index_fields).await?
     else {
         log::info!("generate_fst_index_on_compactor creates empty index. skip");
         return Ok(());
@@ -1380,182 +1338,181 @@ pub(crate) async fn generate_fst_inverted_index(
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
             log::info!(
-                "{} Written fst index file successfully compressed size {}, original size {}",
+                "{} Written fst index file successfully: {}, compressed size {}, original size {}, took: {} ms",
                 caller,
+                idx_file_name,
                 file_meta.compressed_size,
                 file_meta.original_size,
+                start.elapsed().as_millis()
             );
             Ok(())
         }
         Err(e) => {
-            log::error!("{} Written fst index file error: {}", caller, e.to_string());
+            log::error!(
+                "{} Written fst index file: {}, error: {}",
+                caller,
+                idx_file_name,
+                e.to_string()
+            );
             Err(e)
         }
     }
 }
 
 /// Create and compressed inverted index bytes using FST solution for the given RecordBatch
-pub(crate) fn prepare_fst_index_bytes(
-    inverted_idx_batch: RecordBatch,
+pub(crate) async fn prepare_fst_index_bytes(
+    schema: Arc<Schema>,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
-    let schema = inverted_idx_batch.schema();
+    let cfg = get_config();
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|f| (f.name(), f))
+        .collect::<HashMap<_, _>>();
 
-    let mut writer = Vec::new();
-    let mut index_file_metas = IndexFileMetas::new();
-
-    let num_rows = inverted_idx_batch.num_rows();
-    // Process full text search fields
-    let mut ft_indexer = ColumnIndexer::new();
-    for column in schema.fields() {
-        let column_name = column.name();
-        if !full_text_search_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
-            continue;
-        }
-
-        let Some(column_data) = inverted_idx_batch
-            .column_by_name(column_name)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-        else {
-            continue;
+    let mut total_num_rows = 0;
+    let mut uniq_terms: HashMap<String, BTreeMap<String, _>> = HashMap::new();
+    loop {
+        let batch = reader.try_next().await?;
+        let Some(inverted_idx_batch) = batch else {
+            break;
         };
-
-        // split the column into terms
-        let terms = (0..num_rows)
-            .flat_map(|i| {
-                split_token(
-                    column_data.value(i),
-                    &config::get_config().common.inverted_index_split_chars,
-                )
-                .into_iter()
-                .map(|s| (s, i))
-                .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
-        if terms.is_empty() {
+        let num_rows = inverted_idx_batch.num_rows();
+        if num_rows == 0 {
             continue;
         }
 
-        for (term, row_id) in terms {
-            let segment_id = row_id / INDEX_SEGMENT_LENGTH;
-            ft_indexer.push(term.as_bytes(), segment_id, term.len());
+        // update total_num_rows
+        let prev_total_num_rows = total_num_rows;
+        total_num_rows += num_rows;
+
+        // process full text search fields
+        for column_name in full_text_search_fields.iter() {
+            if !schema_fields.contains_key(column_name) {
+                continue;
+            }
+            if schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8 {
+                continue;
+            }
+
+            // get full text search column
+            let Some(column_data) = inverted_idx_batch
+                .column_by_name(column_name)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+            else {
+                continue;
+            };
+
+            // split the column into terms
+            let terms = (0..num_rows)
+                .flat_map(|i| {
+                    split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
+                        .into_iter()
+                        .map(|s| (s, i))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            if terms.is_empty() {
+                continue;
+            }
+
+            // unique terms and get the min & max _timestamp
+            let column_uniq_terms = uniq_terms
+                .entry(INDEX_FIELD_NAME_FOR_ALL.to_string())
+                .or_insert(BTreeMap::new());
+            for (term, idx) in terms {
+                let ids = column_uniq_terms
+                    .entry(term.to_string())
+                    .or_insert(Vec::new());
+                ids.push(idx + prev_total_num_rows);
+            }
+        }
+
+        // process index fields
+        for column_name in index_fields.iter() {
+            if !schema_fields.contains_key(column_name) {
+                continue;
+            }
+            if schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8 {
+                continue;
+            }
+
+            // get index column
+            let Some(column_data) = inverted_idx_batch
+                .column_by_name(column_name)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+            else {
+                continue;
+            };
+
+            // collect terms
+            let terms = (0..num_rows)
+                .map(|i| (column_data.value(i), i))
+                .collect::<Vec<_>>();
+            if terms.is_empty() {
+                continue;
+            }
+
+            // unique terms
+            let column_uniq_terms = uniq_terms
+                .entry(column_name.to_string())
+                .or_insert(BTreeMap::new());
+            for (term, idx) in terms {
+                let ids = column_uniq_terms
+                    .entry(term.to_string())
+                    .or_insert(Vec::new());
+                ids.push(idx + prev_total_num_rows);
+            }
         }
     }
-    // finish ft_indexer
-    if !ft_indexer.is_empty() {
-        let ft_index_meta = ft_indexer
-            .write(&mut writer)
-            .context("Error constructing FST ColumnIndex for full text search fields")?;
-        // add ft_indexer_meta to IndexFileMetas
-        index_file_metas
-            .metas
-            .insert(INDEX_FIELD_NAME_FOR_ALL.to_string(), ft_index_meta);
-    }
 
-    // Process secondary index fields
-    for column in schema.fields() {
-        let column_name = column.name();
-        if !index_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
-            continue;
-        }
-
-        let Some(column_data) = inverted_idx_batch
-            .column_by_name(column_name)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-        else {
-            continue;
-        };
-
-        let terms = (0..num_rows)
-            .map(|i| (column_data.value(i), i))
-            .collect::<Vec<_>>();
-        if terms.is_empty() {
-            continue;
-        }
-
-        let mut col_indexer = ColumnIndexer::new();
-        for (term, row_id) in terms {
-            let segment_id = row_id / INDEX_SEGMENT_LENGTH;
-            col_indexer.push(term.as_bytes(), segment_id, term.len());
-        }
-
-        // finish col_indexer
-        if !col_indexer.is_empty() {
-            let col_index_meta = col_indexer.write(&mut writer).context(format!(
-                "Error constructing FST ColumnIndex for field {}",
-                column_name
-            ))?;
-            // add ft_indexer_meta to IndexFileMetas
-            index_file_metas
-                .metas
-                .insert(column_name.to_string(), col_index_meta);
+    // Process fst writer
+    let mut indexers = HashMap::new();
+    for (column_name, terms) in uniq_terms {
+        let indexer = indexers
+            .entry(column_name)
+            .or_insert_with(ColumnIndexer::new);
+        for (term, ids) in terms {
+            for row_id in ids {
+                let segment_id = row_id / INDEX_SEGMENT_LENGTH;
+                indexer.push(term.as_bytes(), segment_id, term.len());
+            }
         }
     }
 
-    // TODO(taiming): left for future improvement - write index files into file_list to show total
-    // index size
-    let mut file_meta = FileMeta {
-        min_ts: 0,
-        max_ts: 0,
-        records: 0,
-        original_size: 0,
-        compressed_size: 0,
-        flattened: false,
-    };
-
-    let _ = index_file_metas.finish(&mut writer)?;
-    let original_size = writer.len();
-
+    // create puffin file
     let mut puffin_buf: Vec<u8> = Vec::new();
     let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
-    puffin_writer.add_blob(writer)?;
+
+    let mut original_size = 0;
+    for (column_name, indexer) in indexers {
+        if indexer.is_empty() {
+            continue;
+        }
+        let mut buf = Vec::new();
+        let _index_meta = indexer.write(&mut buf).context(format!(
+            "Error constructing FST ColumnIndex for field {}",
+            column_name
+        ))?;
+        original_size += buf.len();
+        puffin_writer.add_blob(column_name, buf)?;
+    }
+
     puffin_writer.finish()?;
 
-    file_meta.original_size = original_size as _;
-    file_meta.compressed_size = puffin_buf.len() as _;
+    // index size
+    let file_meta = FileMeta {
+        original_size: original_size as i64,
+        compressed_size: puffin_buf.len() as i64,
+        ..Default::default()
+    };
 
     Ok(Some((puffin_buf, file_meta)))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn move_single_file(
-    thread_id: usize,
-    trace_id: &str,
-    file: &FileKey,
-    stream_type: StreamType,
-    stream_name: &str,
-    buf: &mut Vec<u8>,
-) -> datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
-    let data = tmpfs::get(format!("{trace_id}/{}", &file.key).as_str()).map_err(|e| {
-        log::error!(
-            "[INGESTER:JOB:{thread_id}] merge small file: {}, err: {}",
-            file.key,
-            e
-        );
-        datafusion::error::DataFusionError::Execution(e.to_string())
-    })?;
-
-    // copy data to buf
-    buf.extend_from_slice(&data);
-
-    read_recordbatch_from_bytes(&data).await.map_err(|e| {
-        log::error!(
-            "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for stream -> '{}/{}/{}'",
-            trace_id,
-            stream_type,
-            stream_name
-        );
-        log::error!(
-            "[INGESTER:JOB:{thread_id}] read recordbatch for file: {}, err: {}",
-            file.key,
-            e
-        );
-        datafusion::error::DataFusionError::Execution(e.to_string())
-    })
 }

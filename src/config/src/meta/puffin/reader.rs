@@ -26,7 +26,6 @@ use crate::meta::puffin::{CompressionCodec, MIN_FILE_SIZE};
 
 pub struct PuffinBytesReader<R> {
     source: R,
-
     metadata: Option<PuffinMeta>,
 }
 
@@ -46,23 +45,49 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             .seek(SeekFrom::Start(blob_metadata.offset as _))
             .await?;
 
-        // decompress bytes since OpenObserve InvertedIndex compresses index data by default
-        ensure!(
-            blob_metadata.compression_codec == Some(CompressionCodec::Zstd),
-            anyhow!("Unexpected CompressionCodex found in BlobMetadata")
-        );
-        let mut compressed = vec![0u8; blob_metadata.length as usize];
-        self.source.read_exact(&mut compressed).await?;
+        let mut raw_data = vec![0u8; blob_metadata.length as usize];
+        self.source.read_exact(&mut raw_data).await?;
 
-        let mut decompressed = Vec::new();
-        let mut decoder = zstd::Decoder::new(&compressed[..])?;
-        decoder.read_to_end(&mut decompressed)?;
-        Ok(decompressed)
+        let data = match blob_metadata.compression_codec {
+            None => raw_data,
+            Some(CompressionCodec::Zstd) => {
+                let mut decompressed = Vec::new();
+                let mut decoder = zstd::Decoder::new(&raw_data[..])?;
+                decoder.read_to_end(&mut decompressed)?;
+                decompressed
+            }
+            Some(CompressionCodec::Lz4) => {
+                todo!("Lz4 decompression is not implemented yet")
+            }
+        };
+
+        Ok(data)
     }
 
-    pub async fn get_metadata(&mut self) -> Result<PuffinMeta> {
-        if let Some(meta) = &self.metadata {
-            return Ok(meta.clone());
+    pub async fn get_field(&mut self, field: &str) -> Result<Option<BlobMetadata>> {
+        self.parse_footer().await?;
+        match self.metadata.as_ref() {
+            None => Err(anyhow!("Metadata not found")),
+            Some(v) => {
+                let Some(idx) = v.properties.get(field) else {
+                    return Ok(None);
+                };
+                let idx = idx
+                    .parse::<usize>()
+                    .map_err(|_| anyhow!("Field not found"))?;
+                Ok(v.blobs.get(idx).cloned())
+            }
+        }
+    }
+
+    pub async fn get_metadata(&mut self) -> Result<Option<PuffinMeta>> {
+        self.parse_footer().await?;
+        Ok(self.metadata.clone())
+    }
+
+    pub async fn parse_footer(&mut self) -> Result<()> {
+        if self.metadata.is_some() {
+            return Ok(());
         }
 
         // check MAGIC
@@ -83,9 +108,8 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
         let puffin_meta = PuffinFooterBytesReader::new(&mut self.source, end_offset)
             .parse()
             .await?;
-        self.metadata = Some(puffin_meta.clone());
-
-        Ok(puffin_meta)
+        self.metadata = Some(puffin_meta);
+        Ok(())
     }
 }
 
@@ -181,7 +205,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
     }
 
     fn parse_payload(&self, bytes: &[u8]) -> Result<PuffinMeta> {
-        if self.flags.contains(PuffinFooterFlags::COMPRESSED_ZSTD) {
+        if self.flags.contains(PuffinFooterFlags::COMPRESSED) {
             let decoder = zstd::Decoder::new(bytes)?;
             serde_json::from_reader(decoder)
                 .map_err(|e| anyhow!("Error decompress footer payload {}", e.to_string()))
@@ -195,18 +219,18 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
         let puffin_metadata = self.metadata.as_ref().expect("metadata is not set");
 
         let mut offset = MAGIC_SIZE;
-        for blob in &puffin_metadata.blob_metadata {
+        for blob in &puffin_metadata.blobs {
             ensure!(
-                blob.offset as u64 == offset,
+                blob.offset == offset,
                 anyhow!("Blob payload offset mismatch")
             );
-            offset += blob.length as u64;
+            offset += blob.length;
         }
 
         let payload_ends_at = puffin_metadata
-            .blob_metadata
+            .blobs
             .last()
-            .map_or(MAGIC_SIZE, |blob| (blob.offset + blob.length) as u64);
+            .map_or(MAGIC_SIZE, |blob| blob.offset + blob.length);
 
         ensure!(
             payload_ends_at == self.head_magic_offset(),

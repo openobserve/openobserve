@@ -17,6 +17,7 @@ phases:
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       # disable gxhash
       - sed -i 's/default = \[\"gxhash\"\]/default = []/g' src/config/Cargo.toml
+      - sed -i 's/+aes,//g' .cargo/config.toml
       
       # std version
       - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .

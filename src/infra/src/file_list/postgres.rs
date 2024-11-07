@@ -1517,7 +1517,7 @@ pub async fn create_table_index() -> Result<()> {
             &["stream", "date", "file"],
         ))
         .await?;
-        log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) succeed");
+        log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) successfully");
     }
 
     Ok(())

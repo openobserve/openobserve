@@ -1356,7 +1356,7 @@ pub async fn create_table_index() -> Result<()> {
             &["stream", "date", "file"],
         ))
         .await?;
-        log::warn!("[SQLITE] create table index(file_list_stream_file_idx) succeed");
+        log::warn!("[SQLITE] create table index(file_list_stream_file_idx) successfully");
     }
 
     // delete trigger for old version
