@@ -970,6 +970,8 @@ pub(crate) async fn generate_index_on_compactor(
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+    let start = std::time::Instant::now();
+
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -1056,11 +1058,16 @@ pub(crate) async fn generate_index_on_compactor(
         StreamType::Index,
         &index_stream_name,
         new_file_key,
-        "index_creator",
     )
     .await?;
 
-    log::debug!("[COMPACTOR:JOB] Written index files successfully");
+    log::info!(
+        "[COMPACT:JOB] generate index succeeded, data file: {}, index files: {:?}, took: {} ms",
+        new_file_key,
+        files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+        start.elapsed().as_millis(),
+    );
+
     Ok(files)
 }
 
@@ -1098,10 +1105,10 @@ async fn prepare_index_record_batches(
     let mut uniq_terms: HashMap<String, BTreeMap<String, _>> = HashMap::new();
     loop {
         let batch = reader.try_next().await?;
-        let Some(inverted_idx_batch) = batch else {
+        let Some(batch) = batch else {
             break;
         };
-        let num_rows = inverted_idx_batch.num_rows();
+        let num_rows = batch.num_rows();
         if num_rows == 0 {
             continue;
         }
@@ -1111,7 +1118,7 @@ async fn prepare_index_record_batches(
         total_num_rows += num_rows;
 
         // get _timestamp column
-        let Some(time_data) = inverted_idx_batch
+        let Some(time_data) = batch
             .column_by_name(&cfg.common.column_timestamp)
             .unwrap()
             .as_any()
@@ -1122,15 +1129,14 @@ async fn prepare_index_record_batches(
 
         // process full text search fields
         for column_name in full_text_search_fields.iter() {
-            if !schema_fields.contains_key(column_name) {
-                continue;
-            }
-            if schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8 {
+            if !schema_fields.contains_key(column_name)
+                || schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8
+            {
                 continue;
             }
 
             // get full text search column
-            let Some(column_data) = inverted_idx_batch
+            let Some(column_data) = batch
                 .column_by_name(column_name)
                 .unwrap()
                 .as_any()
@@ -1144,7 +1150,7 @@ async fn prepare_index_record_batches(
                 .flat_map(|i| {
                     split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
                         .into_iter()
-                        .map(|s| (s, i + prev_total_num_rows))
+                        .map(|s| (s, i))
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
@@ -1169,21 +1175,20 @@ async fn prepare_index_record_batches(
                 if *max_ts < term_time {
                     *max_ts = term_time;
                 }
-                ids.push(idx);
+                ids.push(idx + prev_total_num_rows);
             }
         }
 
         // process index fields
         for column_name in index_fields.iter() {
-            if !schema_fields.contains_key(column_name) {
-                continue;
-            }
-            if schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8 {
+            if !schema_fields.contains_key(column_name)
+                || schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8
+            {
                 continue;
             }
 
             // get index column
-            let Some(column_data) = inverted_idx_batch
+            let Some(column_data) = batch
                 .column_by_name(column_name)
                 .unwrap()
                 .as_any()
@@ -1194,7 +1199,7 @@ async fn prepare_index_record_batches(
 
             // collect terms
             let terms = (0..num_rows)
-                .map(|i| (column_data.value(i), i + prev_total_num_rows))
+                .map(|i| (column_data.value(i), i))
                 .collect::<Vec<_>>();
             if terms.is_empty() {
                 continue;
@@ -1217,7 +1222,7 @@ async fn prepare_index_record_batches(
                 if *max_ts < term_time {
                     *max_ts = term_time;
                 }
-                ids.push(idx);
+                ids.push(idx + prev_total_num_rows);
             }
         }
     }
@@ -1232,7 +1237,7 @@ async fn prepare_index_record_batches(
         let mut field_min_ts = Int64Builder::with_capacity(records_len);
         let mut field_max_ts = Int64Builder::with_capacity(records_len);
         let mut field_field =
-            StringBuilder::with_capacity(records_len, INDEX_FIELD_NAME_FOR_ALL.len() * records_len);
+            StringBuilder::with_capacity(records_len, column_name.len() * records_len);
         let mut field_term = StringBuilder::with_capacity(
             records_len,
             column_uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),

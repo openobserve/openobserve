@@ -62,7 +62,6 @@ pub(crate) async fn write_parquet_index_to_disk(
     stream_type: StreamType,
     stream_name: &str,
     file_name: &str,
-    caller: &str,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
@@ -71,7 +70,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     };
 
     log::debug!(
-        "write_parquet_index_to_disk: batches row counts: {:?}",
+        "[JOB:IDX] write_parquet_index_to_disk: batches row counts: {:?}",
         batches.iter().map(|b| b.num_rows()).sum::<usize>()
     );
 
@@ -129,24 +128,18 @@ pub(crate) async fn write_parquet_index_to_disk(
             file_name,
             &prefix,
         );
-        log::info!(
-            "[JOB] IDX: write_to_disk: {}/{}/{} {} {} {}",
-            org_id,
-            stream_name,
-            stream_type,
-            new_idx_file_name,
-            file_name,
-            caller,
-        );
 
         let store_file_name = new_idx_file_name.clone();
         match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
             Ok(_) => {
-                log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
+                log::info!(
+                    "[JOB:IDX] index file upload succeeded: {}",
+                    &new_idx_file_name
+                );
                 ret.push((new_idx_file_name, file_meta));
             }
             Err(err) => {
-                log::error!("[JOB] disk file upload error: {:?}", err);
+                log::error!("[JOB] index file upload error: {:?}", err);
                 return Err(anyhow::anyhow!(err));
             }
         }
