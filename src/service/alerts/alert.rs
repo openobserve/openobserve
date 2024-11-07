@@ -556,7 +556,7 @@ pub async fn send_email_notification(
 
     let mut email = Message::builder()
         .from(cfg.smtp.smtp_from_email.parse()?)
-        .subject(format!("Openobserve Alert - {}", email_subject));
+        .subject(format!("{}", email_subject));
 
     for recipient in recipients {
         email = email.to(recipient.parse()?);
