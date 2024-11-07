@@ -128,7 +128,10 @@
     "viewTrace": "View Trace",
     "flattened": "Flattened",
     "unflattened": "Unflattened",
-    "resetFilters": "Reset Filters"
+    "resetFilters": "Reset Filters",
+    "savedViewUpdateConfirmMsg": "Are you sure you want to update the saved view?",
+    "existingSavedViews": "Select an Existing Saved View",
+    "noSavedViews": "No saved view available."
   },
   "menu": {
     "home": "Home",
@@ -458,6 +461,8 @@
   "confirmDialog": {
     "cancel": "Cancel",
     "ok": "Ok",
+    "update": "Update",
+    "create": "Create",
     "loading": "Loading..."
   },
   "ingestion": {
