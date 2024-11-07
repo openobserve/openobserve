@@ -708,6 +708,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum SearchEventType {
     UI,
     Dashboards,

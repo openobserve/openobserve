@@ -379,7 +379,7 @@ impl Report {
 
         let mut email = Message::builder()
             .from(cfg.smtp.smtp_from_email.parse()?)
-            .subject(format!("{}", &self.title));
+            .subject(self.title.to_string());
 
         for recipient in recipients {
             email = email.to(recipient.parse()?);

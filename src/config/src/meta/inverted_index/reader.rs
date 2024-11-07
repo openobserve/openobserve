@@ -16,25 +16,49 @@
 /// interface
 use std::{io::SeekFrom, sync::Arc};
 
-use anyhow::{anyhow, ensure, Result};
-use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
+use anyhow::{anyhow, Result};
+use futures::{io::Cursor, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 
-use super::{ColumnIndexMeta, IndexFileMetas, INDEX_FILE_METAS_SIZE_SIZE};
-use crate::{meta::bitvec::BitVec, utils::inverted_index::unpack_u32_pair};
+use super::{ColumnIndexMeta, INDEX_FILE_METAS_SIZE_SIZE};
+use crate::{
+    meta::{bitvec::BitVec, puffin::reader::PuffinBytesReader},
+    utils::inverted_index::unpack_u32_pair,
+};
 
 /// Index reader helps read Index Blob which consists of multiple ColumnIndex.
 pub struct IndexReader<R> {
-    source: R,
+    source: PuffinBytesReader<R>,
 }
 
 impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
     pub fn new(source: R) -> Self {
+        Self {
+            source: PuffinBytesReader::new(source),
+        }
+    }
+
+    pub async fn field(&mut self, field: &str) -> Result<Option<FieldReader>> {
+        let Some(field_metdata) = self.source.get_field(field).await? else {
+            return Ok(None);
+        };
+        let blob_bytes = self.source.read_blob_bytes(&field_metdata).await?;
+        let data = Cursor::new(blob_bytes);
+        Ok(Some(FieldReader::new(data)))
+    }
+}
+
+pub struct FieldReader {
+    source: Cursor<Vec<u8>>,
+}
+
+impl FieldReader {
+    pub fn new(source: Cursor<Vec<u8>>) -> Self {
         Self { source }
     }
 
     /// Reads and parse the bytes read from source to construct [`IndexFileMetas`].
     /// IndexFileMetas is used to find and read ColumnIndex for a particular column.
-    pub async fn metadata(&mut self) -> Result<Arc<IndexFileMetas>> {
+    pub async fn metadata(&mut self) -> Result<Arc<ColumnIndexMeta>> {
         let end_offset = self.source.seek(SeekFrom::End(0)).await?;
 
         // read index_size
@@ -44,17 +68,16 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
         self.source.read_exact(index_file_metas_size_buf).await?;
         let index_file_metas_size = u32::from_le_bytes(*index_file_metas_size_buf) as u64;
 
-        // read index_file_metas
+        // read column index meta
         let index_file_metas_offset =
             SeekFrom::Start(end_offset - INDEX_FILE_METAS_SIZE_SIZE - index_file_metas_size);
         self.source.seek(index_file_metas_offset).await?;
         let index_file_metas_buf = &mut vec![0u8; index_file_metas_size as usize];
         self.source.read_exact(index_file_metas_buf).await?;
 
-        let index_file_metas: IndexFileMetas = serde_json::from_slice(index_file_metas_buf)?;
-        Self::validate_meta(&index_file_metas, index_file_metas_size, end_offset)?;
+        let column_meta: ColumnIndexMeta = serde_json::from_slice(index_file_metas_buf)?;
 
-        Ok(Arc::new(index_file_metas))
+        Ok(Arc::new(column_meta))
     }
 
     pub async fn fst(&mut self, offset: u64, size: u32) -> Result<fst::Map<Vec<u8>>> {
@@ -67,14 +90,9 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
         })
     }
 
-    pub async fn get_bitmap(
-        &mut self,
-        column_index_meta: &ColumnIndexMeta,
-        fst_val: u64,
-    ) -> Result<BitVec> {
+    pub async fn get_bitmap(&mut self, fst_val: u64) -> Result<BitVec> {
         let (relative_offset, size) = unpack_u32_pair(fst_val);
-        self.bitmap(column_index_meta.base_offset + relative_offset as u64, size)
-            .await
+        self.bitmap(relative_offset as u64, size).await
     }
 
     async fn bitmap(&mut self, offset: u64, size: u32) -> Result<BitVec> {
@@ -86,34 +104,6 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
         let mut buf = vec![0u8; size as usize];
         self.source.read_exact(&mut buf).await?;
         Ok(buf)
-    }
-}
-
-impl<R> IndexReader<R> {
-    fn validate_meta(
-        index_file_metas: &IndexFileMetas,
-        index_file_metas_size: u64,
-        end_offset: u64,
-    ) -> Result<()> {
-        for col_meta in index_file_metas.metas.values() {
-            let ColumnIndexMeta {
-                base_offset,
-                index_size,
-                ..
-            } = col_meta;
-
-            let limit = end_offset - INDEX_FILE_METAS_SIZE_SIZE - index_file_metas_size;
-            ensure!(
-                *base_offset + *index_size <= limit,
-                anyhow!(
-                    "ColumnIndexMeta unexpected offset: {} and size: {}. IndexFileMetas size {}",
-                    base_offset,
-                    index_size,
-                    index_file_metas_size
-                )
-            );
-        }
-        Ok(())
     }
 }
 
@@ -190,58 +180,5 @@ impl<'a> fst::automaton::Automaton for Contains<'a> {
         }
         // otherwise we're either past the end or didn't match the byte
         None
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::collections::HashMap;
-
-    use super::*;
-    #[test]
-    fn test_index_reader_validate_empty_meta() {
-        let index_file_metas = IndexFileMetas {
-            metas: HashMap::new(),
-        };
-        let index_file_metas_size = 0;
-        let end_offset = 0;
-        let result = IndexReader::<Vec<u8>>::validate_meta(
-            &index_file_metas,
-            index_file_metas_size,
-            end_offset,
-        );
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_index_reader_validate_meta() {
-        let mut metas = HashMap::new();
-        metas.insert(
-            "col1".to_string(),
-            ColumnIndexMeta {
-                base_offset: 0,
-                index_size: 10,
-                relative_fst_offset: 10,
-                ..Default::default()
-            },
-        );
-        metas.insert(
-            "col2".to_string(),
-            ColumnIndexMeta {
-                base_offset: 10,
-                index_size: 10,
-                relative_fst_offset: 10,
-                ..Default::default()
-            },
-        );
-        let index_file_metas = IndexFileMetas { metas };
-        let index_file_metas_size = 0;
-        let end_offset = 30;
-        let result = IndexReader::<Vec<u8>>::validate_meta(
-            &index_file_metas,
-            index_file_metas_size,
-            end_offset,
-        );
-        assert!(result.is_ok());
     }
 }
