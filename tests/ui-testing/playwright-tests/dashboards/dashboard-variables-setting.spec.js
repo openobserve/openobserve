@@ -76,7 +76,7 @@ async function waitForDashboardPage(page) {
   await page.waitForTimeout(500);
 }
 
-test.describe("dashboard general setting", () => {
+test.describe("dashboard variables setting", () => {
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -130,6 +130,136 @@ test.describe("dashboard general setting", () => {
     await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
     await page.locator('[data-test="dashboard-variable-add-btn"]').click();
     await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+  })
+
+  test("should add query_values to dashboard and save it", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Query Values' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('query_value_test');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('namespace');
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-stream-select"]').click();
+    await page.getByRole('option', { name: 'e2e_automate' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.getByText('kubernetes_namespace_name').click();
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+  });
+
+  test("should add max records size, check toggle of multi select, and save it", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Query Values' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('query_value_test');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('namespace');
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-stream-select"]').click();
+    await page.getByRole('option', { name: 'e2e_automate' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.getByText('kubernetes_namespace_name').click();
+    await page.locator('[data-test="dashboard-variable-max-record-size"]').click();
+    await page.locator('[data-test="dashboard-variable-max-record-size"]').fill('2');
+    await page.locator('[data-test="dashboard-query_values-show_multiple_values"] div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+  });
+
+  test("should verify that by default select is working", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Query Values' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('query_value_test');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('namespace');
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-stream-select"]').click();
+    await page.getByRole('option', { name: 'e2e_automate' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.getByText('kubernetes_namespace_name').click();
+    await page.locator('[data-test="dashboard-variable-max-record-size"]').click();
+    await page.locator('[data-test="dashboard-variable-max-record-size"]').fill('2');
+    await page.locator('[data-test="dashboard-query_values-show_multiple_values"] div').nth(2).click();
+    await page.locator('[data-test="dashboard-multi-select-default-value-toggle-first-value"]').click();
+    await page.locator('[data-test="dashboard-multi-select-default-value-toggle-all-values"]').click();
+    await page.locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]').click();
+    await page.locator('[data-test="dashboard-add-custom-value-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-custom-value-0"]').click();
+    await page.locator('[data-test="dashboard-variable-custom-value-0"]').fill('ingress-nginx');
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+  })
+
+  test("should verify that hide on dashboard is working", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Query Values' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('query_value_test');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('namespace');
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-stream-select"]').click();
+    await page.getByRole('option', { name: 'e2e_automate' }).locator('span').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').click();
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.getByText('kubernetes_namespace_name').click();
+    await page.locator('[data-test="dashboard-variable-hide_on_dashboard"] div').nth(2).click()
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
   })
 });
 
