@@ -355,7 +355,7 @@ pub trait AlertExt: Sync + Send + 'static {
         start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 
-    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
+    /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
     async fn send_notification(
         &self,
@@ -556,7 +556,7 @@ pub async fn send_email_notification(
 
     let mut email = Message::builder()
         .from(cfg.smtp.smtp_from_email.parse()?)
-        .subject(format!("{}", email_subject));
+        .subject(email_subject.to_string());
 
     for recipient in recipients {
         email = email.to(recipient.parse()?);
