@@ -798,6 +798,12 @@ pub(crate) async fn generate_index_on_ingester(
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+
+    if full_text_search_fields.is_empty() && index_fields.is_empty() {
+        return Ok(());
+    }
+
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -953,7 +959,12 @@ pub(crate) async fn generate_index_on_ingester(
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-    log::info!("[INGESTER:JOB] Written index wal file successfully");
+
+    log::info!(
+        "[INGESTER:JOB] Written index wal file successfully, took: {} ms",
+        start.elapsed().as_millis(),
+    );
+
     Ok(())
 }
 
@@ -971,6 +982,10 @@ pub(crate) async fn generate_index_on_compactor(
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let start = std::time::Instant::now();
+
+    if full_text_search_fields.is_empty() && index_fields.is_empty() {
+        return Ok(vec![(String::new(), FileMeta::default())]);
+    }
 
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -1302,6 +1317,10 @@ pub(crate) async fn generate_fst_inverted_index(
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+
+    if full_text_search_fields.is_empty() && index_fields.is_empty() {
+        return Ok(());
+    }
 
     let Some((compressed_bytes, file_meta)) =
         prepare_fst_index_bytes(schema, reader, full_text_search_fields, index_fields).await?
