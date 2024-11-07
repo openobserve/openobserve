@@ -77,47 +77,48 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(5000)
 
     // ("ingests logs via API", () => {
-    //   const orgId = process.env["ORGNAME"];
-    //   const streamName = "e2e_automate";
-    //   const basicAuthCredentials = Buffer.from(
-    //     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    //   ).toString('base64');
+      const orgId = process.env["ORGNAME"];
+      const streamName = "e2e_automate";
+      const basicAuthCredentials = Buffer.from(
+        `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+      ).toString('base64');
     
-    //   const headers = {
-    //     "Authorization": `Basic ${basicAuthCredentials}`,
-    //     "Content-Type": "application/json",
-    //   };
+      const headers = {
+        "Authorization": `Basic ${basicAuthCredentials}`,
+        "Content-Type": "application/json",
+      };
     
-    //   // const logsdata = {}; // Fill this with your actual data
+      // const logsdata = {}; // Fill this with your actual data
     
-    //   // Making a POST request using fetch API
-    //   const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    //     const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-    //       method: 'POST',
-    //       headers: headers,
-    //       body: JSON.stringify(logsdata)
-    //     });
-    //     return await fetchResponse.json();
-    //   }, {
-    //     url: process.env.INGESTION_URL,
-    //     headers: headers,
-    //     orgId: orgId,
-    //     streamName: streamName,
-    //     logsdata: logsdata
-    //   });
+      // Making a POST request using fetch API
+      const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+        const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(logsdata)
+        });
+        return await fetchResponse.json();
+      }, {
+        url: process.env.INGESTION_URL,
+        headers: headers,
+        orgId: orgId,
+        streamName: streamName,
+        logsdata: logsdata
+      });
     
-    //   console.log(response);
-    // //  });
-    // // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // // const functions = page.waitForResponse("**/api/default/functions**");
-    // await page.goto(
-    //   `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    // );
-    // const allsearch = page.waitForResponse("**/api/default/_search**");
-    // await selectStreamAndStreamTypeForLogs(page,logData.Stream);
-    // await applyQueryButton(page);
+      console.log(response);
+    //  });
+    // const allorgs = page.waitForResponse("**/api/default/organizations**");
+    // const functions = page.waitForResponse("**/api/default/functions**");
+    await page.goto(
+      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+    );
+    const allsearch = page.waitForResponse("**/api/default/_search**");
+    await selectStreamAndStreamTypeForLogs(page,logData.Stream);
+    await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
+  
   
   test('should display error when stream not selected while adding source', async ({ page }) => {
     const pipelinePage = new PipelinePage(page);
