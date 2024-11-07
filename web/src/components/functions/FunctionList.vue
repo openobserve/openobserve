@@ -133,6 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <ConfirmDialog
+      title="Delete Function"
+      message="Confirming this action will delete the transform and all its associated Pipelines. Are you sure you want to delete this transform?"
+      @update:ok="forceDeleteFn"
+      @update:cancel="confirmForceDelete = false"
+      v-model="confirmForceDelete"
+    />
   </q-page>
 </template>
 
@@ -177,6 +184,7 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -351,31 +359,6 @@ export default defineComponent({
     };
 
     const deleteFn = () => {
-      // if (selectedDelete.value.ingest) {
-      //   jsTransformService
-      //     .delete_stream_function(
-      //       store.state.selectedOrganization.identifier,
-      //       selectedDelete.value.stream_name,
-      //       selectedDelete.value.stream_type,
-      //       selectedDelete.value.name
-      //     )
-      //     .then((res: any) => {
-      //       if (res.data.code == 200) {
-      //         $q.notify({
-      //           type: "positive",
-      //           message: res.data.message,
-      //           timeout: 2000,
-      //         });
-      //         getJSTransforms();
-      //       } else {
-      //         $q.notify({
-      //           type: "negative",
-      //           message: res.data.message,
-      //           timeout: 2000,
-      //         });
-      //       }
-      //     });
-      // } else {
       jsTransformService
         .delete(
           store.state.selectedOrganization.identifier,
@@ -398,6 +381,23 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if(err.response.data.code == 409){
+            $q.notify({
+                type: "negative",
+                message: "Function is being used in Pipeline. If you still want to delete this function, click on Force Remove.",
+                timeout: 4000,
+                actions: [
+                  {
+                    label: "Force Remove",
+                    color: "white",
+                    handler: () => {
+                      forceRemoveFunction();
+                    }
+                  }
+                ]
+              });
+            return;
+          }
           $q.notify({
             type: "negative",
             message:
@@ -420,6 +420,41 @@ export default defineComponent({
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
+
+    const forceRemoveFunction = () =>{
+      confirmForceDelete.value = true;
+    }
+
+    const forceDeleteFn = () =>{
+      jsTransformService
+        .delete(
+          store.state.selectedOrganization.identifier,
+          selectedDelete.value.name,
+          true
+        ).then((res: any) => {
+          if (res.data.code == 200) {
+            $q.notify({
+              type: "positive",
+              message: res.data.message,
+              timeout: 2000,
+            });
+            getJSTransforms();
+          } else {
+            $q.notify({
+              type: "negative",
+              message: res.data.message,
+              timeout: 2000,
+            });
+          }
+        }).catch((err) => {
+          $q.notify({
+            type: "negative",
+            message:
+              JSON.stringify(err.response.data["message"]) ||
+              "Function deletion failed.",
+          });
+        });
+    }
 
     return {
       t,
@@ -448,6 +483,8 @@ export default defineComponent({
       showAddJSTransformDialog,
       changeMaxRecordToReturn,
       outlinedDelete,
+      forceDeleteFn,
+      confirmForceDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
