@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="log-search-saved-view-list-fields-table"
               :visible-columns="['view_name']"
               :rows="searchObj.data.savedViews"
-              :row-key="
-                (row: { view_id: string }) => 'saved_view_' + row.view_id
-              "
+              :row-key="(row: any) => 'saved_view_' + row.view_id"
               :filter="searchObj.data.savedViewFilterFields"
               :filter-method="filterSavedViewFn"
               :pagination="{ rowsPerPage }"
@@ -155,10 +153,7 @@ color="grey" size="xs" />
               data-test="log-search-saved-view-favorite-list-fields-table"
               :visible-columns="['view_name']"
               :rows="localSavedViews"
-              :row-key="
-                (row: { view_name: string }) =>
-                  'favorite_saved_view_' + row.view_name
-              "
+              :row-key="(row: any) => 'favorite_saved_view_' + row.view_name"
               hide-header
               hide-bottom
               :wrap-cells="searchObj.meta.resultGrid.wrapCells"
@@ -234,7 +229,7 @@ class="q-pa-sm text-bold favorite-label"
         />
       </q-card-section>
 
-      <div class="field-container">
+      <div  class="field-container">
         <div class="oo-field q-pl-md q-pr-md q-pt-md">
           <label for="create_saved_view_name" class="q-mr-sm">{{
             t("search.savedViewName")
@@ -249,6 +244,7 @@ class="q-pa-sm text-bold favorite-label"
             outlined
             filled
             dense
+            
             class="col q-mr-sm create-saved-view-input"
             :rules="[
               (val: string) => !!val.trim() || 'This field is required',
@@ -272,15 +268,16 @@ class="q-pa-sm text-bold favorite-label"
           />
           <q-btn
             data-test="saved-view-dialog-cancel-btn"
-            unelevated
             no-caps
             outline
-            bg-white
             :label="t('confirmDialog.cancel')"
             color="red"
-            v-close-popup
             class="text-bold btn-cancel"
+            v-close-popup
+            
           />
+         
+
         </div>
       </div>
 
@@ -337,14 +334,14 @@ class="q-pa-sm text-bold favorite-label"
           </div>
           <div v-else class="text-center q-pa-md full-width">
             <q-icon name="saved_search"
-size="100px" style="color: #dedede" />
+              size="100px" style="color: #dedede" />
             <br />
             {{ t("search.noSavedViews") }}
           </div>
         </div>
       </div>
 
-      <q-card-actions class="bg-white text-teal">
+      <q-card-actions class=" text-teal">
         <div class="col q-ml-sm text-left">
           <q-pagination
             v-if="filteredSavedViews.length"
@@ -360,28 +357,31 @@ size="100px" style="color: #dedede" />
             :rows-per-page="rowsPerPageInModel"
           ></q-pagination>
         </div>
-        <div class="col-2 text-right">
+        <div   class=" text-right">
           <q-btn
-            :disable="searchObj.data.savedViews.length == 0"
+            :disable="searchObj.data.savedViews.length == 0 || paginatedFilteredSavedViews.length == 0"
             data-test="saved-view-dialog-save-btn"
             v-if="!saveViewLoader"
             unelevated
             no-caps
             :label="t('confirmDialog.update')"
             color="secondary"
+              style="padding: 0px 14px !important;"
             @click="handleSavedView('update')"
             class="text-bold"
           />
           <q-btn
+            :disable="searchObj.data.savedViews.length == 0 || paginatedFilteredSavedViews.length == 0"
             data-test="saved-view-dialog-cancel-btn"
             unelevated
             no-caps
             outline
-            bg-white
             class="q-mr-sm text-bold q-ml-sm btn-cancel"
+            style="padding: 0px 16px !important;"
             :label="t('confirmDialog.cancel')"
             color="red"
             v-close-popup
+           
           />
         </div>
       </q-card-actions>
@@ -1229,9 +1229,8 @@ const confirmDialogOK = () => {
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .field-container {
-  background-color: #f5f5f5;
 
   .oo-field {
     display: flex;
@@ -1242,14 +1241,10 @@ const confirmDialogOK = () => {
     }
 
     .q-field__inner {
-      border: 1px solid rgba(0, 0, 0, 0.2) !important;
+     
       border-radius: 5px !important;
     }
 
-    .q-field__control,
-    .q-field__control:before {
-      background-color: white !important;
-    }
 
     .q-field--dense .q-field__control,
     .q-field--dense .q-field__marginal {
@@ -1258,8 +1253,11 @@ const confirmDialogOK = () => {
   }
 }
 
-.btn-cancel {
-  background-color: white;
-  border: 1px solid red !important;
+.btn-cancel:before {
+
+  border: 2px solid rgb(242, 10, 10) !important;
 }
+
+
+
 </style>
