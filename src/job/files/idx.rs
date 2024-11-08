@@ -64,6 +64,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     stream_name: &str,
     file_name: &str,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+    let start = std::time::Instant::now();
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
     } else {
@@ -121,11 +122,14 @@ pub(crate) async fn write_parquet_index_to_disk(
         );
 
         let store_file_name = new_idx_file_name.clone();
+        let buf_size = buf_parquet.len();
         match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
             Ok(_) => {
                 log::info!(
-                    "[JOB:IDX] index file upload successfully: {}",
-                    &new_idx_file_name
+                    "[JOB:IDX] index file upload successfully: {}, size: {}, took: {} ms",
+                    &new_idx_file_name,
+                    buf_size,
+                    start.elapsed().as_millis()
                 );
                 ret.push((new_idx_file_name, file_meta));
             }
