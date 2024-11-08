@@ -189,7 +189,7 @@ async fn scan_wal_files(
         }
     }
     if files_num > 0 {
-        log::info!(
+        log::debug!(
             "[INGESTER:JOB] scan files get total: {}, took: {} ms",
             files_num,
             start.elapsed().as_millis()
@@ -611,6 +611,7 @@ async fn merge_files(
         new_file_size += file.meta.original_size;
         new_compressed_file_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
+        log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
     }
     // no files need to merge
     if new_file_list.is_empty() {
