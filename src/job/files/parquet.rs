@@ -1008,6 +1008,12 @@ pub(crate) async fn generate_index_on_compactor(
         return Ok(vec![(String::new(), FileMeta::default())]);
     }
 
+    log::info!(
+        "[COMPACT:JOB] prepare_index_record_batches, data file: {}, took: {} ms",
+        new_file_key,
+        start.elapsed().as_millis(),
+    );
+
     let schema = record_batches.first().unwrap().schema();
     let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
@@ -1095,6 +1101,7 @@ async fn prepare_index_record_batches(
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<Vec<RecordBatch>, anyhow::Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
     let schema_fields = schema
         .fields()
@@ -1240,6 +1247,13 @@ async fn prepare_index_record_batches(
         }
     }
 
+    tokio::task::yield_now().await;
+    log::info!(
+        "[INGESTER:JOB] prepare_index_record_batches, collect records, data file: {}, took: {} ms",
+        new_file_key,
+        start.elapsed().as_millis(),
+    );
+
     // build record batch
     let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
@@ -1298,6 +1312,12 @@ async fn prepare_index_record_batches(
         )
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
         indexed_record_batches_to_merge.push(record_batch);
+
+        log::info!(
+            "[INGESTER:JOB] prepare_index_record_batches, build record batch, data file: {}, took: {} ms",
+            new_file_key,
+            start.elapsed().as_millis(),
+        );
     }
 
     Ok(indexed_record_batches_to_merge)

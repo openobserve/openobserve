@@ -131,7 +131,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
-    tokio::task::yield_now().await; // yield let other tasks run
+    tokio::task::yield_now().await;
 
     // cache core metadata
     db::schema::cache().await.expect("stream cache failed");

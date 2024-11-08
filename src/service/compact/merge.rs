@@ -830,7 +830,7 @@ pub async fn merge_files(
                 continue;
             }
             log::info!(
-                "Created parquet index file during compaction: {}",
+                "created parquet index file during compaction: {}",
                 file_name
             );
             // Notify that we wrote the index file to the db.
