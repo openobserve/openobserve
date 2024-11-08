@@ -45,6 +45,7 @@ class PipelinePage {
   }
 
   async addPipeline() {
+    await this.addPipelineButton.waitFor({ state: 'visible' });
     await this.addPipelineButton.click();
   }
 

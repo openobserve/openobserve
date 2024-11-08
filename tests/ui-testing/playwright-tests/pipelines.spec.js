@@ -124,6 +124,7 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = new PipelinePage(page);
 
     await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000)
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);;
@@ -135,6 +136,7 @@ test.describe("Pipeline testcases", () => {
   test('should display error when user directly clicks on save without adding details', async ({ page }) => {
     const pipelinePage = new PipelinePage(page);
     await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000)
     await pipelinePage.addPipeline();
     await pipelinePage.savePipeline();
     await pipelinePage.confirmPipelineNameRequired()
@@ -143,6 +145,7 @@ test.describe("Pipeline testcases", () => {
   test('should display error on entering only pipeline name and save', async ({ page }) => {
     const pipelinePage = new PipelinePage(page);
     await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000)
     await pipelinePage.addPipeline();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
@@ -154,6 +157,7 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = new PipelinePage(page);
   
     await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000)
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
@@ -162,7 +166,7 @@ test.describe("Pipeline testcases", () => {
     // Interact with stream name and save
     await pipelinePage.enterStreamName('e2e');
     await pipelinePage.enterStreamName('e2e_automate');
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(1000)
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
   
@@ -179,6 +183,7 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = new PipelinePage(page);
   
     await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000)
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.streamButton.waitFor({ state: 'visible' })
@@ -203,6 +208,7 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = new PipelinePage(page);
   
     await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000)
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
@@ -230,10 +236,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole('option', { name: 'Logs' }).locator('div').nth(2).click();
     await page.locator('[data-test="save-stream-btn"]').click();
     await page.locator('[data-test="input-node-stream-save-btn"]').click();
-
    
-  });
-   
-   
+  }); 
   
 })
