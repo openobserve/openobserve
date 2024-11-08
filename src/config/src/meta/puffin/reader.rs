@@ -61,54 +61,30 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             }
             None => compressed,
         };
-        // decompress bytes since OpenObserve InvertedIndex compresses index data by default
-        // This check should be outside the puffin reader logic
-        // ensure!(
-        //     blob_metadata.compression_codec == Some(CompressionCodec::Zstd),
-        //     anyhow!("Unexpected CompressionCodex found in BlobMetadata")
-        // );
 
         Ok(decompressed)
     }
 
-    /// Read the slice of bytes from the blob in a puffin file, given the blob metadata
-    // pub async fn read_slice(
-    //     &mut self,
-    //     blob_metadata: &BlobMetadata,
-    //     range: Range<usize>,
-    // ) -> Result<Vec<u8>> {
-    //     let offset = blob_metadata.offset as usize;
-    //     let start = offset + range.start;
-    //     let end = offset + range.end;
-    //     let slice_len = range.start - range.end;
+    pub async fn get_field(&mut self, field: &str) -> Result<Option<BlobMetadata>> {
+        self.parse_footer().await?;
+        match self.metadata.as_ref() {
+            None => Err(anyhow!("Metadata not found")),
+            Some(v) => Ok(v
+                .blobs
+                .iter()
+                .find(|b| b.properties.get("blob_tag").is_some_and(|val| val == field))
+                .cloned()),
+        }
+    }
 
-    //     match blob_metadata.compression_codec {
-    //         Some(CompressionCodec::Lz4) => unimplemented!(),
-    //         Some(CompressionCodec::Zstd) => {
-    //             self.source.seek(SeekFrom::Start(offset as _)).await?;
+    pub async fn get_metadata(&mut self) -> Result<Option<PuffinMeta>> {
+        self.parse_footer().await?;
+        Ok(self.metadata.clone())
+    }
 
-    //             let mut compressed = vec![0u8; blob_metadata.length as usize];
-    //             self.source.read_exact(&mut compressed).await?;
-
-    //             // Read the blob, decompress it, and give slice
-    //             let mut decompressed = Vec::new();
-    //             let mut decoder = zstd::Decoder::new(&compressed[..])?;
-    //             decoder.read_to_end(&mut decompressed)?;
-    //             Ok(decompressed[start..end].to_vec())
-    //         }
-    //         None => {
-    //             // Read slice directly using offsets, return vec
-    //             self.source.seek(SeekFrom::Start(start as _)).await?;
-    //             let mut compressed = vec![0u8; slice_len as usize];
-    //             self.source.read_exact(&mut compressed).await?;
-    //             Ok(compressed)
-    //         }
-    //     }
-    // }
-
-    pub async fn get_metadata(&mut self) -> Result<PuffinMeta> {
-        if let Some(meta) = &self.metadata {
-            return Ok(meta.clone());
+    pub async fn parse_footer(&mut self) -> Result<()> {
+        if self.metadata.is_some() {
+            return Ok(());
         }
 
         // check MAGIC
@@ -126,13 +102,13 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             )
         );
 
-        let puffin_meta = PuffinFooterBytesReader::new(&mut self.source, end_offset)
-            .parse()
-            .await
-            .unwrap();
-        self.metadata = Some(puffin_meta.clone());
-
-        Ok(puffin_meta)
+        let puffin_meta = dbg!(
+            PuffinFooterBytesReader::new(&mut self.source, end_offset)
+                .parse()
+                .await
+        )?;
+        self.metadata = Some(puffin_meta);
+        Ok(())
     }
 }
 
@@ -202,7 +178,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
     }
 
     fn parse_payload(&self, bytes: &[u8]) -> Result<PuffinMeta> {
-        if self.flags.contains(PuffinFooterFlags::COMPRESSED_ZSTD) {
+        if self.flags.contains(PuffinFooterFlags::COMPRESSED) {
             let decoder = zstd::Decoder::new(bytes)?;
             serde_json::from_reader(decoder)
                 .map_err(|e| anyhow!("Error decompress footer payload {}", e.to_string()))
@@ -216,18 +192,18 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
         let puffin_metadata = self.metadata.as_ref().expect("metadata is not set");
 
         let mut offset = MAGIC_SIZE;
-        for blob in &puffin_metadata.blob_metadata {
+        for blob in &puffin_metadata.blobs {
             ensure!(
-                blob.offset as u64 == offset,
+                blob.offset == offset,
                 anyhow!("Blob payload offset mismatch")
             );
-            offset += blob.length as u64;
+            offset += blob.length;
         }
 
         let payload_ends_at = puffin_metadata
-            .blob_metadata
+            .blobs
             .last()
-            .map_or(MAGIC_SIZE, |blob| (blob.offset + blob.length) as u64);
+            .map_or(MAGIC_SIZE, |blob| blob.offset + blob.length);
 
         ensure!(
             payload_ends_at == self.head_magic_offset(),

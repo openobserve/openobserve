@@ -1588,7 +1588,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !["both", "parquet", "tantivy"].contains(&cfg.common.inverted_index_store_format.as_str()) {
         return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet."
+            "ZO_INVERTED_INDEX_STORE_FORMAT must be one of both, parquet."
         ));
     }
     if cfg.common.inverted_index_store_format != "both" {

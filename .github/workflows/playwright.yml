@@ -101,6 +101,7 @@ jobs:
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
             "dashboard-transpose.spec.js",
+            "reportsUpdated.spec.js",
           ]
 
     steps:

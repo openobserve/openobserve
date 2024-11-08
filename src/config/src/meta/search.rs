@@ -703,7 +703,8 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
     }
 }
 
-#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum SearchEventType {
     UI,
     Dashboards,
@@ -713,6 +714,32 @@ pub enum SearchEventType {
     Other,
     RUM,
     DerivedStream,
+}
+
+impl<'de> Deserialize<'de> for SearchEventType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct FieldVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+            type Value = SearchEventType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("Invalid SearchEventType")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<SearchEventType, E>
+            where
+                E: serde::de::Error,
+            {
+                SearchEventType::from_str(value).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_identifier(FieldVisitor)
+    }
 }
 
 impl std::fmt::Display for SearchEventType {
@@ -743,7 +770,9 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
-            _ => Err(format!("Invalid search event type: {s}")),
+            _ => Err(format!(
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`"
+            )),
         }
     }
 }

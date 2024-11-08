@@ -538,14 +538,14 @@ async fn filter_file_list_by_inverted_index(
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let file_name = file.clone();
-        let trace_id_clone = query.trace_id.to_string();
+        let trace_id = query.trace_id.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
         let task = if use_tantivy {
             tokio::task::spawn(async move {
                 let res = search_tantivy_index(
-                    trace_id_clone.as_str(),
+                    &trace_id,
                     &file_name,
                     full_text_term_clone,
                     index_terms_clone,
@@ -557,7 +557,7 @@ async fn filter_file_list_by_inverted_index(
         } else {
             tokio::task::spawn(async move {
                 let res = inverted_index_search_in_file(
-                    trace_id_clone.as_str(),
+                    &trace_id,
                     &file_name,
                     full_text_term_clone,
                     index_terms_clone,
@@ -567,7 +567,6 @@ async fn filter_file_list_by_inverted_index(
                 res
             })
         };
-
         tasks.push(task)
     }
 
@@ -601,7 +600,7 @@ async fn filter_file_list_by_inverted_index(
                     );
                 } else {
                     // if the bitmap is empty then we remove the file from the list
-                    log::info!(
+                    log::debug!(
                         "[trace_id {}] search->storage: no match found in index for file {}",
                         query.trace_id,
                         file_name
@@ -861,26 +860,23 @@ async fn inverted_index_search_in_file(
         Ok(bytes) => bytes,
     };
 
-    let mut index_reader = create_index_reader_from_puffin_bytes(compressed_index_blob).await?;
-    let file_meta = index_reader.metadata().await?;
-
     let mut res = BitVec::new();
-
-    if let Some(column_index_meta) = &file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
-        // TODO: Add Eq and check performance
+    let mut index_reader = create_index_reader_from_puffin_bytes(compressed_index_blob).await?;
+    if let Some(mut field_reader) = index_reader.field(INDEX_FIELD_NAME_FOR_ALL).await? {
+        let column_index_meta = field_reader.metadata().await?;
         let matched_bv = match cfg.common.full_text_search_type.as_str() {
             "eq" => {
-                let mut searcher = ExactSearch::new(fts_terms.as_ref(), column_index_meta);
-                searcher.search(&mut index_reader).await
+                let mut searcher = ExactSearch::new(fts_terms.as_ref(), &column_index_meta);
+                searcher.search(&mut field_reader).await
             }
             "contains" => {
-                let mut searcher = SubstringSearch::new(fts_terms.as_ref(), column_index_meta);
-                searcher.search(&mut index_reader).await
+                let mut searcher = SubstringSearch::new(fts_terms.as_ref(), &column_index_meta);
+                searcher.search(&mut field_reader).await
             }
             // Default to prefix search
             _ => {
-                let mut searcher = PrefixSearch::new(fts_terms.as_ref(), column_index_meta);
-                searcher.search(&mut index_reader).await
+                let mut searcher = PrefixSearch::new(fts_terms.as_ref(), &column_index_meta);
+                searcher.search(&mut field_reader).await
             }
         };
 
@@ -903,9 +899,10 @@ async fn inverted_index_search_in_file(
 
     if !index_terms.is_empty() {
         for (col, index_terms) in index_terms.iter() {
-            if let Some(column_index_meta) = file_meta.metas.get(col) {
-                let mut secondary_index_match = ExactSearch::new(index_terms, column_index_meta);
-                match secondary_index_match.search(&mut index_reader).await {
+            if let Some(mut field_reader) = index_reader.field(col).await? {
+                let column_index_meta = field_reader.metadata().await?;
+                let mut secondary_index_match = ExactSearch::new(index_terms, &column_index_meta);
+                match secondary_index_match.search(&mut field_reader).await {
                     Ok(bitmap) => {
                         if res.len() < bitmap.len() {
                             res.resize(bitmap.len(), false);

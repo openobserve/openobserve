@@ -22,8 +22,8 @@ use std::{
 use anyhow::{Context, Result};
 
 use super::{
-    BlobMetadata, BlobMetadataBuilder, CompressionCodec, PuffinFooterFlags, PuffinMeta, MAGIC,
-    MAGIC_SIZE, MIN_FOOTER_SIZE,
+    BlobMetadata, BlobMetadataBuilder, BlobTypes, CompressionCodec, PuffinFooterFlags, PuffinMeta,
+    MAGIC, MAGIC_SIZE, MIN_FOOTER_SIZE,
 };
 
 pub struct PuffinBytesWriter<W> {
@@ -50,9 +50,9 @@ impl<W> PuffinBytesWriter<W> {
         }
     }
 
-    fn add_blob_metadata(
+    fn build_blob_metadata(
         &self,
-        blob_type: String,
+        blob_type: BlobTypes,
         compression_codec: Option<CompressionCodec>,
         properties: HashMap<String, String>,
         size: u64,
@@ -62,7 +62,7 @@ impl<W> PuffinBytesWriter<W> {
             .compression_codec(compression_codec)
             .properties(properties)
             .offset(self.written_bytes as _)
-            .length(size as _)
+            .length(size)
             .build()
             .expect("Missing required fields")
     }
@@ -72,8 +72,9 @@ impl<W: io::Write> PuffinBytesWriter<W> {
     pub fn add_blob(
         &mut self,
         raw_data: &Vec<u8>,
-        object_type: String,
-        file_name: String,
+        blob_type: BlobTypes,
+        // blob_tag will be added in the puffin footer, with its respective offset
+        blob_tag: String,
         compress: bool,
     ) -> Result<()> {
         self.add_header_if_needed()
@@ -101,13 +102,13 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         self.writer.write_all(&final_data)?;
         let properties = {
             let mut properties = HashMap::new();
-            properties.insert("file_name".to_string(), file_name);
+            properties.insert("blob_tag".to_string(), blob_tag);
             properties
         };
 
         // add metadata for this blob
         let blob_metadata =
-            self.add_blob_metadata(object_type, compression_codec, properties, final_size);
+            self.build_blob_metadata(blob_type, compression_codec, properties, final_size);
         self.blobs_metadata.push(blob_metadata);
         self.written_bytes += final_size;
         Ok(())
@@ -135,7 +136,6 @@ impl<W: io::Write> PuffinBytesWriter<W> {
             mem::take(&mut self.properties),
         )
         .into_bytes()?;
-
         self.writer.write_all(&footer_bytes)?;
         self.written_bytes += footer_bytes.len() as u64;
         Ok(())
@@ -172,7 +172,7 @@ impl PuffinFooterWriter {
         buf.extend_from_slice(&(payload_size as i32).to_le_bytes());
 
         // flags
-        buf.extend_from_slice(&PuffinFooterFlags::COMPRESSED_ZSTD.bits().to_le_bytes());
+        buf.extend_from_slice(&PuffinFooterFlags::DEFAULT.bits().to_le_bytes());
 
         // FootMagic
         buf.extend_from_slice(&MAGIC);
@@ -182,12 +182,9 @@ impl PuffinFooterWriter {
 
     fn get_payload(&mut self) -> Result<Vec<u8>> {
         let file_metdadata = PuffinMeta {
-            blob_metadata: mem::take(&mut self.blob_metadata),
+            blobs: mem::take(&mut self.blob_metadata),
             properties: mem::take(&mut self.file_properties),
         };
-
-        let mut encoder = zstd::Encoder::new(vec![], 3)?;
-        serde_json::to_writer(&mut encoder, &file_metdadata)?;
-        Ok(encoder.finish()?)
+        serde_json::to_vec(&file_metdadata).context("Error serializing puffin metadata")
     }
 }
