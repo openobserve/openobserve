@@ -117,6 +117,7 @@ test.describe("dashboard variables setting", () => {
     await orgNavigation;
   });
 
+  // query values test cases
   test("should try to open variables, click add variable, and without saving close it ", async ({ page, }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -230,10 +231,14 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-custom-value-0"]').click();
     await page.locator('[data-test="dashboard-variable-custom-value-0"]').fill('ingress-nginx');
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-variable-query-value-selector"]');
+    await expect(page.getByText("ingress-nginx")).toBeVisible({
+      timeout: 30000,
+    });
   })
 
-  test("should verify that hide on dashboard is working", async ({ page, }) => {
+  test("should verify that hide on query_values variable dashboard is working", async ({ page, }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -261,6 +266,112 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-hide_on_dashboard"] div').nth(2).click()
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
   })
+
+
+  // constant test cases
+  test("should verify constant variable by adding and verify that its visible on dashboard", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Constant' }).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('constant');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('constant-variable');
+    await page.locator('[data-test="dashboard-variable-constant-value"]').click();
+    await page.locator('[data-test="dashboard-variable-constant-value"]').fill('200');
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-variable-constant-selector"]').click();
+  })
+
+  test("should verify that hide on constant variable dashboard is working", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Constant' }).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('constant');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('constant-variable');
+    await page.locator('[data-test="dashboard-variable-constant-value"]').click();
+    await page.locator('[data-test="dashboard-variable-constant-value"]').fill('200');
+    await page.locator('[data-test="dashboard-variable-hide_on_dashboard"] div').nth(2).click()
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+  })
+
+
+  // textbox test cases
+  test("should verify textbox variable by adding and verify that its visible on dashboard", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Textbox' }).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('textbox');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('textbox-variable');
+    await page.locator('[data-test="dashboard-variable-textbox-default-value"]').click();
+    await page.locator('[data-test="dashboard-variable-textbox-default-value"]').fill('500');
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-variable-textbox-selector"]').click();
+    await page.locator('[data-test="dashboard-variable-textbox-selector"]').fill('800');
+    await expect(page.locator('[data-test="dashboard-variable-textbox-selector"]')).toHaveValue('800');
+  })
+
+  test("should verify that hide on textbox variable dashboard is working", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Textbox' }).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('textbox');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('textbox-variable');
+    await page.locator('[data-test="dashboard-variable-textbox-default-value"]').click();
+    await page.locator('[data-test="dashboard-variable-textbox-default-value"]').fill('500');
+    await page.locator('[data-test="dashboard-variable-hide_on_dashboard"] div').nth(2).click()
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+  })
+
+  // custom test cases
 });
 
   
