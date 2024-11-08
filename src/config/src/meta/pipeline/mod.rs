@@ -298,6 +298,17 @@ pub struct PipelineList {
     pub list: Vec<Pipeline>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipelineDependencyItem {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipelineDependencyResponse {
+    pub list: Vec<PipelineDependencyItem>,
+}
+
 /// DFS traversal to check:
 /// 1. all leaf nodes are of StreamNode
 /// 2. No `After Flattened` unchecked FunctionNode follows `After Flatten` checked FunctionNode in

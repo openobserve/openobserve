@@ -19,7 +19,10 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::function::{FunctionList, Transform};
+use config::meta::{
+    function::{FunctionList, Transform},
+    pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
+};
 
 use crate::{
     common::{
@@ -182,51 +185,36 @@ pub async fn delete_function(
             }
         }
     }
-    if let Ok(mut pipelines) = db::pipeline::list_by_org(&org_id).await {
-        pipelines.retain(|pipeline| pipeline.contains_function(&fn_name));
-        if !pipelines.is_empty() {
-            if force_delete {
-                for pl in pipelines {
-                    match super::pipeline::delete_pipeline(&pl.id).await {
-                        Ok(resp) if resp.status().as_u16() != 200 => {
-                            return Ok(resp);
-                        }
-                        Err(e) => {
-                            return Ok(HttpResponse::InternalServerError().json(
-                                MetaHttpResponse::error(
-                                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    e.to_string(),
-                                ),
-                            ));
-                        }
-                        _ => {}
+    let pipeline_dep = get_dependencies(&org_id, &fn_name).await;
+    if !pipeline_dep.is_empty() {
+        if force_delete {
+            for pl in pipeline_dep {
+                match super::pipeline::delete_pipeline(&pl.id).await {
+                    Ok(resp) if resp.status().as_u16() != 200 => {
+                        return Ok(resp);
                     }
+                    Err(e) => {
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                e.to_string(),
+                            ),
+                        ));
+                    }
+                    _ => {}
                 }
-            } 
-            else {
-                let pipeline_info: Vec<_> = pipelines
-                    .iter()
-                    .map(|pl| {
-                        serde_json::json!({
-                            "id": pl.id,
-                            "name": pl.name
-                        })
-                    })
-                    .collect();
-            
-                let pipeline_data = serde_json::to_string(&pipeline_info).unwrap_or_else(|_| "[]".to_string());
-            
-                return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
-                    http::StatusCode::CONFLICT.into(),
-                    format!(
-                        "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
-                        fn_name,
-                        pipelines.len(),
-                        pipeline_data
-                    ),
-                )));
             }
-            
+        } else {
+            let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
+            return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
+                http::StatusCode::CONFLICT.into(),
+                format!(
+                    "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
+                    fn_name,
+                    pipeline_dep.len(),
+                    pipeline_data
+                ),
+            )));
         }
     }
     let result = db::functions::delete(&org_id, &fn_name).await;
@@ -244,6 +232,29 @@ pub async fn delete_function(
             FN_NOT_FOUND.to_string(),
         ))),
     }
+}
+
+pub async fn get_pipeline_dependencies(
+    org_id: &str,
+    func_name: &str,
+) -> Result<HttpResponse, Error> {
+    let list = get_dependencies(org_id, func_name).await;
+    Ok(HttpResponse::Ok().json(PipelineDependencyResponse { list }))
+}
+
+async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
+    db::pipeline::list_by_org(org_id)
+        .await
+        .map_or(vec![], |mut pipelines| {
+            pipelines.retain(|pl| pl.contains_function(func_name));
+            pipelines
+                .into_iter()
+                .map(|pl| PipelineDependencyItem {
+                    id: pl.id,
+                    name: pl.name,
+                })
+                .collect()
+        })
 }
 
 fn extract_num_args(func: &mut Transform) {
