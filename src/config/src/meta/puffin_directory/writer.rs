@@ -27,6 +27,12 @@ pub struct PuffinDirWriter {
     file_paths: Arc<RwLock<HashSet<PathBuf>>>,
 }
 
+impl Default for PuffinDirWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Clone for PuffinDirWriter {
     fn clone(&self) -> Self {
         PuffinDirWriter {
@@ -64,10 +70,12 @@ pub fn convert_puffin_dir_to_tantivy_dir(
     }
 
     for file in puffin_dir.list_files() {
-        let file_data = puffin_dir.open_read(&PathBuf::from(file.clone())).unwrap();
+        let file_data = puffin_dir.open_read(file.as_path()).unwrap();
         let mut file_handle = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .append(false)
+            .truncate(true)
             .open(tantivy_folder_path.join(&file))
             .unwrap();
         file_handle

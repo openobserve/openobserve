@@ -114,7 +114,7 @@ where
                     Some(ext) => ext,
                     None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 };
-                if let Some(blob) = get_file_from_empty_puffin_dir_with_ext(ext).ok() {
+                if let Ok(blob) = get_file_from_empty_puffin_dir_with_ext(ext) {
                     Ok(Arc::new(PuffinSliceHandle { blob }))
                 } else {
                     Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))
@@ -135,7 +135,7 @@ where
             return EMPTY_PUFFIN_DIRECTORY.exists(&PathBuf::from(dir_path));
         }
 
-        return Ok(exists);
+        Ok(exists)
     }
 
     fn atomic_read(&self, path: &Path) -> std::result::Result<Vec<u8>, OpenReadError> {
@@ -146,7 +146,7 @@ where
                     Some(ext) => ext,
                     None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 };
-                if let Some(blob) = get_file_from_empty_puffin_dir_with_ext(ext).ok() {
+                if let Ok(blob) = get_file_from_empty_puffin_dir_with_ext(ext) {
                     Ok(blob.to_vec())
                 } else {
                     Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))

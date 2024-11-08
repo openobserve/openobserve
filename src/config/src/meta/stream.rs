@@ -218,7 +218,7 @@ impl FileMeta {
 
 impl From<&FileMeta> for Vec<u8> {
     fn from(value: &FileMeta) -> Vec<u8> {
-        let mut bytes = [0; 40];
+        let mut bytes = [0; 48];
         LittleEndian::write_i64(&mut bytes[0..8], value.min_ts);
         LittleEndian::write_i64(&mut bytes[8..16], value.max_ts);
         LittleEndian::write_i64(&mut bytes[16..24], value.records);

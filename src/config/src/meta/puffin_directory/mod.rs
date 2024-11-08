@@ -90,10 +90,12 @@ pub fn convert_puffin_dir_to_tantivy_dir(
     }
 
     for file in puffin_dir.list_files() {
-        let file_data = puffin_dir.open_read(&PathBuf::from(file.clone()))?;
+        let file_data = puffin_dir.open_read(file.as_path())?;
         let mut file_handle = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
+            .append(false)
             .open(tantivy_folder_path.join(&file))?;
         file_handle.write_all(&file_data.read_bytes()?)?;
         file_handle.flush()?;

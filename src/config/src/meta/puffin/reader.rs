@@ -162,9 +162,8 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
         self.source
             .seek(SeekFrom::Start(self.payload_offset()))
             .await?;
-        let mut payload: Vec<u8> = Vec::with_capacity(self.payload_size as usize);
-        payload.resize(self.payload_size as usize, 0);
-        self.source.read(&mut payload).await?;
+        let mut payload: Vec<u8> = vec![0; self.payload_size as usize];
+        self.source.read_exact(&mut payload).await?;
         self.metadata = Some(self.parse_payload(&payload)?);
         self.validate_payload()?;
 
