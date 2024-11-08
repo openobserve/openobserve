@@ -137,20 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
     <q-card-section class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
       <div>Pipelines Associated with  <strong> {{ selectedDelete.name}}</strong> </div>
-          <div
-          data-test="close-dialog-associated-pipelines-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="closeDialog"
-        >
-          <q-icon name="close" size="14px" />
-        </div>
+          <q-icon  name="close" size="18px" @click="closeDialog" style="cursor: pointer" />
     </q-card-section>
     <q-card-section>
   <div class="pipeline-list-container">
