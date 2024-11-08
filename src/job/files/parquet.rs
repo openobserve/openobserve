@@ -53,7 +53,7 @@ use config::{
         },
         schema_ext::SchemaExt,
     },
-    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH,
+    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
@@ -189,7 +189,7 @@ async fn scan_wal_files(
         }
     }
     if files_num > 0 {
-        log::info!(
+        log::debug!(
             "[INGESTER:JOB] scan files get total: {}, took: {} ms",
             files_num,
             start.elapsed().as_millis()
@@ -611,6 +611,7 @@ async fn merge_files(
         new_file_size += file.meta.original_size;
         new_compressed_file_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
+        log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
     }
     // no files need to merge
     if new_file_list.is_empty() {
@@ -798,6 +799,12 @@ pub(crate) async fn generate_index_on_ingester(
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+
+    if full_text_search_fields.is_empty() && index_fields.is_empty() {
+        return Ok(());
+    }
+
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -953,7 +960,12 @@ pub(crate) async fn generate_index_on_ingester(
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-    log::info!("[INGESTER:JOB] Written index wal file successfully");
+
+    log::info!(
+        "[INGESTER:JOB] Written index wal file successfully, took: {} ms",
+        start.elapsed().as_millis(),
+    );
+
     Ok(())
 }
 
@@ -971,6 +983,10 @@ pub(crate) async fn generate_index_on_compactor(
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
     let start = std::time::Instant::now();
+
+    if full_text_search_fields.is_empty() && index_fields.is_empty() {
+        return Ok(vec![]);
+    }
 
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -990,7 +1006,7 @@ pub(crate) async fn generate_index_on_compactor(
     )
     .await?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
-        return Ok(vec![(String::new(), FileMeta::default())]);
+        return Ok(vec![]);
     }
 
     let schema = record_batches.first().unwrap().schema();
@@ -1223,6 +1239,9 @@ async fn prepare_index_record_batches(
                 ids.push(idx + prev_total_num_rows);
             }
         }
+
+        // yield, this operation is time-consuming
+        tokio::task::yield_now().await;
     }
 
     // build record batch
@@ -1231,21 +1250,28 @@ async fn prepare_index_record_batches(
     let mut indexed_record_batches_to_merge = Vec::new();
     for (column_name, column_uniq_terms) in uniq_terms {
         let records_len = column_uniq_terms.len();
-        let mut field_timestamp = Int64Builder::with_capacity(records_len);
-        let mut field_min_ts = Int64Builder::with_capacity(records_len);
-        let mut field_max_ts = Int64Builder::with_capacity(records_len);
+        let batch_size = PARQUET_BATCH_SIZE.min(records_len);
+
+        let mut field_timestamp = Int64Builder::with_capacity(batch_size);
+        let mut field_min_ts = Int64Builder::with_capacity(batch_size);
+        let mut field_max_ts = Int64Builder::with_capacity(batch_size);
         let mut field_field =
-            StringBuilder::with_capacity(records_len, column_name.len() * records_len);
+            StringBuilder::with_capacity(batch_size, column_name.len() * batch_size);
         let mut field_term = StringBuilder::with_capacity(
-            records_len,
-            column_uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
+            batch_size,
+            column_uniq_terms
+                .iter()
+                .take(batch_size)
+                .map(|x| x.0.len())
+                .sum::<usize>(),
         );
         let mut field_file_name =
-            StringBuilder::with_capacity(records_len, file_name_without_prefix.len() * records_len);
-        let mut field_count = Int64Builder::with_capacity(records_len);
-        let mut field_deleted = BooleanBuilder::with_capacity(records_len);
-        let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
-        for (term, (min_ts, max_ts, ids)) in column_uniq_terms {
+            StringBuilder::with_capacity(batch_size, file_name_without_prefix.len() * batch_size);
+        let mut field_count = Int64Builder::with_capacity(batch_size);
+        let mut field_deleted = BooleanBuilder::with_capacity(batch_size);
+        let mut field_segment_ids = BinaryBuilder::with_capacity(batch_size, batch_size);
+
+        for (i, (term, (min_ts, max_ts, ids))) in column_uniq_terms.into_iter().enumerate() {
             field_timestamp.append_value(min_ts);
             field_min_ts.append_value(min_ts);
             field_max_ts.append_value(max_ts);
@@ -1265,24 +1291,30 @@ async fn prepare_index_record_batches(
                 bv.push(segment_ids.contains(&i));
             }
             field_segment_ids.append_value(bv.into_vec());
-        }
 
-        let record_batch = RecordBatch::try_new(
-            new_schema.clone(),
-            vec![
-                Arc::new(field_timestamp.finish()),
-                Arc::new(field_min_ts.finish()),
-                Arc::new(field_max_ts.finish()),
-                Arc::new(field_field.finish()),
-                Arc::new(field_term.finish()),
-                Arc::new(field_file_name.finish()),
-                Arc::new(field_count.finish()),
-                Arc::new(field_deleted.finish()),
-                Arc::new(field_segment_ids.finish()),
-            ],
-        )
-        .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
-        indexed_record_batches_to_merge.push(record_batch);
+            // build record batch
+            if i == records_len - 1 || i % batch_size == 0 {
+                let record_batch = RecordBatch::try_new(
+                    new_schema.clone(),
+                    vec![
+                        Arc::new(field_timestamp.finish()),
+                        Arc::new(field_min_ts.finish()),
+                        Arc::new(field_max_ts.finish()),
+                        Arc::new(field_field.finish()),
+                        Arc::new(field_term.finish()),
+                        Arc::new(field_file_name.finish()),
+                        Arc::new(field_count.finish()),
+                        Arc::new(field_deleted.finish()),
+                        Arc::new(field_segment_ids.finish()),
+                    ],
+                )
+                .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
+                indexed_record_batches_to_merge.push(record_batch);
+
+                // yield, this operation is time-consuming
+                tokio::task::yield_now().await;
+            }
+        }
     }
 
     Ok(indexed_record_batches_to_merge)
@@ -1302,6 +1334,10 @@ pub(crate) async fn generate_fst_inverted_index(
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+
+    if full_text_search_fields.is_empty() && index_fields.is_empty() {
+        return Ok(());
+    }
 
     let Some((compressed_bytes, file_meta)) =
         prepare_fst_index_bytes(schema, reader, full_text_search_fields, index_fields).await?

@@ -69,7 +69,7 @@ pub async fn metrics_proto_handler(
     match handle_grpc_request(org_id, request, false).await {
         Ok(res) => Ok(res),
         Err(e) => {
-            log::error!("error processing request: {}", e);
+            log::error!("error processing request/{org_id}/metrics/otlp: {}", e);
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),

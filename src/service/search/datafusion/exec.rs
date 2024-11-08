@@ -136,7 +136,7 @@ pub async fn merge_parquet_files(
     ctx.deregister_table("tbl")?;
     drop(ctx);
 
-    log::info!(
+    log::debug!(
         "merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );

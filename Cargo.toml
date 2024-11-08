@@ -170,7 +170,7 @@ url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
-vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "70e61fc344b9db2f191cfba9ad58ee08e79d30b4" }
+vector-enrichment.workspace = true
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -323,5 +323,6 @@ url = "2.2"
 urlencoding = "2.1"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
-vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }
+vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "3d16e345232bb3cb9b104ee6461e9dd0b4c361da" }
+vrl = { version = "0.19.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"

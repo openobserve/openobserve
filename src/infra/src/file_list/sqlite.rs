@@ -829,7 +829,7 @@ UPDATE stream_stats
         stream_type: StreamType,
         stream: &str,
         offset: i64,
-    ) -> Result<()> {
+    ) -> Result<i64> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -837,20 +837,31 @@ UPDATE stream_stats
             "INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at) VALUES ($1, $2, $3, $4, '', 0, 0);",
         )
         .bind(org_id)
-        .bind(stream_key)
+        .bind(&stream_key)
         .bind(offset)
         .bind(super::FileListJobStatus::Pending)
         .execute(&*client)
         .await
         {
-            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
-                Ok(())
-            } else {
-                Err(Error::Message(e.to_string()))
+            Err(sqlx::Error::Database(e)) => if !e.is_unique_violation() {
+                return Err(Error::Message(e.to_string()));
             },
-            Err(e) => Err(e.into()),
-            Ok(_) => Ok(()),
-        }
+            Err(e) => {
+                return Err(e.into());
+            },
+            Ok(_) => {}
+        };
+
+        // get job id
+        let ret = sqlx::query(
+            "SELECT id FROM file_list_jobs WHERE org = $1 AND stream = $2 AND offsets = $3;",
+        )
+        .bind(org_id)
+        .bind(&stream_key)
+        .bind(offset)
+        .fetch_one(&*client)
+        .await?;
+        Ok(ret.try_get::<i64, &str>("id").unwrap_or_default())
     }
 
     #[tracing::instrument(name = "file_list::db::get_pending_jobs", skip(self))]
