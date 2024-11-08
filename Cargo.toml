@@ -157,8 +157,6 @@ thiserror.workspace = true
 time.workspace = true
 tikv-jemallocator = { version = "0.5", optional = true }
 tokio.workspace = true
-tokio-util.workspace = true
-tokio-stream.workspace = true
 console-subscriber = { version = "0.2", optional = true }
 tonic.workspace = true
 tracing.workspace = true
