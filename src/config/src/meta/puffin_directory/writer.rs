@@ -84,12 +84,6 @@ pub fn convert_puffin_dir_to_tantivy_dir(
     }
 }
 
-impl Default for PuffinDirWriter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl PuffinDirWriter {
     pub fn new() -> Self {
         PuffinDirWriter {
