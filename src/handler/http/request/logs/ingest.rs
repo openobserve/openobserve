@@ -114,7 +114,10 @@ pub async fn multi(
                 _ => MetaHttpResponse::json(v),
             },
             Err(e) => {
-                log::error!("Error processing request {org_id}/{stream_name}: {:?}", e);
+                log::error!(
+                    "Error processing request {org_id}/{stream_name}/_multi: {:?}",
+                    e
+                );
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
@@ -167,7 +170,10 @@ pub async fn json(
                 _ => MetaHttpResponse::json(v),
             },
             Err(e) => {
-                log::error!("Error processing request {org_id}/{stream_name}: {:?}", e);
+                log::error!(
+                    "Error processing request {org_id}/{stream_name}/_json: {:?}",
+                    e
+                );
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
@@ -258,7 +264,10 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!("Error processing request {org_id}/{stream_name}: {:?}", e);
+                log::error!(
+                    "Error processing request {org_id}/{stream_name}/_gcp: {:?}",
+                    e
+                );
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
