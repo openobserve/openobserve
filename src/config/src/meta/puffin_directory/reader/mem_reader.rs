@@ -1,5 +1,20 @@
+// Copyright 2024 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::{
-    io::{self},
+    io,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
@@ -114,10 +129,9 @@ where
                     Some(ext) => ext,
                     None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 };
-                if let Ok(blob) = get_file_from_empty_puffin_dir_with_ext(ext) {
-                    Ok(Arc::new(PuffinSliceHandle { blob }))
-                } else {
-                    Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))
+                match get_file_from_empty_puffin_dir_with_ext(ext) {
+                    Ok(blob) => Ok(Arc::new(PuffinSliceHandle { blob })),
+                    Err(_) => Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 }
             }
         }
@@ -146,10 +160,9 @@ where
                     Some(ext) => ext,
                     None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 };
-                if let Ok(blob) = get_file_from_empty_puffin_dir_with_ext(ext) {
-                    Ok(blob.to_vec())
-                } else {
-                    Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))
+                match get_file_from_empty_puffin_dir_with_ext(ext) {
+                    Ok(blob) => Ok(blob.to_vec()),
+                    Err(_) => Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 }
             }
         }

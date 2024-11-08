@@ -15,7 +15,6 @@
 
 use std::{cmp::max, fmt::Display};
 
-use byteorder::{ByteOrder, LittleEndian};
 use chrono::Duration;
 use hashbrown::HashMap;
 use proto::cluster_rpc;
@@ -206,54 +205,13 @@ pub struct FileMeta {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub index_size: i64,
     pub flattened: bool,
-    pub index_file_size: i64,
 }
 
 impl FileMeta {
     pub fn is_empty(&self) -> bool {
         self.records == 0 && self.original_size == 0
-    }
-}
-
-impl From<&FileMeta> for Vec<u8> {
-    fn from(value: &FileMeta) -> Vec<u8> {
-        let mut bytes = [0; 48];
-        LittleEndian::write_i64(&mut bytes[0..8], value.min_ts);
-        LittleEndian::write_i64(&mut bytes[8..16], value.max_ts);
-        LittleEndian::write_i64(&mut bytes[16..24], value.records);
-        LittleEndian::write_i64(&mut bytes[24..32], value.original_size);
-        LittleEndian::write_i64(&mut bytes[32..40], value.compressed_size);
-        LittleEndian::write_i64(&mut bytes[40..48], value.index_file_size);
-        bytes.to_vec()
-    }
-}
-
-impl TryFrom<&[u8]> for FileMeta {
-    type Error = std::io::Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < 40 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid FileMeta",
-            ));
-        }
-        let min_ts = LittleEndian::read_i64(&value[0..8]);
-        let max_ts = LittleEndian::read_i64(&value[8..16]);
-        let records = LittleEndian::read_i64(&value[16..24]);
-        let original_size = LittleEndian::read_i64(&value[24..32]);
-        let compressed_size = LittleEndian::read_i64(&value[32..40]);
-        let index_size = LittleEndian::read_i64(&value[40..48]);
-        Ok(Self {
-            min_ts,
-            max_ts,
-            records,
-            original_size,
-            compressed_size,
-            flattened: false,
-            index_file_size: index_size,
-        })
     }
 }
 
@@ -358,7 +316,7 @@ impl StreamStats {
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
         self.storage_size += meta.original_size;
         self.compressed_size += meta.compressed_size;
-        self.index_size += meta.index_file_size;
+        self.index_size += meta.index_size;
         if self.doc_time_min == 0 {
             self.doc_time_min = meta.min_ts;
         }
@@ -432,7 +390,7 @@ impl std::ops::Sub<FileMeta> for StreamStats {
             doc_time_max: self.doc_time_max.max(rhs.max_ts),
             storage_size: self.storage_size - rhs.original_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
-            index_size: self.index_size - rhs.index_file_size,
+            index_size: self.index_size - rhs.index_size,
         };
         if ret.doc_time_min == 0 {
             ret.doc_time_min = rhs.min_ts;
@@ -449,7 +407,7 @@ impl From<&FileMeta> for cluster_rpc::FileMeta {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
-            index_file_size: req.index_file_size,
+            index_size: req.index_size,
         }
     }
 }
@@ -463,7 +421,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             original_size: req.original_size,
             compressed_size: req.compressed_size,
             flattened: false,
-            index_file_size: req.index_file_size,
+            index_size: req.index_size,
         }
     }
 }
@@ -971,7 +929,7 @@ mod tests {
             original_size: 10,
             compressed_size: 1,
             flattened: false,
-            index_file_size: 0, // Assuming 0 as a placeholder value
+            index_size: 0,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);

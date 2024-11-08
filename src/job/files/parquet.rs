@@ -637,7 +637,7 @@ async fn merge_files(
         original_size: new_file_size,
         compressed_size: 0,
         flattened: false,
-        index_file_size: 0,
+        index_size: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -1418,7 +1418,7 @@ pub(crate) async fn create_tantivy_index(
     if let Some(file_list) = file_list_to_invalidate {
         for old_parquet_file in file_list {
             // the parquet file has no index
-            if old_parquet_file.meta.index_file_size == 0 {
+            if old_parquet_file.meta.index_size == 0 {
                 continue;
             }
             // get directory of the parquet file
@@ -1460,7 +1460,7 @@ pub(crate) async fn create_tantivy_index(
     let puffin_bytes = dir.to_puffin_bytes()?;
 
     // Index size set here will be used to aggregate stream stats
-    parquet_file_meta.index_file_size = puffin_bytes.len() as i64;
+    parquet_file_meta.index_size = puffin_bytes.len() as i64;
 
     // write fst bytes into disk
     let Some(tantivy_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
@@ -1473,7 +1473,7 @@ pub(crate) async fn create_tantivy_index(
             log::info!(
                 "{} Written tantivy index file successfully with size {}",
                 caller,
-                parquet_file_meta.index_file_size,
+                parquet_file_meta.index_size,
             );
         }
         Err(e) => {

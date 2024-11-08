@@ -482,9 +482,9 @@ pub struct FileRecord {
     pub original_size: i64,
     pub compressed_size: i64,
     #[sqlx(default)]
-    pub flattened: bool,
-    #[sqlx(default)]
     pub index_size: i64,
+    #[sqlx(default)]
+    pub flattened: bool,
 }
 
 impl From<&FileRecord> for FileMeta {
@@ -495,8 +495,8 @@ impl From<&FileRecord> for FileMeta {
             records: record.records,
             original_size: record.original_size,
             compressed_size: record.compressed_size,
+            index_size: record.index_size,
             flattened: record.flattened,
-            index_file_size: record.index_size,
         }
     }
 }

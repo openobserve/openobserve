@@ -16,6 +16,7 @@ arc-swap.workspace = true
 arrow.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
+async-trait.workspace = true
 async-recursion.workspace = true
 async-walkdir.workspace = true
 aws-config.workspace = true
@@ -64,6 +65,7 @@ svix-ksuid.workspace = true
 sysinfo.workspace = true
 tantivy.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 tracing.workspace = true
 tracing-log.workspace = true
 tracing-subscriber.workspace = true
@@ -71,13 +73,3 @@ urlencoding.workspace = true
 utoipa.workspace = true
 vrl.workspace = true
 zstd.workspace = true
-tokio-util = { version = "0.7.12", features = ["compat"] }
-async-trait = "0.1.83"
-
-[dev-dependencies]
-criterion.workspace = true
-pprof = { version = "0.13", features = ["criterion", "flamegraph"] }
-
-[[bench]]
-name = "test_puffin"
-harness = false

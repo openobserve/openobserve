@@ -118,8 +118,7 @@ pub async fn search(
     // check inverted index
     let cfg = get_config();
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let use_inverted_index = query.use_inverted_index
-        && (inverted_index_type == "both" || inverted_index_type == "tantivy");
+    let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
     log::info!(
         "[trace_id {}] flight->search: use_inverted_index with fst format {}",
         query.trace_id,

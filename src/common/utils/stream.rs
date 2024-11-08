@@ -179,7 +179,7 @@ mod tests {
             original_size: 1000,
             compressed_size: 700,
             flattened: false,
-            index_file_size: 0,
+            index_size: 0,
         };
         populate_file_meta(&[&batch], &mut file_meta, None, None)
             .await
@@ -216,7 +216,7 @@ mod tests {
             original_size: 1000,
             compressed_size: 700,
             flattened: false,
-            index_file_size: 0,
+            index_size: 0,
         };
         populate_file_meta(&[&batch], &mut file_meta, Some("time"), Some("time"))
             .await

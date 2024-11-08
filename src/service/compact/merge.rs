@@ -663,7 +663,7 @@ pub async fn merge_files(
         original_size: new_file_size,
         compressed_size: 0,
         flattened: false,
-        index_file_size: 0,
+        index_size: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));

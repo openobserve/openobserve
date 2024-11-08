@@ -229,7 +229,7 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -279,7 +279,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list;"#,
+            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened FROM file_list;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -315,7 +315,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -329,7 +329,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
@@ -1042,7 +1042,7 @@ impl SqliteFileList {
         let client = client.lock().await;
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size)
+INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
         "#).as_str(),
     )
@@ -1057,8 +1057,8 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
         .bind(meta.records)
         .bind(meta.original_size)
         .bind(meta.compressed_size)
+        .bind(meta.index_size)
         .bind(meta.flattened)
-        .bind(meta.index_file_size)
         .execute(&*client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -1090,7 +1090,7 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
             let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened, index_size)").as_str(),
+                format!("INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
             );
             query_builder.push_values(files, |mut b, (id, item)| {
                 let (stream_key, date_key, file_name) =
@@ -1107,8 +1107,8 @@ INSERT INTO {table} (id, org, stream, date, file, deleted, min_ts, max_ts, recor
                     .push_bind(item.meta.records)
                     .push_bind(item.meta.original_size)
                     .push_bind(item.meta.compressed_size)
-                    .push_bind(item.meta.flattened)
-                    .push_bind(item.meta.index_file_size);
+                    .push_bind(item.meta.index_size)
+                    .push_bind(item.meta.flattened);
             });
             let need_single_insert = match query_builder.build().execute(&mut *tx).await {
                 Ok(_) => false,
@@ -1174,7 +1174,7 @@ CREATE TABLE IF NOT EXISTS file_list
     records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size BIGINT not null
+    index_size      BIGINT not null
 );
         "#,
     )
@@ -1197,7 +1197,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size BIGINT not null
+    index_size      BIGINT not null
 );
         "#,
     )
@@ -1252,19 +1252,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
     records  BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size BIGINT not null
+    index_size      BIGINT not null
 );
         "#,
     )
     .execute(&*client)
     .await?;
-
-    // create column flattened for old version <= 0.10.5
-    let column = "index_size";
-    let data_type = "BIGINT default 0 not null";
-    add_column(&client, "file_list", column, data_type).await?;
-    add_column(&client, "stream_stats", column, data_type).await?;
-    add_column(&client, "file_list_history", column, data_type).await?;
 
     // create column flattened for old version <= 0.10.5
     let column = "flattened";
@@ -1277,6 +1270,13 @@ CREATE TABLE IF NOT EXISTS stream_stats
     let column = "started_at";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list_jobs", column, data_type).await?;
+
+    // create column index_size for old version <= 0.13.1
+    let column = "index_size";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+    add_column(&client, "stream_stats", column, data_type).await?;
 
     Ok(())
 }
