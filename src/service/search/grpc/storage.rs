@@ -688,10 +688,7 @@ fn search_tantivy_index_with_field(
         )])),
     };
 
-    let docs = tantivy_searcher
-        .search(&query, &tantivy::collector::DocSetCollector)
-        .unwrap();
-
+    let docs = tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)?;
     for doc in docs {
         max_doc_id = cmp::max(doc.doc_id, max_doc_id);
         matched_docs.insert(doc);
