@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { scaleLinear } from "d3-scale";
+import { isNumber } from "lodash-es";
 
 export enum ColorModeWithoutMinMax {
   PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
@@ -237,16 +238,17 @@ interface SQLData {
 
 export const getSQLMinMaxValue = (
   yaxiskeys: string[],
-  searchQueryData: SQLData[][],
+  searchQueryData: SQLData[],
 ): [number, number] => {
   // need min and max value for color
   let min = Infinity;
   let max = -Infinity;
 
-  searchQueryData[0]?.forEach((data: SQLData) => {
+  searchQueryData?.forEach((data: SQLData) => {
     yaxiskeys?.forEach((key: string) => {
       if (
         data[key] !== undefined &&
+        isNumber(data[key]) &&
         !Number.isNaN(data[key]) &&
         data[key] !== null
       ) {
@@ -281,18 +283,42 @@ const getSeriesHash = (seriesName: string) => {
 type SeriesBy = "last" | "min" | "max";
 
 const getSeriesValueBasedOnSeriesBy = (
-  values: number[],
+  values: any[],
   seriesBy: SeriesBy,
-): number => {
-  switch (seriesBy) {
-    case "last":
-      return values[values.length - 1];
-    case "min":
-      return Math.min(...values);
-    case "max":
-      return Math.max(...values);
-    default:
-      return values[values.length - 1];
+): number | null => {
+  try {
+    switch (seriesBy) {
+      case "last":
+        for (let i = values.length - 1; i >= 0; i--) {
+          if (
+            !Number.isNaN(values[i]) &&
+            isNumber(values[i]) &&
+            values[i] != null &&
+            values[i] != ""
+          ) {
+            return +values[i];
+          }
+        }
+        return null;
+      case "min":
+        return Math.min(...values) ?? null;
+      case "max":
+        return Math.max(...values) ?? null;
+      default:
+        for (let i = values.length - 1; i >= 0; i--) {
+          if (
+            !Number.isNaN(values[i]) &&
+            isNumber(values[i]) &&
+            values[i] != null &&
+            values[i] != ""
+          ) {
+            return +values[i];
+          }
+        }
+        return null;
+    }
+  } catch (error) {
+    return null;
   }
 };
 
@@ -347,7 +373,7 @@ export const getSeriesColor = (
   } else if (colorCfg.mode === "shades") {
     return shadeColor(
       colorCfg?.fixedColor?.[0] ?? "#53ca53",
-      getSeriesValueBasedOnSeriesBy(value, "last"),
+      getSeriesValueBasedOnSeriesBy(value, "last") ?? chartMin,
       chartMin,
       chartMax,
     );
@@ -365,7 +391,8 @@ export const getSeriesColor = (
       colorCfg?.fixedColor?.length ? colorCfg.fixedColor : palette,
     );
     return d3ColorObj(
-      getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last"),
+      getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
+        chartMin,
     );
   }
 };
