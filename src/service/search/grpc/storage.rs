@@ -665,7 +665,7 @@ fn search_tantivy_index_with_field(
     query_parser: QueryParser,
     field: tantivy::schema::Field,
     tantivy_searcher: tantivy::Searcher,
-    fts_terms: &Vec<String>,
+    fts_terms: &[String],
 ) -> anyhow::Result<(HashSet<tantivy::DocAddress>, u32)> {
     let cfg = get_config();
     let mut max_doc_id = 0;
@@ -705,7 +705,7 @@ pub async fn get_tantivy_directory(
     trace_id: &str,
     file_name: &str,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    let index_file_bytes = fetch_file(trace_id, &file_name).await?;
+    let index_file_bytes = fetch_file(trace_id, file_name).await?;
     let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
     Ok(Box::new(puffin_dir))
 }
@@ -760,7 +760,7 @@ async fn search_tantivy_index(
                 query_parser,
                 fts_field,
                 tantivy_searcher_clone,
-                &*fts_terms,
+                &fts_terms,
             )
         })
         .await?
@@ -775,7 +775,7 @@ async fn search_tantivy_index(
         };
     }
     for (field_name, terms) in index_terms.iter() {
-        let field = tantivy_schema.get_field(&field_name).unwrap();
+        let field = tantivy_schema.get_field(field_name).unwrap();
         let query_parser = QueryParser::for_index(&tantivy_index, vec![field]);
         let tantivy_searcher_clone = tantivy_searcher.clone();
         let terms = terms.clone();
@@ -826,11 +826,11 @@ async fn search_tantivy_index(
             elapsed_tantivy_searcher.as_secs(),
             elapsed_tantivy_searcher.as_millis(),
         );
-        return Ok((parquet_file_name.to_string(), Some(res)));
+        Ok((parquet_file_name.to_string(), Some(res)))
     } else {
-        return Err(anyhow::anyhow!(
+        Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
-        ));
+        ))
     }
 }
 
