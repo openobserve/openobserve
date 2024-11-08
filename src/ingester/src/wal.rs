@@ -205,6 +205,11 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             wal_file.to_owned(),
             Arc::new(immutable::Immutable::new(idx, key, memtable)),
         );
+
+        // to avoid the memory OOM, sleep for a while after reply one wal file
+        if immutable::len().await > 2 {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
     }
 
     Ok(())

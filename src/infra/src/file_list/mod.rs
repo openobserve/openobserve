@@ -149,7 +149,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream: &str,
         offset: i64,
-    ) -> Result<()>;
+    ) -> Result<i64>;
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
@@ -383,7 +383,7 @@ pub async fn add_job(
     stream_type: StreamType,
     stream: &str,
     offset: i64,
-) -> Result<()> {
+) -> Result<i64> {
     CLIENT.add_job(org_id, stream_type, stream, offset).await
 }
 

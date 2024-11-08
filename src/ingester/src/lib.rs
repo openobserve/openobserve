@@ -46,7 +46,11 @@ pub async fn init() -> errors::Result<()> {
     wal::check_uncompleted_parquet_files().await?;
 
     // replay wal files to create immutable
-    wal::replay_wal_files().await?;
+    tokio::task::spawn(async move {
+        if let Err(e) = wal::replay_wal_files().await {
+            log::error!("replay wal files error: {}", e);
+        }
+    });
 
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
