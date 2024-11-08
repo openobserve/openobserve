@@ -857,10 +857,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
     #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 0)]
     pub udschema_max_fields: usize,
@@ -1493,13 +1493,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_on_disk = 128 * 1024 * 1024; // 128MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_in_memory = 128 * 1024 * 1024; // 128MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
