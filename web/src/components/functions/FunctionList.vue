@@ -398,7 +398,7 @@ export default defineComponent({
     };
 
     const transformedPipelineList = computed(() => {
-      return pipelineList.value.map(pipeline => ({
+      return pipelineList.value.map((pipeline:any) => ({
         label: pipeline.name,
         value: pipeline.id
       }));
