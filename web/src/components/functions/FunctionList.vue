@@ -133,18 +133,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
-    <ConfirmDialog
-      title="Delete Function"
-      message="Confirming this action will delete the transform and all its associated Pipelines. Are you sure you want to delete this transform?"
-      @update:ok="forceDeleteFn"
-      @update:cancel="confirmForceDelete = false"
-      v-model="confirmForceDelete"
-    />
+    <q-dialog v-model="confirmForceDelete"  persistent>
+  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
+    <q-card-section class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
+      <div>Pipelines Associated with  <strong> {{ selectedDelete.name}}</strong> </div>
+          <div
+          data-test="close-dialog-associated-pipelines-btn"
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="closeDialog"
+        >
+          <q-icon name="close" size="14px" />
+        </div>
+    </q-card-section>
+    <q-card-section>
+  <div class="pipeline-list-container">
+    <q-list class="scrollable-list">
+    <q-item
+      v-for="(pipeline, index) in transformedPipelineList"
+      :key="pipeline.value"
+      clickable
+      @click="onPipelineSelect(pipeline)"
+    >
+      <q-item-section>
+        {{ index + 1 }}. {{ pipeline.label }}
+      </q-item-section>
+    </q-item>
+  </q-list>
+  </div>
+    </q-card-section>
+
+  </q-card>
+</q-dialog>
+
+
+
+
   </q-page>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref } from "vue";
+import { defineAsyncComponent, defineComponent, ref,computed,watch,onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -186,6 +221,63 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
+    const pipelineList = ref([
+"Pipeline Alpha",
+  "Pipeline Beta",
+  "Pipeline Gamma",
+  "Pipeline Delta",
+  "Pipeline Epsilon",
+  "Pipeline Zeta",
+  "Pipeline Eta",
+  "Pipeline Theta",
+  "Pipeline Iota",
+  "Pipeline Kappa",
+  "Pipeline Lambda",
+  "Pipeline Mu",
+  "Pipeline Nu",
+  "Pipeline Xi",
+  "Pipeline Omicron",
+  "Pipeline Pi",
+  "Pipeline Rho",
+  "Pipeline Sigma",
+  "Pipeline Tau",
+  "Pipeline Upsilon",
+  "Pipeline Phi",
+  "Pipeline Chi",
+  "Pipeline Psi",
+  "Pipeline Omega",
+  "Pipeline One",
+  "Pipeline Two",
+  "Pipeline Three",
+  "Pipeline Four",
+  "Pipeline Five",
+  "Pipeline Six",
+  "Pipeline Seven",
+  "Pipeline Eight",
+  "Pipeline Nine",
+  "Pipeline Ten",
+  "Pipeline Eleven",
+  "Pipeline Twelve",
+  "Pipeline Thirteen",
+  "Pipeline Fourteen",
+  "Pipeline Fifteen",
+  "Pipeline Sixteen",
+  "Pipeline Seventeen",
+  "Pipeline Eighteen",
+  "Pipeline Nineteen",
+  "Pipeline Twenty",
+  "Pipeline Twenty-One",
+  "Pipeline Twenty-Two",
+  "Pipeline Twenty-Three",
+  "Pipeline Twenty-Four",
+  "Pipeline Twenty-Five",
+  "Pipeline Twenty-Six",
+  "Pipeline Twenty-Seven",
+  "Pipeline Twenty-Eight",
+  "Pipeline Twenty-Nine",
+  "Pipeline Thirty"
+]);
+    const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -209,11 +301,27 @@ export default defineComponent({
       },
     ]);
 
+     const onPipelineSelect = (pipeline:any) =>{
+
+      const routeUrl = router.resolve({
+        name: "pipelineEditor",
+        query: {
+          id: pipeline.value,
+          name: pipeline.label,
+        },
+      }).href;
+
+      window.open(routeUrl, '_blank');
+
+      }
+
     const getJSTransforms = () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading functions...",
       });
+
+
 
       jsTransformService
         .list(
@@ -302,6 +410,14 @@ export default defineComponent({
       showAddJSTransformDialog.value = true;
     };
 
+    const transformedPipelineList = computed(() => {
+      return pipelineList.value.map(pipeline => ({
+        label: pipeline.name,
+        value: pipeline.id
+      }));
+    });
+
+
     const showAddUpdateFn = (props: any) => {
       formData.value = props.row;
       let action;
@@ -384,14 +500,14 @@ export default defineComponent({
           if(err.response.data.code == 409){
             $q.notify({
                 type: "negative",
-                message: "Function is being used in Pipeline. If you still want to delete this function, click on Force Remove.",
-                timeout: 4000,
+                message: "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+                timeout: 10000,
                 actions: [
                   {
-                    label: "Force Remove",
+                    label: "View",
                     color: "white",
                     handler: () => {
-                      forceRemoveFunction();
+                      forceRemoveFunction(err.response.data["message"]);
                     }
                   }
                 ]
@@ -421,39 +537,23 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
-    const forceRemoveFunction = () =>{
+    const forceRemoveFunction = (message : any) =>{
+      const match = message.match(/\[([^\]]+)\]/);
+      if (match) {
+        // Convert the matched string to an array of pipeline names
+        pipelineList.value = JSON.parse(match[0].replace(/'/g, '"'));
+      }
+     
+
       confirmForceDelete.value = true;
     }
 
+    const closeDialog = () =>{
+      confirmForceDelete.value = false;
+    }
+
     const forceDeleteFn = () =>{
-      jsTransformService
-        .delete(
-          store.state.selectedOrganization.identifier,
-          selectedDelete.value.name,
-          true
-        ).then((res: any) => {
-          if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
-              message: res.data.message,
-              timeout: 2000,
-            });
-            getJSTransforms();
-          } else {
-            $q.notify({
-              type: "negative",
-              message: res.data.message,
-              timeout: 2000,
-            });
-          }
-        }).catch((err) => {
-          $q.notify({
-            type: "negative",
-            message:
-              JSON.stringify(err.response.data["message"]) ||
-              "Function deletion failed.",
-          });
-        });
+
     }
 
     return {
@@ -485,6 +585,11 @@ export default defineComponent({
       outlinedDelete,
       forceDeleteFn,
       confirmForceDelete,
+      pipelineList,
+      selectedPipeline,
+      closeDialog,
+      onPipelineSelect,
+      transformedPipelineList,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -506,6 +611,8 @@ export default defineComponent({
     // },
   },
   watch: {
+
+
     // selectedOrg(newVal: any, oldVal: any) {
     //   this.verifyOrganizationStatus(
     //     this.store.state.organizations,
@@ -531,4 +638,32 @@ export default defineComponent({
     justify-content: flex-end;
   }
 }
+.pipeline-list-container {
+  max-height: 200px; /* Adjust based on item height to fit 5 items */
+  overflow-y: auto;
+}
+.dialog-heading{
+  border-bottom: 1px solid $border-color;
+
+}
+
+
+.scrollable-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollable-list::-webkit-scrollbar-thumb {
+  background-color: #888; /* Desired thumb color */
+  border-radius: 4px;
+}
+
+.scrollable-list::-webkit-scrollbar-thumb:hover {
+  background-color: blue; /* Darker shade on hover */
+
+}
+
+.scrollable-list::-webkit-scrollbar-track {
+  background-color: blue; /* Track color */
+}
+
 </style>

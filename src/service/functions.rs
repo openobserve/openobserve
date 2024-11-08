@@ -202,19 +202,31 @@ pub async fn delete_function(
                         _ => {}
                     }
                 }
-            } else {
+            } 
+            else {
+                let pipeline_info: Vec<_> = pipelines
+                    .iter()
+                    .map(|pl| {
+                        serde_json::json!({
+                            "id": pl.id,
+                            "name": pl.name
+                        })
+                    })
+                    .collect();
+            
+                let pipeline_data = serde_json::to_string(&pipeline_info).unwrap_or_else(|_| "[]".to_string());
+            
                 return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
                     http::StatusCode::CONFLICT.into(),
                     format!(
-                        "Warning: Function '{}' has {} pipeline dependencies, \
-                        including: {:?} \
-                        Please remove these pipelines first.",
+                        "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
                         fn_name,
                         pipelines.len(),
-                        pipelines.iter().map(|pl| &pl.name).collect::<Vec<_>>()
+                        pipeline_data
                     ),
                 )));
             }
+            
         }
     }
     let result = db::functions::delete(&org_id, &fn_name).await;
