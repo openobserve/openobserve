@@ -14,8 +14,8 @@ use tantivy::{
 use crate::{
     get_config,
     meta::{
-        puffin::writer::PuffinBytesWriter,
-        puffin_directory::{ALLOWED_FILE_EXT, META_JSON, TANTIVY_INDEX_VERSION},
+        puffin::{writer::PuffinBytesWriter, BlobTypes},
+        puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
     },
 };
 /// Puffin directory is a puffin file which contains all the tantivy files.
@@ -132,7 +132,7 @@ impl PuffinDirWriter {
                         .read_bytes()
                         .expect("failed to read file")
                         .to_vec(),
-                    TANTIVY_INDEX_VERSION.to_string(),
+                    BlobTypes::O2TtvV1,
                     path.to_str().unwrap().to_owned(),
                     false,
                 )

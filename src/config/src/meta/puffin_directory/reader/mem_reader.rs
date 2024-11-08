@@ -35,16 +35,17 @@ where
         let puffin_meta = puffin_reader
             .get_metadata()
             .await
-            .context("Failed to get blobs meta")?;
+            .context("Failed to get blobs meta")?
+            .ok_or_else(|| anyhow::anyhow!("Corrupted tantivy index file without blob tag"))?;
 
         let mut blob_meta_map = HashMap::new();
 
-        for blob_meta in puffin_meta.blob_metadata {
+        for blob in puffin_meta.blobs {
             // Fetch the files names from the blob_meta itself
-            if let Some(file_name) = blob_meta.properties.get("file_name") {
+            if let Some(file_name) = blob.properties.get("blob_tag") {
                 let path = PathBuf::from(file_name);
-                let blob = puffin_reader.read_blob_bytes(&blob_meta).await?;
-                blob_meta_map.insert(path, OwnedBytes::new(blob));
+                let blob_bytes = puffin_reader.read_blob_bytes(&blob).await?;
+                blob_meta_map.insert(path, OwnedBytes::new(blob_bytes));
             }
         }
 

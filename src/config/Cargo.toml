@@ -81,10 +81,3 @@ pprof = { version = "0.13", features = ["criterion", "flamegraph"] }
 [[bench]]
 name = "test_puffin"
 harness = false
-
-[[bin]]
-name = "profile_puffin"
-path = "benches/profile_puffin.rs"
-
-[profile.dev]
-debug = true

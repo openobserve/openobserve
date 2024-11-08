@@ -13,10 +13,6 @@ use crate::get_config;
 pub mod reader;
 pub mod writer;
 
-// This is an identifier for tantivy blobs inside puffin file.
-// Note: Tantivy blobs are not compressed.
-const TANTIVY_INDEX_VERSION: &str = "TIIv0.1.0";
-
 // We do not need all of the tantivy files, only the .term and .idx files
 // for getting doc IDs and also the meta.json file
 // This might change in the future when we add more features to the index

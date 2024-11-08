@@ -100,6 +100,8 @@ pub enum BlobTypes {
     #[default]
     #[serde(rename = "o2-fst-v1")]
     O2FstV1,
+    #[serde(rename = "o2-ttv-v1")]
+    O2TtvV1,
 }
 
 #[derive(Default)]
