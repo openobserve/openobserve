@@ -259,7 +259,7 @@ async fn get_inverted_index_file_lists(
         req.inverted_index_type.as_ref().unwrap().to_string()
     };
     let use_inverted_index = req.use_inverted_index
-        && (inverted_index_type == "parquet" || inverted_index_type == "all");
+        && (inverted_index_type == "parquet" || inverted_index_type == "both");
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
         use_inverted_index

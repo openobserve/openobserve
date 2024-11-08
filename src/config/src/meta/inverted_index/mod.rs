@@ -54,10 +54,10 @@ const fn default_min_len() -> usize {
     usize::MAX
 }
 
-/// Currently supports two InvertedIndexFormat
-/// Parquet -> v2
-/// Tantivy     -> v3
-/// BOTH    -> use both
+/// Supported inverted index formats:
+///  - Parquet (v2): Index is stored in parquet format
+///  - Tantivy (v3): Index is stored in custom puffin format files
+///  - both: Use both Parquet and Tantivy. Note that this will generate two inverted index files.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum InvertedIndexFormat {
     #[default]

@@ -18,7 +18,9 @@ fn benchmark_puffin(c: &mut Criterion) {
     group.bench_function("test_mem_dir_reader", |b| {
         b.to_async(&runtime).iter(|| async {
             let mut data = Vec::<u8>::new();
-            let mut file = File::open("/Users/uddhav/Projects/openobserve/data/openobserve/stream/files/default/index/default22_logs/2024/10/23/07/7254744283947730080.ttv").unwrap();
+            let path = std::env::var("BENCH_INDEX_PATH")
+                .expect("BENCH_INDEX_PATH environment variable must be set");
+            let mut file = File::open(&path).unwrap();
             let _ = file.read_to_end(&mut data);
             tokio::task::block_in_place(|| async {
                 let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(black_box(data)))

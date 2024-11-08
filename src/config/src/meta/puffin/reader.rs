@@ -51,7 +51,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
 
         let decompressed = match blob_metadata.compression_codec {
             Some(CompressionCodec::Lz4) => {
-                unimplemented!()
+                return Err(anyhow!("Lz4 compression is not supported"));
             }
             Some(CompressionCodec::Zstd) => {
                 let mut decompressed = Vec::new();

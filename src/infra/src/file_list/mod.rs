@@ -483,6 +483,7 @@ pub struct FileRecord {
     pub compressed_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
+    #[sqlx(default)]
     pub index_size: i64,
 }
 

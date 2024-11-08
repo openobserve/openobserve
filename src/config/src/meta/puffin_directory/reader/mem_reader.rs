@@ -110,7 +110,10 @@ where
                 Ok(Arc::new(file_handle))
             }
             None => {
-                let ext = path.extension().unwrap().to_str().unwrap();
+                let ext = match path.extension().and_then(|ext| ext.to_str()) {
+                    Some(ext) => ext,
+                    None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
+                };
                 if let Some(blob) = get_file_from_empty_puffin_dir_with_ext(ext).ok() {
                     Ok(Arc::new(PuffinSliceHandle { blob }))
                 } else {
@@ -124,7 +127,10 @@ where
         let exists = self.blob_metadata_map.read().unwrap().contains_key(path);
 
         if !exists {
-            let ext = path.extension().unwrap().to_str().unwrap();
+            let ext = match path.extension().and_then(|ext| ext.to_str()) {
+                Some(ext) => ext,
+                None => return Ok(false),
+            };
             let dir_path = format!("{}.{}", &EMPTY_PUFFIN_SEG_ID.as_str(), ext);
             return EMPTY_PUFFIN_DIRECTORY.exists(&PathBuf::from(dir_path));
         }
@@ -136,7 +142,10 @@ where
         match self.blob_metadata_map.read().unwrap().get(path) {
             Some(blob) => Ok(blob.to_vec()),
             None => {
-                let ext = path.extension().unwrap().to_str().unwrap();
+                let ext = match path.extension().and_then(|ext| ext.to_str()) {
+                    Some(ext) => ext,
+                    None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
+                };
                 if let Some(blob) = get_file_from_empty_puffin_dir_with_ext(ext).ok() {
                     Ok(blob.to_vec())
                 } else {

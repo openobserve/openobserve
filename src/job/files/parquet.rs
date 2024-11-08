@@ -1578,11 +1578,17 @@ pub(crate) async fn generate_tantivy_index<D: Directory>(
         .context("failed to create index builder")?;
 
     for (_, doc) in docs.into_iter() {
-        index_writer.add_document(doc).unwrap();
+        if let Err(e) = index_writer.add_document(doc) {
+            log::error!("Failed to add document to index: {}", e);
+            return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
+        }
     }
 
-    let tantivy_index = index_writer.finalize().unwrap();
-    Ok(tantivy_index)
+    let tantivy_index_res = index_writer.finalize().map_err(|e| {
+        log::error!("Failed to finalize the index writer: {}", e);
+        anyhow::anyhow!("Failed to finalize the index writer: {}", e)
+    });
+    tantivy_index_res
 }
 
 /// Create and compressed inverted index bytes using FST solution for the given RecordBatch

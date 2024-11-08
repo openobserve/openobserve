@@ -29,9 +29,11 @@ static EMPTY_PUFFIN_DIRECTORY: LazyLock<PuffinDirWriter> = LazyLock::new(|| {
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(schema)
         .single_segment_index_writer(puffin_dir_clone, 50_000_000)
-        .unwrap();
+        .expect("Failed to create index writer for EMPTY_PUFFIN_DIRECTORY");
     let _ = index_writer.add_document(doc!());
-    index_writer.finalize().unwrap();
+    index_writer
+        .finalize()
+        .expect("Failed to finalize index writer for EMPTY_PUFFIN_DIRECTORY");
     puffin_dir
 });
 
@@ -61,10 +63,12 @@ pub fn get_file_from_empty_puffin_dir_with_ext(file_ext: &str) -> Result<OwnedBy
 pub fn convert_puffin_dir_to_tantivy_dir(
     mut puffin_dir_path: PathBuf,
     puffin_dir: PuffinDirWriter,
-) {
+) -> Result<()> {
     // create directory
     let cfg = get_config();
-    let file_name = puffin_dir_path.file_name().unwrap();
+    let file_name = puffin_dir_path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get file name from path"))?;
     let mut file_name = file_name.to_os_string();
     file_name.push(".folder");
     puffin_dir_path.set_file_name(file_name);
@@ -73,28 +77,27 @@ pub fn convert_puffin_dir_to_tantivy_dir(
 
     // Check if the folder already exists
     if !tantivy_folder_path.exists() {
-        std::fs::create_dir_all(&tantivy_folder_path).unwrap();
+        std::fs::create_dir_all(&tantivy_folder_path)?;
         log::info!(
             "Created folder for index at {}",
-            tantivy_folder_path.to_str().unwrap()
+            tantivy_folder_path.to_str().unwrap_or("<invalid path>")
         );
     } else {
         log::warn!(
             "Folder already exists for index at {}",
-            tantivy_folder_path.to_str().unwrap()
+            tantivy_folder_path.to_str().unwrap_or("<invalid path>")
         );
     }
 
     for file in puffin_dir.list_files() {
-        let file_data = puffin_dir.open_read(&PathBuf::from(file.clone())).unwrap();
+        let file_data = puffin_dir.open_read(&PathBuf::from(file.clone()))?;
         let mut file_handle = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
-            .open(tantivy_folder_path.join(&file))
-            .unwrap();
-        file_handle
-            .write_all(&file_data.read_bytes().unwrap())
-            .unwrap();
-        file_handle.flush().unwrap();
+            .open(tantivy_folder_path.join(&file))?;
+        file_handle.write_all(&file_data.read_bytes()?)?;
+        file_handle.flush()?;
     }
+
+    Ok(())
 }

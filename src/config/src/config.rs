@@ -734,7 +734,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
         default = "parquet",
-        help = "InvertedIndex search format. Can only be configured when store format is all. Otherwise, it's set by store format"
+        help = "InvertedIndex search format. Can only be configured when store format is both. Otherwise, it's set by store format"
     )]
     pub inverted_index_search_format: String,
     #[env_config(
