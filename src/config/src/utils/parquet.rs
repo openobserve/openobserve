@@ -124,7 +124,7 @@ pub async fn get_recordbatch_reader_from_bytes(
     let schema_reader = Cursor::new(data.clone());
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
     let schema = arrow_reader.schema().clone();
-    let reader = arrow_reader.build()?;
+    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
     Ok((schema, reader))
 }
 
@@ -134,7 +134,7 @@ pub async fn get_recordbatch_reader_from_file(
     let file = tokio::fs::File::open(path).await?;
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
     let schema = arrow_reader.schema().clone();
-    let reader = arrow_reader.build()?;
+    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
     Ok((schema, reader))
 }
 

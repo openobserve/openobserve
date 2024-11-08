@@ -826,7 +826,13 @@ pub async fn merge_files(
             )
         })?;
         for (file_name, filemeta) in files {
-            log::info!("Created parquet index file during compaction {}", file_name);
+            if file_name.is_empty() {
+                continue;
+            }
+            log::info!(
+                "created parquet index file during compaction: {}",
+                file_name
+            );
             // Notify that we wrote the index file to the db.
             if let Err(e) = write_file_list(
                 org_id,
