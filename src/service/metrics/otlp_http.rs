@@ -23,8 +23,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
-        usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},

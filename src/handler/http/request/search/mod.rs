@@ -22,9 +22,9 @@ use config::{
     get_config,
     meta::{
         search::{SearchEventType, SearchHistoryHitResponse},
+        self_reporting::usage::{RequestStats, UsageType, USAGE_STREAM},
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType, USAGE_STREAM},
     },
     metrics,
     utils::{base64, json},

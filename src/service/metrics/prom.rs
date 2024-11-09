@@ -22,8 +22,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
+        self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
-        usage::UsageType,
     },
     metrics,
     utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},

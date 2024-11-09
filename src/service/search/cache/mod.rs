@@ -18,9 +18,9 @@ use config::{
     get_config,
     meta::{
         search::{self, ResponseTook},
+        self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query},

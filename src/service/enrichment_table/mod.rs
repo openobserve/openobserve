@@ -26,8 +26,8 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        self_reporting::usage::UsageType,
         stream::{PartitionTimeLevel, StreamType},
-        usage::UsageType,
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
     SIZE_IN_MB,

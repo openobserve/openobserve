@@ -13,17 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
-pub mod bitvec;
-pub mod cluster;
-pub mod folder;
-pub mod function;
-pub mod inverted_index;
-pub mod logger;
-pub mod meta_store;
-pub mod pipeline;
-pub mod search;
-pub mod self_reporting;
-pub mod short_url;
-pub mod sql;
-pub mod stream;
+use tokio::sync::{mpsc, oneshot};
+use usage::{TriggerData, UsageData};
+
+pub mod usage;
+
+#[derive(Debug)]
+pub struct ReportingQueue {
+    pub msg_sender: mpsc::Sender<ReportingMessage>,
+}
+
+#[derive(Debug)]
+pub enum ReportingMessage {
+    Usage(UsageData),
+    Trigger(TriggerData),
+    Error,
+    Shutdown(oneshot::Sender<()>),
+    Start(oneshot::Sender<()>),
+}

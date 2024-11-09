@@ -23,9 +23,9 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
+        self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, SqlOperator},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query},

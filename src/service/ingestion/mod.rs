@@ -27,10 +27,10 @@ use config::{
     meta::{
         alerts::alert::Alert,
         function::{VRLResultResolver, VRLRuntimeConfig},
+        self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
         stream::{
             PartitionTimeLevel, PartitioningDetails, StreamParams, StreamPartition, StreamType,
         },
-        usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},

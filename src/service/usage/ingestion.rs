@@ -18,7 +18,7 @@ use config::{
     get_config,
     meta::{
         cluster::get_internal_grpc_token,
-        usage::{
+        self_reporting::usage::{
             AggregatedData, GroupKey, TriggerData, UsageData, UsageEvent, TRIGGERS_USAGE_STREAM,
             USAGE_STREAM,
         },

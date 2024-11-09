@@ -17,8 +17,8 @@ use chrono::{DateTime, Datelike, Timelike};
 use config::{
     get_config,
     meta::{
+        self_reporting::usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
         stream::StreamType,
-        usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
     },
     metrics, SIZE_IN_MB,
 };

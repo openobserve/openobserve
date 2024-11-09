@@ -22,9 +22,9 @@ use config::{
     meta::{
         function::VRLResultResolver,
         search,
+        self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, json},

@@ -27,8 +27,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{

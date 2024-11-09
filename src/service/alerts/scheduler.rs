@@ -20,8 +20,8 @@ use config::{
     get_config,
     meta::{
         alerts::FrequencyType,
+        self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
         stream::{StreamParams, StreamType},
-        usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
     utils::{
         json,

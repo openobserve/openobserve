@@ -23,8 +23,8 @@ use config::{
     meta::{
         cluster::{get_internal_grpc_token, RoleGroup},
         search::ScanStats,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
-        usage::{RequestStats, UsageType},
     },
 };
 use futures::future::try_join_all;

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use config::{
     get_config,
-    meta::usage::{TriggerData, UsageData},
+    meta::self_reporting::usage::{TriggerData, UsageData},
 };
 use once_cell::sync::Lazy;
 use tokio::{

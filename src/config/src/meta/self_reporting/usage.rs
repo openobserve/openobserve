@@ -15,9 +15,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::search::{SearchEventContext, SearchEventType};
 use crate::{
-    meta::stream::{FileMeta, StreamType},
+    meta::{
+        search::{SearchEventContext, SearchEventType},
+        stream::{FileMeta, StreamType},
+    },
     SIZE_IN_MB,
 };
 
