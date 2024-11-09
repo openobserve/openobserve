@@ -120,7 +120,7 @@ pub async fn search(
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
     log::info!(
-        "[trace_id {}] flight->search: use_inverted_index with fst format {}",
+        "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
         query.trace_id,
         use_inverted_index
     );

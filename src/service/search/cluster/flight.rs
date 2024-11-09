@@ -775,10 +775,8 @@ async fn get_inverted_index_file_lists(
     let cfg = get_config();
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
-    let use_parquet_inverted_index =
-        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
-    let use_ttv_inverted_index =
-        use_inverted_index && (inverted_index_type == "tantivy" || inverted_index_type == "both");
+    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
+    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
     log::info!(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
         use_parquet_inverted_index
