@@ -501,7 +501,7 @@ pub struct MapView {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct Trellis {
-    pub layout: String,
+    pub layout: Option<String>,
     pub num_of_columns: i64,
 }
 
