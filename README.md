@@ -172,7 +172,7 @@ Error tracking
 
 ![Ingestion](./screenshots/ingestion1.png)
 
-![Ingestion](./screenshots/ingestion2.png)
+![Ingestion](./screenshots/ingestion2.webp)
 
 ### SBOM
 
