@@ -41,11 +41,11 @@ https://github.com/openobserve/openobserve/assets/4242188/77c71e8c-23f6-4123-b42
 - **Logs, Metrics, Traces**: Comprehensive support for various data types.
 - **OpenTelemetry Support**: Full compatibility with OTLP for logs, metrics, and traces.
 - **Real User Monitoring (RUM)**: Includes performance tracking, error logging, and session replay.
-- **Alerts & Dashboards**: Features over 18 different chart types for comprehensive data visualization.
-- **Advanced Ingest and Query Functions**: Aid in enrichment, redaction, log reduction, and compliance, like redacting sensitive data from logs.
+- **Dashboards, Reports, Alerts**: Features over 18 different chart types for comprehensive data visualization for on-the-fly analysis and reporting along with alerting.
+- **Pipelines**: Enrich, redact, reduce, normalize data on the fly. Stream processing for logs to metrics and more.
 - **Advanced Embedded GUI**: Intuitive and user-friendly interface.
 - **SQL and PromQL Support**: Query logs and traces with SQL, and metrics with SQL and PromQL.
-- **Single Binary Installation**: Easy installation and running, with binaries available for multiple platforms under [releases](https://github.com/openobserve/openobserve/releases).
+- **Single Binary or HA Installation**: Install using a single binary for small deployments or in HA mode for large deployments.
 - **Versatile Storage Options**: Supports local disk, S3, MinIO, GCS, Azure Blob Storage.
 - **High Availability and Clustering**: Ensures reliable and scalable performance.
 - **Dynamic Schema**: Adapts to your data structure seamlessly.
@@ -90,7 +90,7 @@ For other ways to quickly install OpenObserve or use OpenObserve cloud, check [q
 
 For installing OpenObserve in HA mode, check [HA deployment documentation](https://openobserve.ai/docs/ha_deployment/).
 
-## Enterprise Vs Open source Vs Cloud edition
+<!-- ## Enterprise Vs Open source Vs Cloud edition
 
 OpenObserve is available in three different editions:
 
@@ -119,7 +119,7 @@ OpenObserve is available in three different editions:
 | Ability to influence roadmap | ❌ | ✅ | ✅ on enterprise plan |
 | License | AGPL | Enterprise | Cloud |
 | Support | Community | Enterprise | Cloud |
-| Cost | Free | If self hosted, free for up to 200 GB/Day data ingested <br> Paid thereafter  | Free 200 GB/Month data ingested <br> Paid thereafter |
+| Cost | Free | If self hosted, free for up to 200 GB/Day data ingested <br> Paid thereafter  | Free 200 GB/Month data ingested <br> Paid thereafter | -->
 
 
 ## 📷 Screenshots
