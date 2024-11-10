@@ -220,12 +220,12 @@ OpenObserve is licensed under the AGPL-3.0 license. For more details, see the [L
 
 ## 🌍 Community
 
-### 🔗 Join our Slack Channel
+### 🔗 Join OpenObserve community on Slack
 
 [![Slack](./screenshots/slack.png)](https://short.openobserve.ai/community)
 
 Easiest way to get support is to join the [Slack channel](https://short.openobserve.ai/community).
 
-### 📱 Join our WeChat Group
+### 📱 Join OpenObserve community on WeChat
 
 <img src="./screenshots/wechat_qr.jpg" width="300">
