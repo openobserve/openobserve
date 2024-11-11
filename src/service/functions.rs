@@ -19,7 +19,10 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::function::{FunctionList, Transform};
+use config::meta::{
+    function::{FunctionList, Transform},
+    pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
+};
 
 use crate::{
     common::{
@@ -104,6 +107,7 @@ pub async fn update_function(
         }
     }
     extract_num_args(&mut func);
+
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
@@ -112,6 +116,26 @@ pub async fn update_function(
             )),
         );
     }
+
+    // update associated pipelines
+    if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
+        for pipeline in associated_pipelines {
+            if pipeline.contains_function(&func.name) {
+                if let Err(e) = db::pipeline::update(&pipeline).await {
+                    return Ok(HttpResponse::InternalServerError().json(
+                        MetaHttpResponse::message(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            format!(
+                                "Failed to update associated pipeline({}/{}): {}",
+                                pipeline.id, pipeline.name, e
+                            ),
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         FN_SUCCESS.to_string(),
@@ -155,6 +179,8 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             )));
         }
     };
+    // TODO(taiming): Function Stream Association to be deprecated starting v0.13.1.
+    // remove this check after migrating functions to its dedicated table
     if let Some(val) = existing_fn.streams {
         if !val.is_empty() {
             let names = val
@@ -176,6 +202,19 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             }
         }
     }
+    let pipeline_dep = get_dependencies(&org_id, &fn_name).await;
+    if !pipeline_dep.is_empty() {
+        let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
+        return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
+            http::StatusCode::CONFLICT.into(),
+            format!(
+                "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
+                fn_name,
+                pipeline_dep.len(),
+                pipeline_data
+            ),
+        )));
+    }
     let result = db::functions::delete(&org_id, &fn_name).await;
     match result {
         Ok(_) => {
@@ -191,6 +230,29 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             FN_NOT_FOUND.to_string(),
         ))),
     }
+}
+
+pub async fn get_pipeline_dependencies(
+    org_id: &str,
+    func_name: &str,
+) -> Result<HttpResponse, Error> {
+    let list = get_dependencies(org_id, func_name).await;
+    Ok(HttpResponse::Ok().json(PipelineDependencyResponse { list }))
+}
+
+async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
+    db::pipeline::list_by_org(org_id)
+        .await
+        .map_or(vec![], |mut pipelines| {
+            pipelines.retain(|pl| pl.contains_function(func_name));
+            pipelines
+                .into_iter()
+                .map(|pl| PipelineDependencyItem {
+                    id: pl.id,
+                    name: pl.name,
+                })
+                .collect()
+        })
 }
 
 fn extract_num_args(func: &mut Transform) {
