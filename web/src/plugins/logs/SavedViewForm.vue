@@ -120,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="sync"
                         color="grey"
                         size="xs"
-                        label="update"
                       />
                     </q-item-section>
                     <q-item-section
@@ -150,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="handleDeleteSavedView(props.row)"
                     >
                       <q-icon name="delete"
-color="grey" size="xs" />
+                        color="grey" size="xs" />
 
                     </q-item-section>
                   </q-item> </q-td
