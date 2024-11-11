@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         }`"
       >
-        <div class="flex justify-between items-center q-pa-xs">
-          <div class="flex">
+        <div class="tw-flex justify-between items-center q-pa-xs tw-w-full">
+          <div class="flex tw-w-1/2">
             <q-btn
               v-if="!isFullscreen"
               no-caps
@@ -50,11 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }} /
             </span>
-            <span class="q-table__title q-mt-xs">{{
+            <span class="q-table__title q-mt-xs tw-flex-1 tw-truncate">{{
               currentDashboardData.data?.title
             }}</span>
           </div>
-          <div class="flex">
+          <div class="flex tw-w-1/2 tw-justify-end">
             <q-btn
               v-if="!isFullscreen"
               outline
