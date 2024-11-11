@@ -692,7 +692,6 @@ pub async fn merge_files(
     } else {
         schema_latest
     };
-    let schema_latest = Arc::new(schema_latest.with_metadata(Default::default()));
 
     // read schema from parquet file and group files by schema
     let mut schemas = HashMap::new();
