@@ -400,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="shareLink.isLoading.value"
         ></q-btn>
         <q-btn
+        v-if="store.state.zoConfig.usage_enabled"
           data-test="logs-search-bar-share-link-btn"
           class="q-mr-xs download-logs-btn q-px-sm"
           size="sm"

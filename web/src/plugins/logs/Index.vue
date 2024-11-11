@@ -273,13 +273,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div   v-show="showSearchHistory">
       <search-history
+        v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
+      <div v-else>
+        <Error404 />
+      </div>
     </div>
+
   </q-page>
 </template>
 
@@ -317,6 +322,7 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
+import Error404 from "@/views/Error404.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -334,6 +340,7 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
     SearchHistory,
+    Error404,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -865,7 +872,7 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
-      router.push({
+        router.push({
         name: "logs",
         query: {
           action: "history",
@@ -874,6 +881,7 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
+
     };
 
     function removeFieldByName(data, fieldName) {
