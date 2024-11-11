@@ -200,7 +200,7 @@ export default defineComponent({
       store,
       router,
       config,
-      splitterModel: ref(250),
+      splitterModel: ref(270),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,

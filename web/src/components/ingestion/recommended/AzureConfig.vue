@@ -33,50 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
-import config from "../../../aws-exports";
-import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import { defineComponent } from "vue";
 
 export default defineComponent({
   name: "AzureConfig",
-  props: {
-    currOrgIdentifier: {
-      type: String,
-    },
-    currUserEmail: {
-      type: String,
-    },
-  },
-  components: { CopyContent },
-  setup(props) {
-    const store = useStore();
-    const endpoint: any = ref({
-      url: "",
-      host: "",
-      port: "",
-      protocol: "",
-      tls: "",
-    });
-    const url = new URL(store.state.API_ENDPOINT);
-    endpoint.value = {
-      url: store.state.API_ENDPOINT,
-      host: url.hostname,
-      port: url.port || (url.protocol === "https:" ? "443" : "80"),
-      protocol: url.protocol.replace(":", ""),
-      tls: url.protocol === "https:" ? "On" : "Off",
-    };
-
-    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
-Access Key: [BASIC_PASSCODE]`;
-    return {
-      store,
-      config,
-      endpoint,
-      content,
-      getImageURL,
-    };
-  },
 });
 </script>
