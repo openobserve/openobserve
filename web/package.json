@@ -69,6 +69,7 @@
     "@cypress/webpack-dev-server": "^3.10.0",
     "@quasar/vite-plugin": "^1.7.0",
     "@rushstack/eslint-patch": "^1.10.3",
+    "@tailwindcss/typography": "^0.5.15",
     "@types/axios": "^0.14.0",
     "@types/d3-scale": "^4.0.8",
     "@types/dompurify": "^3.0.5",

@@ -507,9 +507,6 @@ const editPipeline = (pipeline: any) => {
     query: {
       id: pipeline.pipeline_id,
       name: pipeline.name,
-      stream: pipeline.stream_name,
-      stream_type: pipeline.stream_type,
-      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };

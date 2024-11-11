@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { scaleLinear } from "d3-scale";
+import { isNumber } from "lodash-es";
 
 export enum ColorModeWithoutMinMax {
   PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
@@ -22,51 +23,70 @@ export enum ColorModeWithoutMinMax {
 }
 
 export const classicColorPalette = [
-  "#a2b6ff",
-  "#889ef9",
-  "#6e87df",
-  "#5470c6",
-  "#385aad",
-  "#c3ffa5",
-  "#aae58d",
-  "#91cc75",
-  "#79b35e",
-  "#619b48",
-  "#ffffa1",
-  "#fffb89",
-  "#ffe170",
-  "#fac858",
-  "#dfaf40",
-  "#ffb1ac",
-  "#ff9794",
-  "#ff7f7d",
-  "#ee6666",
-  "#d24d50",
-  "#c1ffff",
-  "#a6f3ff",
-  "#8dd9f8",
-  "#73c0de",
-  "#59a8c5",
-  "#89eeb9",
-  "#6fd4a1",
-  "#56bb89",
-  "#3ba272",
-  "#1c8a5c",
-  "#ffce98",
-  "#ffb580",
-  "#ff9c69",
-  "#fc8452",
-  "#e06c3c",
-  "#e6a7ff",
-  "#cc8fe6",
-  "#b377cd",
-  "#9a60b4",
-  "#824a9c",
-  "#ffc7ff",
-  "#ffaeff",
-  "#ff95e5",
-  "#ea7ccc",
-  "#d064b3",
+  "#FFCDD2",
+  "#EF9A9A",
+  "#E57373",
+  "#EF5350",
+  "#F8BBD0",
+  "#F48FB1",
+  "#F06292",
+  "#EC407A",
+  "#E1BEE7",
+  "#CE93D8",
+  "#BA68C8",
+  "#AB47BC",
+  "#D1C4E9",
+  "#B39DDB",
+  "#9575CD",
+  "#7E57C2",
+  "#C5CAE9",
+  "#9FA8DA",
+  "#7986CB",
+  "#5C6BC0",
+  "#BBDEFB",
+  "#90CAF9",
+  "#64B5F6",
+  "#42A5F5",
+  "#B3E5FC",
+  "#81D4FA",
+  "#4FC3F7",
+  "#29B6F6",
+  "#B2EBF2",
+  "#80DEEA",
+  "#4DD0E1",
+  "#26C6DA",
+  "#B2DFDB",
+  "#80CBC4",
+  "#4DB6AC",
+  "#26A69A",
+  "#C8E6C9",
+  "#A5D6A7",
+  "#81C784",
+  "#66BB6A",
+  "#DCEDC8",
+  "#C5E1A5",
+  "#AED581",
+  "#9CCC65",
+  "#F0F4C3",
+  "#E6EE9C",
+  "#DCE775",
+  "#D4E157",
+  "#FFF9C4",
+  "#FFF59D",
+  "#FFF176",
+  "#FFEE58",
+  "#FFECB3",
+  "#FFE082",
+  "#FFD54F",
+  "#FFCA28",
+  "#FFE0B2",
+  "#FFCC80",
+  "#FFB74D",
+  "#FFA726",
+  "#FFCCBC",
+  "#FFAB91",
+  "#FF8A65",
+  "#FF7043",
 ];
 
 const isValidHexColor = (color: string): boolean => {
@@ -147,16 +167,17 @@ interface SQLData {
 
 export const getSQLMinMaxValue = (
   yaxiskeys: string[],
-  searchQueryData: SQLData[][],
+  searchQueryData: SQLData[],
 ): [number, number] => {
   // need min and max value for color
   let min = Infinity;
   let max = -Infinity;
 
-  searchQueryData[0]?.forEach((data: SQLData) => {
+  searchQueryData?.forEach((data: SQLData) => {
     yaxiskeys?.forEach((key: string) => {
       if (
         data[key] !== undefined &&
+        isNumber(data[key]) &&
         !Number.isNaN(data[key]) &&
         data[key] !== null
       ) {
@@ -173,9 +194,7 @@ export const getSQLMinMaxValue = (
 const getSeriesHash = (seriesName: string) => {
   // Initialize a hash variable
   let hash = 0;
-
   const classicColorPaletteLength = classicColorPalette.length;
-
   // If the seriesName is empty, return 1 as a default hash value
   if (seriesName.length === 0) return 1;
 
@@ -193,18 +212,33 @@ const getSeriesHash = (seriesName: string) => {
 type SeriesBy = "last" | "min" | "max";
 
 const getSeriesValueBasedOnSeriesBy = (
-  values: number[],
+  values: any[],
   seriesBy: SeriesBy,
-): number => {
-  switch (seriesBy) {
-    case "last":
-      return values[values.length - 1];
-    case "min":
-      return Math.min(...values);
-    case "max":
-      return Math.max(...values);
-    default:
-      return values[values.length - 1];
+): number | null => {
+  try {
+    const validValues = values.filter(
+      (value) =>
+        value != null &&
+        value !== "" &&
+        isNumber(value) &&
+        !Number.isNaN(value),
+    );
+
+    if (validValues.length === 0) return null;
+
+    switch (seriesBy) {
+      case "last":
+        return +validValues[validValues.length - 1];
+      case "min":
+        return Math.min(...validValues);
+
+      case "max":
+        return Math.max(...validValues);
+      default:
+        return +validValues[validValues.length - 1];
+    }
+  } catch (error) {
+    return null;
   }
 };
 
@@ -258,7 +292,7 @@ export const getSeriesColor = (
   } else if (colorCfg.mode === "shades") {
     return shadeColor(
       colorCfg?.fixedColor?.[0] ?? "#53ca53",
-      getSeriesValueBasedOnSeriesBy(value, "last"),
+      getSeriesValueBasedOnSeriesBy(value, "last") ?? chartMin,
       chartMin,
       chartMax,
     );
@@ -276,7 +310,8 @@ export const getSeriesColor = (
       colorCfg?.fixedColor?.length ? colorCfg.fixedColor : classicColorPalette,
     );
     return d3ColorObj(
-      getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last"),
+      (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
+        chartMin) as number,
     );
   }
 };
