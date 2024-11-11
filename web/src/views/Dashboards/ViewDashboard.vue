@@ -50,9 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }} /
             </span>
-            <span class="q-table__title q-mt-xs tw-flex-1 tw-truncate">{{
-              currentDashboardData.data?.title
-            }}</span>
+            <span
+              class="q-table__title q-mt-xs tw-flex-1 tw-truncate"
+              :title="currentDashboardData.data?.title"
+            >
+              {{ currentDashboardData.data?.title }}
+            </span>
           </div>
           <div class="flex tw-w-1/2 tw-justify-end">
             <q-btn
