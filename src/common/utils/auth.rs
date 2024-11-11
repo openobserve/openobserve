@@ -314,6 +314,7 @@ impl FromRequest for AuthExtractor {
                 || method.eq("DELETE")
                 || path_columns[1].starts_with("reports")
                 || path_columns[1].starts_with("savedviews")
+                || path_columns[1].starts_with("functions")
             {
                 format!(
                     "{}:{}",

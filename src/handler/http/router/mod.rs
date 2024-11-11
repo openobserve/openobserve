@@ -403,6 +403,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(functions::list_functions)
             .service(functions::delete_function)
             .service(functions::update_function)
+            .service(functions::list_pipeline_dependencies)
             .service(dashboards::create_dashboard)
             .service(dashboards::update_dashboard)
             .service(dashboards::list_dashboards)
