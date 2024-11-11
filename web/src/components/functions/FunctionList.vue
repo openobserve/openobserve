@@ -67,8 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="'Associated Pipelines'"
               @click="getAssociatedPipelines(props)"
             ></q-btn>
-            <q-btn icon="fa fa-sitemap" label="Sitemap" />
-
           </q-td>
         </template>
 
