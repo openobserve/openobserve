@@ -291,7 +291,11 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
+import {
+  getDashboard,
+  movePanelToAnotherTab,
+  getFoldersList,
+} from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
@@ -344,22 +348,18 @@ export default defineComponent({
     } = useNotifications();
 
     let moment: any = () => {};
-    // want folder name from folderId
-    console.log(
-      "route.query.folder",
-      route.query.folder,
-      "store",
-      store.state.organizationData.folders,
-    );
 
     const folderNameFromFolderId = computed(() => {
+      if (store.state.organizationData.folders.length === 0) {
+        return "";
+      }
       return (
         store.state.organizationData.folders.find(
           (item: any) => item.folderId === route.query.folder ?? "default",
         )?.name ?? "default"
       );
     });
-    console.log("folderNameFromFolderId", folderNameFromFolderId.value);
+
     const importMoment = async () => {
       const momentModule: any = await import("moment-timezone");
       moment = momentModule.default;
@@ -499,6 +499,9 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
+      if (!store.state.organizationData.folders.length) {
+        await getFoldersList(store);
+      }
     });
 
     const setTimeString = () => {

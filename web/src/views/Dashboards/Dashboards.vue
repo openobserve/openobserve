@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboards-folder-tabs"
           >
             <q-tab
-              v-for="(tab, index) in sortedFolders"
+              v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
@@ -488,23 +488,6 @@ export default defineComponent({
       }
     });
 
-    const sortedFolders = computed(() => {
-      const folders = store.state.organizationData.folders;
-
-      if (folders.length === 0) return folders;
-
-      // Extract the first item (0th index) to keep it as "default"
-      const defaultFolder = folders[0];
-
-      // Sort the remaining folders (excluding the first item)
-      const sortedRest = folders
-        .slice(1)
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      // Combine the default folder with the sorted rest
-      return [defaultFolder, ...sortedRest];
-    });
-
     watch(
       activeFolderId,
       async () => {
@@ -776,7 +759,6 @@ export default defineComponent({
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
       handleDashboardMoved,
-      sortedFolders,
     };
   },
   methods: {
