@@ -634,7 +634,7 @@ const savePipeline = async () => {
 
 const openCancelDialog = () => {
  
-  if(pipelineObj.dirtyFlag){
+  if(pipelineObj.dirtyFlag ||( !pipelineObj.isEditPipeline && pipelineObj.currentSelectedPipeline.nodes.length > 1)){
     confirmDialogMeta.value.show = true;
     confirmDialogMeta.value.title = t("common.cancelChanges");
     confirmDialogMeta.value.message = "Are you sure you want to cancel changes?";
