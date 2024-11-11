@@ -563,6 +563,9 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub distinct_value_fields: Vec<String>,
 }
 
 impl Serialize for StreamSettings {
@@ -587,6 +590,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
+        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -702,6 +706,15 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let mut distinct_value_fields = Vec::new();
+        let fields = settings.get("distinct_value_fields");
+        if let Some(value) = fields {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                distinct_value_fields.push(item.as_str().unwrap().to_string())
+            }
+        }
+
         Self {
             partition_time_level,
             partition_keys,
@@ -714,6 +727,7 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            distinct_value_fields,
         }
     }
 }

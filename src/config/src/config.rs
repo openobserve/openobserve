@@ -143,6 +143,29 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_VALUES_FIELDS: [&str; 2] = ["kubernetes_namespace", "kubernetes_pod_name"];
+pub static VALUES_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let mut fields = chain(
+        _DEFAULT_VALUES_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_distinct_values_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
+});
+
 const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
@@ -569,6 +592,8 @@ pub struct Common {
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_VALUES_EXTRA_FIELDS", default = "")]
+    pub feature_distinct_values_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
