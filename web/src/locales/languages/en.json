@@ -916,7 +916,8 @@
     "orgLabel": "Organization Parameters",
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
-    "spanIdFieldName": "Span ID Field Name"
+    "spanIdFieldName": "Span ID Field Name",
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs"
   },
   "reports": {
     "header": "Reports",

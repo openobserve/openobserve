@@ -35,6 +35,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{IngestionStatus, StreamStatus},
     handler::http::request::CONTENT_TYPE_PROTO,
@@ -44,6 +45,7 @@ use crate::{
             check_ingestion_allowed,
             grpc::{get_val, get_val_with_type_retained},
         },
+        logs::bulk::TRANSFORM_FAILED,
         schema::get_upto_discard_error,
     },
 };
@@ -69,6 +71,7 @@ pub async fn handle_grpc_request(
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -147,6 +150,19 @@ pub async fn handle_grpc_request(
                 if timestamp < min_ts {
                     stream_status.status.failed += 1; // to old data, just discard
                     stream_status.status.error = get_upto_discard_error().to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(
+                        log_ingestion_errors,
+                        &log_record,
+                        &stream_status.status.error,
+                    );
                     continue;
                 }
 
@@ -268,6 +284,14 @@ pub async fn handle_grpc_request(
                 );
                 stream_status.status.failed += records_count as u32;
                 stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
             }
             Ok(pl_results) => {
                 let function_no = exec_pl.num_of_func();

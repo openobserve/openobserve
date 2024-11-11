@@ -140,6 +140,7 @@ pub async fn report_request_usage_stats(
             user_email: user_email.to_owned(),
             response_time: stats.response_time,
             num_records: stats.records * num_functions as i64,
+            dropped_records: stats.dropped_records,
             stream_type,
             stream_name: stream_name.to_owned(),
             min_ts: None,
@@ -178,6 +179,7 @@ pub async fn report_request_usage_stats(
         response_time: stats.response_time,
         function: stats.function,
         num_records: stats.records,
+        dropped_records: stats.dropped_records,
         stream_type,
         stream_name: stream_name.to_owned(),
         min_ts: stats.min_ts,
@@ -287,6 +289,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             continue;
         } else {
             entry.usage_data.num_records += usage_data.num_records;
+            entry.usage_data.dropped_records += usage_data.dropped_records;
             entry.usage_data.size += usage_data.size;
             entry.usage_data.response_time += usage_data.response_time;
             entry.count += 1;

@@ -33,7 +33,9 @@ use config::{
 };
 use syslog_loose::{Message, ProcId, Protocol};
 
-use super::ingest::handle_timestamp;
+use super::{
+    bulk::TS_PARSE_FAILED, ingest::handle_timestamp, ingestion_log_enabled, log_failed_record,
+};
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
@@ -43,7 +45,9 @@ use crate::{
             syslog::SyslogRoute,
         },
     },
-    service::{format_stream_name, ingestion::check_ingestion_allowed},
+    service::{
+        format_stream_name, ingestion::check_ingestion_allowed, logs::bulk::TRANSFORM_FAILED,
+    },
 };
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
@@ -67,6 +71,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
@@ -178,6 +183,19 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             Err(e) => {
                 stream_status.status.failed += 1;
                 stream_status.status.error = e.to_string();
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TS_PARSE_FAILED,
+                    ])
+                    .inc();
+                log_failed_record(
+                    log_ingestion_errors,
+                    &local_val,
+                    &stream_status.status.error,
+                );
                 return Ok(HttpResponse::Ok().json(IngestionResponse::new(
                     http::StatusCode::OK.into(),
                     vec![stream_status],
@@ -205,6 +223,14 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                 );
                 stream_status.status.failed += records_count as u32;
                 stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
             }
             Ok(pl_results) => {
                 let function_no = exec_pl.num_of_func();
@@ -251,6 +277,19 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             Err(e) => {
                                 stream_status.status.failed += 1;
                                 stream_status.status.error = e.to_string();
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.to_string().as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                                log_failed_record(
+                                    log_ingestion_errors,
+                                    &local_val,
+                                    &stream_status.status.error,
+                                );
                                 continue;
                             }
                         };
