@@ -17,6 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-ma-md">
     <CopyContent class="q-mt-sm" :content="content" />
+    <div class="tw-text-[16px]">
+      <div class="tw-font-bold tw-pt-6 tw-pb-2">
+        Check further documentation at:
+      </div>
+      <div
+        v-for="awsService in awsServiceLinks"
+        :key="awsService.name"
+        class="tw-py-2"
+      >
+        {{ awsService.name }} -
+        <a :href="awsService.link" class="hover:tw-underline text-primary">{{
+          awsService.link
+        }}</a>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -28,7 +43,7 @@ import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 
 export default defineComponent({
-  name: "kineses-firehose",
+  name: "AWSConfig",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -58,12 +73,49 @@ export default defineComponent({
 
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
+
+    const awsServiceLinks = [
+      {
+        name: "Cloudwatch Logs",
+        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html",
+      },
+      {
+        name: "Cloudwatch Events",
+        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-events.html",
+      },
+      {
+        name: "Cloudwatch Metrics",
+        link: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Metric-Streams.html",
+      },
+      {
+        name: "VPC Flow Logs",
+        link: "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-firehose.html",
+      },
+      {
+        name: "AWS Network Firewall Logs",
+        link: "https://docs.aws.amazon.com/network-firewall/latest/developerguide/logging-kinesis.html",
+      },
+      {
+        name: "AWS WAF Logs",
+        link: "https://docs.aws.amazon.com/waf/latest/developerguide/logging-kinesis.html",
+      },
+      {
+        name: "AWS IoT",
+        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-iot.html",
+      },
+      {
+        name: "Other AWS Services (Via Kinesis streams)",
+        link: "https://docs.aws.amazon.com/streams/latest/dev/using-other-services.html",
+      },
+    ];
+
     return {
       store,
       config,
       endpoint,
       content,
       getImageURL,
+      awsServiceLinks,
     };
   },
 });

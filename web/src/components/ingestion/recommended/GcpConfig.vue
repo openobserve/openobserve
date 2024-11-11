@@ -17,6 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-ma-md">
     <CopyContent class="q-mt-sm" :content="content" />
+    <div class="tw-text-[16px]">
+      <div class="tw-font-bold tw-pt-6 tw-pb-2">
+        Check further documentation at:
+      </div>
+      <div class="tw-py-2">
+        Pub/Sub Logs -
+        <a
+          href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
+          class="hover:tw-underline text-primary"
+        >
+          https://openobserve.ai/blog/send-gcp-logs-to-openobserve
+        </a>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -28,7 +42,7 @@ import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 
 export default defineComponent({
-  name: "GcpPubSub",
+  name: "GCPConfig",
   props: {
     currOrgIdentifier: {
       type: String,
