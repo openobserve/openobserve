@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="width: 100%; height: 100%; overflow: auto; padding: 1%"
   >
     <div
+      class="tw-prose tw-prose-sm tw-max-w-none"
       v-html="DOMPurify.sanitize(marked(markdownContent))"
       data-test="markdown-renderer"
     ></div>
