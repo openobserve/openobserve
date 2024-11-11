@@ -168,11 +168,7 @@ pub async fn list_functions(
     }
 }
 
-pub async fn delete_function(
-    org_id: String,
-    fn_name: String,
-    force_delete: bool,
-) -> Result<HttpResponse, Error> {
+pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
         None => {
@@ -207,35 +203,16 @@ pub async fn delete_function(
     }
     let pipeline_dep = get_dependencies(&org_id, &fn_name).await;
     if !pipeline_dep.is_empty() {
-        if force_delete {
-            for pl in pipeline_dep {
-                match super::pipeline::delete_pipeline(&pl.id).await {
-                    Ok(resp) if resp.status().as_u16() != 200 => {
-                        return Ok(resp);
-                    }
-                    Err(e) => {
-                        return Ok(HttpResponse::InternalServerError().json(
-                            MetaHttpResponse::error(
-                                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                e.to_string(),
-                            ),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
-        } else {
-            let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
-            return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
-                http::StatusCode::CONFLICT.into(),
-                format!(
-                    "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
-                    fn_name,
-                    pipeline_dep.len(),
-                    pipeline_data
-                ),
-            )));
-        }
+        let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
+        return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
+            http::StatusCode::CONFLICT.into(),
+            format!(
+                "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
+                fn_name,
+                pipeline_dep.len(),
+                pipeline_data
+            ),
+        )));
     }
     let result = db::functions::delete(&org_id, &fn_name).await;
     match result {
@@ -348,7 +325,7 @@ mod tests {
         assert!(list_resp.is_ok());
 
         assert!(
-            delete_function("nexus".to_string(), "dummyfn".to_owned(), true)
+            delete_function("nexus".to_string(), "dummyfn".to_owned())
                 .await
                 .is_ok()
         );

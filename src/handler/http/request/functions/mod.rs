@@ -114,18 +114,9 @@ async fn list_functions(
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
-async fn delete_function(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let query =
-        web::Query::<ahash::HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let force_del = match query.get("force") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
-    };
-    crate::service::functions::delete_function(org_id, name, force_del).await
+    crate::service::functions::delete_function(org_id, name).await
 }
 
 /// UpdateFunction
@@ -173,6 +164,8 @@ pub async fn update_function(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 404, description = "Function not found", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Internal server error", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/functions/{name}")]
