@@ -67,6 +67,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           content-class="tab_content"
         />
         <q-route-tab
+          name="AWSConfig"
+          :to="{
+            name: 'AWSConfig',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/aws.svg')"
+          label="Amazon Web Services(AWS)"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="GCPConfig"
+          :to="{
+            name: 'GCPConfig',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
+          label="Google Cloud Platform(GCP)"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="AzureConfig"
+          :to="{
+            name: 'AzureConfig',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/azure.png')"
+          label="Microsoft Azure"
+          content-class="tab_content"
+        />
+        <q-route-tab
           name="ingestFromTraces"
           :to="{
             name: 'ingestFromTraces',
@@ -130,7 +166,7 @@ export default defineComponent({
     const router: any = useRouter();
     const tabs = ref("");
     const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
     );
 
     const ingestTabType = ref("ingestFromKubernetes");
@@ -164,7 +200,7 @@ export default defineComponent({
       store,
       router,
       config,
-      splitterModel: ref(250),
+      splitterModel: ref(270),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,

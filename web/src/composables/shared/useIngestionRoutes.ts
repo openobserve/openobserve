@@ -22,8 +22,9 @@ import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 import Curl from "@/components/ingestion/logs/Curl.vue";
-import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
-import GcpPubSub from "@/components/ingestion/logs/GcpPubSub.vue";
+import AWSConfig from "@/components/ingestion/recommended/AWSConfig.vue";
+import GCPConfig from "@/components/ingestion/recommended/GCPConfig.vue";
+import AzureConfig from "@/components/ingestion/recommended/AzureConfig.vue";
 import FileBeat from "@/components/ingestion/logs/FileBeat.vue";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
@@ -230,6 +231,30 @@ const useIngestionRoutes = () => {
               },
             },
             {
+              path: "aws",
+              name: "AWSConfig",
+              component: AWSConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "gcp",
+              name: "GCPConfig",
+              component: GCPConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "azure",
+              name: "AzureConfig",
+              component: AzureConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
               path: "traces",
               name: "ingestFromTraces",
               component: OpenTelemetry,
@@ -269,35 +294,12 @@ const useIngestionRoutes = () => {
     },
   };
 
-  const kinesisFirehose = {
-    path: "kinesisfirehose",
-    name: "kinesisfirehose",
-    component: KinesisFirehose,
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
-  };
-
-  const gcpPubSub = {
-    path: "gcp",
-    name: "gcpLogs",
-    component: GcpPubSub,
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
-  };
-
   if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
       .find((child: any) => child.name === "custom")
       .children.find((child: any) => child.name === "ingestLogs")
       ?.children.push(...[sysLog, sysLogNg]);
   }
-
-  ingestionRoutes[0].children
-    .find((child: any) => child.name === "custom")
-    .children.find((child: any) => child.name === "ingestLogs")
-    ?.children.push(...[kinesisFirehose, gcpPubSub]);
 
   return ingestionRoutes;
 };
