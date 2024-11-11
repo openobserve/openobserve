@@ -31,6 +31,9 @@ const jstransform = {
   create: (org_identifier: string, data: any) => {
     return http().post(`/api/${org_identifier}/functions`, data);
   },
+  getAssociatedPipelines: (org_identifier: string, name: string) => {
+    return http().get(`/api/${org_identifier}/functions/${name}`);
+  },
   update: (org_identifier: string, data: any) => {
     return http().put(`/api/${org_identifier}/functions/${data.name}`, data);
   },

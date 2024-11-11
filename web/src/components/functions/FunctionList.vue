@@ -56,6 +56,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('function.delete')"
               @click="showDeleteDialogFn(props)"
             ></q-btn>
+            <q-btn
+              :icon="outlinedAccountTree"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="'Associated Pipelines'"
+              @click="getAssociatedPipelines(props)"
+            ></q-btn>
+            <q-btn icon="fa fa-sitemap" label="Sitemap" />
+
           </q-td>
         </template>
 
@@ -178,7 +191,7 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { outlinedDelete ,outlinedAccountTree} from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
@@ -524,6 +537,19 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
+    const getAssociatedPipelines = (props: any) => {
+      selectedDelete.value = props.row
+      jsTransformService.getAssociatedPipelines(
+        store.state.selectedOrganization.identifier,
+        props.row.name
+      ).then((res: any) => {
+        pipelineList.value = res.data.list;
+        confirmForceDelete.value = true;
+      }).catch((err) => {
+        console.log(err);
+      });
+    }
+
     const forceRemoveFunction = (message : any) =>{
       const match = message.match(/\[([^\]]+)\]/);
       if (match) {
@@ -570,6 +596,7 @@ export default defineComponent({
       showAddJSTransformDialog,
       changeMaxRecordToReturn,
       outlinedDelete,
+      outlinedAccountTree,
       forceDeleteFn,
       confirmForceDelete,
       pipelineList,
@@ -577,6 +604,7 @@ export default defineComponent({
       closeDialog,
       onPipelineSelect,
       transformedPipelineList,
+      getAssociatedPipelines,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
