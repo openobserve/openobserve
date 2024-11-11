@@ -285,11 +285,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class=" text-center q-pa-md flex flex-center"
      >
     <div>
-      <div class="text-h4" style="opacity: 0.8">Search history not enabled. <br> <span class="text-h6">Please contact to administrator.</span></div>
+      <div>
+        <q-icon
+          name="history"
+          size="100px"
+          color="gray"
+          class="q-mb-md"
+          style="opacity: 0.1;"
+  
+        />
+      </div>
+      <div class="text-h4" style="opacity: 0.8">Search history is not enabled. </div>
+      <div  style="opacity: 0.8" class="q-mt-sm flex items-center justify-center">
+        <q-icon name="info" class="q-mr-xs " size="20px" />
+        <span class="text-h6 text-center ">
+          Please contact administrator to enable.</span>
+      </div>
 
       <q-btn
         class="q-mt-xl"
-        color="primary"
+        color="secondary"
       
         unelevated
         label="Go Back to Logs page"
