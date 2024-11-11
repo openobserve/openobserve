@@ -903,6 +903,8 @@ export default defineComponent({
             orgSettings?.data?.data?.span_id_field_name ?? "spanId",
           trace_id_field_name:
             orgSettings?.data?.data?.trace_id_field_name ?? "traceId",
+          toggle_ingestion_logs:
+            orgSettings?.data?.data?.toggle_ingestion_logs ?? false,
         });
       } catch (error) {}
       return;

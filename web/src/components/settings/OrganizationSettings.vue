@@ -63,6 +63,22 @@
       </q-input>
     </div>
 
+    <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
+      <q-toggle
+        data-test="add-toggle-ingestion-btn"
+        v-model="toggleIngestionLogs"
+        :label="t('settings.toggleIngestionLogsLabel')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+      >
+      </q-toggle>
+    </div>
+
     <div class="flex justify-start q-mt-lg">
       <q-btn
         data-test="add-alert-cancel-btn"
@@ -110,6 +126,10 @@ const q = useQuasar();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);
+const toggleIngestionLogs = ref(
+  store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
+    false,
+);
 
 const isValidRoleName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
@@ -138,6 +158,7 @@ const saveOrgSettings = async () => {
       {
         trace_id_field_name: traceIdFieldName.value,
         span_id_field_name: spanIdFieldName.value,
+        toggle_ingestion_logs: toggleIngestionLogs.value,
       },
     );
 
@@ -145,6 +166,7 @@ const saveOrgSettings = async () => {
       ...store.state?.organizationData?.organizationSettings,
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
+      toggle_ingestion_logs: toggleIngestionLogs.value,
     });
 
     q.notify({
