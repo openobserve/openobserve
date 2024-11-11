@@ -87,20 +87,6 @@ export const convertPanelData = async (
         };
       }
     }
-    case "trellis": {
-      return {
-        chartType: panelSchema.type,
-        ...(await convertMultiSQLData(
-          panelSchema,
-          data,
-          store,
-          chartPanelRef,
-          hoveredSeriesState,
-          resultMetaData,
-          metadata,
-        )),
-      };
-    }
     case "table": {
       return {
         chartType: panelSchema.type,

@@ -312,7 +312,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "scatter":
       case "area-stacked":
       case "stacked":
-      case "trellis":
       case "h-stacked":
         return (
           dashboardPanelData.data.queries[
@@ -830,7 +829,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "area-stacked":
       case "bar":
       case "line":
-      case "trellis":
       case "scatter":
       case "h-bar":
       case "stacked":
@@ -2755,7 +2753,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         case "h-bar":
         case "area":
         case "line":
-        case "trellis":
         case "scatter":
         case "bar": {
           if (

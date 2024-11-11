@@ -676,6 +676,11 @@ export const convertSQLData = async (
     );
   };
 
+  /**
+   * This method is used to configure trellis layout for the chart,  it will update the yAxis label properties
+   * @param yAxisNameGap
+   * @param gridData
+   */
   const updateYAxisOption = (
     yAxisNameGap: number,
     gridData: null | any = null,
@@ -719,6 +724,11 @@ export const convertSQLData = async (
     });
   };
 
+  /**
+   * This method is used to configure trellis layout for the chart, it will update the xAxis label properties
+   * @param yAxisNameGap
+   * @param gridData
+   */
   const updateXAxisOption = (
     yAxisNameGap: number,
     gridData: null | any = null,
@@ -1051,6 +1061,7 @@ export const convertSQLData = async (
     }
   }
 
+  // ------- Series Building Methods -----------
   /**
    * Retrieves unique values for the second x-axis key in a stacked chart.
    * Assumes the first value in breakDownKeys corresponds to the second x-axis key.
@@ -1173,6 +1184,8 @@ export const convertSQLData = async (
         .flat() || []
     );
   };
+
+  // ------- End of Series Building Methods -----------
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type

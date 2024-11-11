@@ -471,7 +471,6 @@ export default defineComponent({
         case "gauge":
         case "table":
         case "pie":
-        case "trellis":
         case "donut": {
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
@@ -816,7 +815,9 @@ export default defineComponent({
           );
 
           if (!dashboardData) {
-            console.error(`Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`);
+            console.error(
+              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`,
+            );
             return;
           }
 

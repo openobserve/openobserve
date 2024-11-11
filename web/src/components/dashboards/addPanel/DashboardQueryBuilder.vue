@@ -268,8 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'h-stacked' ||
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
-          dashboardPanelData.data.type == 'stacked' ||
-          dashboardPanelData.data.type == 'trellis'
+          dashboardPanelData.data.type == 'stacked'
         "
       >
         <div style="display: flex; flex-direction: row" class="q-pl-md">
