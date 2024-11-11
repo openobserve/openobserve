@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a
           href="https://github.com/openobserve/azure-function-openobserve"
           class="hover:tw-underline text-primary"
+          target="_blank"
+          rel="noopener noreferrer"
         >
           https://github.com/openobserve/azure-function-openobserve
         </a>

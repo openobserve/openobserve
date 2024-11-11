@@ -27,9 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw-py-2"
       >
         {{ awsService.name }} -
-        <a :href="awsService.link" class="hover:tw-underline text-primary">{{
-          awsService.link
-        }}</a>
+        <a
+          :href="awsService.link"
+          class="hover:tw-underline text-primary"
+          target="_blank"
+          rel="noopener noreferrer"
+          >{{ awsService.link }}</a
+        >
       </div>
     </div>
   </div>
