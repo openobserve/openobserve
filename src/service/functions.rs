@@ -107,6 +107,26 @@ pub async fn update_function(
         }
     }
     extract_num_args(&mut func);
+
+    // update associated pipelines
+    if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
+        for pipeline in associated_pipelines {
+            if pipeline.contains_function(&func.name) {
+                if let Err(e) = db::pipeline::update(&pipeline).await {
+                    return Ok(HttpResponse::InternalServerError().json(
+                        MetaHttpResponse::message(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            format!(
+                                "Failed to update associated pipeline({}/{}): {}",
+                                pipeline.id, pipeline.name, e
+                            ),
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
