@@ -59,6 +59,7 @@ export default defineComponent({
   components: { CopyContent },
   setup(props) {
     const store = useStore();
+    // TODO OK: Create interface for ENDPOINT
     const endpoint: any = ref({
       url: "",
       host: "",
@@ -66,14 +67,19 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    const url = new URL(store.state.API_ENDPOINT);
-    endpoint.value = {
-      url: store.state.API_ENDPOINT,
-      host: url.hostname,
-      port: url.port || (url.protocol === "https:" ? "443" : "80"),
-      protocol: url.protocol.replace(":", ""),
-      tls: url.protocol === "https:" ? "On" : "Off",
-    };
+
+    try {
+      const url = new URL(store.state.API_ENDPOINT);
+      endpoint.value = {
+        url: store.state.API_ENDPOINT,
+        host: url.hostname,
+        port: url.port || (url.protocol === "https:" ? "443" : "80"),
+        protocol: url.protocol.replace(":", ""),
+        tls: url.protocol === "https:" ? "On" : "Off",
+      };
+    } catch (e) {
+      console.error("Error while creating end point", e);
+    }
 
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
