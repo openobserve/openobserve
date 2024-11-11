@@ -107,9 +107,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-close-popup
                       :title="props.row.view_name"
                     >
-                      <q-item-label class="ellipsis" style="max-width: 188px">{{
+                      <q-item-label class="ellipsis" style="max-width: 165px">{{
                         props.row.view_name
                       }}</q-item-label>
+                    </q-item-section>
+                    <q-item-section
+                      :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                      side
+                      @click="handleUpdateSavedView(props.row, props.row.view_name)"
+                    >
+                      <q-icon
+                        name="sync"
+                        color="grey"
+                        size="xs"
+                        label="update"
+                      />
                     </q-item-section>
                     <q-item-section
                       :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
@@ -131,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                       />
                     </q-item-section>
+
                     <q-item-section
                       :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
                       side
@@ -138,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <q-icon name="delete"
 color="grey" size="xs" />
+
                     </q-item-section>
                   </q-item> </q-td
               ></template>
@@ -422,6 +436,13 @@ class="q-pa-sm text-bold favorite-label"
     @update:cancel="confirmDelete = false"
     v-model="confirmDelete"
   />
+  <ConfirmDialog
+    title="Update Saved View"
+    message="Are you sure you want to Update saved view?"
+    @update:ok="confirmUpdateSavedView"
+    @update:cancel="confirmUpdate = false"
+    v-model="confirmUpdate"
+  />
 </template>
 
 <script setup lang="ts">
@@ -457,6 +478,7 @@ const $q = useQuasar();
 const store = useStore();
 const savedViewDropdownModel = ref(false);
 const confirmDelete = ref(false);
+const confirmUpdate = ref(false);
 const deleteViewID = ref("");
 const savedViewName = ref("");
 const savedViewSelectedName: any = ref({});
@@ -1113,6 +1135,16 @@ const handleDeleteSavedView = (item: any) => {
   savedViewDropdownModel.value = false;
   deleteViewID.value = item.view_id;
   confirmDelete.value = true;
+};
+
+const handleUpdateSavedView = (item: any, viewName: any) => {
+  savedViewSelectedName.value = item;
+  savedViewName.value = viewName;
+  confirmUpdate.value = true;
+};
+
+const confirmUpdateSavedView = () => {
+  updateSavedViews(savedViewSelectedName.value.view_id, savedViewName.value);
 };
 const confirmDeleteSavedViews = () => {
   deleteSavedViews();
