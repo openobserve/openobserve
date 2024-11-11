@@ -216,35 +216,26 @@ const getSeriesValueBasedOnSeriesBy = (
   seriesBy: SeriesBy,
 ): number | null => {
   try {
+    const validValues = values.filter(
+      (value) =>
+        value != null &&
+        value !== "" &&
+        isNumber(value) &&
+        !Number.isNaN(value),
+    );
+
+    if (validValues.length === 0) return null;
+
     switch (seriesBy) {
       case "last":
-        for (let i = values.length - 1; i >= 0; i--) {
-          if (
-            !Number.isNaN(values[i]) &&
-            isNumber(values[i]) &&
-            values[i] != null &&
-            values[i] != ""
-          ) {
-            return +values[i];
-          }
-        }
-        return null;
+        return +validValues[validValues.length - 1];
       case "min":
-        return Math.min(...values) ?? null;
+        return Math.min(...validValues);
+
       case "max":
-        return Math.max(...values) ?? null;
+        return Math.max(...validValues);
       default:
-        for (let i = values.length - 1; i >= 0; i--) {
-          if (
-            !Number.isNaN(values[i]) &&
-            isNumber(values[i]) &&
-            values[i] != null &&
-            values[i] != ""
-          ) {
-            return +values[i];
-          }
-        }
-        return null;
+        return +validValues[validValues.length - 1];
     }
   } catch (error) {
     return null;
@@ -310,7 +301,7 @@ export const getSeriesColor = (
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {
-    const d3ColorObj: any = scaleLinear(
+    const d3ColorObj = scaleLinear(
       getDomainPartitions(
         chartMin,
         chartMax,
@@ -319,8 +310,8 @@ export const getSeriesColor = (
       colorCfg?.fixedColor?.length ? colorCfg.fixedColor : classicColorPalette,
     );
     return d3ColorObj(
-      getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
-        chartMin,
+      (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
+        chartMin) as number,
     );
   }
 };
