@@ -281,16 +281,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isClicked="showSearchHistory"
       />
       <div v-else style="height: 200px;" >
-        <div style="height: 100vh"
+        <div style="height: 80vh"
       class=" text-center q-pa-md flex flex-center"
      >
     <div>
-      <div class="text-h4" style="opacity: 0.8">Search history not enabled /activated. Please contact to administrator.</div>
+      <div class="text-h4" style="opacity: 0.8">Search history not enabled. <br> <span class="text-h6">Please contact to administrator.</span></div>
 
       <q-btn
         class="q-mt-xl"
+        color="primary"
       
-        text-color="blue"
         unelevated
         label="Go Back to Logs page"
         no-caps
