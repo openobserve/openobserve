@@ -32,6 +32,7 @@ use config::{
     BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
+use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     service::{
@@ -70,6 +71,7 @@ pub async fn ingest(
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
+    let log_ingestion_errors = ingestion_log_enabled().await;
     let mut action = String::from("");
     let mut stream_name = String::from("");
     let mut doc_id = None;
@@ -225,6 +227,15 @@ pub async fn ingest(
                         Ok(t) => t,
                         Err(_e) => {
                             bulk_res.errors = true;
+                            metrics::INGEST_ERRORS
+                                .with_label_values(&[
+                                    org_id,
+                                    StreamType::Logs.to_string().as_str(),
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                ])
+                                .inc();
+                            log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
                             add_record_status(
                                 stream_name.clone(),
                                 &doc_id,
@@ -244,6 +255,15 @@ pub async fn ingest(
                 if timestamp < min_ts {
                     bulk_res.errors = true;
                     let failure_reason = Some(get_upto_discard_error().to_string());
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
                     add_record_status(
                         stream_name.clone(),
                         &doc_id,
@@ -289,6 +309,14 @@ pub async fn ingest(
                         e
                     );
                     bulk_res.errors = true;
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TRANSFORM_FAILED,
+                        ])
+                        .inc();
                     add_record_status(
                         stream_name.clone(),
                         &None,
@@ -354,6 +382,19 @@ pub async fn ingest(
                                     Ok(t) => t,
                                     Err(_e) => {
                                         bulk_res.errors = true;
+                                        metrics::INGEST_ERRORS
+                                            .with_label_values(&[
+                                                org_id,
+                                                StreamType::Logs.to_string().as_str(),
+                                                &stream_name,
+                                                TS_PARSE_FAILED,
+                                            ])
+                                            .inc();
+                                        log_failed_record(
+                                            log_ingestion_errors,
+                                            &local_val,
+                                            TS_PARSE_FAILED,
+                                        );
                                         add_record_status(
                                             stream_params.stream_name.to_string(),
                                             &doc_ids[idx],
@@ -372,7 +413,17 @@ pub async fn ingest(
                             // check ingestion time
                             if timestamp < min_ts {
                                 bulk_res.errors = true;
-                                let failure_reason = Some(get_upto_discard_error().to_string());
+                                let error = get_upto_discard_error().to_string();
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.to_string().as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                                log_failed_record(log_ingestion_errors, &local_val, &error);
+                                let failure_reason = Some(error);
                                 add_record_status(
                                     stream_params.stream_name.to_string(),
                                     &doc_ids[idx],

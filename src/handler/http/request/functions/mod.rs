@@ -106,6 +106,7 @@ async fn list_functions(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name" = String, Path, description = "Function name"),
+        ("force" = bool, Query, description = "Force delete function regardless pipeline dependencies"),
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
@@ -147,4 +148,30 @@ pub async fn update_function(
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
     crate::service::functions::update_function(&org_id, name, transform).await
+}
+
+/// FunctionPipelineDependency
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "functionPipelineDependency",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("name" = String, Path, description = "Function name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 404, description = "Function not found", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Internal server error", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/functions/{name}")]
+pub async fn list_pipeline_dependencies(
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, fn_name) = path.into_inner();
+    crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await
 }

@@ -15,42 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="scroll"
-    style="width: 100%; height: 100%; overflow: auto; padding: 1%"
-  >
-    <div
-      :class="[
-        'tw-prose tw-prose-sm tw-max-w-none',
-        store.state?.theme === 'dark' && 'tw-prose-invert',
-      ]"
-      v-html="DOMPurify.sanitize(marked(markdownContent))"
-      data-test="markdown-renderer"
-    ></div>
+  <div class="q-ma-md">
+    <div class="tw-text-[16px]">
+      <div class="tw-font-bold">
+        Azure Function for sending logs to OpenObserve
+      </div>
+      <div class="tw-py-2">
+        <a
+          href="https://github.com/openobserve/azure-function-openobserve"
+          class="hover:tw-underline text-primary"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          https://github.com/openobserve/azure-function-openobserve
+        </a>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
-import { useStore } from "vuex";
 
 export default defineComponent({
-  name: "MarkdownRenderer",
-  props: {
-    markdownContent: {
-      type: String,
-      default: "",
-    },
-  },
-  setup(): any {
-    const store = useStore();
-    return {
-      DOMPurify,
-      marked,
-      store,
-    };
-  },
+  name: "AzureConfig",
 });
 </script>

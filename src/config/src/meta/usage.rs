@@ -86,6 +86,8 @@ pub struct UsageData {
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: i64,
+    #[serde(default)]
+    pub dropped_records: i64,
     pub stream_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
@@ -251,6 +253,8 @@ impl std::fmt::Display for UsageType {
 pub struct RequestStats {
     pub size: f64,
     pub records: i64,
+    #[serde(default)]
+    pub dropped_records: i64,
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,
@@ -287,6 +291,7 @@ impl Default for RequestStats {
         Self {
             size: 0.0,
             records: 0,
+            dropped_records: 0,
             response_time: 0.0,
             request_body: None,
             function: None,
@@ -311,6 +316,7 @@ impl From<FileMeta> for RequestStats {
         RequestStats {
             size: (meta.original_size / SIZE_IN_MB) as f64,
             records: meta.records,
+            dropped_records: 0,
             response_time: 0.0,
             function: None,
             request_body: None,

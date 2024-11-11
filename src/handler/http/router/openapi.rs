@@ -74,6 +74,7 @@ use crate::{common::meta, handler::http::request};
         request::functions::update_function,
         request::functions::save_function,
         request::functions::delete_function,
+        request::functions::list_pipeline_dependencies,
         request::dashboards::create_dashboard,
         request::dashboards::update_dashboard,
         request::dashboards::list_dashboards,

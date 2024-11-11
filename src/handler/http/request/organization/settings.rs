@@ -16,7 +16,6 @@
 use std::io::Error as StdErr;
 
 use actix_web::{delete, get, post, web, HttpResponse};
-use config::utils::json;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
@@ -60,10 +59,7 @@ async fn create(
     let org_id = path.into_inner();
     let settings = settings.into_inner();
     let mut data = match get_org_setting(&org_id).await {
-        Ok(s) => {
-            let data: OrganizationSetting = json::from_slice(&s).unwrap();
-            data
-        }
+        Ok(data) => data,
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 OrganizationSetting::default()
@@ -90,6 +86,10 @@ async fn create(
     if let Some(span_id_field_name) = settings.span_id_field_name {
         field_found = true;
         data.span_id_field_name = span_id_field_name;
+    }
+    if let Some(toggle_ingestion_logs) = settings.toggle_ingestion_logs {
+        field_found = true;
+        data.toggle_ingestion_logs = toggle_ingestion_logs;
     }
 
     if !field_found {
@@ -122,10 +122,7 @@ async fn create(
 async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
     let org_id = path.into_inner();
     match get_org_setting(&org_id).await {
-        Ok(s) => {
-            let data: OrganizationSetting = json::from_slice(&s).unwrap();
-            Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data }))
-        }
+        Ok(data) => Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data })),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();

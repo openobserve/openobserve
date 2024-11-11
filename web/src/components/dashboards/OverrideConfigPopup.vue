@@ -29,6 +29,8 @@
         v-model="overrideConfig.field.value"
         :label="'Field'"
         :options="columnsOptions"
+        :error="duplicateErrors[index]"
+        :error-message="'This field has already been selected. Please choose a different field.'"
         style="width: 50%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
@@ -43,6 +45,8 @@
         <q-select
           v-model="overrideConfig.config[0].value.unit"
           :label="'Unit'"
+          :error="duplicateErrors[index]"
+          :error-message="'This field has already been selected. Please choose a different field.'"
           :options="filteredUnitOptions(index)"
           :disable="!overrideConfig.field.value"
           style="flex-grow: 1"
@@ -119,6 +123,9 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
+    const duplicateErrors = ref<Array<boolean>>(
+      props.overrideConfig.overrideConfigs?.map(() => false) || [],
+    );
 
     const unitOptions = [
       {
@@ -224,6 +231,7 @@ export default defineComponent({
       overrideConfigs.value = JSON.parse(
         JSON.stringify(originalOverrideConfigs.value),
       );
+      duplicateErrors.value.fill(false);
       emit("close");
     };
 
@@ -232,10 +240,12 @@ export default defineComponent({
         field: { matchBy: "name", value: "" },
         config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
       });
+      duplicateErrors.value.push(false);
     };
 
     const removeOverrideConfig = (index: number) => {
       overrideConfigs.value.splice(index, 1);
+      duplicateErrors.value.splice(index, 1);
     };
 
     const filteredUnitOptions = (index: number) => {
@@ -243,6 +253,15 @@ export default defineComponent({
     };
 
     const saveOverrides = () => {
+      const names = overrideConfigs.value.map((config: any) => config.field.value);
+      duplicateErrors.value = names.map(
+        (name: any, idx: any) => names.indexOf(name) !== idx,
+      );
+
+      if (duplicateErrors.value.some((isDuplicate) => isDuplicate)) {
+        return;
+      }
+
       originalOverrideConfigs.value = JSON.parse(
         JSON.stringify(overrideConfigs.value),
       );
@@ -282,6 +301,7 @@ export default defineComponent({
       removeOverrideConfig,
       filteredUnitOptions,
       saveOverrides,
+      duplicateErrors,
       t,
     };
   },
