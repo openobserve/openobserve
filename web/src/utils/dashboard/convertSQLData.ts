@@ -856,7 +856,7 @@ export const convertSQLData = async (
       chartMin = null;
       chartMax = null;
     } else {
-      [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, searchQueryData);
+      [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, missingValueData);
     }
   }
 
