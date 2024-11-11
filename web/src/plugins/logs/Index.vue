@@ -280,8 +280,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
-      <div v-else>
-        <Error404 />
+      <div v-else style="height: 200px;" >
+        <div style="height: 100vh"
+      class=" text-center q-pa-md flex flex-center"
+     >
+    <div>
+      <div class="text-h4" style="opacity: 0.8">Search history not enabled /activated. Please contact to administrator.</div>
+
+      <q-btn
+        class="q-mt-xl"
+      
+        text-color="blue"
+        unelevated
+        label="Go Back to Logs page"
+        no-caps
+        @click="redirectBackToLogs"
+      />
+    </div>
+  </div>
       </div>
     </div>
 
@@ -322,7 +338,6 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
-import Error404 from "@/views/Error404.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -340,7 +355,6 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
     SearchHistory,
-    Error404,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -884,6 +898,15 @@ export default defineComponent({
 
     };
 
+    const redirectBackToLogs = () =>{
+      router.push({
+        name: "logs",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
+
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
         if (item.expr) {
@@ -1228,6 +1251,7 @@ export default defineComponent({
       onAutoIntervalTrigger,
       showSearchHistory,
       showSearchHistoryfn,
+      redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
       resetSearchObj,
