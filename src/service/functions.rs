@@ -108,6 +108,15 @@ pub async fn update_function(
     }
     extract_num_args(&mut func);
 
+    if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        );
+    }
+
     // update associated pipelines
     if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
@@ -127,14 +136,6 @@ pub async fn update_function(
         }
     }
 
-    if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        );
-    }
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         FN_SUCCESS.to_string(),
