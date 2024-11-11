@@ -22,143 +22,72 @@ export enum ColorModeWithoutMinMax {
   FIXED = "fixed",
 }
 
-declare global {
-  interface Window {
-    _o2_setDashboardColors: () => any;
-  }
-}
-
-const defaultColors = [
-  // "#a2b6ff",
-  // "#889ef9",
-  // "#6e87df",
-  // "#5470c6",
-  // "#385aad",
-  // "#c3ffa5",
-  // "#aae58d",
-  // "#91cc75",
-  // "#79b35e",
-  // "#619b48",
-  // "#ffffa1",
-  // "#fffb89",
-  // "#ffe170",
-  // "#fac858",
-  // "#dfaf40",
-  // "#ffb1ac",
-  // "#ff9794",
-  // "#ff7f7d",
-  // "#ee6666",
-  // "#d24d50",
-  // "#c1ffff",
-  // "#a6f3ff",
-  // "#8dd9f8",
-  // "#73c0de",
-  // "#59a8c5",
-  // "#89eeb9",
-  // "#6fd4a1",
-  // "#56bb89",
-  // "#3ba272",
-  // "#1c8a5c",
-  // "#ffce98",
-  // "#ffb580",
-  // "#ff9c69",
-  // "#fc8452",
-  // "#e06c3c",
-  // "#e6a7ff",
-  // "#cc8fe6",
-  // "#b377cd",
-  // "#9a60b4",
-  // "#824a9c",
-  // "#ffc7ff",
-  // "#ffaeff",
-  // "#ff95e5",
-  // "#ea7ccc",
-  // "#d064b3",
-  "#F54337",
-  "#4CB050",
-  "#03A9F5",
-  "#FFEB3C",
-  "#9C28B1",
-  "#009788",
-  "#2196F3",
-  "#FE5722",
-  "#8CC34B",
-  "#673BB7",
-  "#FEC107",
-  "#00BCD5",
-  "#EA1E63",
-  "#CDDC39",
-  "#FF9801",
-  "#3F51B5",
-  "#EF999A",
-  "#A5D6A7",
-  "#81D5FA",
-  "#FFF59C",
-  "#CF93D9",
-  "#80CBC4",
-  "#90CAF8",
-  "#FFAB91",
-  "#C5E1A6",
-  "#B39DDB",
-  "#FFE083",
-  "#80DEEA",
+export const classicColorPalette = [
+  "#FFCDD2",
+  "#EF9A9A",
+  "#E57373",
+  "#EF5350",
+  "#F8BBD0",
   "#F48FB1",
-  "#E6EE9B",
+  "#F06292",
+  "#EC407A",
+  "#E1BEE7",
+  "#CE93D8",
+  "#BA68C8",
+  "#AB47BC",
+  "#D1C4E9",
+  "#B39DDB",
+  "#9575CD",
+  "#7E57C2",
+  "#C5CAE9",
+  "#9FA8DA",
+  "#7986CB",
+  "#5C6BC0",
+  "#BBDEFB",
+  "#90CAF9",
+  "#64B5F6",
+  "#42A5F5",
+  "#B3E5FC",
+  "#81D4FA",
+  "#4FC3F7",
+  "#29B6F6",
+  "#B2EBF2",
+  "#80DEEA",
+  "#4DD0E1",
+  "#26C6DA",
+  "#B2DFDB",
+  "#80CBC4",
+  "#4DB6AC",
+  "#26A69A",
+  "#C8E6C9",
+  "#A5D6A7",
+  "#81C784",
+  "#66BB6A",
+  "#DCEDC8",
+  "#C5E1A5",
+  "#AED581",
+  "#9CCC65",
+  "#F0F4C3",
+  "#E6EE9C",
+  "#DCE775",
+  "#D4E157",
+  "#FFF9C4",
+  "#FFF59D",
+  "#FFF176",
+  "#FFEE58",
+  "#FFECB3",
+  "#FFE082",
+  "#FFD54F",
+  "#FFCA28",
+  "#FFE0B2",
   "#FFCC80",
-  "#9EA8DB",
-  "#B71B1C",
-  "#1C5E20",
-  "#02569C",
-  "#F57E16",
-  "#4A148C",
-  "#014D41",
-  "#0E47A1",
-  "#BF360C",
-  "#33691E",
-  "#301B92",
-  "#FF6F00",
-  "#016064",
-  "#890E4F",
-  "#817716",
-  "#E65100",
-  "#1A237E",
-  "#FF5253",
-  "#69F0AE",
-  "#3FC4FF",
-  "#FFFF01",
-  "#E040FC",
-  "#64FEDA",
-  "#4489FE",
-  "#FF6E41",
-  "#B2FF59",
-  "#7C4DFF",
-  "#FFD741",
-  "#19FFFF",
-  "#FF4181",
-  "#EEFF41",
-  "#FFAB40",
-  "#536DFE",
-  "#D60000",
-  "#01C853",
-  "#0091EA",
-  "#FFD600",
-  "#AA00FF",
-  "#01BFA5",
-  "#2A62FF",
-  "#DD2C00",
-  "#64DD16",
-  "#6200EB",
-  "#FFAB00",
-  "#00B8D4",
-  "#C41162",
-  "#AEEA00",
-  "#FF6D00",
-  "#304FFF",
+  "#FFB74D",
+  "#FFA726",
+  "#FFCCBC",
+  "#FFAB91",
+  "#FF8A65",
+  "#FF7043",
 ];
-
-export const getClassicColorPalette = () => {
-  return window._o2_setDashboardColors || defaultColors;
-};
 
 const isValidHexColor = (color: string): boolean => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
@@ -265,7 +194,7 @@ export const getSQLMinMaxValue = (
 const getSeriesHash = (seriesName: string) => {
   // Initialize a hash variable
   let hash = 0;
-  const classicColorPaletteLength = getClassicColorPalette().length;
+  const classicColorPaletteLength = classicColorPalette.length;
   // If the seriesName is empty, return 1 as a default hash value
   if (seriesName.length === 0) return 1;
 
@@ -365,9 +294,8 @@ export const getSeriesColor = (
   chartMin: number,
   chartMax: number,
 ): string | null => {
-  const palette: any = getClassicColorPalette();
   if (!colorCfg) {
-    return palette[getSeriesHash(seriesName)];
+    return classicColorPalette[getSeriesHash(seriesName)];
   } else if (colorCfg.mode === "fixed") {
     return colorCfg?.fixedColor?.[0] ?? "#53ca53";
   } else if (colorCfg.mode === "shades") {
@@ -378,7 +306,7 @@ export const getSeriesColor = (
       chartMax,
     );
   } else if (colorCfg.mode === "palette-classic-by-series") {
-    return palette[getSeriesHash(seriesName)];
+    return classicColorPalette[getSeriesHash(seriesName)];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {
@@ -386,9 +314,9 @@ export const getSeriesColor = (
       getDomainPartitions(
         chartMin,
         chartMax,
-        colorCfg?.fixedColor?.length ?? palette.length,
+        colorCfg?.fixedColor?.length ?? classicColorPalette.length,
       ),
-      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : palette,
+      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : classicColorPalette,
     );
     return d3ColorObj(
       getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
