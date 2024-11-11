@@ -688,9 +688,9 @@ pub async fn merge_files(
             &defined_schema_fields,
             need_original,
         );
-        schema_latest.schema().clone()
+        schema_latest.schema().as_ref().clone()
     } else {
-        Arc::new(schema_latest)
+        schema_latest
     };
 
     // read schema from parquet file and group files by schema
