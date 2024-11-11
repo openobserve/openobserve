@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboards-folder-tabs"
           >
             <q-tab
-              v-for="(tab, index) in store.state.organizationData.folders"
+              v-for="(tab, index) in sortedFolders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
@@ -479,13 +479,30 @@ export default defineComponent({
       if (
         route.query.folder &&
         store.state.organizationData.folders.find(
-          (it: any) => it.folderId === route.query.folder
+          (it: any) => it.folderId === route.query.folder,
         )
       ) {
         activeFolderId.value = route.query.folder;
       } else {
         activeFolderId.value = "default";
       }
+    });
+
+    const sortedFolders = computed(() => {
+      const folders = store.state.organizationData.folders;
+
+      if (folders.length === 0) return folders;
+
+      // Extract the first item (0th index) to keep it as "default"
+      const defaultFolder = folders[0];
+
+      // Sort the remaining folders (excluding the first item)
+      const sortedRest = folders
+        .slice(1)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Combine the default folder with the sorted rest
+      return [defaultFolder, ...sortedRest];
     });
 
     watch(
@@ -505,7 +522,7 @@ export default defineComponent({
           },
         });
       },
-      { deep: true }
+      { deep: true },
     );
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -546,7 +563,7 @@ export default defineComponent({
         const dashboard = await getDashboard(
           store,
           dashboardId,
-          activeFolderId.value ?? "default"
+          activeFolderId.value ?? "default",
         );
 
         // Duplicate the dashboard
@@ -560,7 +577,7 @@ export default defineComponent({
         await dashboardService.create(
           store.state.selectedOrganization.identifier,
           data,
-          activeFolderId.value || "default"
+          activeFolderId.value || "default",
         );
 
         await getDashboards();
@@ -602,7 +619,7 @@ export default defineComponent({
     const dashboards = computed(function () {
       const dashboardList = toRaw(
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-          []
+          [],
       );
       return dashboardList.map((board: any, index) => {
         return {
@@ -632,7 +649,7 @@ export default defineComponent({
           await deleteDashboardById(
             store,
             selectedDelete.value.id,
-            activeFolderId.value ?? "default"
+            activeFolderId.value ?? "default",
           );
           showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
@@ -694,7 +711,7 @@ export default defineComponent({
               "Folder deletion failed",
             {
               timeout: 2000,
-            }
+            },
           );
         } finally {
           confirmDeleteFolderDialog.value = false;
@@ -759,6 +776,7 @@ export default defineComponent({
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
       handleDashboardMoved,
+      sortedFolders,
     };
   },
   methods: {
@@ -842,8 +860,8 @@ export default defineComponent({
         }
 
         &--active {
-          background-color: $accent;
-          color: black;
+          background-color: $primary;
+          color: white;
         }
       }
     }
@@ -856,5 +874,9 @@ export default defineComponent({
     padding: 0px 16px;
     height: 32px;
   }
+}
+
+.folder-name {
+  text-transform: none !important;
 }
 </style>
