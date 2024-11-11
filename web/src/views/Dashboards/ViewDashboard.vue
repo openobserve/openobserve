@@ -45,9 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-back-btn"
               class="hideOnPrintMode"
             />
-            <span class="q-table__title color q-mx-sm q-mt-xs">{{
-              folderNameFromFolderId 
-            }} / </span>
+            <span
+              class="q-table__title color q-mx-sm q-mt-xs"
+              @click="goBackToDashboardList"
+              >{{ folderNameFromFolderId }} /
+            </span>
             <span class="q-table__title q-mt-xs">{{
               currentDashboardData.data?.title
             }}</span>
@@ -1070,7 +1072,11 @@ export default defineComponent({
   height: 30px;
 }
 
-.color{
-  // text-color:
+.color {
+  color: $primary !important;
+}
+
+.color:hover {
+  background-color: $accent !important;
 }
 </style>
