@@ -90,30 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           content-class="tab_content"
         />
         <q-route-tab
-          name="kinesisfirehose"
-          :to="{
-            name: 'kinesisfirehose',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
-          label="Kinesis Firehose"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="gcpLogs"
-          :to="{
-            name: 'gcpLogs',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
-          label="GCP Logs via (Pub/Sub)"
-          content-class="tab_content"
-        />
-        <q-route-tab
           name="ingestLogsFromOtel"
           :to="{
             name: 'ingestLogsFromOtel',
@@ -212,10 +188,8 @@ export default defineComponent({
       "curl",
       "fluentbit",
       "fluentd",
-      "kinesisfirehose",
       "vector",
       "syslog",
-      "gcpLogs",
       "syslogNg",
     ];
 
