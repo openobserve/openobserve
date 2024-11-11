@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="handleUpdateSavedView(props.row, props.row.view_name)"
                     >
                       <q-icon
-                        name="sync"
+                        name="save"
                         color="grey"
                         size="xs"
                       />
