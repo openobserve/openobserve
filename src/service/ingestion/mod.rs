@@ -46,7 +46,8 @@ use vrl::{
 };
 
 use super::{
-    db::pipeline, pipeline::batch_execution::ExecutablePipeline, usage::publish_triggers_usage,
+    db::pipeline, pipeline::batch_execution::ExecutablePipeline,
+    self_reporting::publish_triggers_usage,
 };
 use crate::{
     common::{

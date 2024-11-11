@@ -57,7 +57,7 @@ use {
     tracing::info_span,
 };
 
-use super::usage::report_request_usage_stats;
+use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster},
     handler::grpc::request::search::Searcher,

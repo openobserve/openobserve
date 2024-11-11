@@ -44,7 +44,7 @@ use crate::{
         db::{self, scheduler::ScheduledTriggerData},
         ingestion::ingestion_service,
         pipeline::batch_execution::ExecutablePipeline,
-        usage::publish_triggers_usage,
+        self_reporting::publish_triggers_usage,
     },
 };
 

@@ -91,6 +91,10 @@ impl Node {
     pub fn is_function_node(&self) -> bool {
         matches!(&self.data, NodeData::Function(_))
     }
+
+    pub fn node_type(&self) -> String {
+        self.data.to_string()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -115,6 +119,17 @@ pub enum NodeData {
     Query(DerivedStream),
     Function(FunctionParams),
     Condition(ConditionParams),
+}
+
+impl std::fmt::Display for NodeData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeData::Stream(_) => write!(f, "stream"),
+            NodeData::Query(_) => write!(f, "query"),
+            NodeData::Function(_) => write!(f, "function"),
+            NodeData::Condition(_) => write!(f, "condition"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]

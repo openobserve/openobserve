@@ -57,7 +57,7 @@ use crate::{
             MetadataType,
         },
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

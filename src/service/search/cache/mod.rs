@@ -39,7 +39,7 @@ use crate::{
     },
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
-        usage::{http_report_metrics, report_request_usage_stats},
+        self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
 

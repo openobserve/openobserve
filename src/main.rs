@@ -54,7 +54,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER, usage},
+    service::{db, metadata, search::SEARCH_SERVER, self_reporting},
 };
 use opentelemetry::{global, trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
@@ -340,7 +340,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("HTTP server stopped");
 
     // flush usage report
-    usage::flush().await;
+    self_reporting::flush().await;
 
     // leave the cluster
     _ = cluster::leave().await;

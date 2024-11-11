@@ -18,9 +18,13 @@ use config::{
     get_config,
     meta::{
         cluster::get_internal_grpc_token,
-        self_reporting::usage::{
-            AggregatedData, GroupKey, TriggerData, UsageData, UsageEvent, TRIGGERS_USAGE_STREAM,
-            USAGE_STREAM,
+        self_reporting::{
+            error::ErrorData,
+            usage::{
+                AggregatedData, GroupKey, TriggerData, UsageData, UsageEvent,
+                TRIGGERS_USAGE_STREAM, USAGE_STREAM,
+            },
+            ReportingData,
         },
     },
     utils::json,
@@ -67,7 +71,7 @@ pub(super) async fn ingest(
         Ok(res) => res.into_inner(),
         Err(err) => {
             log::error!(
-                "[UsageReport] export partial_success node: {addr}, response: {:?}",
+                "[SELF-REPORTING] export partial_success node: {addr}, response: {:?}",
                 err
             );
             if err.code() == tonic::Code::Internal {
@@ -84,7 +88,7 @@ pub(super) async fn ingest(
 
 pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
-        log::info!("Returning as no usages reported ");
+        log::info!("[SELF-REPORTING] Returning as no usages reported ");
         return;
     }
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
@@ -156,7 +160,7 @@ pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
                 let resp_status = resp.status();
                 if !resp_status.is_success() {
                     log::error!(
-                        "Error in ingesting usage data to external URL: {}",
+                        "[SELF-REPORTING] Error in ingesting usage data to external URL: {}",
                         resp.text()
                             .await
                             .unwrap_or_else(|_| resp_status.to_string())
@@ -164,39 +168,36 @@ pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
                     if &cfg.common.usage_reporting_mode != "both" {
                         // on error in ingesting usage data, push back the data
                         let curr_usages = curr_usages.clone();
-                        if let Err(e) = super::queuer::USAGE_QUEUER
-                            .enqueue(
-                                curr_usages
-                                    .into_iter()
-                                    .map(|item| super::queuer::UsageBuffer::Usage(Box::new(item)))
-                                    .collect(),
-                            )
-                            .await
-                        {
-                            log::error!(
-                                "Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                            );
+                        for usage_data in curr_usages {
+                            if let Err(e) = super::queues::USAGE_QUEUE
+                                .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                                .await
+                            {
+                                log::error!(
+                                    "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                                );
+                            }
                         }
                     }
                 }
             }
             Err(e) => {
-                log::error!("Error in ingesting usage data to external URL {:?}", e);
+                log::error!(
+                    "[SELF-REPORTING] Error in ingesting usage data to external URL {:?}",
+                    e
+                );
                 if &cfg.common.usage_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();
-                    if let Err(e) = super::queuer::USAGE_QUEUER
-                        .enqueue(
-                            curr_usages
-                                .into_iter()
-                                .map(|item| super::queuer::UsageBuffer::Usage(Box::new(item)))
-                                .collect(),
-                        )
-                        .await
-                    {
-                        log::error!(
-                            "Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                        );
+                    for usage_data in curr_usages {
+                        if let Err(e) = super::queues::USAGE_QUEUE
+                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                            .await
+                        {
+                            log::error!(
+                                "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                            );
+                        }
                     }
                 }
             }
@@ -214,32 +215,31 @@ pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
             data: Some(cluster_rpc::UsageData::from(report_data)),
         };
         if let Err(e) = ingest(&cfg.common.usage_org, req).await {
-            log::error!("Error in ingesting usage data {:?}", e);
+            log::error!("[SELF-REPORTING] Error in ingesting usage data {:?}", e);
             // on error in ingesting usage data, push back the data
-            if let Err(e) = super::queuer::USAGE_QUEUER
-                .enqueue(
-                    curr_usages
-                        .into_iter()
-                        .map(|item| super::queuer::UsageBuffer::Usage(Box::new(item)))
-                        .collect(),
-                )
-                .await
-            {
-                log::error!("Error in pushing back un-ingested Usage data to UsageQueuer: {e}");
+            for usage_data in curr_usages {
+                if let Err(e) = super::queues::USAGE_QUEUE
+                    .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                    .await
+                {
+                    log::error!(
+                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                    );
+                }
             }
         }
     }
 }
 
-pub(super) async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
-    if curr_usages.is_empty() {
-        log::info!(" Returning as no triggers reported");
+pub(super) async fn ingest_trigger_usages(trigger_data: Vec<TriggerData>) {
+    if trigger_data.is_empty() {
+        log::info!("[SELF-REPORTING] Returning as no triggers reported");
         return;
     }
 
     let mut json_triggers = vec![];
-    for trigger_data in &curr_usages {
-        json_triggers.push(json::to_value(trigger_data).unwrap());
+    for item in &trigger_data {
+        json_triggers.push(json::to_value(item).unwrap());
     }
 
     // report trigger usage data
@@ -248,17 +248,55 @@ pub(super) async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
         data: Some(cluster_rpc::UsageData::from(json_triggers)),
     };
     if let Err(e) = ingest(&get_config().common.usage_org, req).await {
-        log::error!("Error in ingesting triggers usage data {:?}", e);
-        if let Err(e) = super::queuer::USAGE_QUEUER
-            .enqueue(
-                curr_usages
-                    .into_iter()
-                    .map(|item| super::queuer::UsageBuffer::Trigger(Box::new(item)))
-                    .collect(),
-            )
-            .await
-        {
-            log::error!("Error in pushing back un-ingested Usage data to UsageQueuer: {e}");
+        log::error!(
+            "[SELF-REPORTING] Error in ingesting triggers usage data {:?}",
+            e
+        );
+        // on error in ingesting trigger data, push back to the queue
+        for trigger in trigger_data {
+            if let Err(e) = super::queues::USAGE_QUEUE
+                .enqueue(ReportingData::Trigger(Box::new(trigger)))
+                .await
+            {
+                log::error!(
+                    "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                );
+            }
         }
     }
+}
+
+pub(super) async fn ingest_errors(error_data: Vec<ErrorData>) {
+    if error_data.is_empty() {
+        log::info!("[SELF-REPORTING] Returning as no errors reported");
+        return;
+    }
+
+    let mut json_errors = vec![];
+    for item in &error_data {
+        json_errors.push(json::to_value(item).unwrap());
+    }
+
+    // report trigger usage data
+    // let req = cluster_rpc::UsageRequest {
+    //     stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
+    //     data: Some(cluster_rpc::UsageData::from(json_triggers)),
+    // };
+    // if let Err(e) = ingest(&get_config().common.usage_org, req).await {
+    //     log::error!(
+    //         "[SELF-REPORTING] Error in ingesting triggers usage data {:?}",
+    //         e
+    //     );
+    //     // on error in ingesting trigger data, push back to the queue
+    //     for trigger in trigger_data {
+    //         if let Err(e) = super::queues::USAGE_QUEUE
+    //             .enqueue(ReportingData::Trigger(Box::new(trigger)))
+    //             .await
+    //         {
+    //             log::error!(
+    //                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to
+    // UsageQueuer: {e}"             );
+    //         }
+    //     }
+    // }
 }

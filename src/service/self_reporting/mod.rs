@@ -17,17 +17,22 @@ use chrono::{DateTime, Datelike, Timelike};
 use config::{
     get_config,
     meta::{
-        self_reporting::usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
+        self_reporting::{
+            error::ErrorData,
+            usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
+            ReportingData,
+        },
         stream::StreamType,
     },
     metrics, SIZE_IN_MB,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
-use tokio::sync::oneshot;
+use proto::cluster_rpc;
+use tokio::{sync::oneshot, time};
 
 mod ingestion;
-mod queuer;
+mod queues;
 
 pub async fn run() {
     let cfg = get_config();
@@ -35,23 +40,31 @@ pub async fn run() {
         return;
     }
 
-    // Force initialization and wait for the background task to be ready
-    let (ping_sender, ping_receiver) = oneshot::channel();
-    if let Err(e) = queuer::USAGE_QUEUER
-        .msg_sender
-        .send(queuer::UsageMessage::Ping(ping_sender))
-        .await
-    {
-        log::error!("[USAGE] Failed to initialize usage queuer: {e}");
+    // Force initialization usage queue
+    let (usage_start_sender, usage_start_receiver) = oneshot::channel();
+    if let Err(e) = queues::USAGE_QUEUE.start(usage_start_sender).await {
+        log::error!("[SELF-REPORTING] Failed to initialize usage queue: {e}");
         return;
     }
 
-    if let Err(e) = ping_receiver.await {
-        log::error!("[USAGE] Usage queuer initialization failed: {e}");
+    if let Err(e) = usage_start_receiver.await {
+        log::error!("[SELF-REPORTING] Usage queue initialization failed: {e}");
         return;
     }
 
-    log::debug!("[USAGE] Usage queuer initialized successfully");
+    // Force initialization error queue
+    let (error_start_sender, error_start_receiver) = oneshot::channel();
+    if let Err(e) = queues::ERROR_QUEUE.start(error_start_sender).await {
+        log::error!("[SELF-REPORTING] Failed to initialize error queue: {e}");
+        return;
+    }
+
+    if let Err(e) = error_start_receiver.await {
+        log::error!("[SELF-REPORTING] Error queue initialization failed: {e}");
+        return;
+    }
+
+    log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
 }
 
 pub async fn report_request_usage_stats(
@@ -163,23 +176,22 @@ pub async fn report_request_usage_stats(
     }
 }
 
-async fn publish_usage(usage: Vec<UsageData>) {
+async fn publish_usage(usages: Vec<UsageData>) {
     let cfg = get_config();
     if !cfg.common.usage_enabled {
         return;
     }
 
-    if let Err(e) = queuer::USAGE_QUEUER
-        .enqueue(
-            usage
-                .into_iter()
-                .map(|item| queuer::UsageBuffer::Usage(Box::new(item)))
-                .collect(),
-        )
-        .await
-    {
-        log::error!("[USAGE] Failed to send usage data to background ingesting job: {e}")
-    };
+    for usage in usages {
+        if let Err(e) = queues::USAGE_QUEUE
+            .enqueue(ReportingData::Usage(Box::new(usage)))
+            .await
+        {
+            log::error!(
+                "[SELF-REPORTING] Failed to send usage data to background ingesting job: {e}"
+            );
+        }
+    }
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
@@ -188,17 +200,39 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
         return;
     }
 
-    match queuer::USAGE_QUEUER
-        .enqueue(vec![queuer::UsageBuffer::Trigger(Box::new(trigger))])
+    match queues::USAGE_QUEUE
+        .enqueue(ReportingData::Trigger(Box::new(trigger)))
         .await
     {
         Err(e) => {
             log::error!(
-                "[USAGE] Failed to send trigger usage data to background ingesting job: {e}"
+                "[SELF-REPORTING] Failed to send trigger usage data to background ingesting job: {e}"
             )
         }
         Ok(()) => {
-            log::debug!("[USAGE] Successfully queued trigger usage data to be ingested")
+            log::debug!("[SELF-REPORTING] Successfully queued trigger usage data to be ingested")
+        }
+    }
+}
+
+pub async fn publish_error(error_data: ErrorData) {
+    let cfg = get_config();
+    // TODO(taiming): diff env
+    if !cfg.common.usage_enabled {
+        return;
+    }
+
+    match queues::ERROR_QUEUE
+        .enqueue(ReportingData::Error(Box::new(error_data)))
+        .await
+    {
+        Err(e) => {
+            log::error!(
+                "[SELF-REPORTING] Failed to send error data to background ingesting job: {e}"
+            )
+        }
+        Ok(()) => {
+            log::debug!("[SELF-REPORTING] Successfully queued error data to be ingested");
         }
     }
 }
@@ -211,11 +245,18 @@ pub async fn flush() {
     // shutdown usage_queuer
     for _ in 0..get_config().limit.usage_reporting_thread_num {
         let (res_sender, res_receiver) = oneshot::channel();
-        if let Err(e) = queuer::USAGE_QUEUER.shutdown(res_sender).await {
-            log::error!("[USAGE] Error shutting down USAGE_QUEUER: {e}");
+        if let Err(e) = queues::USAGE_QUEUE.shutdown(res_sender).await {
+            log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");
         }
         // wait for flush ingestion job
         res_receiver.await.ok();
+
+        let (error_sender, error_receiver) = oneshot::channel();
+        if let Err(e) = queues::ERROR_QUEUE.shutdown(error_sender).await {
+            log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");
+        }
+        // wait for flush ingestion job
+        error_receiver.await.ok();
     }
 }
 

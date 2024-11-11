@@ -49,7 +49,7 @@ use crate::{
         format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

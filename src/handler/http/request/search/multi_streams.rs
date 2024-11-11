@@ -45,7 +45,7 @@ use crate::{
     },
     service::{
         search::{self as SearchService, RESULT_ARRAY},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

@@ -53,7 +53,7 @@ use crate::{
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

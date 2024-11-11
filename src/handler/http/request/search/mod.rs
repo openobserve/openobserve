@@ -47,7 +47,7 @@ use crate::{
     },
     service::{
         search as SearchService,
-        usage::{http_report_metrics, report_request_usage_stats},
+        self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
 

@@ -53,7 +53,7 @@ use crate::{
         metrics::{format_label_name, get_exclude_labels},
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

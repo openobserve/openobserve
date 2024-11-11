@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use tokio::sync::{mpsc, oneshot};
+use error::ErrorData;
+use tokio::{
+    sync::{mpsc, oneshot},
+    time,
+};
 use usage::{TriggerData, UsageData};
 
+pub mod error;
 pub mod usage;
 
 #[derive(Debug)]
@@ -25,9 +30,80 @@ pub struct ReportingQueue {
 
 #[derive(Debug)]
 pub enum ReportingMessage {
-    Usage(UsageData),
-    Trigger(TriggerData),
-    Error,
+    Data(ReportingData),
     Shutdown(oneshot::Sender<()>),
     Start(oneshot::Sender<()>),
+}
+
+#[derive(Debug)]
+pub enum ReportingData {
+    Usage(Box<UsageData>),
+    Trigger(Box<TriggerData>),
+    Error(Box<ErrorData>),
+}
+
+#[derive(Debug)]
+pub struct ReportingRunner {
+    pub pending: Vec<ReportingData>,
+    pub batch_size: usize, 
+    pub timeout: time::Duration,
+    pub last_processed: time::Instant,
+}
+
+impl ReportingQueue {
+    pub fn new(msg_sender: mpsc::Sender<ReportingMessage>) -> Self {
+        Self { msg_sender }
+    }
+
+    pub async fn enqueue(
+        &self,
+        reporting_data: ReportingData,
+    ) -> Result<(), mpsc::error::SendError<ReportingMessage>> {
+        self.msg_sender
+            .send(ReportingMessage::Data(reporting_data))
+            .await
+    }
+
+    pub async fn start(
+        &self,
+        start_sender: oneshot::Sender<()>,
+    ) -> Result<(), mpsc::error::SendError<ReportingMessage>> {
+        self.msg_sender
+            .send(ReportingMessage::Start(start_sender))
+            .await
+    }
+
+    pub async fn shutdown(
+        &self,
+        res_sender: oneshot::Sender<()>,
+    ) -> Result<(), mpsc::error::SendError<ReportingMessage>> {
+        self.msg_sender
+            .send(ReportingMessage::Shutdown(res_sender))
+            .await
+    }
+}
+
+impl ReportingRunner {
+    pub fn new(batch_size: usize, timeout: time::Duration) -> Self {
+        Self {
+            pending: vec![],
+            batch_size,
+            timeout,
+            last_processed: time::Instant::now(),
+        }
+    }
+
+    pub fn push(&mut self, data: ReportingData) {
+        self.pending.push(data);
+    }
+
+    pub fn should_process(&self) -> bool {
+        self.pending.len() >= self.batch_size
+            || (!self.pending.is_empty() && self.last_processed.elapsed() >= self.timeout)
+    }
+
+    pub fn take_batch(&mut self) -> Vec<ReportingData> {
+        self.last_processed = time::Instant::now();
+        std::mem::take(&mut self.pending)
+    }
 }

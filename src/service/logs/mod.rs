@@ -49,7 +49,7 @@ use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
