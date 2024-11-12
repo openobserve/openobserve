@@ -211,6 +211,7 @@ const defaultObject = {
     functionError: "",
     searchRequestTraceIds: <string[]>[],
     isOperationCancelled: false,
+    timezone:"",
   },
 };
 

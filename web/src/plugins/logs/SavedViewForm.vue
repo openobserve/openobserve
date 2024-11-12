@@ -796,9 +796,6 @@ const getSearchObj = () => {
     delete savedSearchObj.data.savedViews;
     delete savedSearchObj.data.transforms;
 
-    //this needs to be under no-check and in future we need to add a timeZone property in uselogs to handle this
-
-   //@ts-ignore
 
     savedSearchObj.data.timezone = store.state.timezone;
 
