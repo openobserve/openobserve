@@ -821,7 +821,8 @@ pub async fn merge_files(
         .await
         .map_err(|e| {
             anyhow::anyhow!(
-                "generate_index_on_compactor error: {}, need delete files: {:?}",
+                "generate_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                new_file_key,
                 e,
                 retain_file_list
             )
@@ -861,24 +862,23 @@ pub async fn merge_files(
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-        if let Err(e) = create_tantivy_index(
-            &mut reader,
+        let index_size =  create_tantivy_index(
+            "COMPACTOR",
             &new_file_key,
-            &mut new_file_meta,
             &full_text_search_fields,
             &index_fields,
             schema,
-            Some(retain_file_list.as_slice()),
+            &mut reader,
         )
-        .await
-        {
-            log::error!(
-                "create_tantivy_index for file: {}, error: {}, need delete files: {:?}",
+        .await.map_err(|e| {
+            anyhow::anyhow!(
+                "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
                 new_file_key,
                 e,
                 retain_file_list
-            );
-        }
+            )
+        })?;
+        new_file_meta.index_size = index_size as i64;
     }
 
     Ok((new_file_key, new_file_meta, retain_file_list))

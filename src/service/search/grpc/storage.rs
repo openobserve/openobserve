@@ -21,16 +21,11 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
         puffin_directory::reader::RamDirectoryReader,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::inverted_index::{
-        convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
-        create_index_reader_from_puffin_bytes, split_token,
-    },
-    FILE_EXT_PARQUET, INDEX_FIELD_NAME_FOR_ALL,
+    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::{future::try_join_all, io::Cursor};
@@ -119,15 +114,17 @@ pub async fn search(
     let cfg = get_config();
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
-    log::info!(
-        "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
-        query.trace_id,
-        use_inverted_index
-    );
+    if use_inverted_index {
+        log::info!(
+            "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
+            query.trace_id,
+            use_inverted_index
+        );
+    }
 
     let mut idx_took = 0;
     if use_inverted_index {
-        idx_took = filter_file_list_by_inverted_index(
+        idx_took = filter_file_list_by_tantivy_index(
             query.clone(),
             &mut files,
             req_equal_terms,
@@ -135,7 +132,7 @@ pub async fn search(
         )
         .await?;
         log::info!(
-            "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {}ms",
+            "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {} ms",
             query.trace_id,
             query.org_id,
             query.stream_type,
@@ -213,6 +210,7 @@ pub async fn search(
     }
 
     // load files to local cache
+    let cache_start = std::time::Instant::now();
     let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) = cache_files(
         &query.trace_id,
         &files.iter().map(|f| f.key.as_ref()).collect_vec(),
@@ -232,7 +230,7 @@ pub async fn search(
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -241,6 +239,7 @@ pub async fn search(
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
         cache_type,
+        cache_start.elapsed().as_millis()
     );
 
     // set target partitions based on cache type
@@ -328,8 +327,8 @@ async fn cache_files(
         let trace_id = trace_id.to_string();
         let file_name = file.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> = tokio::task::spawn(
-            async move {
+        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> =
+            tokio::task::spawn(async move {
                 let cfg = get_config();
                 let ret = match cache_type {
                     file_data::CacheType::Memory => {
@@ -364,43 +363,19 @@ async fn cache_files(
                     }
                     _ => (None, false, false),
                 };
-                // In case where the parquet file is not found or has no data, we assume that it
-                // must have been deleted by some external entity, and hence we
-                // should remove the entry from file_list table.
-                //
-                // Caching Index files is a little different from caching parquet filesd as index
-                // files are not present in the file_list table as of now
-                // (TODO: part of phase 2).
+                // return file_name if download failed
                 let file_name = if let Some(e) = ret.0 {
-                    if (e.to_string().to_lowercase().contains("not found")
-                        || e.to_string().to_lowercase().contains("data size is zero"))
-                    // only proceed if the file_name has parquet extension
-                    // FIXME: Revisit, after phase 2 of FST Index
-                        && file_name.ends_with(FILE_EXT_PARQUET)
-                    {
-                        // delete file from file list
-                        log::warn!("found invalid file: {}", file_name);
-                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                            log::error!(
-                                "[trace_id {trace_id}] search->storage: delete from file_list err: {}",
-                                e
-                            );
-                        }
-                        Some(file_name)
-                    } else {
-                        log::warn!(
-                            "[trace_id {trace_id}] search->storage: download file to cache err: {}",
-                            e
-                        );
-                        None
-                    }
+                    log::warn!(
+                        "[trace_id {trace_id}] search->storage: download file to cache err: {}",
+                        e
+                    );
+                    Some(file_name)
                 } else {
                     None
                 };
                 drop(permit);
                 (file_name, ret.1, ret.2)
-            },
-        );
+            });
         tasks.push(task);
     }
 
@@ -439,7 +414,7 @@ async fn cache_files(
 /// If the query does not match any FST in the index file, the file will be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
 /// If the query not find corresponding index file, the file will *not* be filtered out.
-async fn filter_file_list_by_inverted_index(
+async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     equal_terms: &[KvItem],
@@ -460,23 +435,19 @@ async fn filter_file_list_by_inverted_index(
     let index_terms_orig = super::super::filter_index_fields(&equal_terms, &index_fields);
     let index_terms = generate_filter_from_equal_items(&index_terms_orig);
 
-    let use_tantivy = cfg.common.inverted_index_search_format.eq("tantivy");
-    log::info!(
-        "[trace_id {}] search->storage: query using tantivy: {}",
-        query.trace_id,
-        use_tantivy,
-    );
-
     // Cache the corresponding Index files
     let mut scan_stats = ScanStats::new();
-    let mut file_list_map = file_list.drain(..).into_group_map_by(|f| f.key.clone());
+    let mut file_list_map = file_list
+        .drain(..)
+        .map(|f| (f.key.clone(), f))
+        .collect::<HashMap<_, _>>();
     let index_file_names = file_list_map
-        .keys()
-        .filter_map(|f| {
-            if use_tantivy {
-                convert_parquet_idx_file_name_to_tantivy_file(f)
+        .iter()
+        .filter_map(|(_, f)| {
+            if f.meta.index_size > 0 {
+                convert_parquet_idx_file_name_to_tantivy_file(&f.key)
             } else {
-                convert_parquet_idx_file_name(f)
+                None
             }
         })
         .collect_vec();
@@ -493,7 +464,7 @@ async fn filter_file_list_by_inverted_index(
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        "[trace_id {}] search->storage: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -502,70 +473,30 @@ async fn filter_file_list_by_inverted_index(
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
         cache_type,
+        start.elapsed().as_millis()
     );
 
-    let full_text_terms = if !use_tantivy {
-        Arc::new(
-            match_terms
-                .iter()
-                .filter_map(|t| {
-                    let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-                    // If tokens empty return None so that full_text_terms will not have empty
-                    // strings
-                    if tokens.is_empty() {
-                        return None;
-                    }
-                    Some(
-                        tokens
-                            .into_iter()
-                            .max_by_key(|key| key.len())
-                            .unwrap_or_default(),
-                    )
-                })
-                .collect_vec(),
-        )
-    } else {
-        Arc::new(match_terms.to_vec())
-    };
-
+    let full_text_terms = Arc::new(match_terms.to_vec());
     let index_terms = Arc::new(index_terms);
 
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     let mut tasks = Vec::new();
 
     for file in file_list_map.keys() {
+        let file = file.clone();
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
-        let file_name = file.clone();
         let trace_id = query.trace_id.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
-        let task = if use_tantivy {
-            tokio::task::spawn(async move {
-                let res = search_tantivy_index(
-                    &trace_id,
-                    &file_name,
-                    full_text_term_clone,
-                    index_terms_clone,
-                )
-                .await;
-                drop(permit);
-                res
-            })
-        } else {
-            tokio::task::spawn(async move {
-                let res = inverted_index_search_in_file(
-                    &trace_id,
-                    &file_name,
-                    full_text_term_clone,
-                    index_terms_clone,
-                )
-                .await;
-                drop(permit);
-                res
-            })
-        };
+        let task = tokio::task::spawn(async move {
+            let res =
+                search_tantivy_index(&trace_id, &file, full_text_term_clone, index_terms_clone)
+                    .await;
+            drop(permit);
+            res
+        });
         tasks.push(task)
     }
 
@@ -582,8 +513,6 @@ async fn filter_file_list_by_inverted_index(
                     // Replace the segment IDs in the existing `FileKey` with the new found segments
                     let file = file_list_map
                         .get_mut(&file_name)
-                        .unwrap()
-                        .first_mut()
                         // we expect each file name has atleast 1 file
                         .unwrap();
                     let hits_per_file = res.count_ones();
@@ -624,7 +553,7 @@ async fn filter_file_list_by_inverted_index(
         index_terms,
         total_hits
     );
-    file_list.extend(file_list_map.into_values().flatten());
+    file_list.extend(file_list_map.into_values());
     Ok(start.elapsed().as_millis() as usize)
 }
 
@@ -828,99 +757,4 @@ async fn search_tantivy_index(
             "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
         ))
     }
-}
-
-async fn inverted_index_search_in_file(
-    trace_id: &str,
-    parquet_file_name: &str,
-    fts_terms: Arc<Vec<String>>,
-    index_terms: Arc<Vec<(String, Vec<String>)>>,
-) -> anyhow::Result<(String, Option<BitVec>)> {
-    let cfg = config::get_config();
-    let Some(index_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
-        return Err(anyhow::anyhow!(
-            "[trace_id {trace_id}] search->storage: Unable to convert parquet file name {} to index file name",
-            parquet_file_name
-        ));
-    };
-    let compressed_index_blob = match fetch_file(trace_id, &index_file_name).await {
-        Err(e) => {
-            log::warn!(
-                "[trace_id {trace_id}] search->storage: Unable to load corresponding FST index
-    file for parquet file {}, err: {}",
-                parquet_file_name,
-                e
-            );
-            return Err(e);
-        }
-        Ok(bytes) => bytes,
-    };
-
-    let mut res = BitVec::new();
-    let mut index_reader = create_index_reader_from_puffin_bytes(compressed_index_blob).await?;
-    if let Some(mut field_reader) = index_reader.field(INDEX_FIELD_NAME_FOR_ALL).await? {
-        let column_index_meta = field_reader.metadata().await?;
-        let matched_bv = match cfg.common.full_text_search_type.as_str() {
-            "eq" => {
-                let mut searcher = ExactSearch::new(fts_terms.as_ref(), &column_index_meta);
-                searcher.search(&mut field_reader).await
-            }
-            "contains" => {
-                let mut searcher = SubstringSearch::new(fts_terms.as_ref(), &column_index_meta);
-                searcher.search(&mut field_reader).await
-            }
-            // Default to prefix search
-            _ => {
-                let mut searcher = PrefixSearch::new(fts_terms.as_ref(), &column_index_meta);
-                searcher.search(&mut field_reader).await
-            }
-        };
-
-        match matched_bv {
-            Ok(bitmap) => {
-                if res.len() < bitmap.len() {
-                    res.resize(bitmap.len(), false);
-                }
-                res |= bitmap;
-            }
-            Err(e) => {
-                log::warn!(
-                    "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for full text search with error {}. Keep the file",
-                    index_file_name,
-                    e.to_string()
-                );
-            }
-        }
-    }
-
-    if !index_terms.is_empty() {
-        for (col, index_terms) in index_terms.iter() {
-            if let Some(mut field_reader) = index_reader.field(col).await? {
-                let column_index_meta = field_reader.metadata().await?;
-                let mut secondary_index_match = ExactSearch::new(index_terms, &column_index_meta);
-                match secondary_index_match.search(&mut field_reader).await {
-                    Ok(bitmap) => {
-                        if res.len() < bitmap.len() {
-                            res.resize(bitmap.len(), false);
-                        }
-                        res &= bitmap;
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for column {} with error {}. Keep the file",
-                            index_file_name,
-                            col,
-                            e.to_string()
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(if res.is_empty() {
-        (parquet_file_name.into(), None) // no match -> skip the file in search
-    } else {
-        (parquet_file_name.into(), Some(res)) // match -> take the file in search
-    })
 }

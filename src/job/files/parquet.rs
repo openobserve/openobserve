@@ -71,7 +71,6 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tantivy::{doc, schema::*, Directory};
 use tokio::{
     sync::{Mutex, RwLock},
     time,
@@ -773,22 +772,23 @@ async fn merge_files(
         .map_err(|e| anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e))?;
     }
 
+    // generate tantivy inverted index and write to storage
     if matches!(
         index_format,
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-        // generate fst inverted index and write to storage
-        create_tantivy_index(
-            &mut reader,
+        let index_size = create_tantivy_index(
+            "INGESTER",
             &new_file_key,
-            &mut new_file_meta,
             &full_text_search_fields,
             &index_fields,
             schema,
-            None,
+            &mut reader,
         )
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {}", e))?;
+        new_file_meta.index_size = index_size as i64;
     }
 
     Ok((new_file_key, new_file_meta, retain_file_list))
@@ -1333,15 +1333,18 @@ async fn prepare_index_record_batches(
 #[allow(dead_code)]
 pub(crate) async fn generate_fst_inverted_index(
     parquet_file_name: &str,
+    file_list_to_invalidate: Option<&[FileKey]>,
     full_text_search_fields: &[String],
     index_fields: &[String],
-    file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
-                                                  * .idx files */
-
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+    let caller = if file_list_to_invalidate.is_some() {
+        "[COMPACTOR:JOB]"
+    } else {
+        "[INGESTER:JOB]"
+    };
 
     if full_text_search_fields.is_empty() && index_fields.is_empty() {
         return Ok(());
@@ -1374,11 +1377,6 @@ pub(crate) async fn generate_fst_inverted_index(
     let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
         return Ok(());
     };
-    let caller = if file_list_to_invalidate.is_some() {
-        "[COMPACTOR:JOB]"
-    } else {
-        "[INGESTER:JOB]"
-    };
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
             log::info!(
@@ -1404,48 +1402,15 @@ pub(crate) async fn generate_fst_inverted_index(
 }
 
 pub(crate) async fn create_tantivy_index(
-    // accept reader
-    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    caller: &str,
     parquet_file_name: &str,
-    parquet_file_meta: &mut FileMeta,
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
-    file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
-                                                  * .idx files */
-) -> Result<(), anyhow::Error> {
-    // delete corresponding tantivy files in .ttv folder
-    if let Some(file_list) = file_list_to_invalidate {
-        for old_parquet_file in file_list {
-            // the parquet file has no index
-            if old_parquet_file.meta.index_size == 0 {
-                continue;
-            }
-            // get directory of the parquet file
-            if let Some(ttv_idx_file) =
-                convert_parquet_idx_file_name_to_tantivy_file(&old_parquet_file.key)
-            {
-                if let Err(e) = storage::del(&[&ttv_idx_file]).await {
-                    log::info!(
-                        "[COMPACTOR:JOB] Failed to remove merged tantivy index file from disk: {}, {}",
-                        ttv_idx_file,
-                        e
-                    );
-                }
-            } else {
-                // TODO: Return err in future when unable to find the tantivy index files
-                log::warn!(
-                    "[COMPACTOR:JOB] Failed to find tantivy index files from index directory",
-                );
-            }
-        }
-    }
-
-    let caller = if file_list_to_invalidate.is_some() {
-        "[COMPACTOR:JOB]"
-    } else {
-        "[INGESTER:JOB]"
-    };
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+) -> Result<usize, anyhow::Error> {
+    let start = std::time::Instant::now();
+    let caller = format!("[{caller}:JOB]");
 
     let dir = PuffinDirWriter::new();
     let _index = generate_tantivy_index(
@@ -1456,53 +1421,100 @@ pub(crate) async fn create_tantivy_index(
         schema,
     )
     .await?;
-
     let puffin_bytes = dir.to_puffin_bytes()?;
-
-    // Index size set here will be used to aggregate stream stats
-    parquet_file_meta.index_size = puffin_bytes.len() as i64;
+    let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
-    let Some(tantivy_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
+    let Some(idx_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
-        return Ok(());
+        return Ok(0);
     };
 
-    match storage::put(&tantivy_file_name, Bytes::from(puffin_bytes)).await {
+    match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
-                "{} Written tantivy index file successfully with size {}",
+                "{} Written tantivy index file successfully: {}, index size {}, took: {} ms",
                 caller,
-                parquet_file_meta.index_size,
+                idx_file_name,
+                index_size,
+                start.elapsed().as_millis()
             );
         }
         Err(e) => {
-            log::error!("{} Written fst index file error: {}", caller, e.to_string());
+            log::error!(
+                "{} Written tantivy index file error: {}",
+                caller,
+                e.to_string()
+            );
             return Err(e);
         }
     }
 
-    Ok(())
+    Ok(index_size)
 }
 
 /// Create a tantivy index in the given directory for the record batch
-pub(crate) async fn generate_tantivy_index<D: Directory>(
+pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     tantivy_dir: D,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
-) -> Result<tantivy::Index, anyhow::Error> {
-    let mut tantivy_schema_builder = SchemaBuilder::new();
-    // We just need, field and the row id
-    // Full text search columns are stored as the same field "_all" but the column values need to be
-    // merged together into a row before indexing
-    let mut _all_field = None;
+) -> Result<Option<tantivy::Index>, anyhow::Error> {
+    let start = std::time::Instant::now();
+    let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
     let schema_fields = schema
         .fields()
         .iter()
         .map(|f| (f.name(), f))
         .collect::<HashMap<_, _>>();
+
+    // filter out fields that are not in schema & not of type Utf8
+    let fts_fields = full_text_search_fields
+        .iter()
+        .filter(|f| {
+            schema_fields
+                .get(f)
+                .map(|v| v.data_type() == &DataType::Utf8)
+                .is_some()
+        })
+        .map(|f| f.to_string())
+        .collect::<HashSet<_>>();
+    let index_fields = index_fields
+        .iter()
+        .filter(|f| {
+            schema_fields
+                .get(f)
+                .map(|v| v.data_type() == &DataType::Utf8)
+                .is_some()
+        })
+        .map(|f| f.to_string())
+        .collect::<HashSet<_>>();
+    let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
+    if tantivy_fields.is_empty() {
+        return Ok(None);
+    }
+
+    // add fields to tantivy schema
+    if !fts_fields.is_empty() {
+        let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_fieldnorms(false),
+        );
+        tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
+    }
+    for field in index_fields.iter() {
+        let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer("raw")
+                .set_fieldnorms(false),
+        );
+        tantivy_schema_builder.add_text_field(field, index_opts);
+    }
+    let tantivy_schema = tantivy_schema_builder.build();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     let mut total_num_rows = 0;
     // docs per row to be added in the tantivy index
@@ -1522,108 +1534,62 @@ pub(crate) async fn generate_tantivy_index<D: Directory>(
         let prev_total_num_rows = total_num_rows;
         total_num_rows += num_rows;
 
-        for column_name in schema_fields.keys() {
-            let (field, column_data) = match (
-                index_fields.contains(column_name),
-                full_text_search_fields.contains(column_name),
-            ) {
-                (true, false) => {
-                    let secondary_index_opts = TextOptions::default().set_indexing_options(
-                        TextFieldIndexing::default()
-                            .set_index_option(IndexRecordOption::Basic)
-                            .set_tokenizer("raw")
-                            .set_fieldnorms(false),
-                    );
-
-                    let column_data = inverted_idx_batch.column_by_name(column_name).unwrap();
-                    let field = match column_data.data_type() {
-                        // currently we only support indexing utf8 columns
-                        DataType::Utf8 => {
-                            tantivy_schema_builder.add_text_field(column_name, secondary_index_opts)
-                        }
-                        _ => {
-                            log::warn!(
-                                "Unsupported data type for indexing: {}",
-                                column_data.data_type()
-                            );
-                            continue;
-                        }
-                    };
-
-                    (field, column_data)
-                }
-                // This is the field name for all full text search fields
-                (false, true) => {
-                    let column_data = inverted_idx_batch.column_by_name(column_name).unwrap();
-                    let field = if let Some(field) = _all_field {
-                        field
-                    } else {
-                        let full_text_search_opts = TextOptions::default().set_indexing_options(
-                            TextFieldIndexing::default()
-                                .set_index_option(IndexRecordOption::Basic)
-                                .set_fieldnorms(false),
-                        );
-                        let field = match column_data.data_type() {
-                            // currently we only support indexing utf8 columns
-                            DataType::Utf8 => {
-                                tantivy_schema_builder.add_text_field("_all", full_text_search_opts)
-                            }
-                            _ => {
-                                log::warn!(
-                                    "Unsupported data type for indexing: {}",
-                                    column_data.data_type()
-                                );
-                                continue;
-                            }
-                        };
-                        _all_field = Some(field);
-                        field
-                    };
-                    (field, column_data)
-                }
-                (false, false) => continue,
-                _ => {
-                    log::warn!(
-                        "Field {} is both full text search and index field, which is not supported",
-                        column_name
-                    );
-                    continue;
-                }
+        // process full text search fields
+        for column_name in tantivy_fields.iter() {
+            // get column
+            let Some(column_data) = inverted_idx_batch
+                .column_by_name(column_name)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+            else {
+                continue;
             };
 
-            for row in 0..num_rows {
-                // get the doc for a particular row
-                let doc = docs.entry(prev_total_num_rows + row).or_insert(doc!());
-                doc.add_text(
-                    field,
-                    column_data
-                        .as_any()
-                        .downcast_ref::<StringArray>()
-                        .unwrap()
-                        .value(row),
-                );
+            // get field
+            let field = match tantivy_schema.get_field(column_name) {
+                Ok(f) => f,
+                Err(_) => fts_field.unwrap(),
+            };
+            for i in 0..num_rows {
+                let doc = docs
+                    .entry(i + prev_total_num_rows)
+                    .or_insert(tantivy::doc!());
+                doc.add_text(field, column_data.value(i));
             }
         }
     }
 
-    let tantivy_schema = tantivy_schema_builder.build();
     // TODO: Check if 50MB is enough for the tantivy index for >1GB parquet file
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    for (_, doc) in docs.into_iter() {
+    for (_rowid, doc) in docs.into_iter() {
         if let Err(e) = index_writer.add_document(doc) {
-            log::error!("Failed to add document to index: {}", e);
+            log::error!(
+                "generate_tantivy_index: Failed to add document to index: {}",
+                e
+            );
             return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
         }
     }
 
-    index_writer.finalize().map_err(|e| {
-        log::error!("Failed to finalize the index writer: {}", e);
+    let index = index_writer.finalize().map_err(|e| {
+        log::error!(
+            "generate_tantivy_index: Failed to finalize the index writer: {}",
+            e
+        );
         anyhow::anyhow!("Failed to finalize the index writer: {}", e)
-    })
+    })?;
+
+    log::info!(
+        "generate_tantivy_index: Created tantivy index successfully, took: {} ms",
+        start.elapsed().as_millis()
+    );
+
+    Ok(Some(index))
 }
 
 /// Create and compressed inverted index bytes using FST solution for the given RecordBatch
