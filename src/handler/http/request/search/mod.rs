@@ -658,6 +658,11 @@ pub async fn values(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+
+    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, StreamType::Logs)
+        .await
+        .unwrap_or_default();
+
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
@@ -690,8 +695,11 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
+    // check that  we have exactly one field, it is either in the default distinct fields or
+    // stream specific distinct fields and the sql doesn't have where clause
     if fields.len() == 1
-        && DISTINCT_FIELDS.contains(&fields[0])
+        && (DISTINCT_FIELDS.contains(&fields[0])
+            || stream_settings.distinct_value_fields.contains(&fields[0]))
         && !query_sql.to_lowercase().contains(" where ")
     {
         if let Some(v) = query.get("filter") {

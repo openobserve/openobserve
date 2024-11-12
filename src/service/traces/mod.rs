@@ -642,6 +642,10 @@ async fn write_traces(
     )
     .await;
 
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
+        .await
+        .unwrap_or_default();
+
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
         PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
@@ -713,7 +717,10 @@ async fn write_traces(
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
         let mut map = Map::new();
-        for field in DISTINCT_FIELDS.iter() {
+        for field in DISTINCT_FIELDS
+            .iter()
+            .chain(stream_settings.distinct_value_fields.iter())
+        {
             if let Some(val) = record_val.get(field) {
                 map.insert(field.clone(), val.clone());
             }
