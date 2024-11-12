@@ -454,7 +454,7 @@ import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import { mergeDeep, useLocalSavedView } from "@/utils/zincutils";
-const {
+let {
   searchObj,
   updatedLocalLogFilterField,
   getSavedViews,
@@ -484,10 +484,10 @@ const savedViewSelectedName: any = ref({});
 const confirmSavedViewDialogVisible: Ref<boolean> = ref(false);
 
 const saveViewLoader = ref(false);
-const favoriteViews = ref([]);
+const favoriteViews : any = ref([]);
 
 const localSavedViews: any = ref([]);
-const savedViews = ref(useLocalSavedView());
+const savedViews : any = ref(useLocalSavedView());
 const dateTimeRef = ref(null);
 const rowsPerPage = ref(10);
 const currentPage = ref(1);
@@ -522,7 +522,7 @@ const truncatedText = computed(() => {
   };
 });
 
-if (savedViews.value != null) {
+if (savedViews.value != null ) {
   let favoriteValues: any = [];
   Object.values(savedViews.value).forEach((view: any) => {
     if (view.org_id === store.state.selectedOrganization.identifier) {
@@ -773,22 +773,34 @@ const updateSavedViews = (viewID: string, viewName: string) => {
 
 const getSearchObj = () => {
   try {
-    delete searchObj.meta.scrollInfo;
-    delete searchObj?.value;
-    let savedSearchObj = toRaw(searchObj);
+    delete (searchObj.meta as any).scrollInfo;
+
+    //this needs to be under no-check and in future we need to add a setValue in uselogs to handle this
+     
+
+      //  if(searchObj.hasOwnProperty("value")){
+      //     searchObj.value = undefined;
+      //  }
+
+  
+
+      let savedSearchObj = toRaw(searchObj);
     savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
 
     delete savedSearchObj.data.queryResults;
     delete savedSearchObj.data.histogram;
     delete savedSearchObj.data.sortedQueryResults;
-    delete savedSearchObj.data.stream?.streamLists;
+    delete (savedSearchObj.data.stream as any).streamLists;
     delete savedSearchObj.data.stream.functions;
     delete savedSearchObj.data.streamResults;
     delete savedSearchObj.data.savedViews;
     delete savedSearchObj.data.transforms;
 
+    //this needs to be under no-check and in future we need to add a timeZone property in uselogs to handle this
+
+   //@ts-ignore
+
     savedSearchObj.data.timezone = store.state.timezone;
-    delete savedSearchObj.value;
 
     return savedSearchObj;
     // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
@@ -843,7 +855,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           // ----- Here we are explicitly handling stream change for multistream -----
           let selectedStreams = [];
           const streamValues = searchObj.data.stream.streamLists.map(
-            (item) => item.value,
+            (item:any) => item.value,
           );
           if (typeof extractedObj.data.stream.selectedStream == "object") {
             if (
@@ -858,7 +870,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           } else {
             selectedStreams.push(extractedObj.data.stream.selectedStream);
           }
-          const streamNotExist = selectedStreams.filter(
+          const streamNotExist : any = selectedStreams.filter(
             (stream_str) => !streamValues.includes(stream_str),
           );
           if (streamNotExist.length > 0) {
@@ -874,14 +886,14 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           delete extractedObj.data.stream.streamLists;
           delete extractedObj.data.stream.selectedStream;
           delete searchObj.data.stream.selectedStream;
-          delete searchObj.meta.regions;
+          delete (searchObj.meta as any).regions;
           if (extractedObj.meta.hasOwnProperty("regions")) {
             searchObj.meta["regions"] = extractedObj.meta.regions;
           } else {
             searchObj.meta["regions"] = [];
           }
           delete searchObj.data.queryResults.aggs;
-          delete searchObj.data.stream.interestingFieldList;
+          delete (searchObj.data.stream as any).interestingFieldList;
           searchObj.data.stream.selectedStream = [];
           extractedObj.data.transforms = searchObj.data.transforms;
           extractedObj.data.stream.functions = searchObj.data.stream.functions;
@@ -893,7 +905,8 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           extractedObj.data.savedViews = searchObj.data.savedViews;
           extractedObj.data.queryResults = [];
           extractedObj.meta.scrollInfo = {};
-          searchObj.value = mergeDeep(searchObj, extractedObj);
+          //this needs to be under no-check
+          searchObj = mergeDeep(searchObj, extractedObj);
           searchObj.shouldIgnoreWatcher = true;
           // await nextTick();
           if (extractedObj.data.tempFunctionContent != "") {
@@ -935,7 +948,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
             searchObj.meta.functionEditorPlaceholderFlag = true;
           }
           emits("on:populate-date-time");
-          if (searchObj.meta.refreshInterval != "0") {
+          if (searchObj.meta.refreshInterval != 0) {
             emits("on:refresh-interval-change");
           } else {
             clearInterval(store.state.refreshIntervalID);
@@ -949,7 +962,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           searchObj.data.stream.streamType =
             extractedObj.data.stream.streamType;
 
-          delete searchObj.meta.regions;
+          delete (searchObj.meta as any).regions;
           if (extractedObj.meta.hasOwnProperty("regions")) {
             searchObj.meta["regions"] = extractedObj.meta.regions;
           } else {
@@ -985,8 +998,8 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           extractedObj.data.queryResults = [];
           extractedObj.meta.scrollInfo = {};
           delete searchObj.data.queryResults.aggs;
-
-          searchObj.value = mergeDeep(searchObj, extractedObj);
+           //this needs to be under no-check
+          searchObj = mergeDeep(searchObj, extractedObj);
           searchObj.data.streamResults = {};
 
           const streamData = await getStreams(
@@ -996,12 +1009,11 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
           searchObj.data.streamResults = streamData;
           await loadStreamLists();
           searchObj.data.stream.selectedStream = [selectedStreams];
-          // searchObj.value = mergeDeep(searchObj, extractedObj);
 
           const streamValues = searchObj.data.stream.streamLists.map(
-            (item) => item.value,
+            (item : any) => item.value,
           );
-          const streamNotExist = selectedStreams.filter(
+          const streamNotExist : any = selectedStreams.filter(
             (stream_str) => !streamValues.includes(stream_str),
           );
           if (streamNotExist.length > 0) {
@@ -1038,7 +1050,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
             searchObj.meta.functionEditorPlaceholderFlag = true;
           }
           emits("on:populate-date-time");
-          if (searchObj.meta.refreshInterval != "0") {
+          if (searchObj.meta.refreshInterval != 0) {
             emits("on:refresh-interval-change");
           } else {
             clearInterval(store.state.refreshIntervalID);
@@ -1094,18 +1106,11 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
               searchObj.data.stream.selectedStream
             ];
         }
-
-        // } else {
-        //   searchObj.value = mergeDeep(searchObj, extractedObj);
-        //   await nextTick();
-        //   updatedLocalLogFilterField();
-        //   handleRunQuery();
-        // }
       } else {
         searchObj.shouldIgnoreWatcher = false;
         store.dispatch("setSavedViewFlag", false);
         $q.notify({
-          message: err.message || `Error while applying saved view.`,
+          message:  `Error while applying saved view.`,
           color: "negative",
           position: "bottom",
           timeout: 3000,
@@ -1116,18 +1121,13 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
       searchObj.shouldIgnoreWatcher = false;
       store.dispatch("setSavedViewFlag", false);
       $q.notify({
-        message: `Error while applying saved view.`,
+        message: err.message ||  `Error while applying saved view.`,
         color: "negative",
         position: "bottom",
         timeout: 1000,
       });
       console.log(err);
     });
-  // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
-  // searchObj.value = mergeDeep(searchObj, extractedObj);
-  // await nextTick();
-  // updatedLocalLogFilterField();
-  // handleRunQuery();
 };
 
 const handleDeleteSavedView = (item: any) => {
@@ -1151,7 +1151,7 @@ const confirmDeleteSavedViews = () => {
 
 const handleFavoriteSavedView = (row: any, flag: boolean) => {
   let localSavedView: any = {};
-  let savedViews = useLocalSavedView();
+  let savedViews :any = useLocalSavedView();
 
   if (savedViews.value != null) {
     localSavedView = savedViews.value;
@@ -1216,7 +1216,8 @@ const handleFavoriteSavedView = (row: any, flag: boolean) => {
   }
 };
 
-const filterSavedView = () => {
+const filterSavedView = (rows : any, terms:any) => {
+  console.log(rows, terms);
   var filtered = [];
   if (terms != "") {
     terms = terms.toLowerCase();
