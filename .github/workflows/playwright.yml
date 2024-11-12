@@ -103,6 +103,7 @@ jobs:
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-general-setting.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
+            "dashboards/dashboard-tabs-setting.spec.js",
             "reportsUpdated.spec.js",
           ]
 
