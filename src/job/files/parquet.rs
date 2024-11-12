@@ -1461,7 +1461,6 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     index_fields: &[String],
     schema: Arc<Schema>,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
-    let start = std::time::Instant::now();
     let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
     let schema_fields = schema
         .fields()
@@ -1583,11 +1582,6 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         anyhow::anyhow!("Failed to finalize the index writer: {}", e)
     })?;
-
-    log::info!(
-        "generate_tantivy_index: Created tantivy index successfully, took: {} ms",
-        start.elapsed().as_millis()
-    );
 
     Ok(Some(index))
 }

@@ -102,11 +102,9 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             )
         );
 
-        let puffin_meta = dbg!(
-            PuffinFooterBytesReader::new(&mut self.source, end_offset)
-                .parse()
-                .await
-        )?;
+        let puffin_meta = PuffinFooterBytesReader::new(&mut self.source, end_offset)
+            .parse()
+            .await?;
         self.metadata = Some(puffin_meta);
         Ok(())
     }

@@ -34,7 +34,6 @@ use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
     schema::get_stream_setting_index_fields,
-    storage,
 };
 use itertools::Itertools;
 use proto::cluster_rpc::KvItem;
@@ -445,7 +444,7 @@ async fn filter_file_list_by_tantivy_index(
         .iter()
         .filter_map(|(_, f)| {
             if f.meta.index_size > 0 {
-                convert_parquet_idx_file_name_to_tantivy_file(&f.key)
+                convert_parquet_idx_file_name_to_tantivy_file(&f.key).map(|v| (f.key.clone(), v))
             } else {
                 None
             }
@@ -455,7 +454,7 @@ async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|path| path.as_str())
+            .map(|(_parquet_file, ttv_file)| ttv_file.as_str())
             .collect_vec(),
         &scan_stats,
     )
@@ -482,8 +481,8 @@ async fn filter_file_list_by_tantivy_index(
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     let mut tasks = Vec::new();
 
-    for file in file_list_map.keys() {
-        let file = file.clone();
+    for (parquet_file, _ttv_file) in index_file_names {
+        let file = parquet_file;
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let trace_id = query.trace_id.to_string();
@@ -518,7 +517,7 @@ async fn filter_file_list_by_tantivy_index(
                     let hits_per_file = res.count_ones();
                     total_hits += hits_per_file;
                     file.segment_ids = Some(res.into_vec());
-                    log::info!(
+                    log::debug!(
                         "[trace_id {}] search->storage: hits for fts_terms {:?} and index_terms: {:?} found {} in {}",
                         query.trace_id,
                         *full_text_terms,
@@ -555,38 +554,6 @@ async fn filter_file_list_by_tantivy_index(
     );
     file_list.extend(file_list_map.into_values());
     Ok(start.elapsed().as_millis() as usize)
-}
-
-/// Fetches the file from cache if it exists, otherwise fetch from storage
-async fn fetch_file(trace_id: &str, file_name: &str) -> anyhow::Result<Vec<u8>> {
-    // first get from memory cache
-    if file_data::memory::exist(file_name).await {
-        log::info!(
-            "[trace_id {}] search->storage: Fetching from memory cache",
-            trace_id,
-        );
-        return file_data::memory::get(file_name, None)
-            .await
-            .map(|bytes| bytes.to_vec())
-            .ok_or(anyhow::anyhow!("memory cache get failed"));
-    }
-    // check disk next
-    if file_data::disk::exist(file_name).await {
-        log::info!(
-            "[trace_id {}] search->storage: Fetching from Disk",
-            trace_id,
-        );
-        return file_data::disk::get(file_name, None)
-            .await
-            .map(|bytes| bytes.to_vec())
-            .ok_or(anyhow::anyhow!("disk cache get failed"));
-    }
-    // finally get from storage
-    log::info!(
-        "[trace_id {}] search->storage: Fetching from Object Store",
-        trace_id,
-    );
-    storage::get(file_name).await.map(|bytes| bytes.to_vec())
 }
 
 fn search_tantivy_index_with_field(
@@ -630,7 +597,7 @@ pub async fn get_tantivy_directory(
     trace_id: &str,
     file_name: &str,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    let index_file_bytes = fetch_file(trace_id, file_name).await?;
+    let index_file_bytes = infra::cache::file_data::get(trace_id, file_name, None).await?;
     let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
     Ok(Box::new(puffin_dir))
 }
@@ -641,9 +608,7 @@ async fn search_tantivy_index(
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
-    let search_index_timer = std::time::Instant::now();
-    let Some(tantivy_index_file_name) =
-        convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
+    let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
@@ -651,30 +616,13 @@ async fn search_tantivy_index(
         ));
     };
 
-    // let index_file_bytes = fetch_file(trace_id, &tantivy_index_file_name).await?;
-    let fetch_file_tt = search_index_timer.elapsed();
-    log::info!(
-        "[trace_id {}] search->storage: fetch_file took {} s, {} ms",
-        trace_id,
-        fetch_file_tt.as_secs(),
-        fetch_file_tt.as_millis(),
-    );
-
-    let puffin_dir = get_tantivy_directory(trace_id, &tantivy_index_file_name).await?;
+    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name).await?;
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;
     let tantivy_searcher = tantivy_reader.searcher();
-    let elapsed_tantivy_searcher = search_index_timer.elapsed() - fetch_file_tt;
-    log::info!(
-        "[trace_id {}] search->storage: Tantivy seracher ready took {} s, {} ms",
-        trace_id,
-        elapsed_tantivy_searcher.as_secs(),
-        elapsed_tantivy_searcher.as_millis(),
-    );
 
     let mut matched_docs = HashSet::new();
-
     let mut max_doc_id = 0u32;
     if !fts_terms.is_empty() {
         let fts_field = tantivy_schema.get_field("_all").unwrap();
@@ -719,13 +667,7 @@ async fn search_tantivy_index(
             ));
         };
     }
-    let search_complete_tt = search_index_timer.elapsed();
-    log::info!(
-        "[trace_id {}] search->storage: index_search took {} s, {} ms",
-        trace_id,
-        search_complete_tt.as_secs(),
-        search_complete_tt.as_millis(),
-    );
+
     // return early if no matches in tantivy
     if matched_docs.is_empty() {
         return Ok((parquet_file_name.to_string(), None));
@@ -744,13 +686,6 @@ async fn search_tantivy_index(
         for doc in matched_docs {
             res.set(doc.doc_id as usize, true);
         }
-
-        log::info!(
-            "[trace_id {}] search->storage: bitvec took {} s, {} ms",
-            trace_id,
-            elapsed_tantivy_searcher.as_secs(),
-            elapsed_tantivy_searcher.as_millis(),
-        );
         Ok((parquet_file_name.to_string(), Some(res)))
     } else {
         Err(anyhow::anyhow!(
