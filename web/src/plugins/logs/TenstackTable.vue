@@ -136,23 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </th>
         </vue-draggable>
 
-        <tr v-if="loading" class="tw-w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
-              opacity: 0.7,
-            }"
-          >
-            <div
-              class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
-            >
-              <q-spinner-hourglass size="20px" />
-              {{ t("confirmDialog.loading") }}
-            </div>
-          </td>
-        </tr>
         <tr v-if="!loading && errMsg != ''" class="tw-w-full">
           <td
             :colspan="columnOrder.length"

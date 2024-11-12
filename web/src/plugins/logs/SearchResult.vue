@@ -33,8 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-6 text-left q-pl-lg q-mt-xs warning">
+        <div v-else class="col-6 text-left q-pl-lg q-mt-xs warning flex">
+         <div class="flex align-center">
+          <div>
           {{ noOfRecordsTitle }}
+         </div>
+          <div v-if="searchObj.loading" style="margin-left: 8px">
+           <q-badge outline color="warning">
+            <div class="tw-flex tw-items-center">
+              <q-spinner-hourglass size="16px" />
+              {{ t("confirmDialog.loading") }}
+            </div>
+           </q-badge>
+          </div>
+         </div>
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination

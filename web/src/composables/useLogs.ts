@@ -820,7 +820,9 @@ const useLogs = () => {
 
           //replace backticks with \" for sql_mode
           query = query.replace(/`/g, '"');
-          searchObj.data.queryResults.hits = [];
+          if (searchObj.meta.refreshInterval > 0) {
+            searchObj.data.queryResults.hits = [];
+          }
         }
 
         req.query.sql = query;
@@ -1041,7 +1043,9 @@ const useLogs = () => {
   const getQueryPartitions = async (queryReq: any) => {
     try {
       // const queryReq = buildSearch();
-      searchObj.data.queryResults.hits = [];
+      if (searchObj.meta.refreshInterval > 0) {
+        searchObj.data.queryResults.hits = [];
+      }
       searchObj.data.histogram = {
         xData: [],
         yData: [],
