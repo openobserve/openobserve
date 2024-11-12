@@ -32,10 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'"
         data-test="logs-search-saved-view-list"
       >
-        <q-item style="padding: 0px 0px 0px 0px">
+        <q-item style="padding: 0px 0px 0px 0px;height: 46vh;">
           <q-item-section
             class="column"
-            style="width: 60%; border-right: 1px solid lightgray"
+            style="width: 60%; height: 100%; border-right: 1px solid lightgray"
           >
             <q-table
               data-test="log-search-saved-view-list-fields-table"
@@ -111,17 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.row.view_name
                       }}</q-item-label>
                     </q-item-section>
-                    <q-item-section
-                      :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                      side
-                      @click="handleUpdateSavedView(props.row, props.row.view_name)"
-                    >
-                      <q-icon
-                        name="save"
-                        color="grey"
-                        size="xs"
-                      />
-                    </q-item-section>
+
                     <q-item-section
                       :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
                       side
@@ -138,6 +128,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'favorite'
                             : 'favorite_border'
                         "
+                        color="grey"
+                        size="xs"
+                      />
+                    </q-item-section>
+                    <q-item-section
+                      :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                      side
+                      @click="handleUpdateSavedView(props.row, props.row.view_name)"
+                    >
+                      <q-icon
+                        name="save"
                         color="grey"
                         size="xs"
                       />
@@ -285,7 +286,7 @@ class="q-pa-sm text-bold favorite-label"
             outline
             :label="t('confirmDialog.cancel')"
             color="red"
-            class="text-bold btn-cancel"
+            class="text-bold btn-cancel-dialog"
             v-close-popup
             
           />
@@ -389,7 +390,7 @@ class="q-pa-sm text-bold favorite-label"
             unelevated
             no-caps
             outline
-            class="q-mr-sm text-bold q-ml-sm btn-cancel"
+            class="q-mr-sm text-bold q-ml-sm btn-cancel-dialog"
             style="padding: 0px 16px !important;"
             :label="t('confirmDialog.cancel')"
             color="red"
@@ -479,6 +480,7 @@ const savedViewDropdownModel = ref(false);
 const confirmDelete = ref(false);
 const confirmUpdate = ref(false);
 const deleteViewID = ref("");
+const deleteItem = ref({});
 const savedViewName = ref("");
 const savedViewSelectedName: any = ref({});
 const confirmSavedViewDialogVisible: Ref<boolean> = ref(false);
@@ -516,7 +518,7 @@ const confirmMessageSavedView: string = t("search.savedViewUpdateConfirmMsg");
 const truncatedText = computed(() => {
   return (text: string) => {
     if (text.length > 25) {
-      return text.substring(0, 25) + "...";
+      return text.substring(0, 20) + "...";
     }
     return text;
   };
@@ -573,6 +575,9 @@ const deleteSavedViews = async () => {
             timeout: 1000,
           });
           getSavedViews();
+
+          handleFavoriteSavedView(deleteItem.value, favoriteViews.value.includes(deleteViewID.value));
+          
         } else {
           $q.notify({
             message: `Error while deleting saved view. ${res.data.error_detail}`,
@@ -1130,6 +1135,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
 const handleDeleteSavedView = (item: any) => {
   savedViewDropdownModel.value = false;
   deleteViewID.value = item.view_id;
+  deleteItem.value = item;
   confirmDelete.value = true;
 };
 
@@ -1147,6 +1153,7 @@ const confirmDeleteSavedViews = () => {
 };
 
 const handleFavoriteSavedView = (row: any, flag: boolean) => {
+  console.log(row, flag);
   let localSavedView: any = {};
   let savedViews :any = useLocalSavedView();
 
@@ -1282,7 +1289,7 @@ const confirmDialogOK = () => {
   }
 }
 
-.btn-cancel:before {
+.btn-cancel-dialog:before {
 
   border: 2px solid rgb(242, 10, 10) !important;
 }
