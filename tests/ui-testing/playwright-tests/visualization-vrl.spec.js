@@ -156,7 +156,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
   });
 
-  test.skip('should display an error  masssge when  if  VRL field is not update after closing the "Toggle function editor " ', async ({
+  test.skip('should display an error message when the VRL field is not updated after closing the "Toggle function editor"', async ({
     page,
   }) => {
     await page.locator('[data-test="date-time-btn"]').click();
