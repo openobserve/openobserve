@@ -38,7 +38,6 @@ mod prom_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
-pub(crate) mod values;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
@@ -198,11 +197,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
-
-    if LOCAL_NODE.is_ingester() {
-        // values api job only needed in ingester
-        tokio::task::spawn(async move { values::run().await });
-    }
 
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
