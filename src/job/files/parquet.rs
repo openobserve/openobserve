@@ -23,7 +23,7 @@ use std::{
 use anyhow::Context;
 use arrow::{
     array::{
-        new_null_array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
+        new_null_array, Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
         Int64Builder, StringArray, StringBuilder,
     },
     datatypes::Field,
@@ -37,7 +37,8 @@ use config::{
     meta::{
         bitvec::BitVec,
         inverted_index::{writer::ColumnIndexer, InvertedIndexFormat},
-        puffin::writer::PuffinBytesWriter,
+        puffin::{writer::PuffinBytesWriter, BlobTypes},
+        puffin_directory::writer::PuffinDirWriter,
         search::StorageType,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
@@ -46,7 +47,10 @@ use config::{
         arrow::record_batches_to_json_rows,
         asynchronism::file::get_file_meta,
         file::scan_files_with_channel,
-        inverted_index::{convert_parquet_idx_file_name, split_token},
+        inverted_index::{
+            convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
+            split_token,
+        },
         json,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
@@ -632,6 +636,7 @@ async fn merge_files(
         original_size: new_file_size,
         compressed_size: 0,
         flattened: false,
+        index_size: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -767,21 +772,23 @@ async fn merge_files(
         .map_err(|e| anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e))?;
     }
 
-    // generate fst format inverted index
+    // generate tantivy inverted index and write to storage
     if matches!(
         index_format,
-        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+        InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-        generate_fst_inverted_index(
+        let index_size = create_tantivy_index(
+            "INGESTER",
             &new_file_key,
             &full_text_search_fields,
             &index_fields,
-            None,
             schema,
             &mut reader,
         )
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {}", e))?;
+        new_file_meta.index_size = index_size as i64;
     }
 
     Ok((new_file_key, new_file_meta, retain_file_list))
@@ -1323,17 +1330,21 @@ async fn prepare_index_record_batches(
 /// Creates fst inverted index bytes and writes to storage.
 /// Called by both ingester and compactor. Compactor needs to provide `file_list_to_invalidate`
 /// to delete previously created small index files
+#[allow(dead_code)]
 pub(crate) async fn generate_fst_inverted_index(
     parquet_file_name: &str,
+    file_list_to_invalidate: Option<&[FileKey]>,
     full_text_search_fields: &[String],
     index_fields: &[String],
-    file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
-                                                  * .idx files */
-
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+    let caller = if file_list_to_invalidate.is_some() {
+        "[COMPACTOR:JOB]"
+    } else {
+        "[INGESTER:JOB]"
+    };
 
     if full_text_search_fields.is_empty() && index_fields.is_empty() {
         return Ok(());
@@ -1366,11 +1377,6 @@ pub(crate) async fn generate_fst_inverted_index(
     let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
         return Ok(());
     };
-    let caller = if file_list_to_invalidate.is_some() {
-        "[COMPACTOR:JOB]"
-    } else {
-        "[INGESTER:JOB]"
-    };
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
             log::info!(
@@ -1393,6 +1399,191 @@ pub(crate) async fn generate_fst_inverted_index(
             Err(e)
         }
     }
+}
+
+pub(crate) async fn create_tantivy_index(
+    caller: &str,
+    parquet_file_name: &str,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
+    schema: Arc<Schema>,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+) -> Result<usize, anyhow::Error> {
+    let start = std::time::Instant::now();
+    let caller = format!("[{caller}:JOB]");
+
+    let dir = PuffinDirWriter::new();
+    let _index = generate_tantivy_index(
+        dir.clone(),
+        reader,
+        full_text_search_fields,
+        index_fields,
+        schema,
+    )
+    .await?;
+    let puffin_bytes = dir.to_puffin_bytes()?;
+    let index_size = puffin_bytes.len();
+
+    // write fst bytes into disk
+    let Some(idx_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
+    else {
+        return Ok(0);
+    };
+
+    match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
+        Ok(_) => {
+            log::info!(
+                "{} Written tantivy index file successfully: {}, index size {}, took: {} ms",
+                caller,
+                idx_file_name,
+                index_size,
+                start.elapsed().as_millis()
+            );
+        }
+        Err(e) => {
+            log::error!(
+                "{} Written tantivy index file error: {}",
+                caller,
+                e.to_string()
+            );
+            return Err(e);
+        }
+    }
+
+    Ok(index_size)
+}
+
+/// Create a tantivy index in the given directory for the record batch
+pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
+    tantivy_dir: D,
+    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
+    schema: Arc<Schema>,
+) -> Result<Option<tantivy::Index>, anyhow::Error> {
+    let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|f| (f.name(), f))
+        .collect::<HashMap<_, _>>();
+
+    // filter out fields that are not in schema & not of type Utf8
+    let fts_fields = full_text_search_fields
+        .iter()
+        .filter(|f| {
+            schema_fields
+                .get(f)
+                .map(|v| v.data_type() == &DataType::Utf8)
+                .is_some()
+        })
+        .map(|f| f.to_string())
+        .collect::<HashSet<_>>();
+    let index_fields = index_fields
+        .iter()
+        .filter(|f| {
+            schema_fields
+                .get(f)
+                .map(|v| v.data_type() == &DataType::Utf8)
+                .is_some()
+        })
+        .map(|f| f.to_string())
+        .collect::<HashSet<_>>();
+    let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
+    if tantivy_fields.is_empty() {
+        return Ok(None);
+    }
+
+    // add fields to tantivy schema
+    if !fts_fields.is_empty() {
+        let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_fieldnorms(false),
+        );
+        tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
+    }
+    for field in index_fields.iter() {
+        let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer("raw")
+                .set_fieldnorms(false),
+        );
+        tantivy_schema_builder.add_text_field(field, index_opts);
+    }
+    let tantivy_schema = tantivy_schema_builder.build();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
+
+    let mut total_num_rows = 0;
+    // docs per row to be added in the tantivy index
+    let mut docs = BTreeMap::new();
+
+    loop {
+        let batch = reader.try_next().await?;
+        let Some(inverted_idx_batch) = batch else {
+            break;
+        };
+        let num_rows = inverted_idx_batch.num_rows();
+        if num_rows == 0 {
+            continue;
+        }
+
+        // update total_num_rows
+        let prev_total_num_rows = total_num_rows;
+        total_num_rows += num_rows;
+
+        // process full text search fields
+        for column_name in tantivy_fields.iter() {
+            // get column
+            let Some(column_data) = inverted_idx_batch
+                .column_by_name(column_name)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+            else {
+                continue;
+            };
+
+            // get field
+            let field = match tantivy_schema.get_field(column_name) {
+                Ok(f) => f,
+                Err(_) => fts_field.unwrap(),
+            };
+            for i in 0..num_rows {
+                let doc = docs
+                    .entry(i + prev_total_num_rows)
+                    .or_insert(tantivy::doc!());
+                doc.add_text(field, column_data.value(i));
+            }
+        }
+    }
+
+    // TODO: Check if 50MB is enough for the tantivy index for >1GB parquet file
+    let mut index_writer = tantivy::IndexBuilder::new()
+        .schema(tantivy_schema)
+        .single_segment_index_writer(tantivy_dir, 50_000_000)
+        .context("failed to create index builder")?;
+
+    for (_rowid, doc) in docs.into_iter() {
+        if let Err(e) = index_writer.add_document(doc) {
+            log::error!(
+                "generate_tantivy_index: Failed to add document to index: {}",
+                e
+            );
+            return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
+        }
+    }
+
+    let index = index_writer.finalize().map_err(|e| {
+        log::error!(
+            "generate_tantivy_index: Failed to finalize the index writer: {}",
+            e
+        );
+        anyhow::anyhow!("Failed to finalize the index writer: {}", e)
+    })?;
+
+    Ok(Some(index))
 }
 
 /// Create and compressed inverted index bytes using FST solution for the given RecordBatch
@@ -1526,7 +1717,6 @@ pub(crate) async fn prepare_fst_index_bytes(
     // create puffin file
     let mut puffin_buf: Vec<u8> = Vec::new();
     let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
-
     let mut original_size = 0;
     for (column_name, indexer) in indexers {
         if indexer.is_empty() {
@@ -1538,7 +1728,7 @@ pub(crate) async fn prepare_fst_index_bytes(
             column_name
         ))?;
         original_size += buf.len();
-        puffin_writer.add_blob(column_name, buf)?;
+        puffin_writer.add_blob(&buf, BlobTypes::O2FstV1, column_name, true)?;
     }
 
     puffin_writer.finish()?;

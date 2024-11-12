@@ -21,12 +21,9 @@ use std::{
 
 use actix_web::{http::header::HeaderName, web::Query};
 use awc::http::header::HeaderMap;
-use config::{
-    get_config,
-    meta::{
-        search::{SearchEventContext, SearchEventType},
-        stream::StreamType,
-    },
+use config::meta::{
+    search::{SearchEventContext, SearchEventType},
+    stream::StreamType,
 };
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -101,41 +98,6 @@ pub(crate) fn get_search_event_context_from_request(
             query.get("report_id").map(String::from),
         )),
         _ => None,
-    }
-}
-
-/// Index type for a search can be either `parquet` or `fst`. It's only effective when env
-/// `ZO_INVERTED_INDEX_STORE_FORMAT` is set as `both`.
-/// Otherwise 'index_type' is set by env `ZO_INVERTED_INDEX_SEARCH_FORMAT`, which is also
-/// the same as store format if store format is not `both`.
-///
-/// For performance testing phrase only. Will be deprecated after 1 month.
-#[inline(always)]
-pub(crate) fn get_index_type_from_request(
-    query: &Query<HashMap<String, String>>,
-) -> Result<String, Error> {
-    let cfg = get_config();
-    let index_type = query
-        .get("index_type")
-        .cloned()
-        .unwrap_or_default()
-        .to_lowercase();
-    if index_type.is_empty() || index_type == cfg.common.inverted_index_search_format {
-        Ok(cfg.common.inverted_index_search_format.to_string())
-    } else if cfg.common.inverted_index_store_format == "both" {
-        match index_type.as_str() {
-            "parquet" => Ok("parquet".to_string()),
-            "fst" => Ok("fst".to_string()),
-            _ => Err(Error::new(
-                ErrorKind::Other,
-                "'index_type' query param with value 'parquet' or 'fst' allowed",
-            )),
-        }
-    } else {
-        Err(Error::new(
-            ErrorKind::Other,
-            "'index_type' query param with value 'parquet' or 'fst' allowed",
-        ))
     }
 }
 

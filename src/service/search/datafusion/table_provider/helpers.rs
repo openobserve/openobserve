@@ -164,13 +164,22 @@ pub fn split_files(
 }
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+    let index_segment_length = if config::get_config()
+        .common
+        .inverted_index_search_format
+        .eq("tantivy")
+    {
+        1
+    } else {
+        INDEX_SEGMENT_LENGTH
+    };
     let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
     };
     let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
-    let segment_count = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+    let segment_count = (num_rows + index_segment_length - 1) / index_segment_length;
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
     let mut selection = Vec::with_capacity(segment_ids.len());
     let mut last_group_id = 0;
@@ -178,7 +187,7 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
         if segment_id >= segment_count {
             break;
         }
-        let row_group_id = (segment_id * INDEX_SEGMENT_LENGTH) / PARQUET_MAX_ROW_GROUP_SIZE;
+        let row_group_id = (segment_id * index_segment_length) / PARQUET_MAX_ROW_GROUP_SIZE;
         if row_group_id != last_group_id && !selection.is_empty() {
             if selection.iter().any(|s: &RowSelector| !s.skip) {
                 access_plan.scan(last_group_id);
@@ -187,10 +196,10 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
             selection.clear();
             last_group_id = row_group_id;
         }
-        let length = if (segment_id + 1) * INDEX_SEGMENT_LENGTH > num_rows {
-            num_rows % INDEX_SEGMENT_LENGTH
+        let length = if (segment_id + 1) * index_segment_length > num_rows {
+            num_rows % index_segment_length
         } else {
-            INDEX_SEGMENT_LENGTH
+            index_segment_length
         };
         if *val {
             selection.push(RowSelector::select(length));

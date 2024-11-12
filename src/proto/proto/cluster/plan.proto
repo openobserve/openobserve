@@ -5,7 +5,7 @@ option java_package = "org.openobserve.cluster";
 option java_outer_classname = "planProto";
 
 package cluster;
- 
+
 import "datafusion_common/datafusion_common.proto";
 import "datafusion/datafusion.proto";
 import "cluster/common.proto";
@@ -26,7 +26,7 @@ message FlightSearchRequest {
     uint32                      partition = 2;
     string                         org_id = 3;
     string                    stream_type = 4;
-    // used for search 
+    // used for search
     bytes                            plan = 6;
     repeated int64           file_id_list = 7;
     repeated IdxFileName    idx_file_list = 8;
@@ -39,7 +39,6 @@ message FlightSearchRequest {
     bool                is_super_cluster = 14;
     bool              use_inverted_index = 15;
     optional string           work_group = 16;
-    optional string           index_type = 17;
     optional string              user_id = 18;
     optional string    search_event_type = 19;
 }

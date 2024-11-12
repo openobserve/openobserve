@@ -36,12 +36,6 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     }
 
     log::info!("Upgrading from {} to {}", old_ver, new_ver);
-    let v053 = Version::from("v0.5.3").unwrap();
-    if old_ver < v053 && new_ver.to_string().starts_with("v0.6.") {
-        upgrade_052_053().await?;
-        return Ok(());
-    }
-
     let v093 = Version::from("v0.9.3").unwrap();
     if old_ver < v093 {
         upgrade_092_093().await?;
@@ -51,16 +45,6 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     if old_ver < v131 {
         upgrade_130_131().await?;
     }
-
-    Ok(())
-}
-
-async fn upgrade_052_053() -> Result<(), anyhow::Error> {
-    // migration for metadata
-    meta::run("sled", "sqlite").await?;
-
-    // migration for file_list
-    file_list::run("", "sled", "sqlite").await?;
 
     Ok(())
 }

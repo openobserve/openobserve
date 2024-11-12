@@ -13,19 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-};
+use std::collections::HashMap;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
-    get_config, ider, is_local_disk_storage,
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    utils::{json, time::BASE_TIME},
+    get_config, is_local_disk_storage,
+    meta::stream::{
+        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
+    },
+    utils::time::BASE_TIME,
 };
-use infra::{cache, dist_lock, file_list as infra_file_list, storage};
+use infra::{cache, dist_lock, file_list as infra_file_list};
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
@@ -338,14 +337,11 @@ async fn delete_from_file_list(
     // collect stream stats
     let mut stream_stats = StreamStats::default();
 
-    let mut file_list_days: HashSet<String> = HashSet::new();
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
         stream_stats = stream_stats - file.meta;
         let file_name = file.key.clone();
         let columns: Vec<_> = file_name.split('/').collect();
-        let day_key = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
-        file_list_days.insert(day_key);
         let hour_key = format!(
             "{}/{}/{}/{}",
             columns[4], columns[5], columns[6], columns[7]
@@ -360,7 +356,7 @@ async fn delete_from_file_list(
     }
 
     // write file list to storage
-    write_file_list(org_id, file_list_days, hours_files).await?;
+    write_file_list(org_id, hours_files).await?;
 
     // update stream stats
     if stream_stats.doc_num != 0 {
@@ -379,18 +375,6 @@ async fn delete_from_file_list(
 
 async fn write_file_list(
     org_id: &str,
-    file_list_days: HashSet<String>,
-    hours_files: HashMap<String, Vec<FileKey>>,
-) -> Result<(), anyhow::Error> {
-    if get_config().common.meta_store_external {
-        write_file_list_db_only(org_id, hours_files).await
-    } else {
-        write_file_list_s3(org_id, file_list_days, hours_files).await
-    }
-}
-
-async fn write_file_list_db_only(
-    org_id: &str,
     hours_files: HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     for (_key, events) in hours_files {
@@ -402,15 +386,18 @@ async fn write_file_list_db_only(
         let del_items = events
             .iter()
             .filter(|v| v.deleted)
-            .map(|v| v.key.clone())
+            .map(|v| FileListDeleted {
+                file: v.key.clone(),
+                index_file: v.meta.index_size > 0,
+                flattened: v.meta.flattened,
+            })
             .collect::<Vec<_>>();
         // set to external db
         // retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
-            if let Err(e) =
-                infra_file_list::batch_add_deleted(org_id, false, created_at, &del_items).await
+            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
                 log::error!(
                     "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
@@ -424,13 +411,16 @@ async fn write_file_list_db_only(
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
-            if let Err(e) = infra_file_list::batch_remove(&del_items).await {
-                log::error!(
-                    "[COMPACT] batch_delete to external db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
+            if !del_items.is_empty() {
+                let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
+                if let Err(e) = infra_file_list::batch_remove(&del_files).await {
+                    log::error!(
+                        "[COMPACT] batch_delete to external db failed, retrying: {}",
+                        e
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
+                }
             }
             success = true;
             break;
@@ -440,84 +430,6 @@ async fn write_file_list_db_only(
                 "[COMPACT] batch_write to external db failed"
             ));
         }
-    }
-    Ok(())
-}
-
-async fn write_file_list_s3(
-    org_id: &str,
-    file_list_days: HashSet<String>,
-    hours_files: HashMap<String, Vec<FileKey>>,
-) -> Result<(), anyhow::Error> {
-    for (key, events) in hours_files {
-        // upload the new file_list to storage
-        let new_file_list_key = format!("file_list/{key}/{}.json.zst", ider::generate());
-        let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-        for file in events.iter() {
-            let mut write_buf = json::to_vec(&file)?;
-            write_buf.push(b'\n');
-            buf.write_all(&write_buf)?;
-        }
-        let compressed_bytes = buf.finish().unwrap();
-        storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-
-        // write deleted files into file_list_deleted
-        let del_items = events
-            .iter()
-            .filter(|v| v.deleted)
-            .map(|v| v.key.clone())
-            .collect::<Vec<_>>();
-        if !del_items.is_empty() {
-            let deleted_file_list_key = format!(
-                "file_list_deleted/{org_id}/{}/{}.json.zst",
-                Utc::now().format("%Y/%m/%d/%H"),
-                ider::generate()
-            );
-            let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-            for file in del_items.iter() {
-                buf.write_all((file.to_owned() + "\n").as_bytes())?;
-            }
-            let compressed_bytes = buf.finish().unwrap();
-            storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;
-        }
-
-        // set to local cache & send broadcast
-        // retry 5 times
-        for _ in 0..5 {
-            // set to local cache
-            let mut cache_success = true;
-            for event in &events {
-                if let Err(e) =
-                    db::file_list::progress(&event.key, Some(&event.meta), event.deleted).await
-                {
-                    cache_success = false;
-                    log::error!(
-                        "[COMPACT] delete_from_file_list set local cache failed, retrying: {}",
-                        e
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    break;
-                }
-            }
-            if !cache_success {
-                continue;
-            }
-            // send broadcast to other nodes
-            if let Err(e) = db::file_list::broadcast::send(&events, None).await {
-                log::error!(
-                    "[COMPACT] delete_from_file_list send broadcast failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-            break;
-        }
-    }
-
-    // mark file list need to do merge again
-    for key in file_list_days {
-        db::compact::file_list::set_delete(&key).await?;
     }
     Ok(())
 }

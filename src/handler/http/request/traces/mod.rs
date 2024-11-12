@@ -273,7 +273,6 @@ pub async fn get_latest_traces(
         timeout,
         search_type: None,
         search_event_context: None,
-        index_type: "".to_string(),
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req
