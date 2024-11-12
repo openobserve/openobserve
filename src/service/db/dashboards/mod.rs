@@ -17,7 +17,7 @@ use actix_web::web;
 use config::utils::{hash::Sum64, json};
 
 use crate::{
-    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
+    common::meta::dashboards::{v1, v2, v3, v4, v5, v6, Dashboard, DashboardVersion},
     service::db,
 };
 
@@ -69,11 +69,19 @@ pub(crate) async fn get(
             hash,
             ..Default::default()
         })
-    } else {
+    } else if d_version.version == 5 {
         let dash: v5::Dashboard = json::from_slice(&bytes)?;
         Ok(Dashboard {
             v5: Some(dash),
             version: 5,
+            hash,
+            ..Default::default()
+        })
+    } else {
+        let dash: v6::Dashboard = json::from_slice(&bytes)?;
+        Ok(Dashboard {
+            v6: Some(dash),
+            version: 6,
             hash,
             ..Default::default()
         })
@@ -189,7 +197,7 @@ pub(crate) async fn put(
             }),
             Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
         }
-    } else {
+    } else if d_version.version == 5 {
         let mut dash: v5::Dashboard = json::from_slice(&body)?;
         dash.title = dash.title.trim().to_string();
         if dash.title.is_empty() {
@@ -205,6 +213,27 @@ pub(crate) async fn put(
             Ok(_) => Ok(Dashboard {
                 v5: Some(dash),
                 version: 5,
+                hash,
+                ..Default::default()
+            }),
+            Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
+        }
+    } else {
+        let mut dash: v6::Dashboard = json::from_slice(&body)?;
+        dash.title = dash.title.trim().to_string();
+        if dash.title.is_empty() {
+            return Err(anyhow::anyhow!("Dashboard should have title"));
+        };
+        dash.dashboard_id = dashboard_id.to_string();
+        let value: bytes::Bytes = json::to_vec(&dash)?.into();
+        let dash_str = std::str::from_utf8(&value)?;
+        let hash = config::utils::hash::gxhash::new()
+            .sum64(dash_str)
+            .to_string();
+        match db::put(&key, value, db::NO_NEED_WATCH, None).await {
+            Ok(_) => Ok(Dashboard {
+                v6: Some(dash),
+                version: 6,
                 hash,
                 ..Default::default()
             }),
@@ -257,11 +286,19 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                     hash,
                     ..Default::default()
                 })
-            } else {
+            } else if d_version.version == 5 {
                 let dash: v5::Dashboard = json::from_slice(&val).unwrap();
                 Ok(Dashboard {
                     v5: Some(dash),
                     version: 5,
+                    hash,
+                    ..Default::default()
+                })
+            } else {
+                let dash: v6::Dashboard = json::from_slice(&val).unwrap();
+                Ok(Dashboard {
+                    v6: Some(dash),
+                    version: 6,
                     hash,
                     ..Default::default()
                 })

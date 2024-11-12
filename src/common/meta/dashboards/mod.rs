@@ -34,6 +34,7 @@ pub struct Dashboard {
     pub v3: Option<v3::Dashboard>,
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
+    pub v6: Option<v6::Dashboard>,
     pub version: i32,
     pub hash: String,
 }
@@ -49,6 +50,7 @@ pub mod v2;
 pub mod v3;
 pub mod v4;
 pub mod v5;
+pub mod v6;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

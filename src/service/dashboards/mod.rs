@@ -219,8 +219,10 @@ pub async fn move_dashboard(
             json::to_vec(&dashboard.v3.unwrap()).unwrap()
         } else if dashboard.version == 4 {
             json::to_vec(&dashboard.v4.unwrap()).unwrap()
-        } else {
+        } else if dashboard.version == 5 {
             json::to_vec(&dashboard.v5.unwrap()).unwrap()
+        } else {
+            json::to_vec(&dashboard.v6.unwrap()).unwrap()
         };
 
         // add the dashboard to the destination folder
