@@ -762,17 +762,27 @@ pub async fn merge_files(
         &new_file_meta,
     )
     .await;
-    let (_new_schema, buf) = merge_result.map_err(|e| {
-        let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-        log::error!(
-            "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
-            e,
-            files,
-            schema_latest
-        );
 
-        DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
-    })?;
+    // clear session data
+    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+
+    let (_new_schema, buf) = match merge_result {
+        Ok(v) => v,
+        Err(e) => {
+            // clear cached data, maybe the data is currupted
+            let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
+            for file in files.iter() {
+                let _ = file_data::disk::remove(&trace_id, file).await;
+            }
+            log::error!(
+                "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
+                e,
+                files,
+                schema_latest
+            );
+            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
+        }
+    };
 
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
