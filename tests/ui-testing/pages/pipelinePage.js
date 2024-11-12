@@ -229,7 +229,7 @@ this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]
     await this.createFunctionToggle.click();
 }
 
-async clickFunctionLable(name) {
+async clickFunctionLabel(name) {
   // Click the label and then fill in the input that appears
   await this.functionNameLabel.click();
 }

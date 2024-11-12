@@ -624,15 +624,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
     await page.getByText('Please connect all nodes').click();
-    // await pipelinePage.searchPipeline(pipelineName);
-    // await page.waitForTimeout(1000);
-    // const deletePipelineButton = page.locator(
-    //   `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-    // );
-    // await deletePipelineButton.waitFor({ state: "visible" });
-    // await deletePipelineButton.click();
-    // await pipelinePage.confirmDeletePipeline();
-    // await pipelinePage.verifyPipelineDeleted();
+  
   });
 
 });
