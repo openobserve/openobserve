@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div  style="opacity: 0.8" class="q-mt-sm flex items-center justify-center">
         <q-icon name="info" class="q-mr-xs " size="20px" style="opacity: 0.5;" />
         <span class="text-h6 text-center ">
-          Please contact administrator to enable.</span>
+          Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.</span>
       </div>
 
       <q-btn
