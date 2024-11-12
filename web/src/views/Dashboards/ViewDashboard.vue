@@ -671,7 +671,9 @@ export default defineComponent({
     };
 
     const refreshData = () => {
-      dateTimePicker.value.refresh();
+      if (!arePanelsLoading.value) {
+        dateTimePicker.value.refresh();
+      }
     };
 
     const onDataZoom = (event: any) => {
