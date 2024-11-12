@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         }`"
       >
-        <div class="tw-flex justify-between items-center q-pa-xs tw-w-full">
-          <div class="flex tw-w-1/2">
+        <div class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0">
+          <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
               v-if="!isFullscreen"
               no-caps
@@ -46,18 +46,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="hideOnPrintMode"
             />
             <span
-              class="q-table__title color q-mx-sm q-mt-xs"
+              class="q-table__title color tw-px-2 tw-cursor-pointer tw-transition-all tw-rounded-sm tw-ml-2"
               @click="goBackToDashboardList"
-              >{{ folderNameFromFolderId }} /
+              >{{ folderNameFromFolderId }}
             </span>
+            <q-spinner-dots v-if="!store.state.organizationData.folders.length" color="primary" size="2em" />
+            <q-icon
+              class="q-table__title tw-text-gray-400 tw-mt-1"
+              name="chevron_right"
+            ></q-icon>
             <span
-              class="q-table__title q-mt-xs tw-flex-1 tw-truncate"
+              class="q-table__title q-mx-sm tw-truncate tw-flex-1"
               :title="currentDashboardData.data?.title"
             >
               {{ currentDashboardData.data?.title }}
             </span>
           </div>
-          <div class="flex tw-w-1/2 tw-justify-end">
+          <div class="tw-flex">
             <q-btn
               v-if="!isFullscreen"
               outline
