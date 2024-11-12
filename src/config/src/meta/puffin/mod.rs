@@ -100,6 +100,8 @@ pub enum BlobTypes {
     #[default]
     #[serde(rename = "o2-fst-v1")]
     O2FstV1,
+    #[serde(rename = "o2-ttv-v1")]
+    O2TtvV1,
 }
 
 #[derive(Default)]
@@ -132,6 +134,11 @@ impl BlobMetadataBuilder {
 
     pub fn compression_codec(mut self, compression_codec: Option<CompressionCodec>) -> Self {
         self.compression_codec = compression_codec;
+        self
+    }
+
+    pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
+        self.properties = properties;
         self
     }
 

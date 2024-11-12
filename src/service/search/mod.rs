@@ -28,10 +28,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{
-        base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query,
-        str::StringExt,
-    },
+    utils::{base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -423,7 +420,6 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
-        in_req.index_type.optional(),
     );
 
     let span = tracing::span::Span::current();

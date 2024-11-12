@@ -336,7 +336,6 @@ impl QueryConditionExt for QueryCondition {
                 timeout: 0,
                 search_type,
                 search_event_context,
-                index_type: "".to_string(),
             };
             SearchService::search(&trace_id, org_id, stream_type, None, &req).await
         };

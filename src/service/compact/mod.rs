@@ -30,8 +30,7 @@ use tokio::sync::{mpsc, Semaphore};
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
-mod file_list;
-pub mod file_list_deleted;
+pub mod deleted;
 pub mod flatten;
 pub mod merge;
 pub mod retention;
@@ -364,13 +363,6 @@ pub async fn run_merge(
         task.await?;
     }
 
-    // after compact, compact file list from storage
-    if !cfg.common.meta_store_external {
-        if let Err(e) = file_list::run(min_offset).await {
-            log::error!("[COMPACTOR] merge file list error: {}", e);
-        }
-    }
-
     Ok(())
 }
 
@@ -406,7 +398,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         let (offset, _) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         let batch_size = 10000;
         loop {
-            match file_list_deleted::delete(&org_id, offset, time_max, batch_size).await {
+            match deleted::delete(&org_id, offset, time_max, batch_size).await {
                 Ok(affected) => {
                     if affected == 0 {
                         break;

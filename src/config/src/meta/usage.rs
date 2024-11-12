@@ -351,4 +351,6 @@ pub struct Stats {
     pub max_ts: i64,
     #[serde(default)]
     pub compressed_size: Option<f64>,
+    #[serde(default)]
+    pub index_size: Option<f64>,
 }

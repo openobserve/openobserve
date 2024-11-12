@@ -41,7 +41,6 @@ message SearchRequest {
     repeated IdxFileName     idx_files = 8;
     int64                      timeout = 9;
     string                 work_group = 10;
-    string                 index_type = 11;
     optional string           user_id = 12;
     optional string search_event_type = 13;
 }

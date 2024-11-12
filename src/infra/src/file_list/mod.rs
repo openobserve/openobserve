@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use config::{
     meta::{
         meta_store::MetaStore,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+        stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     },
     utils::time::second_micros,
 };
@@ -62,9 +62,8 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
-        flattened: bool,
         created_at: i64,
-        files: &[String],
+        files: &[FileListDeleted],
     ) -> Result<()>;
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
@@ -100,7 +99,7 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         time_max: i64,
         limit: i64,
-    ) -> Result<Vec<(String, bool)>>;
+    ) -> Result<Vec<FileListDeleted>>;
     // stream stats
     async fn get_min_ts(
         &self,
@@ -200,13 +199,10 @@ pub async fn batch_remove(files: &[String]) -> Result<()> {
 #[inline]
 pub async fn batch_add_deleted(
     org_id: &str,
-    flattened: bool,
     created_at: i64,
-    files: &[String],
+    files: &[FileListDeleted],
 ) -> Result<()> {
-    CLIENT
-        .batch_add_deleted(org_id, flattened, created_at, files)
-        .await
+    CLIENT.batch_add_deleted(org_id, created_at, files).await
 }
 
 #[inline]
@@ -292,7 +288,11 @@ pub async fn query_old_data_hours(
 }
 
 #[inline]
-pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<(String, bool)>> {
+pub async fn query_deleted(
+    org_id: &str,
+    time_max: i64,
+    limit: i64,
+) -> Result<Vec<FileListDeleted>> {
     CLIENT.query_deleted(org_id, time_max, limit).await
 }
 
@@ -482,6 +482,8 @@ pub struct FileRecord {
     pub original_size: i64,
     pub compressed_size: i64,
     #[sqlx(default)]
+    pub index_size: i64,
+    #[sqlx(default)]
     pub flattened: bool,
 }
 
@@ -493,6 +495,7 @@ impl From<&FileRecord> for FileMeta {
             records: record.records,
             original_size: record.original_size,
             compressed_size: record.compressed_size,
+            index_size: record.index_size,
             flattened: record.flattened,
         }
     }
@@ -507,6 +510,7 @@ pub struct StatsRecord {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub index_size: i64,
 }
 
 impl From<&StatsRecord> for StreamStats {
@@ -519,6 +523,7 @@ impl From<&StatsRecord> for StreamStats {
             file_num: record.file_num,
             storage_size: record.original_size,
             compressed_size: record.compressed_size,
+            index_size: record.index_size,
         }
     }
 }
@@ -528,6 +533,7 @@ pub struct FileDeletedRecord {
     pub stream: String,
     pub date: String,
     pub file: String,
+    pub index_file: bool,
     pub flattened: bool,
 }
 

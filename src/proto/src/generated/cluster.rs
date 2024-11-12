@@ -32,6 +32,8 @@ pub struct FileMeta {
     pub original_size: i64,
     #[prost(int64, tag = "5")]
     pub compressed_size: i64,
+    #[prost(int64, tag = "6")]
+    pub index_size: i64,
 }
 /// Job information for a request
 #[derive(Eq)]
@@ -968,8 +970,6 @@ pub struct SearchRequest {
     pub timeout: i64,
     #[prost(string, tag = "10")]
     pub work_group: ::prost::alloc::string::String,
-    #[prost(string, tag = "11")]
-    pub index_type: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "12")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "13")]
@@ -2804,8 +2804,6 @@ pub struct FlightSearchRequest {
     pub use_inverted_index: bool,
     #[prost(string, optional, tag = "16")]
     pub work_group: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "17")]
-    pub index_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "18")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "19")]

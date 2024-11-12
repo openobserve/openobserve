@@ -26,7 +26,6 @@ pub struct Request {
     pub work_group: Option<String>,
     pub time_range: Option<(i64, i64)>,
     pub search_event_type: Option<String>, // node rule
-    pub inverted_index_type: Option<String>,
     pub use_inverted_index: bool,
 }
 
@@ -41,7 +40,6 @@ impl Default for Request {
             work_group: None,
             time_range: None,
             search_event_type: None,
-            inverted_index_type: None,
             use_inverted_index: false,
         }
     }
@@ -57,7 +55,6 @@ impl Request {
         user_id: Option<String>,
         time_range: Option<(i64, i64)>,
         search_event_type: Option<String>,
-        inverted_index_type: Option<String>,
     ) -> Self {
         Self {
             trace_id,
@@ -68,7 +65,6 @@ impl Request {
             work_group: None,
             time_range,
             search_event_type,
-            inverted_index_type,
             use_inverted_index: false,
         }
     }
@@ -92,10 +88,6 @@ impl Request {
     pub fn set_use_inverted_index(&mut self, use_inverted_index: bool) {
         self.use_inverted_index = use_inverted_index;
     }
-
-    pub fn set_inverted_index_type(&mut self, index_type: Option<String>) {
-        self.inverted_index_type = index_type;
-    }
 }
 
 impl From<FlightSearchRequest> for Request {
@@ -109,7 +101,6 @@ impl From<FlightSearchRequest> for Request {
             work_group: request.work_group,
             time_range: Some((request.start_time, request.end_time)),
             search_event_type: request.search_event_type,
-            inverted_index_type: request.index_type,
             use_inverted_index: request.use_inverted_index,
         }
     }
