@@ -35,6 +35,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
@@ -44,6 +45,7 @@ use crate::{
     service::{
         format_stream_name,
         ingestion::{check_ingestion_allowed, get_val_for_attr},
+        logs::bulk::TRANSFORM_FAILED,
         schema::get_upto_discard_error,
     },
 };
@@ -94,6 +96,7 @@ pub async fn logs_json_handler(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = match in_stream_name {
@@ -303,6 +306,19 @@ pub async fn logs_json_handler(
                 if timestamp < min_ts {
                     stream_status.status.failed += 1; // to old data, just discard
                     stream_status.status.error = get_upto_discard_error().to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(
+                        log_ingestion_errors,
+                        &log_records,
+                        &stream_status.status.error,
+                    );
                     continue;
                 }
                 local_val.insert(
@@ -393,6 +409,14 @@ pub async fn logs_json_handler(
                 );
                 stream_status.status.failed += records_count as u32;
                 stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
             }
             Ok(pl_results) => {
                 let function_no = exec_pl.num_of_func();

@@ -638,10 +638,23 @@ const openCancelDialog = () => {
     confirmDialogMeta.value.show = true;
     confirmDialogMeta.value.title = t("common.cancelChanges");
     confirmDialogMeta.value.message = "Are you sure you want to cancel changes?";
-    confirmDialogMeta.value.onConfirm = () => router.back();
+    confirmDialogMeta.value.onConfirm = () => {
+    resetPipelineData();
+    router.push({
+      name: "pipelines",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  };;
   }
   else{
-    router.back();
+    router.push({
+      name: "pipelines",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
   }
 
 };

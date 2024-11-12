@@ -778,26 +778,24 @@ impl StreamPartition {
     }
 
     pub fn get_partition_value(&self, value: &str) -> String {
-        match &self.types {
+        let val = match &self.types {
             StreamPartitionType::Value => value.to_string(),
             StreamPartitionType::Hash(n) => {
                 let h = gxhash::new().sum64(value);
                 let bucket = h % n;
                 bucket.to_string()
             }
-            StreamPartitionType::Prefix => {
-                let c = value
-                    .to_ascii_lowercase()
-                    .chars()
-                    .next()
-                    .unwrap_or('_')
-                    .to_string();
-                if c.is_ascii() {
-                    c
-                } else {
-                    urlencoding::encode(&c).into_owned()
-                }
-            }
+            StreamPartitionType::Prefix => value
+                .to_ascii_lowercase()
+                .chars()
+                .next()
+                .unwrap_or('_')
+                .to_string(),
+        };
+        if val.is_ascii() {
+            val
+        } else {
+            urlencoding::encode(&val).into_owned()
         }
     }
 }
