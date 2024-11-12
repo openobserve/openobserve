@@ -646,7 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </template>
                         </q-select> -->
-                        <selectFunction />
+                        <DynamicFunctionPopUp />
                       </div>
                       <div
                         class="color-input-wrapper"
@@ -984,7 +984,7 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
-import SelectFunction from "@/components/dashboards/addPanel/dynamicFunction/SelectFunction.vue";
+import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -996,7 +996,7 @@ export default defineComponent({
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
-    SelectFunction,
+    DynamicFunctionPopUp,
   },
   props: ["dashboardData"],
   setup(props) {
