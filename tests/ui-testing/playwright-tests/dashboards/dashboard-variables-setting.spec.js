@@ -117,7 +117,6 @@ test.describe("dashboard variables setting", () => {
     await orgNavigation;
   });
 
-  // query values test cases
   test("should try to open variables, click add variable, and without saving close it ", async ({ page, }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -132,7 +131,8 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-add-btn"]').click();
     await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
   })
-
+  
+  // query values test cases
   test("should add query_values to dashboard and save it", async ({ page, }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -372,6 +372,104 @@ test.describe("dashboard variables setting", () => {
   })
 
   // custom test cases
-});
+  test("should verify custom variables by adding and its visible on dashboard", async({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Custom' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('custom');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('custom-variable');
+    await page.getByRole('button', { name: 'Add Option' }).click();
+    await page.locator('[data-test="dashboard-custom-variable-0-label"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-0-label"]').fill('v1');
+    await page.locator('[data-test="dashboard-custom-variable-0-value"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-0-value"]').fill('v1');
+    await page.getByRole('button', { name: 'Add Option' }).click();
+    await page.locator('[data-test="dashboard-custom-variable-1-label"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-label"]').fill('v2');
+    await page.locator('[data-test="dashboard-custom-variable-1-value"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-value"]').fill('v2');
+    await page.locator('[data-test="dashboard-custom-variable-0-checkbox"]').click();
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+  })
 
-  
+  test("should verify that multi select is working properly", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Custom' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('custom');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('custom-variable');
+    await page.getByRole('button', { name: 'Add Option' }).click();
+    await page.locator('[data-test="dashboard-custom-variable-0-label"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-0-label"]').fill('v1');
+    await page.locator('[data-test="dashboard-custom-variable-0-value"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-0-value"]').fill('v1');
+    await page.getByRole('button', { name: 'Add Option' }).click();
+    await page.locator('[data-test="dashboard-custom-variable-1-label"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-label"]').fill('v2');
+    await page.locator('[data-test="dashboard-custom-variable-1-value"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-value"]').fill('v2');
+    await page.locator('[data-test="dashboard-query_values-show_multiple_values"] div').nth(2).click();
+    await page.locator('[data-test="dashboard-custom-variable-0-checkbox"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-checkbox"]').click();
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+  })
+
+  test("should verify that hide on custom variable dashboard is working", async ({ page, }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.locator('[data-test="dashboard-setting-btn"]').click();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+    await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.getByRole('option', { name: 'Custom' }).locator('div').nth(2).click();
+    await page.locator('[data-test="dashboard-variable-name"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill('custom');
+    await page.locator('[data-test="dashboard-variable-label"]').click();
+    await page.locator('[data-test="dashboard-variable-label"]').fill('custom-variable');
+    await page.getByRole('button', { name: 'Add Option' }).click();
+    await page.locator('[data-test="dashboard-custom-variable-0-label"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-0-label"]').fill('v1');
+    await page.locator('[data-test="dashboard-custom-variable-0-value"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-0-value"]').fill('v1');
+    await page.getByRole('button', { name: 'Add Option' }).click();
+    await page.locator('[data-test="dashboard-custom-variable-1-label"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-label"]').fill('v2');
+    await page.locator('[data-test="dashboard-custom-variable-1-value"]').click();
+    await page.locator('[data-test="dashboard-custom-variable-1-value"]').fill('v2');
+    await page.locator('[data-test="dashboard-variable-hide_on_dashboard"] div').nth(2).click()
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+  })
+});
