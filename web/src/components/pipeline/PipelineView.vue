@@ -39,7 +39,6 @@ import { ControlButton, Controls } from '@vue-flow/controls'
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
-import "@vue-flow/core/dist/theme-default.css";
 import '@vue-flow/controls/dist/style.css'
 import useDragAndDrop from '@/plugins/pipelines/useDnD';
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -73,6 +72,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
       });
 
       onMounted(async () => {
+
         
         pipelineObj.nodeTypes = [
   {
