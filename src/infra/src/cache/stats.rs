@@ -83,6 +83,8 @@ pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error>
     stats.file_num += 1;
     stats.storage_size += val.original_size;
     stats.compressed_size += val.compressed_size;
+    // increase the stats here for inverted index
+    stats.index_size += val.index_size;
 
     Ok(())
 }
@@ -117,6 +119,7 @@ mod tests {
             file_num: 1,
             storage_size: 200,
             compressed_size: 3,
+            index_size: 120000,
         };
 
         set_stream_stats("nexus", "default", StreamType::Logs, val.clone());

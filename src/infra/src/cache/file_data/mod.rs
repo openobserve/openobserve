@@ -133,7 +133,11 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     }
 }
 
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get(
+    _trace_id: &str,
+    file: &str,
+    range: Option<Range<usize>>,
+) -> Result<bytes::Bytes, anyhow::Error> {
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled {

@@ -54,23 +54,23 @@ const fn default_min_len() -> usize {
     usize::MAX
 }
 
-/// Currently supports two InvertedIndexFormat
-/// Parquet -> v2
-/// FST     -> v3
-/// BOTH    -> use both
+/// Supported inverted index formats:
+///  - Parquet (v2): Index is stored in parquet format
+///  - Tantivy (v3): Index is stored in custom puffin format files
+///  - both: Use both Parquet and Tantivy. Note that this will generate two inverted index files.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum InvertedIndexFormat {
     #[default]
     Parquet,
-    FST,
     Both,
+    Tantivy,
 }
 
 impl From<&String> for InvertedIndexFormat {
     fn from(s: &String) -> Self {
         match s.to_lowercase().as_str() {
-            "fst" => InvertedIndexFormat::FST,
             "both" => InvertedIndexFormat::Both,
+            "tantivy" => InvertedIndexFormat::Tantivy,
             _ => InvertedIndexFormat::Parquet,
         }
     }
@@ -80,8 +80,8 @@ impl std::fmt::Display for InvertedIndexFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InvertedIndexFormat::Parquet => write!(f, "parquet"),
-            InvertedIndexFormat::FST => write!(f, "fst"),
             InvertedIndexFormat::Both => write!(f, "both"),
+            InvertedIndexFormat::Tantivy => write!(f, "tantivy"),
         }
     }
 }

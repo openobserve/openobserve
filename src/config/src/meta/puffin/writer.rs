@@ -54,49 +54,63 @@ impl<W> PuffinBytesWriter<W> {
         &self,
         blob_type: BlobTypes,
         compression_codec: Option<CompressionCodec>,
+        properties: HashMap<String, String>,
+        size: u64,
     ) -> BlobMetadata {
         BlobMetadataBuilder::default()
             .blob_type(blob_type)
             .compression_codec(compression_codec)
+            .properties(properties)
             .offset(self.written_bytes as _)
+            .length(size)
             .build()
             .expect("Missing required fields")
     }
 }
 
 impl<W: io::Write> PuffinBytesWriter<W> {
-    pub fn add_blob(&mut self, field: String, raw_data: Vec<u8>) -> Result<()> {
+    pub fn add_blob(
+        &mut self,
+        raw_data: &Vec<u8>,
+        blob_type: BlobTypes,
+        // blob_tag will be added in the puffin footer, with its respective offset
+        blob_tag: String,
+        compress: bool,
+    ) -> Result<()> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
 
-        // build blob metadata
-        let mut metadata = self.build_blob_metadata(BlobTypes::O2FstV1, None);
-
-        // compress blob raw data
-        match metadata.compression_codec {
-            None => {
-                metadata.length = raw_data.len() as u64;
-                self.writer.write_all(&raw_data)?;
-            }
-            Some(CompressionCodec::Zstd) => {
-                let mut encoder = zstd::Encoder::new(vec![], 3)?;
-                encoder
-                    .write_all(&raw_data)
-                    .context("Error encoding blob raw data")?;
-                let compressed_bytes = encoder.finish()?;
-                self.writer.write_all(&compressed_bytes)?;
-                metadata.length = compressed_bytes.len() as u64;
-            }
-            Some(CompressionCodec::Lz4) => {
-                todo!("Lz4 compression is not implemented yet")
-            }
+        let (final_data, final_size, compression_codec) = if compress {
+            // compress blob raw data
+            let mut encoder = zstd::Encoder::new(vec![], 3)?;
+            encoder
+                .write_all(raw_data)
+                .context("Error encoding blob raw data")?;
+            let compressed_bytes = encoder.finish()?;
+            let compressed_bytes_len = compressed_bytes.len() as u64;
+            (
+                compressed_bytes,
+                compressed_bytes_len,
+                Some(CompressionCodec::Zstd),
+            )
+        } else {
+            let raw_data_len = raw_data.len() as u64;
+            // use raw data directly
+            (raw_data.to_owned(), raw_data_len, None)
         };
 
-        self.written_bytes += metadata.length;
-        self.properties
-            .insert(field, self.blobs_metadata.len().to_string());
-        self.blobs_metadata.push(metadata);
+        self.writer.write_all(&final_data)?;
+        let properties = {
+            let mut properties = HashMap::new();
+            properties.insert("blob_tag".to_string(), blob_tag);
+            properties
+        };
 
+        // add metadata for this blob
+        let blob_metadata =
+            self.build_blob_metadata(blob_type, compression_codec, properties, final_size);
+        self.blobs_metadata.push(blob_metadata);
+        self.written_bytes += final_size;
         Ok(())
     }
 

@@ -251,15 +251,8 @@ async fn get_inverted_index_file_lists(
     match_terms: &[String],
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = config::get_config();
-    let inverted_index_type = if req.inverted_index_type.is_none()
-        || req.inverted_index_type.as_ref().unwrap().is_empty()
-    {
-        cfg.common.inverted_index_search_format.clone()
-    } else {
-        req.inverted_index_type.as_ref().unwrap().to_string()
-    };
-    let use_inverted_index = req.use_inverted_index
-        && (inverted_index_type == "parquet" || inverted_index_type == "both");
+    let use_inverted_index =
+        req.use_inverted_index && cfg.common.inverted_index_search_format == "parquet";
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
         use_inverted_index
