@@ -45,7 +45,7 @@ pub enum ReportingData {
 #[derive(Debug)]
 pub struct ReportingRunner {
     pub pending: Vec<ReportingData>,
-    pub batch_size: usize, 
+    pub batch_size: usize,
     pub timeout: time::Duration,
     pub last_processed: time::Instant,
 }

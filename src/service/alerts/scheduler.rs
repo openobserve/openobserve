@@ -996,7 +996,7 @@ async fn handle_derived_stream_triggers(
                         data: Some(cluster_rpc::IngestionData::from(records)),
                         ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                     };
-                    match ingestion_service::ingest(&org_id, req).await {
+                    match ingestion_service::ingest(req).await {
                         Ok(resp) if resp.status_code == 200 => {
                             log::info!(
                                 "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",

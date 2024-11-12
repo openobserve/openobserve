@@ -275,25 +275,29 @@ pub async fn run_audit_publish() {
     loop {
         log::debug!("Audit ingestion loop running");
         audit_interval.tick().await;
-        o2_enterprise::enterprise::common::auditor::publish_existing_audits(publish_audit).await;
+        o2_enterprise::enterprise::common::auditor::publish_existing_audits(
+            &get_config().common.usage_org,
+            publish_audit,
+        )
+        .await;
     }
 }
 
 #[cfg(feature = "enterprise")]
 pub async fn audit(msg: auditor::AuditMessage) {
-    auditor::audit(msg, publish_audit).await;
+    auditor::audit(&get_config().common.usage_org, msg, publish_audit).await;
 }
 
 #[cfg(feature = "enterprise")]
 pub async fn flush_audit() {
-    auditor::flush_audit(publish_audit).await;
+    auditor::flush_audit(&get_config().common.usage_org, publish_audit).await;
 }
 
 #[cfg(feature = "enterprise")]
 async fn publish_audit(
-    req: cluster_rpc::UsageRequest,
-) -> Result<cluster_rpc::UsageResponse, anyhow::Error> {
-    ingestion::ingest(&get_config().common.usage_org, req).await
+    req: cluster_rpc::IngestionRequest,
+) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
+    crate::service::ingestion::ingestion_service::ingest(req).await
 }
 
 #[inline]

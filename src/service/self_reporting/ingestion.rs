@@ -18,7 +18,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::get_internal_grpc_token,
         self_reporting::{
             usage::{AggregatedData, GroupKey, UsageData, UsageEvent, USAGE_STREAM},
             ReportingData,
@@ -29,60 +28,8 @@ use config::{
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc;
-use tonic::{
-    codec::CompressionEncoding,
-    metadata::{MetadataKey, MetadataValue},
-    Request,
-};
 
 use crate::{common::meta::ingestion, service};
-
-pub(super) async fn ingest(
-    dest_org_id: &str,
-    req: cluster_rpc::UsageRequest,
-) -> Result<cluster_rpc::UsageResponse, Error> {
-    let cfg = config::get_config();
-    let org_header_key: MetadataKey<_> = cfg
-        .grpc
-        .org_header_key
-        .parse()
-        .map_err(|_| Error::msg("invalid org_header_key".to_string()))?;
-    let token: MetadataValue<_> = get_internal_grpc_token()
-        .parse()
-        .map_err(|_| Error::msg("invalid token".to_string()))?;
-    let (addr, channel) = service::grpc::get_ingester_channel().await?;
-    let mut client = cluster_rpc::usage_client::UsageClient::with_interceptor(
-        channel,
-        move |mut req: Request<()>| {
-            req.metadata_mut().insert("authorization", token.clone());
-            req.metadata_mut()
-                .insert(org_header_key.clone(), dest_org_id.parse().unwrap());
-            Ok(req)
-        },
-    );
-    client = client
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
-        Ok(res) => res.into_inner(),
-        Err(err) => {
-            log::error!(
-                "[SELF-REPORTING] export partial_success node: {addr}, response: {:?}",
-                err
-            );
-            if err.code() == tonic::Code::Internal {
-                return Err(err.into());
-            }
-            return Err(Error::msg(format!(
-                "Ingest node {addr}, response error: {}",
-                err
-            )));
-        }
-    };
-    Ok(res)
-}
 
 pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
@@ -272,7 +219,7 @@ pub(super) async fn ingest_reporting_data(
             ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
         };
 
-        match service::ingestion::ingestion_service::ingest(&org_id, req).await {
+        match service::ingestion::ingestion_service::ingest(req).await {
             Ok(resp) if resp.status_code == 200 => {
                 log::info!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"

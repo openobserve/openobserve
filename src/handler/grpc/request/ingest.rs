@@ -32,7 +32,6 @@ impl Ingest for Ingester {
         request: Request<IngestionRequest>,
     ) -> Result<Response<IngestionResponse>, Status> {
         let start = std::time::Instant::now();
-        // let metadata = request.metadata().clone();
         let req = request.into_inner();
         let org_id = req.org_id;
         let stream_name = req.stream_name;

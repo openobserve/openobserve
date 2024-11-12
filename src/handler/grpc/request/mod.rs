@@ -20,4 +20,4 @@ pub mod metrics;
 pub mod query_cache;
 pub mod search;
 pub mod traces;
-pub mod usage;
+// pub mod usage;
