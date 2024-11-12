@@ -15,17 +15,15 @@
 
 use anyhow::Error;
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         cluster::get_internal_grpc_token,
         self_reporting::{
-            error::ErrorData,
-            usage::{
-                AggregatedData, GroupKey, TriggerData, UsageData, UsageEvent,
-                TRIGGERS_USAGE_STREAM, USAGE_STREAM,
-            },
+            usage::{AggregatedData, GroupKey, UsageData, UsageEvent, USAGE_STREAM},
             ReportingData,
         },
+        stream::{StreamParams, StreamType},
     },
     utils::json,
 };
@@ -37,7 +35,7 @@ use tonic::{
     Request,
 };
 
-use crate::service::grpc::get_ingester_channel;
+use crate::{common::meta::ingestion, service};
 
 pub(super) async fn ingest(
     dest_org_id: &str,
@@ -52,7 +50,7 @@ pub(super) async fn ingest(
     let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::msg("invalid token".to_string()))?;
-    let (addr, channel) = get_ingester_channel().await?;
+    let (addr, channel) = service::grpc::get_ingester_channel().await?;
     let mut client = cluster_rpc::usage_client::UsageClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
@@ -210,93 +208,82 @@ pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
             .map(|usage| json::to_value(usage).unwrap())
             .collect::<Vec<_>>();
         // report usage data
-        let req = cluster_rpc::UsageRequest {
-            stream_name: USAGE_STREAM.to_owned(),
-            data: Some(cluster_rpc::UsageData::from(report_data)),
-        };
-        if let Err(e) = ingest(&cfg.common.usage_org, req).await {
-            log::error!("[SELF-REPORTING] Error in ingesting usage data {:?}", e);
-            // on error in ingesting usage data, push back the data
-            for usage_data in curr_usages {
-                if let Err(e) = super::queues::USAGE_QUEUE
-                    .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                    .await
-                {
-                    log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                    );
-                }
-            }
-        }
+        let usage_stream = StreamParams::new(&cfg.common.usage_org, USAGE_STREAM, StreamType::Logs);
+        ingest_reporting_data(report_data, usage_stream).await;
+        // // on error in ingesting usage data, push back the data
+        // for usage_data in curr_usages {
+        //     if let Err(e) = super::queues::USAGE_QUEUE
+        //         .enqueue(ReportingData::Usage(Box::new(usage_data)))
+        //         .await
+        //     {
+        //         log::error!(
+        //             "[SELF-REPORTING] Error in pushing back un-ingested Usage data to
+        // UsageQueuer: {e}"         );
+        //     }
+        // }
     }
 }
 
-pub(super) async fn ingest_trigger_usages(trigger_data: Vec<TriggerData>) {
-    if trigger_data.is_empty() {
-        log::info!("[SELF-REPORTING] Returning as no triggers reported");
-        return;
-    }
-
-    let mut json_triggers = vec![];
-    for item in &trigger_data {
-        json_triggers.push(json::to_value(item).unwrap());
-    }
-
-    // report trigger usage data
-    let req = cluster_rpc::UsageRequest {
-        stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
-        data: Some(cluster_rpc::UsageData::from(json_triggers)),
-    };
-    if let Err(e) = ingest(&get_config().common.usage_org, req).await {
-        log::error!(
-            "[SELF-REPORTING] Error in ingesting triggers usage data {:?}",
-            e
-        );
-        // on error in ingesting trigger data, push back to the queue
-        for trigger in trigger_data {
-            if let Err(e) = super::queues::USAGE_QUEUE
-                .enqueue(ReportingData::Trigger(Box::new(trigger)))
-                .await
-            {
-                log::error!(
-                    "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                );
-            }
-        }
-    }
-}
-
-pub(super) async fn ingest_errors(error_data: Vec<ErrorData>) {
-    if error_data.is_empty() {
+// TODO(taiming): handle errors. maybe retries?
+pub(super) async fn ingest_reporting_data(
+    reporting_data_json: Vec<json::Value>,
+    stream_params: StreamParams,
+) {
+    if reporting_data_json.is_empty() {
         log::info!("[SELF-REPORTING] Returning as no errors reported");
         return;
     }
 
-    let mut json_errors = vec![];
-    for item in &error_data {
-        json_errors.push(json::to_value(item).unwrap());
-    }
+    if LOCAL_NODE.is_ingester() {
+        // ingest directly for ingester node
+        let (org_id, stream_name): (String, String) = (
+            stream_params.org_id.into(),
+            stream_params.stream_name.into(),
+        );
+        let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
+        let req = ingestion::IngestionRequest::Usage(&bytes);
+        match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None).await {
+            Ok(resp) if resp.code == 200 => {
+                log::info!(
+                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
+                );
+            }
+            error => {
+                let err =
+                    error.map_or_else(|e| e.to_string(), |resp| resp.error.unwrap_or_default());
+                log::error!(
+                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}. Error: {err}"
+                );
+            }
+        }
+    } else {
+        // call gRPC ingestion service
+        let (org_id, stream_name, stream_type): (String, String, i32) = (
+            stream_params.org_id.into(),
+            stream_params.stream_name.into(),
+            cluster_rpc::StreamType::from(stream_params.stream_type).into(),
+        );
 
-    // report trigger usage data
-    // let req = cluster_rpc::UsageRequest {
-    //     stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
-    //     data: Some(cluster_rpc::UsageData::from(json_triggers)),
-    // };
-    // if let Err(e) = ingest(&get_config().common.usage_org, req).await {
-    //     log::error!(
-    //         "[SELF-REPORTING] Error in ingesting triggers usage data {:?}",
-    //         e
-    //     );
-    //     // on error in ingesting trigger data, push back to the queue
-    //     for trigger in trigger_data {
-    //         if let Err(e) = super::queues::USAGE_QUEUE
-    //             .enqueue(ReportingData::Trigger(Box::new(trigger)))
-    //             .await
-    //         {
-    //             log::error!(
-    //                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to
-    // UsageQueuer: {e}"             );
-    //         }
-    //     }
-    // }
+        let req = cluster_rpc::IngestionRequest {
+            org_id: org_id.clone(),
+            stream_name: stream_name.clone(),
+            stream_type,
+            data: Some(cluster_rpc::IngestionData::from(reporting_data_json)),
+            ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
+        };
+
+        match service::ingestion::ingestion_service::ingest(&org_id, req).await {
+            Ok(resp) if resp.status_code == 200 => {
+                log::info!(
+                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
+                );
+            }
+            error => {
+                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                log::error!(
+                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}. Error: {err}"
+                );
+            }
+        }
+    }
 }

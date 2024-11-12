@@ -251,6 +251,7 @@ pub async fn flush() {
         // wait for flush ingestion job
         res_receiver.await.ok();
 
+        // TODO(taiming): ERROR_QUEUE might not have the same # of threads
         let (error_sender, error_receiver) = oneshot::channel();
         if let Err(e) = queues::ERROR_QUEUE.shutdown(error_sender).await {
             log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");

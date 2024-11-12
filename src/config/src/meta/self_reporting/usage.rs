@@ -26,6 +26,7 @@ use crate::{
 pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_USAGE_STREAM: &str = "triggers";
+pub const ERROR_STREAM: &str = "errors";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TriggerDataStatus {

@@ -17,7 +17,14 @@ use std::sync::Arc;
 
 use config::{
     get_config,
-    meta::self_reporting::{ReportingData, ReportingMessage, ReportingQueue, ReportingRunner},
+    meta::{
+        self_reporting::{
+            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM},
+            ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
+        },
+        stream::{StreamParams, StreamType},
+    },
+    utils::json,
 };
 use once_cell::sync::Lazy;
 use tokio::{
@@ -56,6 +63,7 @@ fn initialize_usage_queue() -> ReportingQueue {
     ReportingQueue::new(msg_sender)
 }
 
+// TODO(taiming): ERROR_QUEUE should be configured differently
 fn initialize_error_queue() -> ReportingQueue {
     let cfg = get_config();
     let timeout = time::Duration::from_secs(
@@ -141,20 +149,28 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         |(mut usages, mut triggers, mut errors), item| {
             match item {
                 ReportingData::Usage(usage) => usages.push(*usage),
-                ReportingData::Trigger(trigger) => triggers.push(*trigger),
-                ReportingData::Error(error) => errors.push(*error),
+                ReportingData::Trigger(trigger) => triggers.push(json::to_value(*trigger).unwrap()),
+                ReportingData::Error(error) => errors.push(json::to_value(*error).unwrap()),
             }
             (usages, triggers, errors)
         },
     );
 
+    let cfg = get_config();
+
     if !usages.is_empty() {
         super::ingestion::ingest_usages(usages).await;
     }
     if !triggers.is_empty() {
-        super::ingestion::ingest_trigger_usages(triggers).await;
+        let trigger_stream = StreamParams::new(
+            &cfg.common.usage_org,
+            TRIGGERS_USAGE_STREAM,
+            StreamType::Logs,
+        );
+        super::ingestion::ingest_reporting_data(triggers, trigger_stream).await;
     }
     if !errors.is_empty() {
-        super::ingestion::ingest_errors(errors).await;
+        let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
+        super::ingestion::ingest_reporting_data(errors, error_stream).await;
     }
 }
