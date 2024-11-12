@@ -422,7 +422,9 @@ export default defineComponent({
     });
 
     const refreshData = () => {
-      dateTimePickerRef.value.refresh();
+      if (!disable.value) {
+        dateTimePickerRef.value.refresh();
+      }
     };
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
