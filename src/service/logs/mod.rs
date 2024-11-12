@@ -22,6 +22,7 @@ use std::{
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field};
+use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
     get_config,
     meta::{
@@ -29,6 +30,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
+    metrics,
     utils::{
         json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
         schema_ext::SchemaExt,
@@ -38,6 +40,7 @@ use config::{
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{
+    db::organization::get_org_setting,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
     metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
     schema::stream_schema_exists,
@@ -212,6 +215,24 @@ async fn write_logs_by_stream(
             Some(user_email.to_string())
         };
 
+        req_stats.dropped_records = match status {
+            IngestionStatus::Record(s) => s.failed.into(),
+            IngestionStatus::Bulk(s) => {
+                if s.errors {
+                    s.items
+                        .iter()
+                        .map(|i| {
+                            i.iter()
+                                .map(|(_, res)| if res.error.is_some() { 1 } else { 0 })
+                                .sum::<i64>()
+                        })
+                        .sum()
+                } else {
+                    0
+                }
+            }
+        };
+
         if let Some(fns_length) = fn_num {
             report_request_usage_stats(
                 req_stats,
@@ -236,6 +257,7 @@ async fn write_logs(
     json_data: Vec<(i64, Map<String, Value>)>,
 ) -> Result<RequestStats> {
     let cfg = get_config();
+    let log_ingest_errors = ingestion_log_enabled().await;
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
@@ -344,9 +366,27 @@ async fn write_logs(
                     IngestionStatus::Record(status) => {
                         status.failed += 1;
                         status.error = e.to_string();
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                stream_name,
+                                SCHEMA_CONFORMANCE_FAILED,
+                            ])
+                            .inc();
+                        log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                     }
                     IngestionStatus::Bulk(bulk_res) => {
                         bulk_res.errors = true;
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.to_string().as_str(),
+                                stream_name,
+                                SCHEMA_CONFORMANCE_FAILED,
+                            ])
+                            .inc();
+                        log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                         bulk::add_record_status(
                             stream_name.to_string(),
                             &doc_id,
@@ -507,6 +547,25 @@ pub fn refactor_map(
     }
 
     new_map
+}
+
+async fn ingestion_log_enabled() -> bool {
+    // the logging will be enabled through meta only, so hardcoded
+    match get_org_setting("_meta").await {
+        Ok(org_settings) => org_settings.toggle_ingestion_logs,
+        Err(_) => false,
+    }
+}
+
+fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {
+    if !enabled {
+        return;
+    }
+    log::warn!(
+        "failed to process record with error {} : {:?} ",
+        error,
+        record
+    );
 }
 
 #[cfg(test)]

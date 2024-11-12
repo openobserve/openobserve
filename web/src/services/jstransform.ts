@@ -31,11 +31,16 @@ const jstransform = {
   create: (org_identifier: string, data: any) => {
     return http().post(`/api/${org_identifier}/functions`, data);
   },
+  getAssociatedPipelines: (org_identifier: string, name: string) => {
+    return http().get(`/api/${org_identifier}/functions/${name}`);
+  },
   update: (org_identifier: string, data: any) => {
     return http().put(`/api/${org_identifier}/functions/${data.name}`, data);
   },
-  delete: (org_identifier: string, transform_name: string) => {
-    return http().delete(`/api/${org_identifier}/functions/${transform_name}`);
+  delete: (org_identifier: string, transform_name: string, force?: boolean) => {
+    const url = `/api/${org_identifier}/functions/${transform_name}`;
+    const config = force ? { params: { force: true } } : {};
+    return http().delete(url, config);
   },
   create_with_index: (
     org_identifier: string,
