@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Write, sync::Arc};
+use std::sync::Arc;
 
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use arrow::array::RecordBatch;
@@ -26,14 +26,14 @@ use config::{
     meta::{
         inverted_index::InvertedIndexFormat,
         search::StorageType,
-        stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
+        stream::{
+            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats,
+            StreamType,
+        },
     },
     metrics,
     utils::{
-        json,
-        parquet::{
-            get_recordbatch_reader_from_bytes, parse_file_key_columns, read_schema_from_bytes,
-        },
+        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::hour_micros,
@@ -856,30 +856,12 @@ pub async fn merge_files(
         }
     }
 
-    // generate fst format inverted index
-    // if matches!(
-    //     index_format,
-    //     InvertedIndexFormat::FST | InvertedIndexFormat::Both
-    // ) {
-    //     let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-    //     // generate fst inverted index and write to storage
-    //     generate_fst_inverted_index(
-    //         &new_file_key,
-    //         &full_text_search_fields,
-    //         &index_fields,
-    //         Some(&retain_file_list),
-    //         schema,
-    //         &mut reader,
-    //     )
-    //     .await?;
-    // }
-
     if matches!(
         index_format,
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-        create_tantivy_index(
+        if let Err(e) = create_tantivy_index(
             &mut reader,
             &new_file_key,
             &mut new_file_meta,
@@ -888,7 +870,15 @@ pub async fn merge_files(
             schema,
             Some(retain_file_list.as_slice()),
         )
-        .await?;
+        .await
+        {
+            log::error!(
+                "create_tantivy_index for file: {}, error: {}, need delete files: {:?}",
+                new_file_key,
+                e,
+                retain_file_list
+            );
+        }
     }
 
     Ok((new_file_key, new_file_meta, retain_file_list))
@@ -898,59 +888,28 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     if events.is_empty() {
         return Ok(());
     }
-    if get_config().common.meta_store_external {
-        write_file_list_db_only(org_id, events).await
-    } else {
-        write_file_list_s3(org_id, events).await
-    }
-}
 
-async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
     let put_items = events
         .iter()
         .filter(|v| !v.deleted)
         .map(|v| v.to_owned())
         .collect::<Vec<_>>();
-    let del_items_need_flatten = events
+    let del_items = events
         .iter()
-        .filter(|v| v.deleted && v.meta.flattened)
-        .map(|v| v.key.clone())
-        .collect::<Vec<_>>();
-    let del_items_noneed_flatten = events
-        .iter()
-        .filter(|v| v.deleted && !v.meta.flattened)
-        .map(|v| v.key.clone())
+        .filter(|v| v.deleted)
+        .map(|v| FileListDeleted {
+            file: v.key.clone(),
+            index_file: v.meta.index_size > 0,
+            flattened: v.meta.flattened,
+        })
         .collect::<Vec<_>>();
     // set to external db
     // retry 5 times
     let mut success = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
-        if !del_items_need_flatten.is_empty() {
-            if let Err(e) = infra_file_list::batch_add_deleted(
-                org_id,
-                true,
-                created_at,
-                &del_items_need_flatten,
-            )
-            .await
-            {
-                log::error!(
-                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        }
-        if !del_items_noneed_flatten.is_empty() {
-            if let Err(e) = infra_file_list::batch_add_deleted(
-                org_id,
-                false,
-                created_at,
-                &del_items_noneed_flatten,
-            )
-            .await
+        if !del_items.is_empty() {
+            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
                 log::error!(
                     "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
@@ -965,18 +924,9 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
-        if !del_items_need_flatten.is_empty() {
-            if let Err(e) = infra_file_list::batch_remove(&del_items_need_flatten).await {
-                log::error!(
-                    "[COMPACT] batch_delete to external db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        }
-        if !del_items_noneed_flatten.is_empty() {
-            if let Err(e) = infra_file_list::batch_remove(&del_items_noneed_flatten).await {
+        if !del_items.is_empty() {
+            let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
+            if let Err(e) = infra_file_list::batch_remove(&del_files).await {
                 log::error!(
                     "[COMPACT] batch_delete to external db failed, retrying: {}",
                     e
@@ -1000,76 +950,6 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
     } else {
         Ok(())
     }
-}
-
-async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
-    // write new data into file_list
-    let (_stream_key, date_key, _file_name) = parse_file_key_columns(&events.first().unwrap().key)?;
-    // upload the new file_list to storage
-    let new_file_list_key = format!("file_list/{}/{}.json.zst", date_key, ider::generate());
-    let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-    for file in events.iter() {
-        let mut write_buf = json::to_vec(&file)?;
-        write_buf.push(b'\n');
-        buf.write_all(&write_buf)?;
-    }
-    let compressed_bytes = buf.finish().unwrap();
-    storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-
-    // write deleted files into file_list_deleted
-    let del_items = events
-        .iter()
-        .filter(|v| v.deleted)
-        .map(|v| v.key.clone())
-        .collect::<Vec<_>>();
-    if !del_items.is_empty() {
-        let deleted_file_list_key = format!(
-            "file_list_deleted/{org_id}/{}/{}.json.zst",
-            Utc::now().format("%Y/%m/%d/%H"),
-            ider::generate()
-        );
-        let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-        for file in del_items.iter() {
-            buf.write_all((file.to_owned() + "\n").as_bytes())?;
-        }
-        let compressed_bytes = buf.finish().unwrap();
-        storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;
-    }
-
-    // set to local cache & send broadcast
-    // retry 5 times
-    for _ in 0..5 {
-        // set to local cache
-        let mut cache_success = true;
-        for event in events.iter() {
-            if let Err(e) =
-                db::file_list::progress(&event.key, Some(&event.meta), event.deleted).await
-            {
-                cache_success = false;
-                log::error!(
-                    "[COMPACT] set local cache for file_list failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                break;
-            }
-        }
-        if !cache_success {
-            continue;
-        }
-        // send broadcast to other nodes
-        if let Err(e) = db::file_list::broadcast::send(events, None).await {
-            log::error!(
-                "[COMPACT] send broadcast for file_list failed, retrying: {}",
-                e
-            );
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        // broadcast success
-        break;
-    }
-    Ok(())
 }
 
 pub fn generate_inverted_idx_recordbatch(

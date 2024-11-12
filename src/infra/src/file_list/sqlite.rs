@@ -18,7 +18,9 @@ use std::collections::HashMap as stdHashMap;
 use async_trait::async_trait;
 use config::{
     get_config,
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    meta::stream::{
+        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
+    },
     utils::{
         parquet::parse_file_key_columns,
         time::{end_of_the_day, DAY_MICRO_SECS},
@@ -135,9 +137,8 @@ impl super::FileList for SqliteFileList {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
-        flattened: bool,
         created_at: i64,
-        files: &[String],
+        files: &[FileListDeleted],
     ) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -148,16 +149,17 @@ impl super::FileList for SqliteFileList {
             let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (org, stream, date, file, index_file, flattened, created_at)",
             );
-            query_builder.push_values(files, |mut b, item: &String| {
+            query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(item).expect("parse file key failed");
+                    parse_file_key_columns(&item.file).expect("parse file key failed");
                 b.push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
-                    .push_bind(flattened)
+                    .push_bind(item.index_file)
+                    .push_bind(item.flattened)
                     .push_bind(created_at);
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -502,13 +504,13 @@ SELECT date
         org_id: &str,
         time_max: i64,
         limit: i64,
-    ) -> Result<Vec<(String, bool)>> {
+    ) -> Result<Vec<FileListDeleted>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
+            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -517,11 +519,10 @@ SELECT date
         .await?;
         Ok(ret
             .iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    r.flattened,
-                )
+            .map(|r| FileListDeleted {
+                file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                index_file: r.index_file,
+                flattened: r.flattened,
             })
             .collect())
     }
@@ -1213,6 +1214,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     stream     VARCHAR not null,
     date       VARCHAR not null,
     file       VARCHAR not null,
+    index_file BOOLEAN default false not null,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
@@ -1277,6 +1279,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
     add_column(&client, "stream_stats", column, data_type).await?;
+    let column = "index_file";
+    let data_type = "BOOLEAN default false not null";
+    add_column(&client, "file_list_deleted", column, data_type).await?;
 
     Ok(())
 }

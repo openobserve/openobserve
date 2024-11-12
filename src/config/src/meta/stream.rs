@@ -234,6 +234,13 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct FileListDeleted {
+    pub file: String,
+    pub index_file: bool,
+    pub flattened: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
     FileNum,

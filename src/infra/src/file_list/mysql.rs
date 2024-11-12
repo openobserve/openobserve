@@ -18,7 +18,9 @@ use std::collections::HashMap as stdHashMap;
 use async_trait::async_trait;
 use config::{
     get_config,
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    meta::stream::{
+        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
+    },
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{
         hash::Sum64,
@@ -159,9 +161,8 @@ impl super::FileList for MysqlFileList {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
-        flattened: bool,
         created_at: i64,
-        files: &[String],
+        files: &[FileListDeleted],
     ) -> Result<()> {
         if files.is_empty() {
             return Ok(());
@@ -171,16 +172,17 @@ impl super::FileList for MysqlFileList {
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (org, stream, date, file, index_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(item).expect("parse file key failed");
+                    parse_file_key_columns(&item.file).expect("parse file key failed");
                 b.push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
-                    .push_bind(flattened)
+                    .push_bind(item.index_file)
+                    .push_bind(item.flattened)
                     .push_bind(created_at);
             });
             DB_QUERY_NUMS
@@ -567,7 +569,7 @@ SELECT date
         org_id: &str,
         time_max: i64,
         limit: i64,
-    ) -> Result<Vec<(String, bool)>> {
+    ) -> Result<Vec<FileListDeleted>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
@@ -576,7 +578,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
+            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -585,11 +587,10 @@ SELECT date
         .await?;
         Ok(ret
             .iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    r.flattened,
-                )
+            .map(|r| FileListDeleted {
+                file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                index_file: r.index_file,
+                flattened: r.flattened,
             })
             .collect())
     }
@@ -1390,6 +1391,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
     file       VARCHAR(496) not null,
+    index_file BOOLEAN default false not null,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
@@ -1460,6 +1462,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
     add_column("stream_stats", column, data_type).await?;
+    let column = "index_file";
+    let data_type = "BOOLEAN default false not null";
+    add_column("file_list_deleted", column, data_type).await?;
 
     Ok(())
 }
