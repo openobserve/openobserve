@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         color="secondary"
       
         unelevated
-        label="Go Back to Logs page"
+        :label="t('search.redirect_to_logs_page')"
         no-caps
         @click="redirectBackToLogs"
       />
