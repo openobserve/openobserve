@@ -40,6 +40,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
+use serde_json::Map;
 
 use super::{logs::O2IngestJsonData, pipeline::batch_execution::ExecutablePipelineTraceInputs};
 use crate::{
@@ -711,24 +712,18 @@ async fn write_traces(
         // get service_name
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
+        let mut map = Map::new();
         for field in DISTINCT_FIELDS.iter() {
             if let Some(val) = record_val.get(field) {
-                if let Some(val) = val.as_str() {
-                    let (filter_name, filter_value) = if field == "operation_name" {
-                        ("service_name".to_string(), service_name.to_string())
-                    } else {
-                        ("".to_string(), "".to_string())
-                    };
-                    distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                        stream_type: StreamType::Traces,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.to_string(),
-                        filter_name,
-                        filter_value,
-                    }));
-                }
+                map.insert(field.clone(), val.clone());
             }
+        }
+        if !map.is_empty() {
+            distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                stream_type: StreamType::Traces,
+                stream_name: stream_name.to_string(),
+                value: map,
+            }));
         }
 
         // build trace metadata
@@ -803,7 +798,7 @@ async fn write_traces(
     }
 
     // send distinct_values
-    if !distinct_values.is_empty() {
+    if !distinct_values.is_empty() && !stream_name.starts_with("distinct_values_") {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
