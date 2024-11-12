@@ -46,6 +46,7 @@ use crate::{
         },
     },
     service::{
+        metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search as SearchService,
         usage::{http_report_metrics, report_request_usage_stats},
     },
@@ -1083,6 +1084,13 @@ async fn values_v2(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
+    let distinct_stream_name = format!(
+        "{}_{}_{}",
+        DISTINCT_STREAM_PREFIX,
+        stream_type.as_str(),
+        stream_name
+    );
+
     let no_count = match query.get("no_count") {
         None => false,
         Some(v) => {
@@ -1092,26 +1100,23 @@ async fn values_v2(
     };
     let mut query_sql = if no_count {
         format!(
-            "SELECT field_value AS zo_sql_key FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-            stream_type, stream_name, field
+            "SELECT DISTINCT {} AS zo_sql_key FROM {}",
+            field, distinct_stream_name,
         )
     } else {
         format!(
-            "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-            stream_type, stream_name, field
+            "SELECT DISTINCT {} AS zo_sql_key, SUM(count) as zo_sql_num FROM {}",
+            field, distinct_stream_name,
         )
     };
     if let Some((key, val)) = filter {
         let val = val.split(',').collect::<Vec<_>>().join("','");
-        query_sql = format!(
-            "{} AND filter_name='{}' AND filter_value IN ('{}')",
-            query_sql, key, val
-        );
+        query_sql = format!("{} AND {} IN ('{}')", query_sql, key, val);
     }
     if let Some(val) = query.get("keyword") {
         let val = val.trim();
         if !val.is_empty() {
-            query_sql = format!("{} AND field_value ILIKE '%{}%'", query_sql, val);
+            query_sql = format!("{} AND {} ILIKE '%{}%'", query_sql, field, val);
         }
     }
 
@@ -1200,6 +1205,7 @@ async fn values_v2(
         .with_label_values(&[org_id])
         .dec();
 
+    log::warn!("{query_sql}");
     // search
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1256,6 +1262,7 @@ async fn values_v2(
             });
         }
     };
+    log::warn!("{:?}", resp_search);
 
     let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();

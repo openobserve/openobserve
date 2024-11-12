@@ -50,7 +50,7 @@ use crate::{
 };
 
 const CHANNEL_SIZE: usize = 10240;
-const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
+pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
 
 pub(crate) static INSTANCE: Lazy<DistinctValues> = Lazy::new(DistinctValues::new);
 
