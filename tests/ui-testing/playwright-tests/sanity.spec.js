@@ -283,6 +283,9 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="tab-realtime"]').click();
+
+    await page.locator('[data-test="function-stream-tab"]').click();
     await page.getByPlaceholder("Search Function").click();
     await page.getByPlaceholder("Search Function").fill("e2eautomatefunctions");
     await page.getByRole("button", { name: "Delete Function" }).click();
@@ -294,6 +297,8 @@ test.describe("Sanity testcases", () => {
   }) => {
     // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="tab-realtime"]').click();
+    await page.locator('[data-test="function-stream-tab"]').click();
     await page.getByRole("button", { name: "Create new function" }).click();
     await page.getByLabel("Name").click();
     await page.getByLabel("Name").fill("sanitytest");

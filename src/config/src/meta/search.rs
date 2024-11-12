@@ -59,8 +59,6 @@ pub struct Request {
     #[serde(default, flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
-    #[serde(default)]
-    pub index_type: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -439,7 +437,6 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
-            index_type: "".to_string(),
         };
         Ok(search_req)
     }
@@ -651,7 +648,6 @@ impl From<Request> for cluster_rpc::SearchRequest {
             work_group: "".to_string(),
             user_id: None,
             search_event_type: req.search_type.map(|event| event.to_string()),
-            index_type: req.index_type.clone(),
         }
     }
 }
@@ -707,7 +703,8 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
     }
 }
 
-#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum SearchEventType {
     UI,
     Dashboards,
@@ -717,6 +714,32 @@ pub enum SearchEventType {
     Other,
     RUM,
     DerivedStream,
+}
+
+impl<'de> Deserialize<'de> for SearchEventType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct FieldVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+            type Value = SearchEventType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("Invalid SearchEventType")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<SearchEventType, E>
+            where
+                E: serde::de::Error,
+            {
+                SearchEventType::from_str(value).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_identifier(FieldVisitor)
+    }
 }
 
 impl std::fmt::Display for SearchEventType {
@@ -747,7 +770,9 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
-            _ => Err(format!("Invalid search event type: {s}")),
+            _ => Err(format!(
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`"
+            )),
         }
     }
 }
@@ -961,7 +986,6 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
-                index_type: self.index_type.clone(),
             });
         }
         res
@@ -1047,7 +1071,6 @@ mod tests {
             timeout: 0,
             search_type: None,
             search_event_context: None,
-            index_type: "".to_string(),
         };
 
         let rpc_req = cluster_rpc::SearchRequest::from(req.clone());

@@ -10,10 +10,10 @@
     <div>
       <div class="text-subtitle1 q-pl-xs q-mt-md">
         Once you have installed the OpenObserve collector, it will:
-        <ol>
+        <ul class="tw-list-disc tw-ml-5">
           <li>Collect logs from Windows event log</li>
           <li>Collect metrics from Windows performance counters</li>
-        </ol>
+        </ul>
       </div>
     </div>
   </div>
@@ -57,7 +57,7 @@ endpoint.value = {
 
 const accessKey = computed(() => {
   return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
+    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`,
   );
 });
 

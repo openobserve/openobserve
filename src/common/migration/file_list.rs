@@ -15,31 +15,19 @@
 
 use config::{
     get_config,
-    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, ALL_STREAM_TYPES},
     utils::time::BASE_TIME,
 };
 use infra::file_list as infra_file_list;
 
-use crate::{
-    job::file_list,
-    service::{compact::stats::update_stats_from_file_list, db},
-};
+use crate::service::{compact::stats::update_stats_from_file_list, db};
 
-pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error> {
+pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
     // check wal dir
     std::fs::create_dir_all(&get_config().common.data_wal_dir).expect("create wal dir success");
 
     // load stream list
-    let mut from_storage = false;
     let src: Box<dyn infra_file_list::FileList> = match from.to_lowercase().as_str().trim() {
-        "local" | "s3" | "sled" | "etcd" => {
-            // load file list to db
-            db::file_list::remote::cache(prefix, false)
-                .await
-                .expect("file list migration failed");
-            from_storage = true;
-            Box::<infra_file_list::sqlite::SqliteFileList>::default()
-        }
         "sqlite" => Box::<infra_file_list::sqlite::SqliteFileList>::default(),
         "mysql" => Box::<infra_file_list::mysql::MysqlFileList>::default(),
         "postgres" | "postgresql" => Box::<infra_file_list::postgres::PostgresFileList>::default(),
@@ -55,24 +43,12 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
     dest.create_table().await?;
     db::schema::cache().await?;
 
-    // move file_list from wal for disk
-    if let Err(e) = file_list::move_file_list_to_storage(false).await {
-        log::error!("Error moving disk files to remote: {}", e);
-    }
-
     // load stream list
-    let stream_types = [
-        StreamType::Logs,
-        StreamType::Metrics,
-        StreamType::Traces,
-        StreamType::EnrichmentTables,
-        StreamType::Metadata,
-    ];
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = chrono::Utc::now().timestamp_micros();
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs.iter() {
-        for stream_type in stream_types {
+        for stream_type in ALL_STREAM_TYPES {
             let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
             for stream_name in streams.iter() {
                 // load file_list from source
@@ -97,64 +73,13 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
             }
         }
 
-        // load file_list_deleted from storage
-        if from_storage {
-            let files =
-                crate::service::compact::file_list_deleted::load_prefix_from_s3(org_id).await?;
-            if !files.is_empty() {
-                let files = files
-                    .values()
-                    .flatten()
-                    .map(|file| file.0.to_owned())
-                    .collect::<Vec<_>>();
-                if let Err(e) = dest
-                    .batch_add_deleted(org_id, false, end_time, &files)
-                    .await
-                {
-                    log::error!("load file_list_deleted into db err: {}", e);
-                }
-            }
-        }
-
         // load file_list_deleted from source
         let files = src
             .query_deleted(org_id, end_time, 1_000_000)
             .await
             .expect("load file_list_deleted failed");
-        let files_need_flatten = files
-            .iter()
-            .filter_map(|(file, flattened)| {
-                if *flattened {
-                    Some(file.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        let files_noneed_flatten = files
-            .iter()
-            .filter_map(|(file, flattened)| {
-                if !*flattened {
-                    Some(file.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        if !files_need_flatten.is_empty() {
-            if let Err(e) = dest
-                .batch_add_deleted(org_id, true, end_time, &files_need_flatten)
-                .await
-            {
-                log::error!("load file_list_deleted into db err: {}", e);
-                continue;
-            }
-        }
-        if !files_noneed_flatten.is_empty() {
-            if let Err(e) = dest
-                .batch_add_deleted(org_id, false, end_time, &files_noneed_flatten)
-                .await
-            {
+        if !files.is_empty() {
+            if let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
                 log::error!("load file_list_deleted into db err: {}", e);
                 continue;
             }

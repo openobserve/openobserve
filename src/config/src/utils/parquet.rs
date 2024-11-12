@@ -24,7 +24,10 @@ use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
-    arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
+    arrow::{
+        arrow_reader::ArrowReaderMetadata, async_reader::ParquetRecordBatchStream,
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
+    },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
@@ -115,25 +118,39 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
-pub async fn read_recordbatch_from_bytes(
+pub async fn get_recordbatch_reader_from_bytes(
     data: &bytes::Bytes,
-) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+) -> Result<(Arc<Schema>, ParquetRecordBatchStream<Cursor<bytes::Bytes>>), anyhow::Error> {
     let schema_reader = Cursor::new(data.clone());
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
     let schema = arrow_reader.schema().clone();
-    let record_reader = arrow_reader.build()?;
-    let batches = record_reader.try_collect().await?;
+    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
+    Ok((schema, reader))
+}
+
+pub async fn get_recordbatch_reader_from_file(
+    path: &PathBuf,
+) -> Result<(Arc<Schema>, ParquetRecordBatchStream<tokio::fs::File>), anyhow::Error> {
+    let file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
+    let schema = arrow_reader.schema().clone();
+    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
+    Ok((schema, reader))
+}
+
+pub async fn read_recordbatch_from_bytes(
+    data: &bytes::Bytes,
+) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+    let (schema, reader) = get_recordbatch_reader_from_bytes(data).await?;
+    let batches = reader.try_collect().await?;
     Ok((schema, batches))
 }
 
 pub async fn read_recordbatch_from_file(
     path: &PathBuf,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let file = tokio::fs::File::open(path).await?;
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
-    let schema = arrow_reader.schema().clone();
-    let record_reader = arrow_reader.build()?;
-    let batches = record_reader.try_collect().await?;
+    let (schema, reader) = get_recordbatch_reader_from_file(path).await?;
+    let batches = reader.try_collect().await?;
     Ok((schema, batches))
 }
 

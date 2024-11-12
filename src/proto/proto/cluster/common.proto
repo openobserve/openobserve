@@ -20,6 +20,7 @@ message FileMeta {
     int64 records         = 3;
     int64 original_size   = 4;
     int64 compressed_size = 5;
+    int64 index_size      = 6;
 }
 
 enum StreamType {

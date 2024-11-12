@@ -132,7 +132,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         match command.get_one::<String>("path") {
             Some(path) => {
                 set_permission(path, 0o777)?;
-                println!("init dir {} succeeded", path);
+                println!("init dir {} successfully", path);
             }
             None => {
                 return Err(anyhow::anyhow!("please set data path"));
@@ -220,10 +220,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "migrate-file-list" => {
-            let prefix = match command.get_one::<String>("prefix") {
-                Some(prefix) => prefix.to_string(),
-                None => "".to_string(),
-            };
             let from = match command.get_one::<String>("from") {
                 Some(from) => from.to_string(),
                 None => "".to_string(),
@@ -232,11 +228,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(to) => to.to_string(),
                 None => "".to_string(),
             };
-            println!(
-                "Running migration file_list from {} to {}, with prefix: {}",
-                from, to, prefix
-            );
-            migration::file_list::run(&prefix, &from, &to).await?;
+            println!("Running migration file_list from {} to {}", from, to);
+            migration::file_list::run(&from, &to).await?;
         }
         "migrate-meta" => {
             let from = match command.get_one::<String>("from") {
@@ -263,7 +256,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let file = command.get_one::<String>("file").unwrap();
             match file_list::delete_parquet_file(file, true).await {
                 Ok(_) => {
-                    println!("delete parquet file {} succeeded", file);
+                    println!("delete parquet file {} successfully", file);
                 }
                 Err(e) => {
                     println!("delete parquet file {} failed, error: {}", file, e);
@@ -291,6 +284,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         log::error!("waiting for db close failed, error: {}", e);
     }
 
-    println!("command {name} execute succeeded");
+    println!("command {name} execute successfully");
     Ok(true)
 }

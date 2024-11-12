@@ -40,6 +40,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::json;
 
+use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{
         AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
@@ -48,7 +49,7 @@ use crate::{
     },
     service::{
         format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        schema::get_upto_discard_error,
+        logs::bulk::TRANSFORM_FAILED, schema::get_upto_discard_error,
     },
 };
 
@@ -64,6 +65,7 @@ pub async fn ingest(
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let mut need_usage_report = true;
+    let log_ingestion_errors = ingestion_log_enabled().await;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {
@@ -230,6 +232,15 @@ pub async fn ingest(
                 Err(e) => {
                     stream_status.status.failed += 1;
                     stream_status.status.error = e.to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.to_string().as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(log_ingestion_errors, &local_val, &e.to_string());
                     continue;
                 }
             };
@@ -255,6 +266,14 @@ pub async fn ingest(
                 );
                 stream_status.status.failed += records_count as u32;
                 stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &stream_name,
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
             }
             Ok(pl_results) => {
                 let function_no = exec_pl.num_of_func();
@@ -301,6 +320,15 @@ pub async fn ingest(
                             Err(e) => {
                                 stream_status.status.failed += 1;
                                 stream_status.status.error = e.to_string();
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.to_string().as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                                log_failed_record(log_ingestion_errors, &local_val, &e.to_string());
                                 continue;
                             }
                         };

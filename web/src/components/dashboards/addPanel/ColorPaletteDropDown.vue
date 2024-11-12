@@ -110,13 +110,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { classicColorPalette } from "@/utils/dashboard/colorPalette";
-import { computed } from "vue";
-import { onBeforeMount } from "vue";
-import { defineComponent } from "vue";
+import { computed, inject, onBeforeMount, defineComponent } from "vue";
 export default defineComponent({
   name: "ColorPaletteDropdown",
   setup() {
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
       if (!dashboardPanelData?.data?.config?.color) {

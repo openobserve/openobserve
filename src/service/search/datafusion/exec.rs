@@ -26,14 +26,11 @@ use config::{
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
-    arrow::{
-        datatypes::{DataType, Schema},
-        record_batch::RecordBatch,
-    },
+    arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
     common::Column,
     datasource::{
-        file_format::{json::JsonFormat, parquet::ParquetFormat},
+        file_format::parquet::ParquetFormat,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
     },
@@ -47,8 +44,10 @@ use datafusion::{
     },
     logical_expr::AggregateUDF,
     optimizer::OptimizerRule,
+    physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
+use futures::TryStreamExt;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -59,112 +58,26 @@ use super::{
     file_type::{FileType, GetExt},
     optimizer::join_reorder::JoinReorderRule,
     storage::file_list,
-    table_provider::NewListingTable,
+    table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
-pub async fn convert_parquet_file(
-    trace_id: &str,
-    buf: &mut Vec<u8>,
-    schema: Arc<Schema>,
-    bloom_filter_fields: &[String],
-    rules: HashMap<String, DataType>,
-    file_type: FileType,
-) -> Result<()> {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
-
-    let query_sql = format!(
-        "SELECT * FROM tbl ORDER BY {} DESC",
-        cfg.common.column_timestamp
-    ); //  select_wildcard -> without_optimizer
-
-    // query data
-    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
-
-    // Configure listing options
-    let listing_options = match file_type {
-        FileType::PARQUET => {
-            let file_format = ParquetFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(ctx.state().config().target_partitions())
-        }
-        FileType::JSON => {
-            let file_format = JsonFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(ctx.state().config().target_partitions())
-        }
-        _ => {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {file_type:?}",
-            )));
-        }
-    };
-
-    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{trace_id}/")) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}"
-            )));
-        }
-    };
-
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema.clone());
-
-    let table = NewListingTable::try_new(config, rules)?;
-    ctx.register_table("tbl", Arc::new(table))?;
-
-    // get all sorted data
-    let df = match ctx.sql(&query_sql).await {
-        Ok(df) => df,
-        Err(e) => {
-            log::error!(
-                "convert sql execute failed, sql: {}, err: {:?}",
-                query_sql,
-                e
-            );
-            return Err(e);
-        }
-    };
-    let schema: Schema = df.schema().into();
-    let schema = Arc::new(schema);
-    let batches = df.collect().await?;
-    let file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
-    for batch in batches {
-        writer.write(&batch).await?;
-    }
-    writer.close().await?;
-    ctx.deregister_table("tbl")?;
-    drop(ctx);
-
-    log::info!(
-        "convert_parquet_file took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok(())
-}
-
 pub async fn merge_parquet_files(
-    trace_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     schema: Arc<Schema>,
-) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
+    tables: Vec<Arc<dyn TableProvider>>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
+) -> Result<(Arc<Schema>, Vec<u8>)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     // get all sorted data
-    let query_sql = if stream_type == StreamType::Index {
+    let sql = if stream_type == StreamType::Index {
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE) ORDER BY {} DESC",
             cfg.common.column_timestamp
@@ -185,34 +98,50 @@ pub async fn merge_parquet_files(
     };
 
     // create datafusion context
-    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
+    let sort_by_timestamp_desc = true;
+    let target_partitions = cfg.limit.cpu_num;
+    let ctx =
+        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    // register union table
+    let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
+    ctx.register_table("tbl", union_table)?;
 
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(ctx.state().config().target_partitions());
-    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema.clone());
-    let table = Arc::new(NewListingTable::try_new(config, HashMap::default())?);
-    ctx.register_table("tbl", table.clone())?;
+    let plan = ctx.state().create_logical_plan(&sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    let schema = physical_plan.schema();
 
-    let df = ctx.sql(&query_sql).await?;
-    let schema: Schema = df.schema().into();
-    let schema = Arc::new(schema);
-    let batches = df.collect().await?;
+    // write result to parquet file
+    let mut buf = Vec::new();
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
+    let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
+    loop {
+        match batch_stream.try_next().await {
+            Ok(Some(batch)) => {
+                if let Err(e) = writer.write(&batch).await {
+                    log::error!("merge_parquet_files write Error: {}", e);
+                    return Err(e.into());
+                }
+            }
+            Ok(None) => {
+                break;
+            }
+            Err(e) => {
+                log::error!("merge_parquet_files execute stream Error: {}", e);
+                return Err(e);
+            }
+        }
+    }
+    writer.close().await?;
 
     ctx.deregister_table("tbl")?;
     drop(ctx);
 
-    log::info!(
+    log::debug!(
         "merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, batches))
+    Ok((schema, buf))
 }
 
 pub fn create_session_config(

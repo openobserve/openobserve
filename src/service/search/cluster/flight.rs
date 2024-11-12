@@ -116,10 +116,10 @@ pub async fn search(
     };
 
     // 2. get inverted index file list
-    let (use_fst_inverted_index, idx_file_list, idx_scan_size, idx_took) =
+    let (use_ttv_inverted_index, idx_file_list, idx_scan_size, idx_took) =
         get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
-    req.set_use_inverted_index(use_fst_inverted_index);
+    req.set_use_inverted_index(use_ttv_inverted_index);
 
     // 3. get nodes
     let node_group = req
@@ -133,6 +133,12 @@ pub async fn search(
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
+
+    log::info!(
+        "[trace_id {trace_id}] flight->search: get nodes num: {}, querier num: {}",
+        nodes.len(),
+        querier_num,
+    );
 
     // waiting in work group queue
     metrics::QUERY_PENDING_NUMS
@@ -348,7 +354,7 @@ pub async fn run_datafusion(
 
     // check inverted index prefix search
     if sql.stream_type == StreamType::Index
-        && cfg.common.inverted_index_search_format.to_lowercase() != "contains"
+        && cfg.common.full_text_search_type.to_lowercase() != "contains"
     {
         for (stream, items) in sql.prefix_items.iter() {
             equal_keys
@@ -767,25 +773,17 @@ async fn get_inverted_index_file_lists(
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
-    let inverted_index_type = if req.inverted_index_type.is_none()
-        || req.inverted_index_type.as_ref().unwrap().is_empty()
-    {
-        cfg.common.inverted_index_search_format.clone()
-    } else {
-        req.inverted_index_type.as_ref().unwrap().to_string()
-    };
+    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
-    let use_parquet_inverted_index =
-        use_inverted_index && (inverted_index_type == "parquet" || inverted_index_type == "both");
-    let use_fst_inverted_index =
-        use_inverted_index && (inverted_index_type == "fst" || inverted_index_type == "both");
+    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
+    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
     log::info!(
         "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
         use_parquet_inverted_index
     );
 
     if !use_parquet_inverted_index {
-        return Ok((use_fst_inverted_index, vec![], 0, 0));
+        return Ok((use_ttv_inverted_index, vec![], 0, 0));
     }
 
     let stream_name = sql.stream_names.first().unwrap();
@@ -808,7 +806,7 @@ async fn get_inverted_index_file_lists(
     );
 
     Ok((
-        use_fst_inverted_index,
+        use_ttv_inverted_index,
         idx_file_list,
         idx_scan_size,
         idx_took,

@@ -24,12 +24,11 @@ use crate::{
         infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
-    service::{compact::stats::update_stats_from_file_list, db, usage, users},
+    service::{db, usage, users},
 };
 
 mod alert_manager;
 mod compactor;
-pub(crate) mod file_list;
 pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
@@ -131,7 +130,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
-    tokio::task::yield_now().await; // yield let other tasks run
+    tokio::task::yield_now().await;
 
     // cache core metadata
     db::schema::cache().await.expect("stream cache failed");
@@ -169,31 +168,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // cache pipeline
     db::pipeline::cache().await.expect("Pipeline cache failed");
 
-    // cache file list
-    if !cfg.common.meta_store_external {
-        if LOCAL_NODE.is_ingester() {
-            // load the wal file_list into memory
-            db::file_list::local::load_wal_in_cache()
-                .await
-                .expect("load wal file list failed");
-        }
-        if LOCAL_NODE.is_querier() || LOCAL_NODE.is_compactor() {
-            db::file_list::remote::cache("", false)
-                .await
-                .expect("file list remote cache failed");
-            infra_file_list::create_table_index()
-                .await
-                .expect("file list create table index failed");
-            infra_file_list::LOCAL_CACHE
-                .create_table_index()
-                .await
-                .expect("file list create table index failed");
-            update_stats_from_file_list()
-                .await
-                .expect("file list remote calculate stats failed");
-        }
-    }
-
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
     tokio::task::spawn(async move { db::file_list::remote::cache_stats().await });
@@ -217,7 +191,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { files::run().await });
-    tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
     tokio::task::spawn(async move { flatten_compactor::run().await });

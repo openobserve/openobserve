@@ -61,6 +61,7 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
+pub const FILE_EXT_TANTIVY: &str = ".ttv";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -727,13 +728,13 @@ pub struct Common {
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "parquet",
-        help = "InvertedIndex store format, parquet(default), or both."
+        help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
         default = "parquet",
-        help = "InvertedIndex search format. Can only be configured when store format is both. Otherwise, it's set by store format"
+        help = "InvertedIndex search format, parquet(default), tantivy."
     )]
     pub inverted_index_search_format: String,
     #[env_config(
@@ -857,10 +858,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
     #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 0)]
     pub udschema_max_fields: usize,
@@ -1493,13 +1494,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_on_disk = 128 * 1024 * 1024; // 128MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_in_memory = 128 * 1024 * 1024; // 128MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
@@ -1583,15 +1584,25 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check default inverted index search format
     cfg.common.inverted_index_store_format = cfg.common.inverted_index_store_format.to_lowercase();
     if cfg.common.inverted_index_store_format.is_empty() {
-        cfg.common.inverted_index_search_format = "parquet".to_string();
+        cfg.common.inverted_index_store_format = "parquet".to_string();
     }
-    if !["both", "parquet"].contains(&cfg.common.inverted_index_store_format.as_str()) {
+    if !["both", "parquet", "tantivy"].contains(&cfg.common.inverted_index_store_format.as_str()) {
         return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet."
+            "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
         ));
     }
-    if cfg.common.inverted_index_store_format != "both" {
+    cfg.common.inverted_index_search_format =
+        cfg.common.inverted_index_search_format.to_lowercase();
+    if cfg.common.inverted_index_search_format.is_empty() {
         cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
+    }
+    if cfg.common.inverted_index_search_format == "both" {
+        cfg.common.inverted_index_search_format = "parquet".to_string();
+    }
+    if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
+        return Err(anyhow::anyhow!(
+            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
+        ));
     }
 
     Ok(())

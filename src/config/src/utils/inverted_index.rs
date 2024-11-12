@@ -15,15 +15,13 @@
 
 use std::borrow::Cow;
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::Result;
 use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    meta::{
-        inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader, stream::StreamType,
-    },
-    FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
+    meta::{inverted_index::reader::IndexReader, stream::StreamType},
+    FILE_EXT_PARQUET, FILE_EXT_PUFFIN, FILE_EXT_TANTIVY, INDEX_MIN_CHAR_LEN,
 };
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
@@ -70,16 +68,44 @@ pub fn unpack_u32_pair(packed: u64) -> (u32, u32) {
 pub async fn create_index_reader_from_puffin_bytes(
     buf: Vec<u8>,
 ) -> Result<IndexReader<Cursor<Vec<u8>>>> {
-    let mut puffin_reader = PuffinBytesReader::new(Cursor::new(buf));
-    let puffin_meta = puffin_reader.get_metadata().await?;
-    ensure!(
-        puffin_meta.blob_metadata.len() == 1,
-        anyhow!("InvertedIndex should only have one blob each puffin file")
-    );
-    let blob_bytes = puffin_reader
-        .read_blob_bytes(puffin_meta.blob_metadata.first().unwrap())
-        .await?;
-    Ok(IndexReader::new(Cursor::new(blob_bytes)))
+    Ok(IndexReader::new(Cursor::new(buf)))
+}
+
+/// FST inverted index solution has a 1:1 mapping between parquet and idx files.
+/// This is a helper function to convert the paruqet file name to idx file name.
+/// e.g.
+/// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
+/// to:   files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv
+pub fn convert_parquet_idx_file_name_to_tantivy_file(from: &str) -> Option<String> {
+    let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
+
+    if parts.len() < 4 {
+        return None;
+    }
+
+    // Replace the stream_type part
+    let stream_type_pos = 2;
+    let stream_type = match parts[stream_type_pos].as_ref() {
+        "logs" => StreamType::Logs,
+        "metrics" => StreamType::Metrics,
+        "traces" => StreamType::Traces,
+        _ => return None,
+    };
+    parts[stream_type_pos] = Cow::Borrowed("index");
+
+    // Replace the stream_name part
+    let stream_name_pos = stream_type_pos + 1;
+    parts[stream_name_pos] = Cow::Owned(format!("{}_{}", parts[stream_name_pos], stream_type));
+
+    // Replace the file extension
+    let file_name_pos = parts.len() - 1;
+    if !parts[file_name_pos].ends_with(FILE_EXT_PARQUET) {
+        return None;
+    }
+    parts[file_name_pos] =
+        Cow::Owned(parts[file_name_pos].replace(FILE_EXT_PARQUET, FILE_EXT_TANTIVY));
+
+    Some(parts.join("/"))
 }
 
 /// FST inverted index solution has a 1:1 mapping between parquet and idx files.
@@ -285,7 +311,49 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_parquet_idx_file_name() {
+    fn test_convert_parquet_idx_file_name_to_tantivy_file() {
+        let test_cases = vec![
+            (
+                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/metrics/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_metrics/2024/02/16/16/7164299619311026293.ttv"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/traces/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_traces/2024/02/16/16/7164299619311026293.ttv"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/metadata/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                None,
+            ),
+            (
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                None,
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                convert_parquet_idx_file_name_to_tantivy_file(input),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_convert_parquet_idx_file_name_to_fst() {
         let test_cases = vec![
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
@@ -317,6 +385,7 @@ mod tests {
                 None,
             ),
         ];
+
         for (input, expected) in test_cases {
             assert_eq!(convert_parquet_idx_file_name(input), expected);
         }

@@ -76,7 +76,6 @@ impl Context for Export {
             timeout: 0,
             search_type,
             search_event_context,
-            index_type: "".to_string(),
         };
 
         match SearchService::search("", &c.org, stream_type, None, &req).await {

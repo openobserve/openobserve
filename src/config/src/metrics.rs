@@ -126,6 +126,18 @@ pub static INGEST_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static INGEST_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ingest_errors",
+            "Errors while ingesting records".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "stream", "error_type"],
+    )
+    .expect("Metric created")
+});
 pub static INGEST_WAL_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -732,6 +744,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_ERRORS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_USED_BYTES.clone()))

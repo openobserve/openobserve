@@ -2606,7 +2606,6 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
-            console.log("stream", stream)
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
@@ -2918,6 +2917,7 @@ const useLogs = () => {
                   },
                   0,
                 );
+
               const recordwithMaxAttribute =
                 searchObj.data.queryResults.hits[maxAttributesIndex];
 
@@ -2945,6 +2945,7 @@ const useLogs = () => {
                       searchObj.data.stream.interestingFieldList.includes(key)
                         ? true
                         : false,
+                    streams: [],
                   };
                   schemaMaps.push(fieldObj);
                   schemaFields.push(key);
@@ -4092,7 +4093,7 @@ const useLogs = () => {
             ...getStreamFieldTypes(stream),
           }),
           {},
-      );
+        );
 
       if (Object.hasOwn(fieldTypeList, field)) {
         fieldType = fieldTypeList[field];

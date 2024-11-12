@@ -28,14 +28,12 @@ pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_FOOTER_SIZE;
 pub const FLAGS_SIZE: u64 = 4;
 pub const FOOTER_PAYLOAD_SIZE_SIZE: u64 = 4;
 pub const MIN_FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
-// Version 1 of the inverted index blob
-pub const BLOB_TYPE: &str = "o2_inverted_index_v1";
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct PuffinFooterFlags: u32 {
         const DEFAULT = 0b00000000;
-        const COMPRESSED_ZSTD = 0b00000001;
+        const COMPRESSED = 0b00000001;
     }
 }
 
@@ -43,7 +41,7 @@ bitflags! {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PuffinMeta {
     /// Metadata for each blob in the file
-    pub blob_metadata: Vec<BlobMetadata>,
+    pub blobs: Vec<BlobMetadata>,
 
     /// Storage for arbitrary meta-information, like writer identification/version
     #[serde(default)]
@@ -57,31 +55,31 @@ pub struct PuffinMeta {
 pub struct BlobMetadata {
     /// Blob type
     #[serde(rename = "type")]
-    pub blob_type: String,
+    pub blob_type: BlobTypes,
 
-    /// Required by specs. Not used for InvertedIndex within OpenObserve
+    /// Required by specs
     #[serde(default)]
-    pub fields: Vec<i32>,
+    pub fields: Vec<u32>,
 
-    /// Required by specs. Not used for InvertedIndex within OpenObserve
+    /// Required by specs
     #[serde(default)]
-    pub snapshot_id: i64,
+    pub snapshot_id: u64,
 
-    /// Required by specs. Not used for InvertedIndex within OpenObserve
+    /// Required by specs
     #[serde(default)]
-    pub sequence_number: i64,
+    pub sequence_number: u64,
 
     /// The offset in the file where the blob contents start
-    pub offset: i64,
+    pub offset: u64,
 
     /// The length of the blob stored in the file (after compression, if compressed)
-    pub length: i64,
+    pub length: u64,
 
     /// Default to ZSTD compression for OpenObserve inverted index
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compression_codec: Option<CompressionCodec>,
 
-    /// Additional meta information of the file. Not used for InvertedIndex within OpenObserve
+    /// Additional meta information of the file.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub properties: HashMap<String, String>,
 }
@@ -93,36 +91,54 @@ pub enum CompressionCodec {
     Zstd,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BlobTypes {
+    #[serde(rename = "apache-datasketches-theta-v1")]
+    ApacheDatasketchesThetaV1,
+    #[serde(rename = "deletion-vector-v1")]
+    DeletionVectorV1,
+    #[default]
+    #[serde(rename = "o2-fst-v1")]
+    O2FstV1,
+    #[serde(rename = "o2-ttv-v1")]
+    O2TtvV1,
+}
+
 #[derive(Default)]
 pub struct BlobMetadataBuilder {
-    blob_type: Option<String>,
-    fields: Vec<i32>,
-    snapshot_id: i64,
-    sequence_number: i64,
-    offset: Option<i64>,
-    length: Option<i64>,
+    blob_type: Option<BlobTypes>,
+    fields: Vec<u32>,
+    snapshot_id: u64,
+    sequence_number: u64,
+    offset: Option<u64>,
+    length: Option<u64>,
     compression_codec: Option<CompressionCodec>,
     properties: HashMap<String, String>,
 }
 
 impl BlobMetadataBuilder {
-    pub fn blob_type(mut self, blob_type: String) -> Self {
+    pub fn blob_type(mut self, blob_type: BlobTypes) -> Self {
         self.blob_type = Some(blob_type);
         self
     }
 
-    pub fn offset(mut self, offset: i64) -> Self {
+    pub fn offset(mut self, offset: u64) -> Self {
         self.offset = Some(offset);
         self
     }
 
-    pub fn length(mut self, length: i64) -> Self {
+    pub fn length(mut self, length: u64) -> Self {
         self.length = Some(length);
         self
     }
 
     pub fn compression_codec(mut self, compression_codec: Option<CompressionCodec>) -> Self {
         self.compression_codec = compression_codec;
+        self
+    }
+
+    pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
+        self.properties = properties;
         self
     }
 
@@ -133,7 +149,7 @@ impl BlobMetadataBuilder {
             snapshot_id: self.snapshot_id,
             sequence_number: self.sequence_number,
             offset: self.offset.ok_or("offset is required")?,
-            length: self.length.ok_or("length is required")?,
+            length: self.length.unwrap_or_default(),
             compression_codec: self.compression_codec,
             properties: self.properties,
         })

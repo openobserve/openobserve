@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{http, http::StatusCode, HttpResponse};
 use config::{
     is_local_disk_storage,
-    meta::stream::{StreamSettings, StreamStats, StreamType, UpdateStreamSettings},
+    meta::stream::{StreamParams, StreamSettings, StreamStats, StreamType, UpdateStreamSettings},
     utils::json,
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -463,6 +463,23 @@ pub async fn delete_stream(
         );
     };
 
+    // delete associated pipelines
+    if let Some(pipeline) =
+        db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+    {
+        if let Err(e) = db::pipeline::delete(&pipeline.id).await {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    format!(
+                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                        pipeline.name
+                    ),
+                )),
+            );
+        }
+    }
+
     crate::common::utils::auth::remove_ownership(
         org_id,
         &stream_type.to_string(),
@@ -479,6 +496,7 @@ pub async fn delete_stream(
 fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
+    stats.index_size /= SIZE_IN_MB;
 }
 
 pub fn stream_created(schema: &Schema) -> Option<i64> {

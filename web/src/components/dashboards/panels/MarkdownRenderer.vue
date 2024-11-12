@@ -20,6 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="width: 100%; height: 100%; overflow: auto; padding: 1%"
   >
     <div
+      :class="[
+        'tw-prose tw-prose-sm tw-max-w-none',
+        store.state?.theme === 'dark' && 'tw-prose-invert',
+      ]"
       v-html="DOMPurify.sanitize(marked(markdownContent))"
       data-test="markdown-renderer"
     ></div>
@@ -30,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "MarkdownRenderer",
@@ -40,9 +45,11 @@ export default defineComponent({
     },
   },
   setup(): any {
+    const store = useStore();
     return {
       DOMPurify,
       marked,
+      store,
     };
   },
 });

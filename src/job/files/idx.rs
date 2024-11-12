@@ -24,7 +24,9 @@ use config::{
     ider,
     meta::stream::{FileMeta, StreamPartition, StreamPartitionType, StreamType},
     utils::{
-        parquet::new_parquet_writer, record_batch_ext::concat_batches, schema::format_partition_key,
+        parquet::new_parquet_writer,
+        record_batch_ext::{concat_batches, RecordBatchExt},
+        schema::format_partition_key,
     },
     FILE_EXT_PARQUET,
 };
@@ -57,13 +59,12 @@ fn generate_index_file_name_from_compacted_file(
 
 pub(crate) async fn write_parquet_index_to_disk(
     batches: Vec<arrow::record_batch::RecordBatch>,
-    file_size: u64,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     file_name: &str,
-    caller: &str,
 ) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+    let start = std::time::Instant::now();
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
     } else {
@@ -71,7 +72,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     };
 
     log::debug!(
-        "write_parquet_index_to_disk: batches row counts: {:?}",
+        "[JOB:IDX] write_parquet_index_to_disk: batches row counts: {:?}",
         batches.iter().map(|b| b.num_rows()).sum::<usize>()
     );
 
@@ -97,22 +98,12 @@ pub(crate) async fn write_parquet_index_to_disk(
     let mut ret = Vec::new();
     for (prefix, batch) in partitioned_batches.into_iter() {
         // write metadata
+        let batch_size = batch.size();
         let mut file_meta = FileMeta {
-            min_ts: 0,
-            max_ts: 0,
-            records: 0,
-            original_size: file_size as i64,
-            compressed_size: 0,
-            flattened: false,
+            original_size: batch_size as i64,
+            ..Default::default()
         };
-        populate_file_meta(
-            schema.clone(),
-            vec![vec![batch.clone()]],
-            &mut file_meta,
-            Some("min_ts"),
-            Some("max_ts"),
-        )
-        .await?;
+        populate_file_meta(&[&batch], &mut file_meta, Some("min_ts"), Some("max_ts")).await?;
 
         // write parquet file
         let mut buf_parquet = Vec::new();
@@ -129,24 +120,21 @@ pub(crate) async fn write_parquet_index_to_disk(
             file_name,
             &prefix,
         );
-        log::info!(
-            "[JOB] IDX: write_to_disk: {}/{}/{} {} {} {}",
-            org_id,
-            stream_name,
-            stream_type,
-            new_idx_file_name,
-            file_name,
-            caller,
-        );
 
         let store_file_name = new_idx_file_name.clone();
+        let buf_size = buf_parquet.len();
         match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
             Ok(_) => {
-                log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
+                log::info!(
+                    "[JOB:IDX] index file upload successfully: {}, size: {}, took: {} ms",
+                    &new_idx_file_name,
+                    buf_size,
+                    start.elapsed().as_millis()
+                );
                 ret.push((new_idx_file_name, file_meta));
             }
             Err(err) => {
-                log::error!("[JOB] disk file upload error: {:?}", err);
+                log::error!("[JOB] index file upload error: {:?}", err);
                 return Err(anyhow::anyhow!(err));
             }
         }

@@ -27,10 +27,10 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
     ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.slice(0, -1)
     : import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   : window.location.origin == "http://localhost:8081"
-  ? "/"
-  : pos > -1
-  ? window.location.origin + window.location.pathname.slice(0, pos)
-  : window.location.origin;
+    ? "/"
+    : pos > -1
+      ? window.location.origin + window.location.pathname.slice(0, pos)
+      : window.location.origin;
 
 const organizationObj = {
   organizationPasscode: "",
@@ -45,8 +45,8 @@ const organizationObj = {
   folders: [],
   organizationSettings: {
     scrape_interval: 15,
-    trace_id_field_name: "traceId",
-    span_id_field_name: "spanId",
+    trace_id_field_name: "trace_id",
+    span_id_field_name: "span_id",
   },
   isDataIngested: false,
 };

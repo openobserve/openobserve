@@ -32,6 +32,7 @@ use config::{
         },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
+    metrics,
     utils::{flatten, json::*, schema::format_partition_key},
     SIZE_IN_MB,
 };
@@ -53,7 +54,7 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{alerts::alert::AlertExt, db},
+    service::{alerts::alert::AlertExt, db, logs::bulk::TRANSFORM_FAILED},
 };
 
 pub mod grpc;
@@ -116,21 +117,39 @@ pub fn apply_vrl_fn(
         Ok(res) => match res.try_into() {
             Ok(val) => val,
             Err(err) => {
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.to_string().as_str(),
+                        &format!("{:?}", stream_name),
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
                 log::error!(
-                    "{}/{:?} vrl failed at processing result {:?}. Returning original row.",
+                    "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
                     org_id,
                     stream_name,
                     err,
+                    row
                 );
                 row
             }
         },
         Err(err) => {
+            metrics::INGEST_ERRORS
+                .with_label_values(&[
+                    org_id,
+                    StreamType::Logs.to_string().as_str(),
+                    &format!("{:?}", stream_name),
+                    TRANSFORM_FAILED,
+                ])
+                .inc();
             log::error!(
-                "{}/{:?} vrl runtime failed at getting result {:?}. Returning original row.",
+                "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
                 org_id,
                 stream_name,
                 err,
+                row
             );
             row
         }

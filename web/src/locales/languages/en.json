@@ -128,6 +128,7 @@
     "viewTrace": "View Trace",
     "flattened": "Flattened",
     "unflattened": "Unflattened",
+    "original": "Original",
     "resetFilters": "Reset Filters",
     "savedViewUpdateConfirmMsg": "Are you sure you want to update the saved view?",
     "existingSavedViews": "Select an Existing Saved View",
@@ -920,7 +921,8 @@
     "orgLabel": "Organization Parameters",
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
-    "spanIdFieldName": "Span ID Field Name"
+    "spanIdFieldName": "Span ID Field Name",
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs"
   },
   "reports": {
     "header": "Reports",

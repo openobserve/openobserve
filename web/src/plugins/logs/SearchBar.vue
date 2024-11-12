@@ -345,8 +345,11 @@ clickable v-close-popup>
         </div>
       </div>
     </div>
-    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
+
+    <div class="row query-editor-container" v-show="searchObj.meta.showQuery"  >
+
+      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%;" :class="{ 'expand-on-focus': isFocused }" :style="backgroundColorStyle"
+      >
         <q-splitter
           class="logs-search-splitter"
           no-scroll
@@ -355,11 +358,13 @@ clickable v-close-popup>
           style="width: 100%; height: 100%"
         >
           <template #before>
+
             <query-editor
               data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
               ref="queryEditorRef"
               class="monaco-editor"
+              :style="editorWidthToggleFunction"
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
@@ -403,6 +408,17 @@ clickable v-close-popup>
           </template>
         </q-splitter>
       </div>
+      <q-btn
+        data-test="logs-query-editor-full_screen-btn"
+        :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
+        :title="isFocused ? 'Collapse' : 'Expand'"
+        dense
+        size="10px"
+        round
+        color="primary"
+        @click="isFocused = !isFocused"
+        style="position: absolute; top: 42px; right: 10px; z-index: 20;"
+      ></q-btn>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -608,7 +624,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard } from "quasar";
+import { useQuasar, copyToClipboard, is } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
@@ -791,6 +807,8 @@ export default defineComponent({
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
 
+    const isFocused = ref(false);
+
     // confirm dialog for logs visualization toggle
     const confirmLogsVisualizeModeChangeDialog = ref(false);
 
@@ -821,7 +839,6 @@ export default defineComponent({
       },
       { immediate: true, deep: true },
     );
-
     watch(
       () => searchObj.data.stream.functions,
       (funs) => {
@@ -988,6 +1005,11 @@ export default defineComponent({
         console.log(e, "Logs: Error while updating query value");
       }
     };
+    const  handleEscKey = (event: KeyboardEvent) =>{
+      if (event.key === 'Escape') {
+        isFocused.value = false;       
+      }
+    }
 
     const updateDateTime = async (value: object) => {
       if (
@@ -1128,12 +1150,15 @@ export default defineComponent({
         fnEditorRef?.value?.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
       }
+      window.addEventListener('keydown', handleEscKey);
+
     });
 
     onUnmounted(() => {
       window.removeEventListener("click", () => {
         fnEditorRef?.value?.resetEditorLayout();
       });
+      window.removeEventListener('keydown', handleEscKey);
     });
 
     onActivated(() => {
@@ -1529,6 +1554,32 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
+    const backgroundColorStyle = computed(() => {
+      const isDarkMode = store.state.theme === 'dark';
+      return {
+        backgroundColor: (searchObj.meta.toggleFunction && isFocused.value)
+          ? (isDarkMode ? '#575A5A' : '#E0E0E0')  // Dark mode: grey, Light mode: yellow (or any color)
+          : '',
+          borderBottom: (searchObj.meta.toggleFunction && isFocused.value) ?
+          (isDarkMode ? '2px solid #575A5A ' : '2px solid #E0E0E0') : 'none',
+      };
+    });
+    const editorWidthToggleFunction = computed(() => {
+      const isDarkMode = store.state.theme === 'dark';
+
+      if(!searchObj.meta.toggleFunction && isFocused.value){
+        return {
+          width: `calc(100 - ${searchObj.config.fnSplitterModel})%`,
+          borderBottom: (isDarkMode ? '2px solid #575A5A' : '2px solid #E0E0E0'),
+        };
+      }
+      else{
+        return {
+          width: '100%',
+          borderBottom: 'none'
+        }
+      }
+    });
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
     const cancelVisualizeQueries = () => {
@@ -1614,6 +1665,9 @@ export default defineComponent({
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,
+      isFocused,
+      backgroundColorStyle,
+      editorWidthToggleFunction,
       populateDateTime,
     };
   },
@@ -2152,5 +2206,13 @@ export default defineComponent({
     background-color: var(--q-primary) !important;
     color: white;
   }
+}
+
+
+</style>
+<style scoped>
+.expand-on-focus {
+  height: calc(100vh - 200px) !important;
+  z-index: 20 !important;
 }
 </style>

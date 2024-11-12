@@ -13,22 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::{Error, ErrorKind},
-    sync::Arc,
-};
+use std::io::{Error, ErrorKind};
 
 use actix_web::HttpResponse;
+use arrow::array::{Int64Array, RecordBatch};
 use config::{
     get_config,
     meta::stream::{FileMeta, StreamType},
-    utils::{arrow::record_batches_to_json_rows, json},
     FILE_EXT_JSON,
-};
-use datafusion::{
-    arrow::{datatypes::Schema, record_batch::RecordBatch},
-    datasource::MemTable,
-    prelude::SessionContext,
 };
 
 #[inline(always)]
@@ -72,61 +64,59 @@ pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String 
 }
 
 pub async fn populate_file_meta(
-    schema: Arc<Schema>,
-    batch: Vec<Vec<RecordBatch>>,
+    batches: &[&RecordBatch],
     file_meta: &mut FileMeta,
     min_field: Option<&str>,
     max_field: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    if schema.fields().is_empty() || batch.is_empty() {
+    if batches.is_empty() {
         return Ok(());
     }
     let cfg = get_config();
     let min_field = min_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
     let max_field = max_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
-    let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema, batch)?;
-    ctx.register_table("temp", Arc::new(provider))?;
 
-    let sql = format!(
-        "SELECT min({}) as min, max({}) as max, count(*) as num_records FROM temp;",
-        min_field, max_field
-    );
-    let df = ctx.sql(sql.as_str()).await?;
-    let batches = df.collect().await?;
-    let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let json_rows = record_batches_to_json_rows(&batches_ref)?;
-    let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
-    if result.is_empty() {
-        return Ok(());
+    let total = batches.iter().map(|batch| batch.num_rows()).sum::<usize>();
+    let mut min_val = i64::MAX;
+    let mut max_val = 0;
+    for batch in batches.iter() {
+        let num_row = batch.num_rows();
+        let Some(min_field) = batch.column_by_name(min_field) else {
+            return Err(anyhow::anyhow!("No min_field found: {}", min_field));
+        };
+        let Some(max_field) = batch.column_by_name(max_field) else {
+            return Err(anyhow::anyhow!("No max_field found: {}", max_field));
+        };
+        let min_col = min_field.as_any().downcast_ref::<Int64Array>().unwrap();
+        let max_col = max_field.as_any().downcast_ref::<Int64Array>().unwrap();
+        for i in 0..num_row {
+            let val = min_col.value(i);
+            if val < min_val {
+                min_val = val;
+            }
+            let val = max_col.value(i);
+            if val > max_val {
+                max_val = val;
+            }
+        }
     }
-    let record = result.pop().expect("No record found");
-    if record.is_null() {
-        return Ok(());
+    if min_val == i64::MAX {
+        min_val = 0;
     }
-    file_meta.min_ts = record
-        .get("min")
-        .expect("No field found: min")
-        .as_i64()
-        .expect("No value found: min");
-    file_meta.max_ts = record
-        .get("max")
-        .expect("No field found: max")
-        .as_i64()
-        .expect("No value found: max");
-    file_meta.records = record
-        .get("num_records")
-        .expect("No field found: num_records")
-        .as_i64()
-        .expect("No value found: num_records");
+
+    file_meta.min_ts = min_val;
+    file_meta.max_ts = max_val;
+    file_meta.records = total as i64;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use datafusion::arrow::{
-        array::{Int64Array, StringArray},
-        datatypes::{DataType, Field},
+        array::StringArray,
+        datatypes::{DataType, Field, Schema},
     };
 
     use super::*;
@@ -173,7 +163,7 @@ mod tests {
 
         // define data.
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            schema,
             vec![
                 Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
                 Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
@@ -189,8 +179,9 @@ mod tests {
             original_size: 1000,
             compressed_size: 700,
             flattened: false,
+            index_size: 0,
         };
-        populate_file_meta(schema, vec![vec![batch]], &mut file_meta, None, None)
+        populate_file_meta(&[&batch], &mut file_meta, None, None)
             .await
             .unwrap();
         assert_eq!(file_meta.records, 4);
@@ -209,7 +200,7 @@ mod tests {
 
         // define data.
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            schema,
             vec![
                 Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
                 Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
@@ -225,16 +216,11 @@ mod tests {
             original_size: 1000,
             compressed_size: 700,
             flattened: false,
+            index_size: 0,
         };
-        populate_file_meta(
-            schema,
-            vec![vec![batch]],
-            &mut file_meta,
-            Some("time"),
-            Some("time"),
-        )
-        .await
-        .unwrap();
+        populate_file_meta(&[&batch], &mut file_meta, Some("time"), Some("time"))
+            .await
+            .unwrap();
         assert_eq!(file_meta.records, 4);
         assert_eq!(file_meta.min_ts, val - 100);
     }

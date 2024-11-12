@@ -16,7 +16,7 @@
 pub mod disk;
 pub mod memory;
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, ops::Range};
 
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
@@ -130,6 +130,31 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         disk::download(trace_id, file).await
     } else {
         Ok(())
+    }
+}
+
+pub async fn get(
+    _trace_id: &str,
+    file: &str,
+    range: Option<Range<usize>>,
+) -> Result<bytes::Bytes, anyhow::Error> {
+    let cfg = config::get_config();
+    // get from memory cache
+    if cfg.memory_cache.enabled {
+        if let Some(v) = memory::get(file, range.clone()).await {
+            return Ok(v);
+        }
+    }
+    // get from disk cache
+    if cfg.disk_cache.enabled {
+        if let Some(v) = disk::get(file, range.clone()).await {
+            return Ok(v);
+        }
+    }
+    // get from storage
+    match range {
+        Some(r) => crate::storage::get_range(file, r).await,
+        None => crate::storage::get(file).await,
     }
 }
 

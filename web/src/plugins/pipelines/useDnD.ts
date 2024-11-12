@@ -83,7 +83,7 @@ const pipelineObj = reactive(Object.assign({}, defaultObject));
 export default function useDragAndDrop() {
   const $q = useQuasar();
 
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges } =
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges  } =
     useVueFlow();
 
     watch(
@@ -336,6 +336,12 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode:any) {
+
+    if(pipelineObj.isEditNode){
+      if(pipelineObj.userSelectedNode == null){
+        pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter((edge:any) => edge.targetNode.id !== pipelineObj.currentSelectedNodeData.id);
+      }
+    }
     if(pipelineObj.userClickedNode && pipelineObj.currentSelectedNodeData.id && !pipelineObj.userSelectedNode?.id ){
 
 
@@ -375,6 +381,7 @@ export default function useDragAndDrop() {
         newEdge,
       ];
       pipelineObj.userClickedNode = {};
+      pipelineObj.userSelectedNode = {};
     }
 
 if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
@@ -461,6 +468,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     
     pipelineObj.isEditNode = false;
     // pipelineObj.currentSelectedNodeData = dialogObj;
+    pipelineObj.userClickedNode = {};
     pipelineObj.userSelectedNode = {};
     console.log(pipelineObj.currentSelectedNodeData,"pipelineObj.currentSelectedPipeline")
   }
