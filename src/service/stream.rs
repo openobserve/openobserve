@@ -353,6 +353,18 @@ pub async fn update_stream_settings(
                     .retain(|field| !update_settings.index_fields.remove.contains(field));
             }
 
+            if !update_settings.distinct_value_fields.add.is_empty() {
+                settings
+                    .distinct_value_fields
+                    .extend(update_settings.distinct_value_fields.add);
+            }
+
+            if !update_settings.distinct_value_fields.remove.is_empty() {
+                settings
+                    .distinct_value_fields
+                    .retain(|field| !update_settings.distinct_value_fields.remove.contains(field));
+            }
+
             if !update_settings.full_text_search_keys.add.is_empty() {
                 settings
                     .full_text_search_keys

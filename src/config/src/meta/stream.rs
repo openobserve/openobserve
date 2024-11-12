@@ -529,6 +529,8 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub defined_schema_fields: UpdateStringSettingsArray,
     #[serde(default)]
+    pub distinct_value_fields: UpdateStringSettingsArray,
+    #[serde(default)]
     pub max_query_range: Option<i64>,
     #[serde(default)]
     pub store_original_data: Option<bool>,

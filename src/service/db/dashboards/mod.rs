@@ -14,15 +14,46 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::web;
-use config::utils::{hash::Sum64, json};
+use config::{
+    meta::stream::StreamType,
+    utils::{hash::Sum64, json},
+};
+use hashbrown::HashMap;
 
 use crate::{
     common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
-    service::db,
+    service::{db, stream::save_stream_settings},
 };
 
 pub mod folders;
 pub mod reports;
+
+macro_rules! set_stream_variables {
+    ($org:ident, $dashboard:ident) => {
+        if let Some(ref vars) = $dashboard.variables {
+            let mut map: HashMap<(&str, &StreamType), Vec<String>> = HashMap::new();
+            for v in vars.list.iter() {
+                if let Some(ref qd) = v.query_data {
+                    map.entry((&qd.stream, &qd.stream_type))
+                        .or_default()
+                        .push(qd.field.clone());
+                }
+            }
+
+            for ((name, typ), fields) in map {
+                let mut stream_settings = infra::schema::get_settings($org, name, *typ)
+                    .await
+                    .unwrap_or_default();
+                for f in fields {
+                    if !stream_settings.distinct_value_fields.contains(&f) {
+                        stream_settings.distinct_value_fields.push(f.to_owned());
+                    }
+                }
+                save_stream_settings($org, name, *typ, stream_settings).await?;
+            }
+        }
+    };
+}
 
 #[tracing::instrument]
 pub(crate) async fn get(
@@ -117,6 +148,7 @@ pub(crate) async fn put(
             .sum64(dash_str)
             .to_string();
 
+        set_stream_variables!(org_id, dash);
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v1: Some(dash),
@@ -138,6 +170,8 @@ pub(crate) async fn put(
         let hash = config::utils::hash::gxhash::new()
             .sum64(dash_str)
             .to_string();
+
+        set_stream_variables!(org_id, dash);
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v2: Some(dash),
@@ -159,6 +193,8 @@ pub(crate) async fn put(
         let hash = config::utils::hash::gxhash::new()
             .sum64(dash_str)
             .to_string();
+
+        set_stream_variables!(org_id, dash);
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v3: Some(dash),
@@ -180,6 +216,8 @@ pub(crate) async fn put(
         let hash = config::utils::hash::gxhash::new()
             .sum64(dash_str)
             .to_string();
+
+        set_stream_variables!(org_id, dash);
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v4: Some(dash),
@@ -201,6 +239,8 @@ pub(crate) async fn put(
         let hash = config::utils::hash::gxhash::new()
             .sum64(dash_str)
             .to_string();
+
+        set_stream_variables!(org_id, dash);
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v5: Some(dash),
