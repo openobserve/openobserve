@@ -545,9 +545,12 @@ clickable v-close-popup>
       </div>
     </div>
 
-    <div class="row query-editor-container" v-show="searchObj.meta.showQuery"  >
-
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%;" :class="{ 'expand-on-focus': isFocused }" :style="backgroundColorStyle"
+    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
+      <div
+        class="col"
+        style="border-top: 1px solid #dbdbdb; height: 100%"
+        :class="{ 'expand-on-focus': isFocused }"
+        :style="backgroundColorStyle"
       >
         <q-splitter
           class="logs-search-splitter"
@@ -557,7 +560,6 @@ clickable v-close-popup>
           style="width: 100%; height: 100%"
         >
           <template #before>
-
             <query-editor
               data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
@@ -616,7 +618,7 @@ clickable v-close-popup>
         round
         color="primary"
         @click="isFocused = !isFocused"
-        style="position: absolute; top: 42px; right: 10px; z-index: 20;"
+        style="position: absolute; top: 42px; right: 10px; z-index: 20"
       ></q-btn>
     </div>
 
@@ -1246,18 +1248,18 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string) => {
-      if (searchObj.data.editorValue == value) {
+      console.log("Logs: Update Query Value");
+      if (searchObj.data.editorValue === value) {
         return;
       }
 
-      if (searchObj.meta.quickMode == true) {
+      if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
-        setSelectedStreams();
         if (
-          parsedSQL != undefined &&
-          parsedSQL.hasOwnProperty("from") &&
-          parsedSQL?.from.length > 0
+          searchObj.meta.sqlMode === true &&
+          Object.hasOwn(parsedSQL, "from")
         ) {
+          setSelectedStreams();
           onStreamChange(value);
         }
         if (parsedSQL != undefined && parsedSQL?.columns?.length > 0) {
@@ -1303,7 +1305,7 @@ export default defineComponent({
         }
       }
 
-      if (value != "" && searchObj.meta.sqlMode == true) {
+      if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
         if (Object.hasOwn(parsedSQL, "from")) {
           setSelectedStreams();
@@ -1315,7 +1317,7 @@ export default defineComponent({
 
       updateAutoComplete(value);
       try {
-        if (searchObj.meta.sqlMode == true) {
+        if (searchObj.meta.sqlMode === true) {
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
@@ -1359,11 +1361,11 @@ export default defineComponent({
         console.log(e, "Logs: Error while updating query value");
       }
     };
-    const  handleEscKey = (event: KeyboardEvent) =>{
-      if (event.key === 'Escape') {
-        isFocused.value = false;       
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        isFocused.value = false;
       }
-    }
+    };
 
     const updateDateTime = async (value: object) => {
       if (
@@ -1504,15 +1506,14 @@ export default defineComponent({
         fnEditorRef?.value?.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
       }
-      window.addEventListener('keydown', handleEscKey);
-
+      window.addEventListener("keydown", handleEscKey);
     });
 
     onUnmounted(() => {
       window.removeEventListener("click", () => {
         fnEditorRef?.value?.resetEditorLayout();
       });
-      window.removeEventListener('keydown', handleEscKey);
+      window.removeEventListener("keydown", handleEscKey);
     });
 
     onActivated(() => {
@@ -2592,29 +2593,35 @@ export default defineComponent({
       return searchIds.flat() as string[];
     });
     const backgroundColorStyle = computed(() => {
-      const isDarkMode = store.state.theme === 'dark';
+      const isDarkMode = store.state.theme === "dark";
       return {
-        backgroundColor: (searchObj.meta.toggleFunction && isFocused.value)
-          ? (isDarkMode ? '#575A5A' : '#E0E0E0')  // Dark mode: grey, Light mode: yellow (or any color)
-          : '',
-          borderBottom: (searchObj.meta.toggleFunction && isFocused.value) ?
-          (isDarkMode ? '2px solid #575A5A ' : '2px solid #E0E0E0') : 'none',
+        backgroundColor:
+          searchObj.meta.toggleFunction && isFocused.value
+            ? isDarkMode
+              ? "#575A5A"
+              : "#E0E0E0" // Dark mode: grey, Light mode: yellow (or any color)
+            : "",
+        borderBottom:
+          searchObj.meta.toggleFunction && isFocused.value
+            ? isDarkMode
+              ? "2px solid #575A5A "
+              : "2px solid #E0E0E0"
+            : "none",
       };
     });
     const editorWidthToggleFunction = computed(() => {
-      const isDarkMode = store.state.theme === 'dark';
+      const isDarkMode = store.state.theme === "dark";
 
-      if(!searchObj.meta.toggleFunction && isFocused.value){
+      if (!searchObj.meta.toggleFunction && isFocused.value) {
         return {
           width: `calc(100 - ${searchObj.config.fnSplitterModel})%`,
-          borderBottom: (isDarkMode ? '2px solid #575A5A' : '2px solid #E0E0E0'),
+          borderBottom: isDarkMode ? "2px solid #575A5A" : "2px solid #E0E0E0",
         };
-      }
-      else{
+      } else {
         return {
-          width: '100%',
-          borderBottom: 'none'
-        }
+          width: "100%",
+          borderBottom: "none",
+        };
       }
     });
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
@@ -3282,8 +3289,6 @@ export default defineComponent({
     color: white;
   }
 }
-
-
 </style>
 <style scoped>
 .expand-on-focus {
