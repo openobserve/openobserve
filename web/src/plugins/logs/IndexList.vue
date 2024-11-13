@@ -988,11 +988,7 @@ export default defineComponent({
                           } else {
                           fieldValues.value[name]["values"].push({
                             key: subItem.zo_sql_key,
-                            count: subItem.zo_sql_num,
                           });
-                        }
-                      } else {
-                        fieldValues.value[name]["values"].push({
                           key: subItem.zo_sql_key,
                           count: subItem.zo_sql_num,
                         });
