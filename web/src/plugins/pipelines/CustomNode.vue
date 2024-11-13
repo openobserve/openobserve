@@ -55,6 +55,7 @@ const onFunctionClick = (data,event,id) =>{
   console.log(data,"data")
   console.log(id,"id")
   console.log(event,"event")
+  pipelineObj.userSelectedNode = data;
   const dataToOpen  =   {
     label: "Function",
     subtype: "function",
@@ -70,7 +71,10 @@ const onFunctionClick = (data,event,id) =>{
 }
 
 const onConditionClick = (data,event,id) =>{
+  data.label = id;
   console.log(data,"data")
+  pipelineObj.userSelectedNode = data;
+
   const dataToOpen  =   {
     label: "Condition",
     subtype: "condition",
@@ -88,6 +92,8 @@ const onConditionClick = (data,event,id) =>{
 const onStreamOutputClick = (data,event,id) =>{
   console.log(data,"data")
   console.log(id,"id")
+  pipelineObj.userSelectedNode = data;
+
   if(!id){
     pipelineObj.userClickedNode = data.label;
   }
@@ -173,7 +179,8 @@ function getIcon(data, ioType) {
       id="input"
       type="target"
       :position="'top'"
-      :style="{ filter: 'invert(100%)' }"
+      class="node_handle_custom"
+     
     />
     <div
       v-if="data.node_type == 'function'"
@@ -196,16 +203,23 @@ function getIcon(data, ioType) {
       <q-item clickable @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
+
         </q-item-section>
+
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item clickable @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
@@ -299,16 +313,23 @@ function getIcon(data, ioType) {
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
         </q-item-section>
+      
+
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
@@ -397,16 +418,23 @@ function getIcon(data, ioType) {
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
+
         </q-item-section>
+
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
@@ -493,36 +521,27 @@ function getIcon(data, ioType) {
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
         </q-item-section>
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item class="q-item-output" clickable  @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
     </q-list>
   </q-menu>
 
-    <q-tooltip>
-      <div v-for="(condition, index) in data.conditions" :key="index">
-        <div>
-          <strong>Column:</strong> {{ condition.column }}
-        </div>
-        <div>
-          <strong>Operator:</strong> {{ condition.operator }}
-        </div>
-        <div>
-          <strong>Value:</strong> {{ condition.value }}
-        </div>
-        <q-separator v-if="index < data.conditions.length - 1" />
-      </div>
-    </q-tooltip>
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
@@ -538,16 +557,17 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
-        >
-          Condition - {{ data.condition }}
-        </div>
+    style="
+      text-align: left;
+      text-wrap: wrap;
+      width: auto;
+      text-overflow: ellipsis;
+    "
+  >
+    <div class="column" v-for="(condition, index) in data.conditions" :key="index" style="margin-bottom: 1px;">
+      {{ condition.column }} {{ condition.operator }} {{ condition.value }}
+    </div>
+  </div>
       </div>
 
       <div class="float-right">
@@ -575,7 +595,7 @@ function getIcon(data, ioType) {
       id="output"
       type="source"
       :position="'bottom'"
-      :style="{ filter: 'invert(100%)' }"
+      class="node_handle_custom"
       
     />
   </div>
@@ -590,6 +610,13 @@ function getIcon(data, ioType) {
 </template>
 
 <style lang="scss">
+.node_handle_custom{
+  background-color:#9a9698;
+    height:8px;
+    width:24px;
+    border-radius:4px;
+  filter: invert(100%);
+}
 .vue-flow__node-custom {
   padding: 10px;
   border-radius: 3px;
@@ -604,7 +631,7 @@ function getIcon(data, ioType) {
 }
 .menu-list{
   margin: 0px 10px;
-  background-color: var(--vf-node-bg);
+  background-color: white;
 }
 
 </style>

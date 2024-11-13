@@ -1,6 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from './baseFixtures';
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import { toZonedTime } from "date-fns-tz";
 
@@ -64,6 +63,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
     .first()
     .click({ force: true });
 };
+
 test.describe("Sanity testcases", () => {
   // let logData;
   function removeUTFCharacters(text) {
@@ -104,7 +104,7 @@ test.describe("Sanity testcases", () => {
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();
   });
-  test("should click on interesting fields icon and display query in editor", async ({
+    test("should click on interesting fields icon and display query in editor", async ({
     page,
   }) => {
     await page.waitForSelector(
@@ -283,6 +283,9 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="tab-realtime"]').click();
+
+    await page.locator('[data-test="function-stream-tab"]').click();
     await page.getByPlaceholder("Search Function").click();
     await page.getByPlaceholder("Search Function").fill("e2eautomatefunctions");
     await page.getByRole("button", { name: "Delete Function" }).click();
@@ -294,6 +297,8 @@ test.describe("Sanity testcases", () => {
   }) => {
     // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="tab-realtime"]').click();
+    await page.locator('[data-test="function-stream-tab"]').click();
     await page.getByRole("button", { name: "Create new function" }).click();
     await page.getByLabel("Name").click();
     await page.getByLabel("Name").fill("sanitytest");
@@ -434,7 +439,6 @@ test.describe("Sanity testcases", () => {
     await expect(
       page
         .locator(".q-notification__message")
-
         .getByText(/Template Saved Successfully/)
         .first()
     ).toBeVisible();
@@ -991,9 +995,6 @@ test.describe("Sanity testcases", () => {
 
     // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element
     await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click();
-});
 
-
-
-
+  });
 });

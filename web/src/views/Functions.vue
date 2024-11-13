@@ -29,19 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inline-label
             vertical
           >
-            <q-route-tab
-              data-test="function-enrichment-table-tab"
-              name="enrichmentTables"
+          <q-route-tab
+              v-if="
+                !store.state.zoConfig?.custom_hide_menus?.split(',')
+                  .includes('pipelines')
+              "
+              data-test="stream-pipelines-tab"
+              name="streamPipelines"
               :to="{
-                name: 'enrichmentTables',
+                name: 'pipelines',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :label="t('function.enrichmentTables')"
+              :label="t('function.streamPipeline')"
               content-class="tab_content"
             />
-
             <q-route-tab
               data-test="function-stream-tab"
               default
@@ -56,22 +59,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               content-class="tab_content"
             />
             <q-route-tab
-              v-if="
-                !store.state.zoConfig?.custom_hide_menus
-                  .split(',')
-                  .includes('pipelines')
-              "
-              data-test="stream-pipelines-tab"
-              name="streamPipelines"
+              data-test="function-enrichment-table-tab"
+              name="enrichmentTables"
               :to="{
-                name: 'pipelines',
+                name: 'enrichmentTables',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :label="t('function.streamPipeline')"
+              :label="t('function.enrichmentTables')"
               content-class="tab_content"
             />
+
+
+
           </q-tabs>
         </div>
       </template>
@@ -100,7 +101,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
-    const activeTab: any = ref("functions");
+    const activeTab: any = ref("streamPipelines");
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
     const splitterModel = ref(220);
@@ -120,7 +121,7 @@ export default defineComponent({
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "pipeline") {
         router.replace({
-          name: "functionList",
+          name: "pipelines",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },

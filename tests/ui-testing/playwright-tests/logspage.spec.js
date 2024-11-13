@@ -1,6 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 
 test.describe.configure({ mode: "parallel" });
@@ -455,6 +454,9 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
     // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="tab-realtime"]').click();
+
+    await page.locator('[data-test="function-stream-tab"]').click();
     await page.getByPlaceholder('Search Function').click();
     await page.getByPlaceholder('Search Function').fill('e2e');
     await page.getByRole('button', { name: 'Delete Function' }).click();

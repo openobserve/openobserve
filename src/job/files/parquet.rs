@@ -1457,14 +1457,17 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
         // process full text search fields
         for column_name in tantivy_fields.iter() {
-            // get column
-            let Some(column_data) = inverted_idx_batch
+            let column_data = match inverted_idx_batch
                 .column_by_name(column_name)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<StringArray>()
-            else {
-                continue;
+            {
+                Some(column_data) => column_data,
+                None => {
+                    // generate empty array to ensure the tantivy and parquet have same rows
+                    &StringArray::from(vec![""; num_rows])
+                }
             };
 
             // get field
@@ -1481,13 +1484,12 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         }
     }
 
-    // TODO: Check if 50MB is enough for the tantivy index for >1GB parquet file
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    for (_rowid, doc) in docs.into_iter() {
+    for (_, doc) in docs.into_iter() {
         if let Err(e) = index_writer.add_document(doc) {
             log::error!(
                 "generate_tantivy_index: Failed to add document to index: {}",
