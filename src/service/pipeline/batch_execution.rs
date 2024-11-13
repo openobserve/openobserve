@@ -40,7 +40,7 @@ use crate::{
 };
 
 static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
-    Lazy::new(|| regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap());
+    Lazy::new(|| regex::Regex::new(r"\{([^}]+)\}").unwrap());
 
 #[async_trait]
 pub trait PipelineExt: Sync + Send + 'static {
@@ -765,9 +765,9 @@ mod tests {
         });
         let ok_cases = vec![
             ("container_name", "container_name"),
-            ("{{container_name}}", "compactor"),
-            ("abc-{{container_name}}", "abc-compactor"),
-            ("abc-{{container_name}}-xyz", "abc-compactor-xyz"),
+            ("{container_name}", "compactor"),
+            ("abc-{container_name}", "abc-compactor"),
+            ("abc-{container_name}-xyz", "abc-compactor-xyz"),
         ];
         for (test, expected) in ok_cases {
             let result = resolve_stream_name(test, &record);
