@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory"
+id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -101,7 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
+                    <q-icon name="warning"
+color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -137,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div data-test="logs-search-error-message" v-else>
                       Error occurred while retrieving search events.
                       <q-btn
-                        v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
+                        v-if="
+                          searchObj.data.errorMsg != '' ||
+                          searchObj?.data?.functionError != ''
+                        "
                         @click="toggleErrorDetails"
                         size="sm"
                         data-test="logs-page-result-error-details-btn"
@@ -178,7 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -197,10 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
-                      v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
+                      v-if="
+                        searchObj.data.errorMsg != '' ||
+                        searchObj?.data?.functionError != ''
+                      "
                       @click="toggleErrorDetails"
                       size="sm"
                       data-test="logs-page-result-error-details-btn-norecord"
@@ -221,7 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -641,7 +652,7 @@ export default defineComponent({
 
         searchObj.organizationIdentifier =
           store.state.selectedOrganization.identifier;
-          restoreUrlQueryParams();
+        restoreUrlQueryParams();
         if (searchObj.loading == false) {
           resetSearchObj();
           resetStreamData();
@@ -809,11 +820,16 @@ export default defineComponent({
               }
             }
 
-            searchObj.data.query =
-              `SELECT [FIELD_LIST]${selectFields} FROM "` +
-              searchObj.data.stream.selectedStream.join(",") +
-              `" ` +
-              whereClause;
+            searchObj.data.query = "";
+            const streams = searchObj.data.stream.selectedStream;
+
+            streams.forEach((stream: string, index: number) => {
+              // Add UNION for all but the first SELECT statement
+              if (index > 0) {
+                searchObj.data.query += " UNION ";
+              }
+              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
+            });
 
             if (searchObj.data.stream.selectedStreamFields.length == 0) {
               const streamData: any = getStream(
@@ -845,12 +861,12 @@ export default defineComponent({
               searchObj.meta.quickMode
             ) {
               searchObj.data.query = searchObj.data.query.replace(
-                "[FIELD_LIST]",
+                /\[FIELD_LIST\]/g,
                 searchObj.data.stream.interestingFieldList.join(","),
               );
             } else {
               searchObj.data.query = searchObj.data.query.replace(
-                "[FIELD_LIST]",
+                /\[FIELD_LIST\]/g,
                 "*",
               );
             }
@@ -926,12 +942,12 @@ export default defineComponent({
       return data.filter((item: any) => {
         if (item.expr) {
           if (
-          (item.expr.type === "column_ref" &&
-            (item.expr?.column?.expr?.value === fieldName || item.expr.column === fieldName)
-          ) ||
-          (item.expr.type === "aggr_func" &&
-            item.expr?.args?.expr?.column?.value === fieldName)
-        ) {
+            (item.expr.type === "column_ref" &&
+              (item.expr?.column?.expr?.value === fieldName ||
+                item.expr.column === fieldName)) ||
+            (item.expr.type === "aggr_func" &&
+              item.expr?.args?.expr?.column?.value === fieldName)
+          ) {
             return false;
           }
         }
@@ -945,11 +961,43 @@ export default defineComponent({
     ) => {
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
-      const parsedSQL = fnParsedSQL();
+      let parsedSQL = fnParsedSQL();
+      parsedSQL = processInterestingFiledInSQLQuery(
+        parsedSQL,
+        field,
+        isFieldExistInSQL,
+      );
+
+      // Modify the query based on stream name
+      const streamName = searchObj.data.stream.selectedStream[0].replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+      const newQuery = parser
+        .sqlify(parsedSQL)
+        .replace(/`/g, "")
+        .replace(
+          new RegExp(`\\b${streamName}\\b`, "g"),
+          `"${searchObj.data.stream.selectedStream[0]}"`,
+        );
+
+      searchObj.data.query = newQuery;
+      searchObj.data.editorValue = newQuery;
+      searchBarRef.value.updateQuery();
+      searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
+
+      console.log(parsedSQL);
+    };
+
+    const processInterestingFiledInSQLQuery = (
+      parsedSQL,
+      field,
+      isFieldExistInSQL,
+    ) => {
       if (parsedSQL) {
         if (isFieldExistInSQL) {
-          //remove the field from the query
-          if (parsedSQL.columns.length > 0) {
+          // Remove the field from the query
+          if (parsedSQL.columns && parsedSQL.columns.length > 0) {
             let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
@@ -962,9 +1010,9 @@ export default defineComponent({
             parsedSQL.columns = filteredData;
           }
         } else {
-          //add the field in the query
-          if (parsedSQL.columns.length > 0) {
-            // iterate and remove the * from the query
+          // Add the field in the query
+          if (parsedSQL.columns && parsedSQL.columns.length > 0) {
+            // Iterate and remove the * from the query
             parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
           }
 
@@ -977,7 +1025,8 @@ export default defineComponent({
           });
         }
 
-        if (parsedSQL.columns.length == 0) {
+        // Add '*' if no columns are left
+        if (parsedSQL.columns && parsedSQL.columns.length === 0) {
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
@@ -986,21 +1035,18 @@ export default defineComponent({
             type: "expr",
           });
         }
-        const streamName = searchObj.data.stream.selectedStream[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const newQuery = parser
-          .sqlify(parsedSQL)
-          .replace(/`/g, "")
-          .replace(
-            new RegExp(`\\b${streamName}\\b`, 'g'), // Wrap only standalone stream name
-            `"${searchObj.data.stream.selectedStream[0]}"`
-          );
-        searchObj.data.query = newQuery;
-        searchObj.data.editorValue = newQuery;
-
-        searchBarRef.value.updateQuery();
-
-        searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
       }
+
+      // Recursively process _next if it exists
+      if (parsedSQL._next) {
+        parsedSQL._next = processInterestingFiledInSQLQuery(
+          parsedSQL._next,
+          field,
+          isFieldExistInSQL,
+        );
+      }
+
+      return parsedSQL;
     };
 
     const handleQuickModeChange = () => {
@@ -1011,7 +1057,7 @@ export default defineComponent({
         }
         if (searchObj.meta.sqlMode == true) {
           searchObj.data.query = searchObj.data.query.replace(
-            /SELECT\s+(.*?)\s+FROM/i,
+            /SELECT\s+(.*?)\s+FROM/gi,
             (match, fields) => {
               return `SELECT ${field_list} FROM`;
             },
