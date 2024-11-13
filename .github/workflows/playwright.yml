@@ -148,6 +148,7 @@ jobs:
       #   run: cat o2.log
 
       - name: Sanitize Test Filename
+        shell: bash 
         run: |
           # Assign the matrix variable to a Bash variable
           SANITIZED_FILENAME="${{ matrix.testfilename }}"
