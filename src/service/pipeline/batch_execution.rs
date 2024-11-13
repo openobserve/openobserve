@@ -209,7 +209,7 @@ impl ExecutablePipeline {
             let mut count: usize = 0;
             let mut results = HashMap::new();
             while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
-                if stream_params.stream_name.contains("{{") {
+                if stream_params.stream_name.contains("{") {
                     match resolve_stream_name(&stream_params.stream_name, &record) {
                         Ok(stream_name) => {
                             stream_params.stream_name = stream_name.into();
@@ -713,9 +713,9 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
 }
 
 fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
-    // Fast path: if it's a complete pattern like "{{field}}", avoid regex
-    if haystack.starts_with("{{") && haystack.ends_with("}}") {
-        let field_name = &haystack[2..haystack.len() - 2];
+    // Fast path: if it's a complete pattern like "{field}", avoid regex
+    if haystack.starts_with("{") && haystack.ends_with("}") {
+        let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
             Some(stream_name) => stream_name
                 .as_str()
