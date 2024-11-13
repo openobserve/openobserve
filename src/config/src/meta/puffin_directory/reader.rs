@@ -16,11 +16,10 @@
 use std::{
     io,
     path::{Path, PathBuf},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
-use anyhow::{Context, Result};
-use futures::{AsyncRead, AsyncSeek};
+use futures::executor::block_on;
 use hashbrown::HashMap;
 use tantivy::{
     directory::{error::OpenReadError, Directory, FileHandle, OwnedBytes},
@@ -28,59 +27,71 @@ use tantivy::{
 };
 
 use crate::meta::{
-    puffin::reader::PuffinBytesReader,
+    puffin::{reader::PuffinBytesReader, BlobMetadata},
     puffin_directory::{
         get_file_from_empty_puffin_dir_with_ext, EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID,
     },
 };
 
 #[derive(Debug)]
-pub struct RamDirectoryReader<R> {
-    source: Arc<PuffinBytesReader<R>>,
-    blob_metadata_map: Arc<RwLock<HashMap<PathBuf, OwnedBytes>>>,
+pub struct PuffinDirReader {
+    source: Arc<PuffinBytesReader>,
+    blobs: Arc<HashMap<PathBuf, OwnedBytes>>,
+    blobs_metadata: Arc<HashMap<PathBuf, BlobMetadata>>,
 }
 
-impl<R> RamDirectoryReader<R>
-where
-    R: AsyncRead + AsyncSeek + Send + Unpin + Sync + Clone,
-{
-    /// Open a puffin direcotry from the given bytes data
-    pub async fn from_bytes(data: R) -> Result<Self> {
-        let mut puffin_reader = PuffinBytesReader::new(data);
-        let puffin_meta = puffin_reader
-            .get_metadata()
-            .await
-            .context("Failed to get blobs meta")?
-            .ok_or_else(|| anyhow::anyhow!("Corrupted tantivy index file without blob tag"))?;
+impl PuffinDirReader {
+    pub async fn from_path(
+        store: Arc<dyn object_store::ObjectStore>,
+        source: object_store::ObjectMeta,
+    ) -> io::Result<Self> {
+        let mut source = PuffinBytesReader::new(store, source);
+        let Some(metadata) = source.get_metadata().await.map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Error reading metadata from puffin file: {:?}", e),
+            )
+        })?
+        else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Error reading metadata from puffin file",
+            ));
+        };
 
-        let mut blob_meta_map = HashMap::new();
-
-        for blob in puffin_meta.blobs {
+        let mut blobs = HashMap::new();
+        let mut blobs_metadata = HashMap::new();
+        for meta in metadata.blobs {
             // Fetch the files names from the blob_meta itself
-            if let Some(file_name) = blob.properties.get("blob_tag") {
+            if let Some(file_name) = meta.properties.get("blob_tag") {
                 let path = PathBuf::from(file_name);
-                let blob_bytes = puffin_reader.read_blob_bytes(&blob).await?;
-                blob_meta_map.insert(path, OwnedBytes::new(blob_bytes));
+                if file_name == "meta.json" {
+                    let data = source.read_blob_bytes(&meta, None).await.map_err(|e| {
+                        io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Error reading bytes from blob: {:?}", e),
+                        )
+                    })?;
+                    blobs.insert(path.clone(), OwnedBytes::new(data.to_vec()));
+                }
+                blobs_metadata.insert(path, meta);
             }
         }
 
-        let puffin_dir = RamDirectoryReader {
-            source: Arc::new(puffin_reader),
-            blob_metadata_map: Arc::new(RwLock::new(blob_meta_map)),
-        };
-
-        Ok(puffin_dir)
+        Ok(Self {
+            source: Arc::new(source),
+            blobs: Arc::new(blobs),
+            blobs_metadata: Arc::new(blobs_metadata),
+        })
     }
 }
 
-impl<R> Clone for RamDirectoryReader<R>
-where
-    R: Clone,
-{
+impl Clone for PuffinDirReader {
     fn clone(&self) -> Self {
-        RamDirectoryReader {
+        PuffinDirReader {
             source: self.source.clone(),
-            blob_metadata_map: self.blob_metadata_map.clone(),
+            blobs: self.blobs.clone(),
+            blobs_metadata: self.blobs_metadata.clone(),
         }
     }
 }
@@ -88,40 +99,58 @@ where
 // Version 1: Keep the blob withing the file handle and return it when read
 #[derive(Debug)]
 struct PuffinSliceHandle {
-    blob: OwnedBytes,
+    source: Arc<PuffinBytesReader>,
+    metadata: BlobMetadata,
 }
 
 impl HasLen for PuffinSliceHandle {
     fn len(&self) -> usize {
-        self.blob.len()
+        self.metadata.length as usize
     }
 }
 
 #[async_trait::async_trait]
 impl FileHandle for PuffinSliceHandle {
     fn read_bytes(&self, byte_range: core::ops::Range<usize>) -> io::Result<OwnedBytes> {
-        Ok(self.blob.slice(byte_range))
+        if byte_range.is_empty() {
+            return Ok(OwnedBytes::empty());
+        }
+
+        block_on(async { self.read_bytes_async(byte_range).await })
     }
 
     async fn read_bytes_async(
         &self,
         byte_range: core::ops::Range<usize>,
     ) -> io::Result<OwnedBytes> {
-        Ok(self.blob.slice(byte_range))
+        if byte_range.is_empty() {
+            return Ok(OwnedBytes::empty());
+        }
+        let data = self
+            .source
+            .read_blob_bytes(&self.metadata, Some(byte_range))
+            .await
+            .map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Error reading bytes from blob: {:?}", e),
+                )
+            })?;
+        Ok(OwnedBytes::new(data.to_vec()))
     }
 }
 
-impl<R> Directory for RamDirectoryReader<R>
-where
-    R: AsyncRead + AsyncSeek + Send + Unpin + Sync + Clone + std::fmt::Debug + 'static,
-{
+impl Directory for PuffinDirReader {
     fn get_file_handle(
         &self,
         path: &Path,
     ) -> std::result::Result<Arc<dyn FileHandle>, OpenReadError> {
-        match self.blob_metadata_map.read().unwrap().get(path) {
+        match self.blobs_metadata.get(path) {
             Some(blob) => {
-                let file_handle = PuffinSliceHandle { blob: blob.clone() };
+                let file_handle = PuffinSliceHandle {
+                    source: self.source.clone(),
+                    metadata: blob.clone(),
+                };
                 Ok(Arc::new(file_handle))
             }
             None => {
@@ -130,7 +159,7 @@ where
                     None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 };
                 match get_file_from_empty_puffin_dir_with_ext(ext) {
-                    Ok(blob) => Ok(Arc::new(PuffinSliceHandle { blob })),
+                    Ok(blob) => Ok(Arc::new(blob)),
                     Err(_) => Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
                 }
             }
@@ -138,7 +167,7 @@ where
     }
 
     fn exists(&self, path: &Path) -> std::result::Result<bool, OpenReadError> {
-        let exists = self.blob_metadata_map.read().unwrap().contains_key(path);
+        let exists = self.blobs_metadata.contains_key(path);
 
         if !exists {
             let ext = match path.extension().and_then(|ext| ext.to_str()) {
@@ -153,19 +182,11 @@ where
     }
 
     fn atomic_read(&self, path: &Path) -> std::result::Result<Vec<u8>, OpenReadError> {
-        match self.blob_metadata_map.read().unwrap().get(path) {
-            Some(blob) => Ok(blob.to_vec()),
-            None => {
-                let ext = match path.extension().and_then(|ext| ext.to_str()) {
-                    Some(ext) => ext,
-                    None => return Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
-                };
-                match get_file_from_empty_puffin_dir_with_ext(ext) {
-                    Ok(blob) => Ok(blob.to_vec()),
-                    Err(_) => Err(OpenReadError::FileDoesNotExist(path.to_path_buf())),
-                }
-            }
+        if path == Path::new("meta.json") {
+            let data = self.blobs.get(path).unwrap();
+            return Ok(data.to_vec());
         }
+        Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))
     }
 
     fn atomic_write(&self, _path: &Path, _data: &[u8]) -> io::Result<()> {

@@ -18,8 +18,10 @@ use std::ops::Range;
 use config::{get_config, is_local_disk_storage, metrics};
 use datafusion::parquet::data_type::AsBytes;
 use futures::{StreamExt, TryStreamExt};
-use object_store::{path::Path, ObjectStore, WriteMultipart};
+use object_store::{path::Path, GetRange, ObjectStore, WriteMultipart};
 use once_cell::sync::Lazy;
+use snafu::Snafu;
+use thiserror::Error as ThisError;
 
 pub mod local;
 pub mod remote;
@@ -158,4 +160,85 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
 
 fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {
     b.len() as f64 / (1024.0 * 1024.0)
+}
+
+/// A specialized `Error` for in-memory object store-related errors
+#[derive(ThisError, Debug)]
+#[allow(missing_docs)]
+pub(crate) enum Error {
+    #[error("Out of range")]
+    OutOfRange(String),
+    #[error("Bad range")]
+    BadRange(String),
+}
+
+impl From<Error> for object_store::Error {
+    fn from(source: Error) -> Self {
+        Self::Generic {
+            store: "storage",
+            source: Box::new(source),
+        }
+    }
+}
+
+#[derive(Debug, Snafu)]
+pub(crate) enum InvalidGetRange {
+    #[snafu(display(
+        "Wanted range starting at {requested}, but object was only {length} bytes long"
+    ))]
+    StartTooLarge { requested: usize, length: usize },
+
+    #[snafu(display("Range started at {start} and ended at {end}"))]
+    Inconsistent { start: usize, end: usize },
+}
+
+pub(crate) trait GetRangeExt {
+    fn is_valid(&self) -> Result<(), InvalidGetRange>;
+    /// Convert to a [`Range`] if valid.
+    fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange>;
+}
+
+impl GetRangeExt for GetRange {
+    fn is_valid(&self) -> Result<(), InvalidGetRange> {
+        match self {
+            Self::Bounded(r) if r.end <= r.start => {
+                return Err(InvalidGetRange::Inconsistent {
+                    start: r.start,
+                    end: r.end,
+                });
+            }
+            _ => (),
+        };
+        Ok(())
+    }
+
+    /// Convert to a [`Range`] if valid.
+    fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange> {
+        self.is_valid()?;
+        match self {
+            Self::Bounded(r) => {
+                if r.start >= len {
+                    Err(InvalidGetRange::StartTooLarge {
+                        requested: r.start,
+                        length: len,
+                    })
+                } else if r.end > len {
+                    Ok(r.start..len)
+                } else {
+                    Ok(r.clone())
+                }
+            }
+            Self::Offset(o) => {
+                if *o >= len {
+                    Err(InvalidGetRange::StartTooLarge {
+                        requested: *o,
+                        length: len,
+                    })
+                } else {
+                    Ok(*o..len)
+                }
+            }
+            Self::Suffix(n) => Ok(len.saturating_sub(*n)..len),
+        }
+    }
 }

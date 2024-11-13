@@ -21,14 +21,14 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        puffin_directory::reader::RamDirectoryReader,
+        puffin_directory::reader::PuffinDirReader,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, time::BASE_TIME},
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
-use futures::{future::try_join_all, io::Cursor};
+use futures::future::try_join_all;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
@@ -483,6 +483,7 @@ async fn filter_file_list_by_tantivy_index(
 
     for (parquet_file, _ttv_file) in index_file_names {
         let file = parquet_file;
+        let file_size = file_list_map.get(&file).unwrap().meta.index_size as usize;
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let trace_id = query.trace_id.to_string();
@@ -490,9 +491,14 @@ async fn filter_file_list_by_tantivy_index(
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
         let task = tokio::task::spawn(async move {
-            let res =
-                search_tantivy_index(&trace_id, &file, full_text_term_clone, index_terms_clone)
-                    .await;
+            let res = search_tantivy_index(
+                &trace_id,
+                &file,
+                file_size,
+                full_text_term_clone,
+                index_terms_clone,
+            )
+            .await;
             drop(permit);
             res
         });
@@ -537,7 +543,7 @@ async fn filter_file_list_by_tantivy_index(
             }
             Err(e) => {
                 log::warn!(
-                    "[trace_id {}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
+                    "[trace_id {}] search->storage: error filtering file via tantivy index. Keep file to search. error: {}",
                     query.trace_id,
                     e.to_string()
                 );
@@ -594,17 +600,26 @@ fn search_tantivy_index_with_field(
 }
 
 pub async fn get_tantivy_directory(
-    trace_id: &str,
+    _trace_id: &str,
     file_name: &str,
+    file_size: usize,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    let index_file_bytes = infra::cache::file_data::get(trace_id, file_name, None).await?;
-    let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
+    let store = Arc::new(infra::cache::storage::CacheFS::new_store());
+    let source = object_store::ObjectMeta {
+        location: file_name.into(),
+        last_modified: *BASE_TIME,
+        size: file_size,
+        e_tag: None,
+        version: None,
+    };
+    let puffin_dir = PuffinDirReader::from_path(store, source).await?;
     Ok(Box::new(puffin_dir))
 }
 
 async fn search_tantivy_index(
     trace_id: &str,
     parquet_file_name: &str,
+    file_size: usize,
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
@@ -616,7 +631,7 @@ async fn search_tantivy_index(
         ));
     };
 
-    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name).await?;
+    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;
