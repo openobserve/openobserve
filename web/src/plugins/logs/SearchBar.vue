@@ -1248,7 +1248,6 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string) => {
-      console.log("Logs: Update Query Value");
       if (searchObj.data.editorValue === value) {
         return;
       }
