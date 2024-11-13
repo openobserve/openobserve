@@ -224,7 +224,7 @@ impl ExecutablePipeline {
                 pipeline_error.add_node_error(node_id, node_type, error);
                 count += 1;
             }
-            log::debug!("[Pipeline]: collected {count} records");
+            log::debug!("[Pipeline]: collected {count} errors");
             if count > 0 {
                 Some(pipeline_error)
             } else {
@@ -268,6 +268,7 @@ impl ExecutablePipeline {
                 stream_params,
                 error_source: ErrorSource::Pipeline(pipeline_errors),
             };
+            log::debug!("[Pipeline]: execution errors occurred and published");
             publish_error(error_data).await;
         }
 
@@ -463,7 +464,7 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: Leaf node failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
                                     );
                                     break;
                                 }
@@ -483,7 +484,7 @@ async fn process_node(
                     }
                     count += 1;
                 }
-                log::debug!("[Pipeline]: leaf node {node_id} done processing {count} records");
+                log::debug!("[Pipeline]: LeafNode {node_id} done processing {count} records");
             } else {
                 log::debug!("[Pipeline]: source node {node_id} starts processing");
                 // source stream node: send received record to all its children
