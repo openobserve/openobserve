@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -72,7 +72,8 @@ impl PipelineError {
 pub struct NodeErrors {
     node_id: String,
     node_type: String,
-    errors: Vec<String>,
+    errors: HashSet<String>,
+    error_count: i32,
 }
 
 impl NodeErrors {
@@ -80,12 +81,14 @@ impl NodeErrors {
         Self {
             node_id,
             node_type,
-            errors: Vec::new(),
+            errors: HashSet::new(),
+            error_count: 0,
         }
     }
 
     pub fn add_error(&mut self, error: String) {
-        self.errors.push(error);
+        self.error_count += 1;
+        self.errors.insert(error);
     }
 }
 
@@ -123,7 +126,8 @@ mod tests {
                     NodeErrors {
                         node_id: "node_1".to_string(),
                         node_type: "function".to_string(),
-                        errors: vec!["failed to compile".to_string()],
+                        errors: HashSet::from(["failed to compile".to_string()]),
+                        error_count: 1,
                     },
                 )]),
             }),
