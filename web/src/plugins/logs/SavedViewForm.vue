@@ -575,7 +575,7 @@ const deleteSavedViews = async () => {
             timeout: 1000,
           });
           getSavedViews();
-
+          if(favoriteViews.value.includes(deleteViewID.value))
           handleFavoriteSavedView(deleteItem.value, favoriteViews.value.includes(deleteViewID.value));
           
         } else {
@@ -1131,6 +1131,7 @@ const applySavedView = (item: { view_id: string; view_name: any }) => {
       console.log(err);
     });
 };
+
 
 const handleDeleteSavedView = (item: any) => {
   savedViewDropdownModel.value = false;
