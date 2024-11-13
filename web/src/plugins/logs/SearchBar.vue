@@ -1319,13 +1319,6 @@ export default defineComponent({
       try {
         if (searchObj.meta.sqlMode === true) {
           searchObj.data.parsedQuery = parser.astify(value);
-          if (searchObj.data.parsedQuery?.from?.length > 0) {
-            if (
-              !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table,
-              ) &&
-              searchObj.data.parsedQuery.from[0].table !== streamName
-            ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
 
