@@ -740,7 +740,7 @@ pub async fn merge_files(
         };
 
         let diff_fields = generate_schema_diff(&schema, &schema_latest_fields)?;
-        let table = exec::create_parquet_table(
+        let table = match exec::create_parquet_table(
             &session,
             schema_latest.clone(),
             &files,
@@ -748,7 +748,19 @@ pub async fn merge_files(
             true,
             None,
         )
-        .await?;
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "create_parquet_table err: {}, files: {:?}, schema: {:?}",
+                    e,
+                    files,
+                    schema
+                );
+                return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
+            }
+        };
         tables.push(table);
     }
 
