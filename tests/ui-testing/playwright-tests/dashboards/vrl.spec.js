@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import logData from "../cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
+import logData from "../../cypress/fixtures/log.json";
+import logsdata from "../../../test-data/logs_data.json";
 import { parseArgs } from "util";
 
 const randomDashboardName =
