@@ -446,7 +446,7 @@ class="q-pa-sm text-bold favorite-label"
 </template>
 
 <script setup lang="ts">
-import { Ref, ref, toRaw, computed } from "vue";
+import { Ref, ref, toRaw, computed , watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
@@ -489,7 +489,7 @@ const saveViewLoader = ref(false);
 const favoriteViews : any = ref([]);
 
 const localSavedViews: any = ref([]);
-const savedViews : any = ref(useLocalSavedView());
+const savedViews : any = ref(searchObj.data.favoriteViews);
 const dateTimeRef = ref(null);
 const rowsPerPage = ref(10);
 const currentPage = ref(1);
@@ -1154,7 +1154,6 @@ const confirmDeleteSavedViews = () => {
 };
 
 const handleFavoriteSavedView = (row: any, flag: boolean) => {
-  console.log(row, flag);
   let localSavedView: any = {};
   let savedViews :any = useLocalSavedView();
 
@@ -1177,13 +1176,6 @@ const handleFavoriteSavedView = (row: any, flag: boolean) => {
           favoriteViewsList = favoriteViewsList.filter(
             (item: { view_id: any }) => item.view_id != row.view_id,
           );
-          // for (const [key, item] of favoriteViewsList.entries()) {
-          //   console.log(item, key);
-          //   if (item.view_id == row.view_id) {
-          //     delete favoriteViewsList[key];
-          //   }
-          // }
-          console.log(favoriteViewsList);
           localSavedViews.value = favoriteViewsList;
         }
       }

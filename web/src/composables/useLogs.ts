@@ -207,6 +207,7 @@ const defaultObject = {
     tempFunctionContent: "",
     tempFunctionLoading: false,
     savedViews: <any>[],
+    favoriteViews: <any>[],
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
@@ -3832,6 +3833,7 @@ const useLogs = () => {
         .get(store.state.selectedOrganization.identifier)
         .then((res) => {
           searchObj.loadingSavedView = false;
+          searchObj.data.favoriteViews = getFavoriteViews(res.data.views);
           searchObj.data.savedViews = res.data.views;
         })
         .catch((err) => {
@@ -4130,6 +4132,34 @@ const useLogs = () => {
     }
   };
 
+  const getFavoriteViews = async (originalViews: any) => {
+    const localSavedViews: any = useLocalSavedView();
+    const selectedOrgId = store.state.selectedOrganization.identifier;
+  
+    // Create a map of valid view_ids for the selected organization
+    const validViewsForOrg = new Set(
+      originalViews
+        .filter((view: any) => view.org_id === selectedOrgId)
+        .map((view: any) => view.view_id)
+    );
+  
+    // Iterate over each key in `localSavedViews`
+    Object.keys(localSavedViews.value).forEach((viewId) => {
+      const savedView = localSavedViews.value[viewId];
+  
+      // Check if the view belongs to the selected org and if it's invalid
+      if (savedView.org_id === selectedOrgId && !validViewsForOrg.has(viewId)) {
+        // Remove the view from `localSavedViews` if it's not valid
+        delete localSavedViews.value[viewId];
+      }
+    });
+  
+    // Update the local storage with the filtered `localSavedViews`
+    useLocalSavedView(localSavedViews.value);
+    return localSavedViews.value
+  };
+  
+
   return {
     searchObj,
     searchAggData,
@@ -4154,6 +4184,7 @@ const useLogs = () => {
     generateHistogramData,
     extractFTSFields,
     getSavedViews,
+    getFavoriteViews,
     onStreamChange,
     generateURLQuery,
     buildSearch,
