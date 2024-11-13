@@ -12,19 +12,32 @@ export function generateUUID() {
 export const test = baseTest.extend({
   context: async ({ context }, use) => {
     await context.addInitScript(() =>
-      window.addEventListener('beforeunload', () =>
-        (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
-      ),
+      window.addEventListener('beforeunload', () => {
+        try {
+          (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
+        } catch (error) {
+          console.error('Failed to collect coverage on page unload:', error);
+        }
+      }),
     );
     await fs.promises.mkdir(istanbulCLIOutput, { recursive: true });
-    await context.exposeFunction('collectIstanbulCoverage', (coverageJSON) => {
-      if (coverageJSON)
-        fs.writeFileSync(path.join(istanbulCLIOutput, `playwright_coverage_${generateUUID()}.json`), coverageJSON);
+    await context.exposeFunction('collectIstanbulCoverage', async (coverageJSON) => {
+      if (!coverageJSON) return;
+      const filename = path.join(istanbulCLIOutput, `playwright_coverage_${generateUUID()}.json`);
+      try {
+        await fs.promises.writeFile(filename, coverageJSON);
+      } catch (error) {
+        console.error('Failed to write coverage data:', error);
+      }
     });
     await use(context);
-    for (const page of context.pages()) {
-      await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
-    }
+    await Promise.all(context.pages().map(async (page) => {
+      try {
+        await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
+      } catch (error) {
+        console.error('Failed to collect final coverage for page:', error);
+      }
+    }));
   }
 });
 

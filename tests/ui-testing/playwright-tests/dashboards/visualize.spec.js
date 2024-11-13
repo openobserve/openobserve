@@ -12,6 +12,7 @@ async function login(page) {
   //Enter Password
   await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
   await page.locator('[data-cy="login-sign-in"]').click();
+  // TODO : Replace all timeouts with waitForSelector for reliable tests
   await page.waitForTimeout(4000);
   await page.goto(process.env["ZO_BASE_URL"]);
 }
