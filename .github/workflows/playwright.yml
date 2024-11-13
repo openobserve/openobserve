@@ -147,10 +147,19 @@ jobs:
       #   if: always()
       #   run: cat o2.log
 
+      - name: Sanitize Test Filename
+        run: |
+          # Assign the matrix variable to a Bash variable
+          SANITIZED_FILENAME="${{ matrix.testfilename }}"
+          # Replace all '/' characters with '_'
+          SANITIZED_FILENAME="${SANITIZED_FILENAME//\//_}"
+          # Export as a GitHub Actions environment variable
+          echo "SANITIZED_FILENAME=$SANITIZED_FILENAME" >> $GITHUB_ENV
+
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage-${{ matrix.testfilename }}
+          name: playwright-coverage-${{ env.SANITIZED_FILENAME }}
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
