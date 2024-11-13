@@ -216,7 +216,6 @@ async fn update_cache<'a>(stream_params: &StreamParams, event: PipelineTableEven
             }
         }
         PipelineTableEvent::Add(pipeline) => {
-            let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
             match ExecutablePipeline::new(pipeline).await {
                 Err(e) => {
                     log::error!(
@@ -228,10 +227,11 @@ async fn update_cache<'a>(stream_params: &StreamParams, event: PipelineTableEven
                     );
                 }
                 Ok(exec_pl) => {
+                    let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
                     stream_pl_exec.insert(stream_params.clone(), exec_pl);
+                    log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
                 }
             };
-            log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
         }
     }
 }
