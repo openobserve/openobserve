@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         }`"
       >
-        <div class="flex justify-between items-center q-pa-xs">
-          <div class="flex">
+        <div class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0">
+          <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
               v-if="!isFullscreen"
               no-caps
@@ -45,11 +45,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-back-btn"
               class="hideOnPrintMode"
             />
-            <span class="q-table__title q-mx-md q-mt-xs">{{
-              currentDashboardData.data?.title
-            }}</span>
+            <span
+              class="q-table__title folder-name tw-px-2 tw-cursor-pointer tw-transition-all tw-rounded-sm tw-ml-2"
+              @click="goBackToDashboardList"
+              >{{ folderNameFromFolderId }}
+            </span>
+            <q-spinner-dots v-if="!store.state.organizationData.folders.length" color="primary" size="2em" />
+            <q-icon
+              class="q-table__title tw-text-gray-400 tw-mt-1"
+              name="chevron_right"
+            ></q-icon>
+            <span
+              class="q-table__title q-mx-sm tw-truncate tw-flex-1"
+              :title="currentDashboardData.data?.title"
+            >
+              {{ currentDashboardData.data?.title }}
+            </span>
           </div>
-          <div class="flex">
+          <div class="tw-flex">
             <q-btn
               v-if="!isFullscreen"
               outline
@@ -210,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
         :folderId="route.query.folder"
-        :reportId = "reportId"
+        :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
@@ -286,7 +299,11 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
+import {
+  getDashboard,
+  movePanelToAnotherTab,
+  getFoldersList,
+} from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
@@ -340,6 +357,17 @@ export default defineComponent({
 
     let moment: any = () => {};
 
+    const folderNameFromFolderId = computed(() => {
+      if (store.state.organizationData.folders.length === 0) {
+        return "";
+      }
+      return (
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === route.query.folder ?? "default",
+        )?.name ?? "default"
+      );
+    });
+
     const importMoment = async () => {
       const momentModule: any = await import("moment-timezone");
       moment = momentModule.default;
@@ -372,8 +400,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-        ? "absolute"
-        : "relative",
+          ? "absolute"
+          : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
@@ -437,7 +465,7 @@ export default defineComponent({
       data.values.forEach((variable) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value
+            (item: any) => item.name && item.operator && item.value,
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -445,7 +473,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters)
+            JSON.stringify(encodedFilters),
           );
         } else {
           variableObj[`var-${variable.name}`] = variable.value;
@@ -479,12 +507,15 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
+      if (!store.state.organizationData.folders.length) {
+        await getFoldersList(store);
+      }
     });
 
     const setTimeString = () => {
       if (!moment()) return;
       timeString.value = ` ${moment(
-        currentTimeObj.value?.start_time?.getTime() / 1000
+        currentTimeObj.value?.start_time?.getTime() / 1000,
       )
         .tz(store.state.timezone)
         .format("YYYY/MM/DD HH:mm")}
@@ -500,12 +531,12 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
 
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
-        (tab: any) => tab.tabId === route.query.tab
+        (tab: any) => tab.tabId === route.query.tab,
       );
 
       selectedTabId.value = selectedTab
@@ -585,7 +616,7 @@ export default defineComponent({
     const savePanelLayout = async (layout) => {
       const panel = getPanelFromTab(
         selectedTabId.value,
-        selectedPanelConfig.value.data.id
+        selectedPanelConfig.value.data.id,
       );
       if (panel) panel.layout = layout;
 
@@ -622,7 +653,7 @@ export default defineComponent({
 
     const getPanelFromTab = (tabId: string, panelId: string) => {
       const tab = currentDashboardData.data.tabs.find(
-        (tab) => tab.tabId === tabId
+        (tab) => tab.tabId === tabId,
       );
 
       if (!tab || !tab.panels) {
@@ -671,7 +702,9 @@ export default defineComponent({
     };
 
     const refreshData = () => {
-      dateTimePicker.value.refresh();
+      if (!arePanelsLoading.value) {
+        dateTimePicker.value.refresh();
+      }
     };
 
     const onDataZoom = (event: any) => {
@@ -769,7 +802,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+          route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
 
@@ -781,7 +814,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel deletion failed"
+              "Panel deletion failed",
           );
         } else {
           showErrorNotification(error?.message ?? "Panel deletion failed", {
@@ -800,7 +833,7 @@ export default defineComponent({
           panelId,
           route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          newTabId
+          newTabId,
         );
         await loadDashboard();
 
@@ -812,7 +845,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel move failed"
+              "Panel move failed",
           );
         } else {
           showErrorNotification(error?.message ?? "Panel move failed", {
@@ -831,7 +864,7 @@ export default defineComponent({
         urlSearchParams.delete("period");
         urlSearchParams.set(
           "from",
-          currentTimeObj?.value?.start_time?.getTime()
+          currentTimeObj?.value?.start_time?.getTime(),
         );
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
@@ -839,7 +872,7 @@ export default defineComponent({
       try {
         const res = await shortURLService.create(
           store.state.selectedOrganization.identifier,
-          urlObj?.href
+          urlObj?.href,
         );
         const shortURL = res?.data?.short_url;
         copyToClipboard(shortURL)
@@ -897,7 +930,7 @@ export default defineComponent({
         .list(
           store.state.selectedOrganization.identifier,
           folderId.value,
-          dashboardId.value
+          dashboardId.value,
         )
         .then((response) => {
           scheduledReports.value = response.data;
@@ -998,6 +1031,7 @@ export default defineComponent({
       selectedPanelConfig,
       savePanelLayout,
       renderDashboardChartsRef,
+      folderNameFromFolderId,
     };
   },
 });
@@ -1047,5 +1081,13 @@ export default defineComponent({
 
 .dashboard-icons {
   height: 30px;
+}
+
+.folder-name {
+  color: $primary !important;
+}
+
+.folder-name:hover {
+  background-color: $accent !important;
 }
 </style>

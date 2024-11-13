@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-routing-section"
-    class="full-width full-height"
+    data-test="add-function-node-routing-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :style="computedStyleForFunction"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
       {{ t("pipeline.associateFunction") }}
     </div>
     <q-separator />
-    <div class="q-px-md">
+    <div data-test="previous-node-associate-function" class="q-px-md">
       <q-select
           color="input-border"
           class="q-py-sm showLabelOnTop no-case tw-w-full "
@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <template v-slot:option="scope">
   <q-item
+   data-test="previous-node-dropdown-input-stream-node-option"
     v-bind="scope.itemProps"
     v-if="!scope.opt.isGroup"
     class="full-width"
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-item-section>
     
-    <div class="flex tw-justify-between tw-w-full"  >
+    <div :data-test="`previous-node-dropdown-item-${scope.opt.label}`" class="flex tw-justify-between tw-w-full"  >
       <q-item-section>
         <q-item-label v-html="scope.opt.label"></q-item-label>
       </q-item-section>
@@ -69,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Render non-selectable group headers -->
   <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <q-item-section >
+    <q-item-section :data-test="`previous-node-dropdown-list-group-${scope.opt.label}`"  >
       <q-item-label v-html="scope.opt.label" />
     </q-item-section>
   </q-item>
@@ -147,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="o2-input full-width" style="padding-top: 12px" v-if="!createNewFunction">
           <q-toggle
-            data-test="pipeline-function-after-flattening-toggle"
+            data-test="associate-function-after-flattening-toggle"
             class="q-mb-sm"
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
@@ -293,6 +294,7 @@ const functionExists = ref(false);
 const selected = ref(null);
 
 watch(selected, (newValue:any) => {
+  console.log(pipelineObj.userSelectedNode,"user seelcted node")
       pipelineObj.userSelectedNode = newValue; 
 });
 
@@ -300,6 +302,10 @@ const nodeLink = ref({
   from: "",
   to: "",
 });
+
+const computedStyleForFunction = computed(() => {
+      return createNewFunction.value ? {  width: '100%' } : {width: '100%',height: '100%',};
+    });
 
 const dialog = ref({
   show: false,
@@ -329,8 +335,19 @@ onMounted(()=>{
     }
   }
   else{
-    pipelineObj.userSelectedNode = {};
-    selected.value = null;
+    if(pipelineObj.userSelectedNode){
+      const currentSelectedNode = formattedOptions.value.find(
+        (node)=> node?.id === pipelineObj.userSelectedNode.label
+      )
+      if(currentSelectedNode?.node_type){
+        selected.value = currentSelectedNode;
+
+      }
+    }
+    else{
+      selected.value = null;
+      pipelineObj.userSelectedNode = {};
+    }
   }
 })
 
@@ -348,6 +365,9 @@ const openCancelDialog = () => {
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel changes?";
   dialog.value.okCallback = () => emit("cancel:hideform");
+  pipelineObj.userClickedNode = {};
+  pipelineObj.userSelectedNode = {};
+
 };
 
 const openDeleteDialog = () => {
@@ -363,6 +383,12 @@ const saveFunction = () => {
   
   if (createNewFunction.value) {
     if(addFunctionRef.value.formData.name == "" ){
+      q.notify({
+        message: "Function Name is required",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000,
+      });
       return;
     }
     if(addFunctionRef.value.formData.function == ""){

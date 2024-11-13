@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-routing-section"
+    data-test="add-stream-query-routing-section"
     class="full-width stream-routing-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
@@ -28,11 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="queryFormRef" @submit="saveQueryData">
         <div>
-          <div
-            data-test="stream-route-stream-type-select"
-            class="stream-route-stream-type o2-input"
-            style="padding-top: 0"
-          >
+
             <q-select
               v-model="streamRoute.stream_type"
               :options="streamTypes"
@@ -50,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="width: 400px"
             />
-          </div>
           <scheduled-pipeline
             ref="scheduledAlertRef"
             :columns="filteredColumns"
@@ -76,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       
           <q-btn
-            data-test="stream-routing-cancel-btn"
+            data-test="stream-routing-query-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
@@ -85,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openCancelDialog"
           />
           <q-btn
-            data-test="add-report-save-btn"
+            data-test="stream-routing-query-save-btn"
             :label="t('alerts.save')"
             class="text-bold no-border q-ml-md"
             color="secondary"
@@ -95,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
           v-if="pipelineObj.isEditNode"
-            data-test="stream-routing-delete-btn"
+            data-test="stream-routing-query-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"
@@ -163,6 +158,8 @@ interface StreamRoute {
     frequency_type: string;
     frequency: string;
     cron: string;
+    timezone: any;
+
   };
   context_attributes: any;
   description: string;
@@ -341,6 +338,8 @@ const updateStreamFields = async () => {
 };
 
 const closeDialog = () => {
+  pipelineObj.userClickedNode = {};
+  pipelineObj.userSelectedNode = {};
   emit("cancel:hideform");
 };
 
@@ -357,6 +356,7 @@ const openCancelDialog = () => {
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
   dialog.value.okCallback = closeDialog;
+
 };
 
 // TODO OK : Add check for duplicate routing name
@@ -380,6 +380,9 @@ const saveQueryData = async () => {
   });
 
   const formData = streamRoute.value;
+  if(typeof formData.trigger_condition.period === 'string') {
+    formData.trigger_condition.period = parseInt(formData.trigger_condition.period);
+  }
   let queryPayload = {
     node_type: "query", // required
     stream_type: formData.stream_type, // required
@@ -405,6 +408,7 @@ const saveQueryData = async () => {
       cron: formData.trigger_condition.cron,
       frequency_type: formData.trigger_condition.frequency_type,
       silence: 0,
+      timezone: formData.trigger_condition.timezone,
     },
   };
   addNode(queryPayload);
@@ -479,7 +483,7 @@ const validateSqlQuery = () => {
         resolve("");
       })
       .catch((err: any) => {
-        if (err.response.data.code === 500) {
+        if (  err) {
           isValidSqlQuery.value = false;
           q.notify({
             type: "negative",
