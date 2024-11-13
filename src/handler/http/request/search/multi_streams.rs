@@ -474,7 +474,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &VRLResultResolver {
                             program: program.program.clone(),
@@ -510,7 +510,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let ret_val = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &VRLResultResolver {
                                     program: program.program.clone(),

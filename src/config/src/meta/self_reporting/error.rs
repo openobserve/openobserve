@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
-use crate::meta::{pipeline, stream::StreamParams};
+use crate::meta::stream::StreamParams;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -24,7 +26,7 @@ pub struct ErrorData {
     #[serde(flatten)]
     pub stream_params: StreamParams,
     #[serde(flatten)]
-    pub error_type: ErrorSource,
+    pub error_source: ErrorSource,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -40,36 +42,67 @@ pub enum ErrorSource {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct PipelineError {
     pub pipeline_id: String,
     pub pipeline_name: String,
-    pub node_errors: Vec<NodeError>,
+    #[serde(serialize_with = "serialize_values_only")]
+    pub node_errors: HashMap<String, NodeErrors>,
 }
 
 impl PipelineError {
-    pub fn new(pipeline: &pipeline::Pipeline) -> Self {
+    pub fn new(pipeline_id: &str, pipeline_name: &str) -> Self {
         Self {
-            pipeline_id: pipeline.id.to_string(),
-            pipeline_name: pipeline.name.to_string(),
-            node_errors: Vec::new(),
+            pipeline_id: pipeline_id.to_string(),
+            pipeline_name: pipeline_name.to_string(),
+            node_errors: HashMap::new(),
         }
     }
 
-    pub fn add_node_error(&mut self, node: &pipeline::components::Node, error_detail: String) {
-        let node_error = NodeError {
-            node_id: node.id.to_string(),
-            node_type: node.node_type(),
-            error_detail,
-        };
-        self.node_errors.push(node_error);
+    pub fn add_node_error(&mut self, node_id: String, node_type: String, error: String) {
+        self.node_errors
+            .entry(node_id.clone())
+            .or_insert_with(|| NodeErrors::new(node_id, node_type))
+            .add_error(error);
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct NodeError {
-    pub node_id: String,
-    pub node_type: String,
-    pub error_detail: String,
+#[serde(rename_all = "snake_case")]
+pub struct NodeErrors {
+    node_id: String,
+    node_type: String,
+    errors: Vec<String>,
+}
+
+impl NodeErrors {
+    pub fn new(node_id: String, node_type: String) -> Self {
+        Self {
+            node_id,
+            node_type,
+            errors: Vec::new(),
+        }
+    }
+
+    pub fn add_error(&mut self, error: String) {
+        self.errors.push(error);
+    }
+}
+
+// Custom serializer for HashMap to serialize values only
+fn serialize_values_only<S>(
+    map: &HashMap<String, NodeErrors>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeSeq;
+    let mut seq = serializer.serialize_seq(Some(map.len()))?;
+    for value in map.values() {
+        seq.serialize_element(value)?;
+    }
+    seq.end()
 }
 
 #[cfg(test)]
@@ -82,14 +115,17 @@ mod tests {
         let error_data = ErrorData {
             _timestamp: 10,
             stream_params: StreamParams::default(),
-            error_type: ErrorSource::Pipeline(PipelineError {
+            error_source: ErrorSource::Pipeline(PipelineError {
                 pipeline_id: "pipeline_id".to_string(),
                 pipeline_name: "pipeline_name".to_string(),
-                node_errors: vec![NodeError {
-                    node_id: "node_id".to_string(),
-                    node_type: "function".to_string(),
-                    error_detail: "error".to_string(),
-                }],
+                node_errors: HashMap::from([(
+                    "node_1".to_string(),
+                    NodeErrors {
+                        node_id: "node_1".to_string(),
+                        node_type: "function".to_string(),
+                        errors: vec!["failed to compile".to_string()],
+                    },
+                )]),
             }),
         };
 

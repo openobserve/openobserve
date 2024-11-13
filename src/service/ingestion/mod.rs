@@ -101,7 +101,7 @@ pub fn apply_vrl_fn(
     row: Value,
     org_id: &str,
     stream_name: &[String],
-) -> Value {
+) -> (Value, Option<String>) {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(&row),
@@ -116,7 +116,7 @@ pub fn apply_vrl_fn(
     };
     match result {
         Ok(res) => match res.try_into() {
-            Ok(val) => val,
+            Ok(val) => (val, None),
             Err(err) => {
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
@@ -126,14 +126,12 @@ pub fn apply_vrl_fn(
                         TRANSFORM_FAILED,
                     ])
                     .inc();
-                log::error!(
+                let err_msg = format!(
                     "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
-                    org_id,
-                    stream_name,
-                    err,
-                    row
+                    org_id, stream_name, err, row
                 );
-                row
+                log::error!("{err_msg}");
+                (row, Some(err_msg))
             }
         },
         Err(err) => {
@@ -145,14 +143,12 @@ pub fn apply_vrl_fn(
                     TRANSFORM_FAILED,
                 ])
                 .inc();
-            log::error!(
+            let err_msg = format!(
                 "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
-                org_id,
-                stream_name,
-                err,
-                row
+                org_id, stream_name, err, row
             );
-            row
+            log::error!("{err_msg}");
+            (row, Some(err_msg))
         }
     }
 }

@@ -161,6 +161,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     if !usages.is_empty() {
         super::ingestion::ingest_usages(usages).await;
     }
+
     if !triggers.is_empty() {
         let trigger_stream = StreamParams::new(
             &cfg.common.usage_org,
@@ -169,6 +170,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         );
         super::ingestion::ingest_reporting_data(triggers, trigger_stream).await;
     }
+
     if !errors.is_empty() {
         let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
         super::ingestion::ingest_reporting_data(errors, error_stream).await;
