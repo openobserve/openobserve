@@ -58,7 +58,6 @@ import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
-import { parse } from "path";
 
 const defaultObject = {
   organizationIdentifier: "",
