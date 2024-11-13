@@ -429,6 +429,7 @@ impl Default for ExecutablePipelineTraceInputs {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn process_node(
     node_id: usize,
     org_id: String,

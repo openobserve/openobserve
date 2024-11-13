@@ -28,8 +28,9 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
+#[cfg(feature = "enterprise")]
 use proto::cluster_rpc;
-use tokio::{sync::oneshot, time};
+use tokio::sync::oneshot;
 
 mod ingestion;
 mod queues;
@@ -268,7 +269,7 @@ pub async fn run_audit_publish() {
     if !o2cfg.common.audit_enabled {
         return;
     }
-    let mut audit_interval = time::interval(time::Duration::from_secs(
+    let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(
         o2cfg.common.audit_publish_interval.try_into().unwrap(),
     ));
     audit_interval.tick().await; // trigger the first run

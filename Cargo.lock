@@ -1626,12 +1626,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d27c3610c36aee21ce8ac510e6224498de4228ad772a171ed65643a24693a5a8"
 
 [[package]]
-name = "base16ct"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
-
-[[package]]
 name = "base62"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1642,12 +1636,6 @@ name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
-
-[[package]]
-name = "base64"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
@@ -2791,18 +2779,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "crypto-bigint"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
-dependencies = [
- "generic-array",
- "rand_core",
- "subtle",
- "zeroize",
-]
-
-[[package]]
 name = "crypto-common"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2871,7 +2847,6 @@ dependencies = [
  "fiat-crypto",
  "rustc_version",
  "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -3604,26 +3579,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
 
 [[package]]
-name = "ecdsa"
-version = "0.16.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
-dependencies = [
- "der",
- "digest",
- "elliptic-curve",
- "rfc6979",
- "signature",
- "spki",
-]
-
-[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
- "pkcs8",
  "signature",
 ]
 
@@ -3635,11 +3595,9 @@ checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
- "serde",
  "sha2",
  "signature",
  "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -3649,27 +3607,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "elliptic-curve"
-version = "0.13.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
-dependencies = [
- "base16ct",
- "crypto-bigint",
- "digest",
- "ff",
- "generic-array",
- "group",
- "hkdf",
- "pem-rfc7468",
- "pkcs8",
- "rand_core",
- "sec1",
- "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -3893,16 +3830,6 @@ dependencies = [
  "bytes",
  "serde",
  "simdutf8",
-]
-
-[[package]]
-name = "ff"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ded41244b729663b1e574f1b4fb731469f69f79c17667b5d776b16cda0479449"
-dependencies = [
- "rand_core",
- "subtle",
 ]
 
 [[package]]
@@ -4268,17 +4195,6 @@ checksum = "273797968160270573071022613fc4aa28b91fe68f3eef6c96a1b2a1947ddfbd"
 dependencies = [
  "glob",
  "onig",
-]
-
-[[package]]
-name = "group"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
-dependencies = [
- "ff",
- "rand_core",
- "subtle",
 ]
 
 [[package]]
@@ -4895,7 +4811,6 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
- "serde",
 ]
 
 [[package]]
@@ -6019,64 +5934,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "o2_enterprise"
-version = "0.1.0"
-dependencies = [
- "ahash 0.8.11",
- "anyhow",
- "arc-swap",
- "arrow",
- "async-recursion",
- "base64 0.21.7",
- "byteorder",
- "bytes",
- "chrono",
- "config",
- "dashmap",
- "dotenv_config",
- "dotenvy",
- "env_logger 0.10.2",
- "infra",
- "log",
- "oauth2",
- "once_cell",
- "openfga-sdk",
- "openidconnect",
- "opentelemetry 0.25.0",
- "proto",
- "rand",
- "regex",
- "reqwest 0.12.8",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tonic 0.12.3",
- "tracing",
- "tracing-opentelemetry",
-]
-
-[[package]]
-name = "oauth2"
-version = "4.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c38841cdd844847e3e7c8d29cef9dcfed8877f8f56f9071f77843ecf3baf937f"
-dependencies = [
- "base64 0.13.1",
- "chrono",
- "getrandom",
- "http 0.2.12",
- "rand",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "sha2",
- "thiserror",
- "url",
-]
-
-[[package]]
 name = "objc-sys"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6217,51 +6074,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
-name = "openfga-sdk"
-version = "1.0.2"
-source = "git+https://github.com/openobserve/openfga-sdk?rev=122eb78d28f31dd3512a3a10304552dae4465a53#122eb78d28f31dd3512a3a10304552dae4465a53"
-dependencies = [
- "reqwest 0.12.8",
- "serde",
- "serde_derive",
- "serde_json",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "openidconnect"
-version = "3.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47e80a9cfae4462dd29c41e987edd228971d6565553fbc14b8a11e666d91590"
-dependencies = [
- "base64 0.13.1",
- "chrono",
- "dyn-clone",
- "ed25519-dalek",
- "hmac",
- "http 0.2.12",
- "itertools 0.10.5",
- "log",
- "oauth2",
- "p256",
- "p384",
- "rand",
- "rsa",
- "serde",
- "serde-value",
- "serde_derive",
- "serde_json",
- "serde_path_to_error",
- "serde_plain",
- "serde_with",
- "sha2",
- "subtle",
- "thiserror",
- "url",
-]
-
-[[package]]
 name = "openobserve"
 version = "0.13.2"
 dependencies = [
@@ -6328,7 +6140,6 @@ dependencies = [
  "maxminddb",
  "memory-stats",
  "mimalloc",
- "o2_enterprise",
  "object_store",
  "once_cell",
  "opentelemetry 0.25.0",
@@ -6590,30 +6401,6 @@ name = "owo-colors"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
-
-[[package]]
-name = "p256"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9863ad85fa8f4460f9c48cb909d38a0d689dba1f6f6988a5e3e0d31071bcd4b"
-dependencies = [
- "ecdsa",
- "elliptic-curve",
- "primeorder",
- "sha2",
-]
-
-[[package]]
-name = "p384"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70786f51bcc69f6a4c0360e063a4cac5419ef7c5cd5b3c99ad70f3be5ba79209"
-dependencies = [
- "ecdsa",
- "elliptic-curve",
- "primeorder",
- "sha2",
-]
 
 [[package]]
 name = "packedvec"
@@ -7023,15 +6810,6 @@ dependencies = [
  "lazy_static",
  "term",
  "unicode-width",
-]
-
-[[package]]
-name = "primeorder"
-version = "0.13.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "353e1ca18966c16d9deb1c69278edbc5f194139612772bd9537af60ac231e1e6"
-dependencies = [
- "elliptic-curve",
 ]
 
 [[package]]
@@ -7760,7 +7538,6 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
- "mime_guess",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -7784,16 +7561,6 @@ dependencies = [
  "web-sys",
  "webpki-roots 0.26.6",
  "windows-registry",
-]
-
-[[package]]
-name = "rfc6979"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
-dependencies = [
- "hmac",
- "subtle",
 ]
 
 [[package]]
@@ -8293,20 +8060,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
-name = "sec1"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
-dependencies = [
- "base16ct",
- "der",
- "generic-array",
- "pkcs8",
- "subtle",
- "zeroize",
-]
-
-[[package]]
 name = "security-framework"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8365,16 +8118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-value"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
-dependencies = [
- "ordered-float 2.10.1",
- "serde",
-]
-
-[[package]]
 name = "serde_derive"
 version = "1.0.213"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8420,16 +8163,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_path_to_error"
-version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af99884400da37c88f5e9146b7f1fd0fbcae8f6eec4e9da38b67d05486f814a6"
-dependencies = [
- "itoa",
- "serde",
-]
-
-[[package]]
 name = "serde_plain"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8459,36 +8192,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "serde_with"
-version = "3.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e28bdad6db2b8340e449f7108f020b3b092e8583a9e3fb82713e1d4e71fe817"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "hex",
- "indexmap 1.9.3",
- "indexmap 2.2.6",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with_macros",
- "time",
-]
-
-[[package]]
-name = "serde_with_macros"
-version = "3.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d846214a9854ef724f3da161b426242d8de7c1fc7de2f89bb1efcb154dca79d"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn 2.0.85",
 ]
 
 [[package]]
