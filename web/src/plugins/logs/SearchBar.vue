@@ -2579,10 +2579,8 @@ export default defineComponent({
 
     // [START] cancel running queries
 
-    const variablesAndPanelsDataLoadingState = inject(
-      "variablesAndPanelsDataLoadingState",
-      {},
-    );
+    const variablesAndPanelsDataLoadingState =
+      inject("variablesAndPanelsDataLoadingState", {}) || {};
 
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
@@ -2634,7 +2632,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
+        variablesAndPanelsDataLoadingState?.panels,
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });

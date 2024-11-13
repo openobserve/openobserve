@@ -1003,16 +1003,19 @@ export default defineComponent({
                     fieldValues.value[name]["values"].sort(
                       (a, b) => b.count - a.count,
                     ); // Sort the array based on count in descending order
-                    fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
+                    fieldValues.value[name]["values"] = fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
                   }
                 }
               })
               .catch((err: any) => {
-                fieldValues.value[name]["isLoading"] = false;
+                console.error('Failed to fetch field values:', err);
+                fieldValues.value[name].errMsg = 'Failed to fetch field values';
               })
               .finally(() => {
-                if (countTotal == 0)
-                  fieldValues.value[name]["isLoading"] = false;
+                countTotal--;
+                if (countTotal <= 0) {
+                  fieldValues.value[name].isLoading = false;
+                }
               });
           }
         }
