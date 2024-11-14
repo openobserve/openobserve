@@ -292,7 +292,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     let evaluation_took = Instant::now();
     // evaluate alert
-    let result = alert.evaluate(None, start_time).await;
+    let result = alert.evaluate(None, (start_time, now)).await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
@@ -822,6 +822,7 @@ async fn handle_derived_stream_triggers(
     }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
+        db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Err(anyhow::anyhow!(
             "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}",
             org_id,
@@ -871,224 +872,254 @@ async fn handle_derived_stream_triggers(
         return Ok(());
     }
 
-    // evaluate trigger and configure trigger next run time
-    let (ret, end_time) = derived_stream
-        .evaluate(start_time, &trigger.module_key)
-        .await?;
-    if ret.is_some() {
-        log::info!(
-            "DerivedStream conditions satisfied, org: {}, module_key: {}",
-            new_trigger.org,
-            new_trigger.module_key
-        );
-    }
-    // Store the last used derived stream period end time
-    new_trigger.data = json::to_string(&ScheduledTriggerData {
-        period_end_time: Some(end_time),
-        tolerance: 0,
-    })
-    .unwrap();
-    if ret.is_some() && derived_stream.trigger_condition.silence > 0 {
-        if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-            let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
-            let silence = Utc::now()
-                + Duration::try_minutes(derived_stream.trigger_condition.silence).unwrap();
-            let silence = silence.with_timezone(
-                FixedOffset::east_opt(derived_stream.tz_offset * 60)
-                    .as_ref()
-                    .unwrap(),
-            );
-            // Check for the cron timestamp after the silence period
-            new_trigger.next_run_at = schedule.after(&silence).next().unwrap().timestamp_micros();
-        } else {
-            new_trigger.next_run_at +=
-                Duration::try_minutes(derived_stream.trigger_condition.silence)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap();
-        }
-        new_trigger.is_silenced = true;
-    } else if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-        let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
-        // tz_offset is in minutes
-        let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
-        new_trigger.next_run_at = schedule
-            .upcoming(tz_offset)
-            .next()
-            .unwrap()
-            .timestamp_micros();
+    // in case the range [start_time, end_time] is greater than querying period, it needs to
+    // evaluate and ingest 1 period at a time.
+    let now = Utc::now().timestamp_micros();
+    let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+    let (mut start, mut end) = if let Some(t0) = start_time {
+        (Some(t0), std::cmp::min(now, t0 + period_num_microseconds))
     } else {
-        new_trigger.next_run_at +=
-            Duration::try_minutes(derived_stream.trigger_condition.frequency)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-    }
-
-    let mut trigger_data_stream = TriggerData {
-        _timestamp: trigger.start_time.unwrap_or_default(),
-        org: trigger.org,
-        module: TriggerDataType::DerivedStream,
-        key: trigger.module_key.clone(),
-        next_run_at: new_trigger.next_run_at,
-        is_realtime: trigger.is_realtime,
-        is_silenced: trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
-        start_time: if let Some(start_time) = start_time {
-            start_time
-        } else {
-            end_time
-                - Duration::try_minutes(derived_stream.trigger_condition.period)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
-        },
-        end_time: trigger.end_time.unwrap_or_default(),
-        retries: trigger.retries,
-        error: None,
-        success_response: None,
-        is_partial: None,
-        delay_in_secs: None,
-        evaluation_took_in_secs: None,
+        (None, now)
     };
 
-    // ingest evaluation result into destination
-    if let Some(data) = ret {
-        let local_val = data
-            .into_iter()
-            .map(json::Value::Object)
-            .collect::<Vec<_>>();
-        if local_val.is_empty() {
-            log::info!(
-                "DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
-                &new_trigger.org,
-                &new_trigger.module_key
-            );
-            db::scheduler::update_trigger(new_trigger).await?;
-            trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
-        } else {
-            // pass search results to pipeline to get modified results before ingesting
-            let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> = HashMap::new();
-            let mut ingestion_error_msg = None;
+    while end <= now {
+        log::debug!(
+            "DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
+            start.unwrap_or_default(),
+            end,
+            now
+        );
 
-            match ExecutablePipeline::new(&pipeline).await {
-                Err(e) => {
-                    let err_msg = format!(
-                        "Pipeline: {}/{} associated with the DerivedStream failed to initialize ExecutablePipeline. Caused by: {}",
-                        org_id, pipeline_name, e
-                    );
-                    log::error!("{err_msg}");
-                    ingestion_error_msg = Some(err_msg);
-                }
-                Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val).await {
+        // evaluate trigger and configure trigger next run time
+        let (ret, next) = derived_stream
+            .evaluate((start, end), &trigger.module_key)
+            .await?;
+        if ret.is_some() {
+            log::info!(
+                "DerivedStream conditions satisfied, org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+        }
+
+        let mut trigger_data_stream = TriggerData {
+            _timestamp: trigger.start_time.unwrap_or_default(),
+            org: trigger.org.clone(),
+            module: TriggerDataType::DerivedStream,
+            key: trigger.module_key.clone(),
+            next_run_at: new_trigger.next_run_at,
+            is_realtime: trigger.is_realtime,
+            is_silenced: trigger.is_silenced,
+            status: TriggerDataStatus::Completed,
+            start_time: if let Some(start) = start {
+                start
+            } else {
+                next - period_num_microseconds
+            },
+            end_time: next,
+            retries: trigger.retries,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+        };
+
+        // ingest evaluation result into destination
+        let is_satisfied = ret.is_some();
+        if let Some(data) = ret {
+            let local_val = data
+                .into_iter()
+                .map(json::Value::Object)
+                .collect::<Vec<_>>();
+            if local_val.is_empty() {
+                log::info!(
+                    "DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
+                    &new_trigger.org,
+                    &new_trigger.module_key
+                );
+                // db::scheduler::update_trigger(new_trigger).await?;
+                trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+            } else {
+                // pass search results to pipeline to get modified results before ingesting
+                let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
+                    HashMap::new();
+                let mut ingestion_error_msg = None;
+
+                match ExecutablePipeline::new(&pipeline).await {
                     Err(e) => {
                         let err_msg = format!(
-                            "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
+                            "Pipeline: {}/{} associated with the DerivedStream failed to initialize ExecutablePipeline. Caused by: {}",
                             org_id, pipeline_name, e
                         );
                         log::error!("{err_msg}");
                         ingestion_error_msg = Some(err_msg);
                     }
-                    Ok(pl_results) => {
-                        for (stream_params, stream_pl_results) in pl_results {
-                            if matches!(
-                                stream_params.stream_type,
-                                StreamType::Logs | StreamType::EnrichmentTables
-                            ) {
-                                let (_, results): (Vec<_>, Vec<_>) =
-                                    stream_pl_results.into_iter().unzip();
-                                json_data_by_stream
-                                    .entry(stream_params)
-                                    .or_default()
-                                    .extend(results);
+                    Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val).await {
+                        Err(e) => {
+                            let err_msg = format!(
+                                "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
+                                org_id, pipeline_name, e
+                            );
+                            log::error!("{err_msg}");
+                            ingestion_error_msg = Some(err_msg);
+                            end = now;
+                        }
+                        Ok(pl_results) => {
+                            for (stream_params, stream_pl_results) in pl_results {
+                                if matches!(
+                                    stream_params.stream_type,
+                                    StreamType::Logs
+                                        | StreamType::EnrichmentTables
+                                        | StreamType::Metrics
+                                ) {
+                                    let (_, results): (Vec<_>, Vec<_>) =
+                                        stream_pl_results.into_iter().unzip();
+                                    json_data_by_stream
+                                        .entry(stream_params)
+                                        .or_default()
+                                        .extend(results);
+                                }
                             }
                         }
+                    },
+                };
+
+                // Ingest result into destination stream
+                if ingestion_error_msg.is_none() {
+                    for (dest_stream, records) in json_data_by_stream {
+                        let (org_id, stream_name, stream_type): (String, String, i32) = {
+                            (
+                                dest_stream.org_id.into(),
+                                dest_stream.stream_name.into(),
+                                cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
+                            )
+                        };
+                        let req = cluster_rpc::IngestionRequest {
+                            org_id: org_id.clone(),
+                            stream_name: stream_name.clone(),
+                            stream_type,
+                            data: Some(cluster_rpc::IngestionData::from(records)),
+                            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                        };
+                        match ingestion_service::ingest(&org_id, req).await {
+                            Ok(resp) if resp.status_code == 200 => {
+                                log::info!(
+                                    "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
+                                );
+                            }
+                            error => {
+                                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                                log::error!(
+                                    "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
+                                    err,
+                                    new_trigger.org,
+                                    new_trigger.module_key
+                                );
+                                ingestion_error_msg = Some(err);
+                                break;
+                            }
+                        };
                     }
-                },
-            };
-
-            // Ingest result into destination stream
-            if ingestion_error_msg.is_none() {
-                for (dest_stream, records) in json_data_by_stream {
-                    let (org_id, stream_name, stream_type): (String, String, i32) = {
-                        (
-                            dest_stream.org_id.into(),
-                            dest_stream.stream_name.into(),
-                            cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
-                        )
-                    };
-                    let req = cluster_rpc::IngestionRequest {
-                        org_id: org_id.clone(),
-                        stream_name: stream_name.clone(),
-                        stream_type,
-                        data: Some(cluster_rpc::IngestionData::from(records)),
-                        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                    };
-                    match ingestion_service::ingest(&org_id, req).await {
-                        Ok(resp) if resp.status_code == 200 => {
-                            log::info!(
-                                "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
-                            );
-                        }
-                        error => {
-                            let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                            log::error!(
-                                "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
-                                err,
-                                new_trigger.org,
-                                new_trigger.module_key
-                            );
-                            ingestion_error_msg = Some(err);
-                            break;
-                        }
-                    };
                 }
-            }
 
-            match ingestion_error_msg {
-                None => db::scheduler::update_trigger(new_trigger).await?,
-                Some(err) => {
+                if let Some(err) = ingestion_error_msg {
                     if trigger.retries + 1 >= max_retries {
-                        // It has been tried the maximum time, just update the
-                        // next_run_at to the next expected trigger time
+                        // It has been tried the maximum time, just update the next_run_at to the
+                        // next expected trigger time
                         log::debug!(
-                            "This DerivedStream trigger: {}/{} has reached maximum retries",
+                            "This DerivedStream trigger: {}/{} has reached maximum retires",
                             &new_trigger.org,
                             &new_trigger.module_key
                         );
                         trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                        db::scheduler::update_trigger(new_trigger).await?;
                     } else {
-                        // Otherwise update its status only
+                        // Otherwise, update its status only
                         db::scheduler::update_status(
                             &new_trigger.org,
-                            new_trigger.module,
+                            new_trigger.module.clone(),
                             &new_trigger.module_key,
                             db::scheduler::TriggerStatus::Waiting,
                             trigger.retries + 1,
                         )
                         .await?;
+                        trigger_data_stream.status = TriggerDataStatus::Failed;
+                        trigger_data_stream.error = Some(err);
                     }
-                    trigger_data_stream.status = TriggerDataStatus::Failed;
-                    trigger_data_stream.error = Some(format!(
-                        "error saving enrichment table for DerivedStream: {err}"
-                    ));
+                    // set end to now to exit the loop
+                    end = now;
                 }
             }
+        } else {
+            log::info!(
+                "DerivedStream conditions not satisfied, org: {}, module_key: {}",
+                &new_trigger.org,
+                &new_trigger.module_key
+            );
+            trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
         }
-    } else {
-        log::info!(
-            "DerivedStream conditions not satisfied, org: {}, module_key: {}",
-            &new_trigger.org,
-            &new_trigger.module_key
-        );
-        db::scheduler::update_trigger(new_trigger).await?;
-        trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+
+        // publish the triggers as stream
+        publish_triggers_usage(trigger_data_stream).await;
+
+        // move the time range forward by frequency
+        start = Some(next + 1);
+        end += period_num_microseconds;
+
+        // configure next run time before exiting the loop
+        if end > now {
+            // Store the last used derived stream period end time
+            new_trigger.data = json::to_string(&ScheduledTriggerData {
+                period_end_time: Some(start.unwrap()), // updated start_time as end_time
+                tolerance: 0,
+            })
+            .unwrap();
+
+            if is_satisfied && derived_stream.trigger_condition.silence > 0 {
+                if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+                    let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+                    let silence = Utc::now()
+                        + Duration::try_minutes(derived_stream.trigger_condition.silence).unwrap();
+                    let silence = silence.with_timezone(
+                        FixedOffset::east_opt(derived_stream.tz_offset * 60)
+                            .as_ref()
+                            .unwrap(),
+                    );
+                    // Check for the cron timestamp after the silence period
+                    new_trigger.next_run_at =
+                        schedule.after(&silence).next().unwrap().timestamp_micros();
+                } else {
+                    new_trigger.next_run_at +=
+                        Duration::try_minutes(derived_stream.trigger_condition.silence)
+                            .unwrap()
+                            .num_microseconds()
+                            .unwrap();
+                }
+                new_trigger.is_silenced = true;
+            } else if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+                let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+                // tz_offset is in minutes
+                let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
+                new_trigger.next_run_at = schedule
+                    .upcoming(tz_offset)
+                    .next()
+                    .unwrap()
+                    .timestamp_micros();
+            } else {
+                new_trigger.next_run_at +=
+                    Duration::try_minutes(derived_stream.trigger_condition.frequency)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap();
+            }
+        }
     }
 
-    // publish the triggers as stream
-    trigger_data_stream.end_time = Utc::now().timestamp_micros();
-    publish_triggers_usage(trigger_data_stream).await;
+    // save the new trigger
+    db::scheduler::update_trigger(new_trigger).await?;
 
     Ok(())
 }
