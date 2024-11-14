@@ -112,7 +112,7 @@ pub async fn post_user(
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{get_user_role_tuple, update_tuples},
+                    authorizer::authz::{get_user_crole_tuple, get_user_role_tuple, update_tuples},
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
                 if get_o2_config().openfga.enabled {
@@ -425,10 +425,11 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         // Update OFGA
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::openfga::authorizer::authz::{
-                get_user_role_tuple, update_tuples,
+            use o2_enterprise::enterprise::{
+                common::infra::config::get_config as get_o2_config,
+                openfga::authorizer::authz::{get_user_role_tuple, update_tuples},
             };
-            if O2_CONFIG.openfga.enabled {
+            if get_o2_config().openfga.enabled {
                 let mut tuples = vec![];
                 get_user_role_tuple(
                     &UserRole::Admin.to_string(),
@@ -514,7 +515,7 @@ pub async fn add_user_to_org(
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::openfga::authorizer::authz::{
-                    get_user_role_tuple, update_tuples,
+                    get_user_crole_tuple, get_user_role_tuple, update_tuples,
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];

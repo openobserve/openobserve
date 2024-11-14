@@ -442,7 +442,6 @@ pub async fn generate_org_invite() -> Result<HttpResponse, Error> {
 async fn accept_org_invite(
     user_email: UserEmail,
     path: web::Path<(String, String)>,
-    invites: web::Json<OrganizationInvites>,
 ) -> Result<HttpResponse, Error> {
     let (org, invite_token) = path.into_inner();
 

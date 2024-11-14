@@ -182,7 +182,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 for user_key_val in ORG_USERS.iter() {
                     let org_user = user_key_val.value();
                     let user = USERS.get(org_user.email.as_str()).unwrap();
-                    if user.is_external {
+                    if user.user_type.eq(&infra::table::users::UserType::External) {
                         continue;
                     } else {
                         let role = if user.is_root {

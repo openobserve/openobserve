@@ -58,7 +58,7 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
-    use crate::service::users;
+    use crate::{common::meta::user::UserOrgRole, service::users};
 
     let o2cfg = get_o2_config();
     let dec_token = res.1.unwrap();
@@ -221,7 +221,10 @@ pub async fn process_token(
             match users::add_user_to_org(
                 &org.name,
                 &user_email,
-                org.role.clone(),
+                UserOrgRole {
+                    base_role: org.role.clone(),
+                    custom_role: None,
+                },
                 &get_config().auth.root_user_email,
             )
             .await
