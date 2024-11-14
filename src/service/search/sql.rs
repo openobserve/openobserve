@@ -1248,7 +1248,7 @@ mod tests {
         index_fields.insert("name".to_string());
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
         statement.visit(&mut index_visitor);
-        let expected = "name:a AND (name:b OR (good AND bar))";
+        let expected = "name:a* AND (name:b* OR (good* AND bar*))";
         let expected_sql = "SELECT * FROM t WHERE age = 1 AND (match_all('foo') OR age = 2)";
         assert_eq!(index_visitor.tantivy_query, expected);
         assert_eq!(statement.to_string(), expected_sql);
@@ -1299,7 +1299,7 @@ mod tests {
         index_fields.insert("name".to_string());
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
         statement.visit(&mut index_visitor);
-        let expected = "((name:b OR (good AND bar)) OR (foo AND name:c))";
+        let expected = "((name:b* OR (good* AND bar*)) OR (foo* AND name:c*))";
         let expected_sql = "SELECT * FROM t";
         assert_eq!(index_visitor.tantivy_query, expected);
         assert_eq!(statement.to_string(), expected_sql);
