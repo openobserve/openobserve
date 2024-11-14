@@ -2496,7 +2496,6 @@ dependencies = [
  "md5",
  "memchr",
  "murmur3",
- "object_store",
  "once_cell",
  "parking_lot",
  "parquet",
