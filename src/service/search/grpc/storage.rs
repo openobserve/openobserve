@@ -53,12 +53,14 @@ type CachedFiles = (usize, usize);
 
 /// search in remote object storage
 #[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
+#[allow(clippy::too_many_arguments)]
 pub async fn search(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
     file_list: &[FileKey],
     req_equal_terms: &[KvItem],
     req_match_terms: &[String],
+    tantivy_query: &str,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {

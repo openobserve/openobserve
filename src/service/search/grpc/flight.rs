@@ -175,6 +175,7 @@ pub async fn search(
             &file_list,
             &req.equal_keys,
             &req.match_all_keys,
+            &req.tantivy_query,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
         )

@@ -372,6 +372,7 @@ pub async fn run_datafusion(
         idx_file_list,
         equal_keys,
         match_all_keys,
+        sql.tantivy_query.clone(),
         false, // for super cluster
         context,
     );
@@ -390,6 +391,7 @@ pub async fn run_datafusion(
                 .cloned()
                 .unwrap_or_default(),
             rewrite.match_all_keys.clone(),
+            rewrite.tantivy_query,
             false,
             rewrite.req,
             rewrite.nodes,
