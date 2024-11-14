@@ -61,7 +61,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
-        let _ = crate::service::organization::check_and_create_org(DEFAULT_ORG).await;
+        let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
         let _ = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
