@@ -3892,7 +3892,7 @@ const useLogs = () => {
       const streamFieldNames: any = [];
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
         // subArray.forEach((item: any) => {
-          streamFieldNames.push(item.name);
+        streamFieldNames.push(item.name);
         // });
       });
 
@@ -4162,40 +4162,48 @@ const useLogs = () => {
   };
 
   const setSelectedStreams = (value: string) => {
-    const parsedSQL = fnParsedSQL();
+    try {
+      const parsedSQL = fnParsedSQL();
 
-    let newSelectedStreams: string[] = [];
-
-    //for simple query get the table name from the parsedSQL object
-    // this will handle joins as well
-    if (parsedSQL?.from) {
-      newSelectedStreams = parsedSQL.from.map((stream: any) => stream.table);
-    }
-
-    // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
-    if (parsedSQL?._next) {
-      let nextTable = parsedSQL._next;
-      while (nextTable) {
-        // Map through each "from" array in the _next object, as it can contain multiple tables
-        if (nextTable.from) {
-          nextTable.from.forEach((stream: { table: string }) =>
-            newSelectedStreams.push(stream.table),
-          );
-        }
-        nextTable = nextTable._next;
+      if (!parsedSQL) {
+        console.error("Failed to parse SQL query");
+        return;
       }
-    }
 
-    if (
-      !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams)
-    ) {
-      searchObj.data.stream.selectedStream = newSelectedStreams;
-      onStreamChange(value);
+      let newSelectedStreams: string[] = [];
+
+      //for simple query get the table name from the parsedSQL object
+      // this will handle joins as well
+      if (parsedSQL?.from) {
+        newSelectedStreams = parsedSQL.from.map((stream: any) => stream.table);
+      }
+
+      // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
+      if (parsedSQL?._next) {
+        let nextTable = parsedSQL._next;
+        while (nextTable) {
+          // Map through each "from" array in the _next object, as it can contain multiple tables
+          if (nextTable.from) {
+            nextTable.from.forEach((stream: { table: string }) =>
+              newSelectedStreams.push(stream.table),
+            );
+          }
+          nextTable = nextTable._next;
+        }
+      }
+
+      if (
+        !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams)
+      ) {
+        searchObj.data.stream.selectedStream = newSelectedStreams;
+        onStreamChange(value);
+      }
+    } catch (error) {
+      console.error("Error in setSelectedStreams:", error);
     }
   };
 
   const extractValueQuery = () => {
-    // const query1: string = `select * from stream1 left join stream2 where stream1.field1 = stream2.field2 and stream1.field3 = 'value' and stream2.field4 = 'value4'`;
     const orgQuery: string = searchObj.data.query
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("--"))
@@ -4245,7 +4253,6 @@ const useLogs = () => {
 
         let nextTable = parsedSQL._next;
         while (nextTable) {
-          console.log(JSON.stringify(nextTable));
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (nextTable.from) {
             let query = `select * from INDEX_NAME`;
