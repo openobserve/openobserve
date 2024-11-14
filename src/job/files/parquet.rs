@@ -80,10 +80,7 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::{
-            datafusion::exec,
-            tantivy::puffin_directory::writer::PuffinDirWriter,
-        },
+        search::{datafusion::exec, tantivy::puffin_directory::writer::PuffinDirWriter},
     },
 };
 
