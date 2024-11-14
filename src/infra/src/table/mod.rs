@@ -18,6 +18,7 @@ use config::get_config;
 use crate::db::{sqlite::CLIENT_RW, SQLITE_STORE};
 
 pub mod short_urls;
+pub mod distinct_values;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     short_urls::init().await?;
