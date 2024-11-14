@@ -20,8 +20,6 @@ use datafusion::parquet::data_type::AsBytes;
 use futures::{StreamExt, TryStreamExt};
 use object_store::{path::Path, GetRange, ObjectStore, WriteMultipart};
 use once_cell::sync::Lazy;
-use snafu::Snafu;
-use thiserror::Error as ThisError;
 
 pub mod local;
 pub mod remote;
@@ -162,34 +160,58 @@ fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {
     b.len() as f64 / (1024.0 * 1024.0)
 }
 
-/// A specialized `Error` for in-memory object store-related errors
-#[derive(ThisError, Debug)]
-#[allow(missing_docs)]
+#[derive(Debug)]
 pub(crate) enum Error {
-    #[error("Out of range")]
     OutOfRange(String),
-    #[error("Bad range")]
     BadRange(String),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OutOfRange(s) => write!(f, "Out of range: {}", s),
+            Self::BadRange(s) => write!(f, "Bad range: {}", s),
+        }
+    }
 }
 
 impl From<Error> for object_store::Error {
     fn from(source: Error) -> Self {
         Self::Generic {
             store: "storage",
-            source: Box::new(source),
+            source: Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                source.to_string(),
+            )),
         }
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug)]
 pub(crate) enum InvalidGetRange {
-    #[snafu(display(
-        "Wanted range starting at {requested}, but object was only {length} bytes long"
-    ))]
     StartTooLarge { requested: usize, length: usize },
-
-    #[snafu(display("Range started at {start} and ended at {end}"))]
     Inconsistent { start: usize, end: usize },
+}
+
+impl std::fmt::Display for InvalidGetRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StartTooLarge { requested, length } => {
+                write!(
+                    f,
+                    "Start too large: requested {} but length is {}",
+                    requested, length
+                )
+            }
+            Self::Inconsistent { start, end } => {
+                write!(
+                    f,
+                    "Inconsistent range: start {} is greater than end {}",
+                    start, end
+                )
+            }
+        }
+    }
 }
 
 pub(crate) trait GetRangeExt {

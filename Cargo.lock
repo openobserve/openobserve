@@ -4853,7 +4853,6 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
- "snafu 0.7.5",
  "sqlx",
  "thiserror",
  "tokio",
@@ -10126,6 +10125,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "bytes",
+ "config",
  "crc32fast",
  "criterion",
  "parking_lot",
