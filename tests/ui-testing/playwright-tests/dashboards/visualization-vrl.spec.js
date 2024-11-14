@@ -121,11 +121,8 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+    await page.waitForTimeout(5000);
+    await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -171,11 +168,8 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+      await page.waitForTimeout(5000);
+      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -230,11 +224,8 @@ test.describe(" visualize UI testcases", () => {
 
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+    await page.waitForTimeout(5000);
+    await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -316,11 +307,8 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+      await page.waitForTimeout(5000);
+      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -382,16 +370,8 @@ test.describe(" visualize UI testcases", () => {
         .locator('[data-test="logs-search-bar-query-editor"]')
         .getByText('SELECT * FROM "e2e_automate"')
     ).toBeVisible();
-    await expect(
-      page.locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-    ).toBeVisible();
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+    await page.waitForTimeout(5000);
+      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -427,11 +407,8 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+    await page.waitForTimeout(5000);
+      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -466,11 +443,8 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+    await page.waitForTimeout(5000);
+      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
@@ -522,11 +496,8 @@ test.describe(" visualize UI testcases", () => {
       }
     });
 
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
-      )
-      .click();
+    await page.waitForTimeout(5000);
+      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
