@@ -1248,7 +1248,7 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string) => {
-      if (searchObj.data.editorValue === value) {
+      if (searchObj.data.query === value) {
         return;
       }
 
@@ -1338,7 +1338,7 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  onStreamChange(searchObj.data.editorValue);
+                  onStreamChange(searchObj.data.query);
                 }
               });
               if (streamFound == false) {
@@ -2747,7 +2747,7 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.editorValue.split("|");
+        let currentQuery = this.searchObj.data.query.split("|");
         if (currentQuery.length > 1) {
           if (currentQuery[1].trim() != "") {
             currentQuery[1] += " and " + filter;

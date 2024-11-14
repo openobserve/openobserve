@@ -597,7 +597,7 @@ const useLogs = () => {
   }
 
   const validateFilterForMultiStream = () => {
-    const filterCondition = searchObj.data.editorValue;
+    const filterCondition = searchObj.data.query;
     const parsedSQL: any = parser.astify(
       "select * from stream where " + filterCondition,
     );
@@ -647,7 +647,7 @@ const useLogs = () => {
 
   function buildSearch() {
     try {
-      let query = searchObj.data.editorValue.trim();
+      let query = searchObj.data.query.trim();
       searchObj.data.filterErrMsg = "";
       searchObj.data.missingStreamMessage = "";
       searchObj.data.stream.missingStreamMultiStreamFilter = [];
