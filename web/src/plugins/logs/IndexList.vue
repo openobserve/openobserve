@@ -852,7 +852,6 @@ export default defineComponent({
           values: [],
           errMsg: "",
         };
-
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
