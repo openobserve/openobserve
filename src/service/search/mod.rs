@@ -67,6 +67,7 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod index;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
