@@ -99,9 +99,9 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 
 #[cfg(feature = "enterprise")]
 pub async fn save_org_tuples(org_id: &str) {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         o2_enterprise::enterprise::openfga::authorizer::authz::save_org_tuples(org_id).await
     }
 }
@@ -111,9 +111,9 @@ pub async fn save_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
 pub async fn delete_org_tuples(org_id: &str) {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
-    if O2_CONFIG.openfga.enabled {
+    if get_o2_config().openfga.enabled {
         o2_enterprise::enterprise::openfga::authorizer::authz::delete_org_tuples(org_id).await
     }
 }

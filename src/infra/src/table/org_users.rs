@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
+
 use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
     FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
@@ -34,6 +36,19 @@ pub enum UserRole {
     User = 3,
     Editor = 4,
     ServiceAccount = 5,
+}
+
+impl Display for UserRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserRole::Admin => write!(f, "admin"),
+            UserRole::Root => write!(f, "root"),
+            UserRole::Viewer => write!(f, "viewer"),
+            UserRole::User => write!(f, "user"),
+            UserRole::Editor => write!(f, "editor"),
+            UserRole::ServiceAccount => write!(f, "service_account"),
+        }
+    }
 }
 
 // define the organizations table
