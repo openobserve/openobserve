@@ -814,45 +814,45 @@ export default defineComponent({
         event.preventDefault();
         return;
       }
-
-      let timestamps: any =
-        searchObj.data.datetime.type === "relative"
-          ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod,
-            )
-          : cloneDeep(searchObj.data.datetime);
-
-      if (searchObj.data.stream.streamType === "enrichment_tables") {
-        const stream = searchObj.data.streamResults.list.find((stream: any) =>
-          searchObj.data.stream.selectedStream.includes(stream.name),
-        );
-        if (stream.stats) {
-          timestamps = {
-            startTime:
-              new Date(
-                convertTimeFromMicroToMilli(
-                  stream.stats.doc_time_min - 300000000,
-                ),
-              ).getTime() * 1000,
-            endTime:
-              new Date(
-                convertTimeFromMicroToMilli(
-                  stream.stats.doc_time_max + 300000000,
-                ),
-              ).getTime() * 1000,
-          };
-        }
-      }
-
-      const startISOTimestamp: number = timestamps?.startTime || 0;
-      const endISOTimestamp: number = timestamps?.endTime || 0;
-
-      fieldValues.value[name] = {
-        isLoading: true,
-        values: [],
-        errMsg: "",
-      };
       try {
+        let timestamps: any =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod,
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        if (searchObj.data.stream.streamType === "enrichment_tables") {
+          const stream = searchObj.data.streamResults.list.find((stream: any) =>
+            searchObj.data.stream.selectedStream.includes(stream.name),
+          );
+          if (stream.stats) {
+            timestamps = {
+              startTime:
+                new Date(
+                  convertTimeFromMicroToMilli(
+                    stream.stats.doc_time_min - 300000000,
+                  ),
+                ).getTime() * 1000,
+              endTime:
+                new Date(
+                  convertTimeFromMicroToMilli(
+                    stream.stats.doc_time_max + 300000000,
+                  ),
+                ).getTime() * 1000,
+            };
+          }
+        }
+
+        const startISOTimestamp: number = timestamps?.startTime || 0;
+        const endISOTimestamp: number = timestamps?.endTime || 0;
+
+        fieldValues.value[name] = {
+          isLoading: true,
+          values: [],
+          errMsg: "",
+        };
+        
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
@@ -860,7 +860,7 @@ export default defineComponent({
         searchObj.data.filterErrMsg = "";
         searchObj.data.missingStreamMessage = "";
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
-        if (searchObj.meta.sqlMode && query.trim().length) {
+        if (searchObj.meta.sqlMode == true && query.trim().length) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
           query_context = parser.sqlify(parsedSQL).replace(/`/g, '"') || "";
@@ -868,7 +868,7 @@ export default defineComponent({
           if (searchObj.data.stream.selectedStream.length > 1) {
             queries = extractValueQuery();
           }
-        } else if (query.trim().length) {
+        } else {
           let parseQuery = query.split("|");
           let queryFunctions = "";
           let whereClause = "";
@@ -947,7 +947,7 @@ export default defineComponent({
         }
         let countTotal = streams.length;
         for (const selectedStream of streams) {
-          query_context = "";
+          query_context = "select * from [INDEX_NAME]";
           if (searchObj.data.stream.selectedStream.length > 1) {
             query_context = queries[selectedStream];
           }
