@@ -15,11 +15,14 @@
 
 use std::{
     io,
+    ops::Range,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use futures::future::try_join_all;
 use hashbrown::HashMap;
+use parking_lot::RwLock;
 use tantivy::{
     directory::{error::OpenReadError, Directory, FileHandle, OwnedBytes},
     HasLen,
@@ -35,8 +38,9 @@ use crate::service::search::tantivy::{
 #[derive(Debug)]
 pub struct PuffinDirReader {
     source: Arc<PuffinBytesReader>,
-    blobs: Arc<HashMap<PathBuf, OwnedBytes>>,
-    blobs_metadata: Arc<HashMap<PathBuf, BlobMetadata>>,
+    blobs: Arc<HashMap<PathBuf, Arc<OwnedBytes>>>,
+    partial_blobs: Arc<HashMap<PathBuf, HashMap<Range<usize>, OwnedBytes>>>,
+    blobs_metadata: Arc<HashMap<PathBuf, Arc<BlobMetadata>>>,
 }
 
 impl PuffinDirReader {
@@ -56,27 +60,61 @@ impl PuffinDirReader {
         };
 
         let mut blobs = HashMap::new();
+        let mut partial_blobs = HashMap::new();
         let mut blobs_metadata = HashMap::new();
         for meta in metadata.blobs {
             // Fetch the files names from the blob_meta itself
             if let Some(file_name) = meta.properties.get("blob_tag") {
                 let path = PathBuf::from(file_name);
-                if file_name == "meta.json" {
+                // TODO: need to check real size of the footer, for now we are assuming 1KB
+                let range = if meta.length > 1024 {
+                    Some((meta.length as usize - 1024)..meta.length as usize)
+                } else {
+                    None
+                };
+                if file_name == "meta.json" || range.is_none() {
                     let data = source.read_blob_bytes(&meta, None).await.map_err(|e| {
                         io::Error::new(
                             io::ErrorKind::Other,
                             format!("Error reading bytes from blob: {:?}", e),
                         )
                     })?;
-                    blobs.insert(path.clone(), OwnedBytes::new(data.to_vec()));
+                    blobs.insert(path.clone(), Arc::new(OwnedBytes::new(data.to_vec())));
+                } else {
+                    let mut partial = HashMap::new();
+                    // cache footer
+                    let data = source
+                        .read_blob_bytes(&meta, range.clone())
+                        .await
+                        .map_err(|e| {
+                            io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("Error reading bytes from blob: {:?}", e),
+                            )
+                        })?;
+                    partial.insert(range.unwrap(), OwnedBytes::new(data.to_vec()));
+                    // cache header
+                    let range = 0..8;
+                    let data = source
+                        .read_blob_bytes(&meta, Some(range.clone()))
+                        .await
+                        .map_err(|e| {
+                            io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("Error reading bytes from blob: {:?}", e),
+                            )
+                        })?;
+                    partial.insert(range, OwnedBytes::new(data.to_vec()));
+                    partial_blobs.insert(path.clone(), partial);
                 }
-                blobs_metadata.insert(path, meta);
+                blobs_metadata.insert(path, Arc::new(meta));
             }
         }
 
         Ok(Self {
             source: Arc::new(source),
             blobs: Arc::new(blobs),
+            partial_blobs: Arc::new(partial_blobs),
             blobs_metadata: Arc::new(blobs_metadata),
         })
     }
@@ -87,6 +125,7 @@ impl Clone for PuffinDirReader {
         PuffinDirReader {
             source: self.source.clone(),
             blobs: self.blobs.clone(),
+            partial_blobs: self.partial_blobs.clone(),
             blobs_metadata: self.blobs_metadata.clone(),
         }
     }
@@ -95,8 +134,11 @@ impl Clone for PuffinDirReader {
 // Version 1: Keep the blob withing the file handle and return it when read
 #[derive(Debug)]
 struct PuffinSliceHandle {
+    path: PathBuf,
     source: Arc<PuffinBytesReader>,
-    metadata: BlobMetadata,
+    metadata: Arc<BlobMetadata>,
+    blob: Arc<OwnedBytes>,
+    partial_blob: Arc<RwLock<HashMap<Range<usize>, OwnedBytes>>>,
 }
 
 impl HasLen for PuffinSliceHandle {
@@ -107,26 +149,40 @@ impl HasLen for PuffinSliceHandle {
 
 #[async_trait::async_trait]
 impl FileHandle for PuffinSliceHandle {
-    fn read_bytes(&self, byte_range: core::ops::Range<usize>) -> io::Result<OwnedBytes> {
+    fn read_bytes(&self, byte_range: Range<usize>) -> io::Result<OwnedBytes> {
         if byte_range.is_empty() {
             return Ok(OwnedBytes::empty());
         }
+        if !self.blob.is_empty() {
+            return Ok(self.blob.slice(byte_range));
+        }
 
-        tokio::task::block_in_place(move || {
-            crate::service::search::DATAFUSION_RUNTIME.block_on(self.read_bytes_async(byte_range))
-        })
+        let partital_reader = self.partial_blob.read();
+        if !partital_reader.is_empty() {
+            for (range, data) in partital_reader.iter() {
+                if range.contains(&byte_range.start) {
+                    let byte_range = byte_range.start - range.start..byte_range.end - range.start;
+                    return Ok(data.slice(byte_range));
+                }
+            }
+        }
+
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!(
+                "Error reading bytes from blob: {:?}, range: {:?}, Not implemented",
+                self.path, byte_range
+            ),
+        ))
     }
 
-    async fn read_bytes_async(
-        &self,
-        byte_range: core::ops::Range<usize>,
-    ) -> io::Result<OwnedBytes> {
+    async fn read_bytes_async(&self, byte_range: Range<usize>) -> io::Result<OwnedBytes> {
         if byte_range.is_empty() {
             return Ok(OwnedBytes::empty());
         }
         let data = self
             .source
-            .read_blob_bytes(&self.metadata, Some(byte_range))
+            .read_blob_bytes(&self.metadata, Some(byte_range.clone()))
             .await
             .map_err(|e| {
                 io::Error::new(
@@ -134,7 +190,9 @@ impl FileHandle for PuffinSliceHandle {
                     format!("Error reading bytes from blob: {:?}", e),
                 )
             })?;
-        Ok(OwnedBytes::new(data.to_vec()))
+        let data = OwnedBytes::new(data.to_vec());
+        self.partial_blob.write().insert(byte_range, data.clone());
+        Ok(data)
     }
 }
 
@@ -144,10 +202,21 @@ impl Directory for PuffinDirReader {
         path: &Path,
     ) -> std::result::Result<Arc<dyn FileHandle>, OpenReadError> {
         match self.blobs_metadata.get(path) {
-            Some(blob) => {
+            Some(meta) => {
+                let blob = match self.blobs.get(path) {
+                    Some(v) => v.clone(),
+                    None => Arc::new(OwnedBytes::empty()),
+                };
+                let partial_blob = match self.partial_blobs.get(path) {
+                    Some(v) => v.clone(),
+                    None => HashMap::new(),
+                };
                 let file_handle = PuffinSliceHandle {
+                    path: path.to_path_buf(),
                     source: self.source.clone(),
-                    metadata: blob.clone(),
+                    metadata: meta.clone(),
+                    blob,
+                    partial_blob: Arc::new(RwLock::new(partial_blob)),
                 };
                 Ok(Arc::new(file_handle))
             }
@@ -180,8 +249,7 @@ impl Directory for PuffinDirReader {
     }
 
     fn atomic_read(&self, path: &Path) -> std::result::Result<Vec<u8>, OpenReadError> {
-        if path == Path::new("meta.json") {
-            let data = self.blobs.get(path).unwrap();
+        if let Some(data) = self.blobs.get(path) {
             return Ok(data.to_vec());
         }
         Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))
@@ -219,4 +287,24 @@ impl Directory for PuffinDirReader {
     ) -> Result<tantivy::directory::DirectoryLock, tantivy::directory::error::LockError> {
         Ok(tantivy::directory::DirectoryLock::from(Box::new(|| {})))
     }
+}
+
+/// preload the terms in the index
+pub async fn warm_up_terms(
+    searcher: &tantivy::Searcher,
+    terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
+) -> anyhow::Result<()> {
+    let mut warm_up_futures = Vec::new();
+    for (field, terms) in terms_grouped_by_field {
+        for segment_reader in searcher.segment_readers() {
+            let inv_idx = segment_reader.inverted_index(*field)?;
+            for (term, position_needed) in terms.iter() {
+                let inv_idx_clone = inv_idx.clone();
+                warm_up_futures
+                    .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
+            }
+        }
+    }
+    try_join_all(warm_up_futures).await?;
+    Ok(())
 }
