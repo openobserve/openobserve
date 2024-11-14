@@ -499,9 +499,15 @@ pub async fn add_user_to_org(
                 )));
             }
 
-            if db::org_users::add(org_id, email, base_role.into(), &token, Some(rum_token))
-                .await
-                .is_err()
+            if db::org_users::add(
+                org_id,
+                email,
+                base_role.clone().into(),
+                &token,
+                Some(rum_token),
+            )
+            .await
+            .is_err()
             {
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(

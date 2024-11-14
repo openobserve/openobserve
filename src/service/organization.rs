@@ -217,6 +217,31 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
     }
 }
 
+pub async fn check_and_create_org_without_ofga(
+    org_id: &str,
+) -> Result<Organization, anyhow::Error> {
+    if let Some(org) = get_org(org_id).await {
+        return Ok(org);
+    }
+
+    let org = &Organization {
+        identifier: org_id.to_owned(),
+        name: org_id.to_owned(),
+        org_type: if org_id.eq(DEFAULT_ORG) {
+            DEFAULT_ORG.to_owned()
+        } else {
+            CUSTOM.to_owned()
+        },
+    };
+    match db::organization::save_org(org).await {
+        Ok(_) => Ok(org.clone()),
+        Err(e) => {
+            log::error!("Error creating org: {}", e);
+            Err(anyhow::anyhow!("Error creating org: {}", e))
+        }
+    }
+}
+
 pub async fn rename_org(
     org_id: &str,
     name: &str,
