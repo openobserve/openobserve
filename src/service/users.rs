@@ -17,18 +17,20 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
+use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
+use super::db::org_users::get_cached_user_org;
 use crate::{
     common::{
-        infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
+        infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
             user::{
                 DBUser, InviteStatus, UpdateUser, User, UserInvite, UserInviteList, UserList,
-                UserOrg, UserRequest, UserResponse, UserRole,
+                UserOrg, UserOrgRole, UserRequest, UserResponse, UserRole,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
@@ -43,16 +45,45 @@ pub async fn post_user(
 ) -> Result<HttpResponse, Error> {
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
     let cfg = get_config();
-    if is_root_user(initiator_id)
-        || (initiator_user.is_ok() && initiator_user.as_ref().unwrap().is_some())
-    // && initiator_user.unwrap().unwrap().role.eq(&UserRole::Admin))
-    {
+
+    let Ok(initiator_user) = initiator_user else {
+        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
+        )));
+    };
+    let Some(_initiator_user) = initiator_user else {
+        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
+        )));
+    };
+
+    // For non-enterprise, it is only Admin or Root user
+    #[cfg(not(feature = "enterprise"))]
+    let is_allowed = true;
+    #[cfg(feature = "enterprise")]
+    let is_allowed = if get_o2_config().openfga.enabled {
+        // Permission already checked through RBAC
+        true
+    } else {
+        _initiator_user.role.eq(&UserRole::Root) || _initiator_user.role.eq(&UserRole::Admin)
+    };
+    if is_root_user(initiator_id) || is_allowed {
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await
         } else {
             db::user::get(Some(org_id), &usr_req.email).await
         };
         if existing_user.is_err() {
+            if !usr_req.is_external {
+                if usr_req.password.is_empty() {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        "Password required to create new user".to_string(),
+                    )));
+                }
+            }
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
@@ -86,14 +117,17 @@ pub async fn post_user(
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
+                    let org_id = org_id.replace(' ', "_");
                     get_user_role_tuple(
-                        &usr_req.role.to_string(),
+                        &usr_req.role.base_role.to_string(),
                         &usr_req.email,
-                        &org_id.replace(' ', "_"),
+                        &org_id,
                         &mut tuples,
                     );
-                    // TODO: create another function to update the &mut tuples
-                    let _ = organization::check_and_create_org(org_id).await;
+                    if usr_req.role.custom_role.is_some() {
+                        let custom_role = usr_req.role.custom_role.unwrap();
+                        tuples.push(get_user_crole_tuple(&org_id, &custom_role, &usr_req.email));
+                    }
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("User saved successfully in openfga");
@@ -419,13 +453,13 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
 pub async fn add_user_to_org(
     org_id: &str,
     email: &str,
-    role: UserRole,
+    role: UserOrgRole,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let existing_user = db::user::get_user_record(email).await;
     let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
-        let initiating_user = if is_root_user(initiator_id) {
+        let _initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
             let _ = organization::check_and_create_org(&local_org).await;
@@ -442,8 +476,18 @@ pub async fn add_user_to_org(
                 }
             }
         };
-        let role = get_role(role);
-        if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
+        let base_role = get_role(&role);
+        #[cfg(not(feature = "enterprise"))]
+        let is_allowed = true;
+        #[cfg(feature = "enterprise")]
+        let is_allowed = if get_o2_config().openfga.enabled {
+            // Permission already checked through RBAC
+            true
+        } else {
+            _initiating_user.role.eq(&UserRole::Root) || _initiating_user.role.eq(&UserRole::Admin)
+        };
+
+        if is_allowed {
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let is_member = db::org_users::get(org_id, email).await.is_ok();
@@ -454,7 +498,7 @@ pub async fn add_user_to_org(
                 )));
             }
 
-            if db::org_users::add(org_id, email, role.into(), &token, Some(rum_token))
+            if db::org_users::add(org_id, email, base_role.into(), &token, Some(rum_token))
                 .await
                 .is_err()
             {
@@ -474,7 +518,11 @@ pub async fn add_user_to_org(
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
-                    get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
+                    get_user_role_tuple(&base_role.to_string(), email, org_id, &mut tuples);
+                    if role.custom_role.is_some() {
+                        let custom_role = role.custom_role.unwrap();
+                        tuples.push(get_user_crole_tuple(org_id, &custom_role, email));
+                    }
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("User added to org successfully in openfga");
@@ -496,22 +544,24 @@ pub async fn add_user_to_org(
             )))
         }
     } else {
-        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "User not found".to_string(),
-        )))
+        Ok(
+            HttpResponse::UnprocessableEntity().json(MetaHttpResponse::error(
+                http::StatusCode::UNPROCESSABLE_ENTITY.into(),
+                "User not found".to_string(),
+            )),
+        )
     }
 }
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
-    let key = match org_id {
-        Some(local_org) => format!("{local_org}/{name}"),
-        None => format!("{DEFAULT_ORG}/{name}"),
+    let org_id = match org_id {
+        Some(local_org) => local_org,
+        None => DEFAULT_ORG,
     };
-    let user = USERS.get(&key);
+    let user = get_cached_user_org(org_id, name);
     match user {
-        Some(loc_user) => Some(loc_user.value().clone()),
-        None => db::user::get(org_id, name).await.ok().flatten(),
+        Some(loc_user) => Some(loc_user),
+        None => db::user::get(Some(org_id), name).await.ok().flatten(),
     }
 }
 
@@ -519,12 +569,12 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let rum_tokens = USERS_RUM_TOKEN.clone();
     let key = format!("{DEFAULT_ORG}/{token}");
     if let Some(user) = rum_tokens.get(&key) {
-        return Some(user.value().clone());
+        return get_user(None, &user.email).await;
     }
 
     let key = format!("{org_id}/{token}");
     if let Some(user) = rum_tokens.get(&key) {
-        return Some(user.value().clone());
+        return get_user(Some(org_id), &user.email).await;
     }
 
     // need to drop the reference to rum_tokens to avoid deadlock of dashmap
@@ -537,12 +587,21 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
         .flatten()
     {
         log::info!("get_user_by_token: User found updating cache");
+        let org_user_record = OrgUserRecord {
+            email: user_from_db.email.clone(),
+            role: user_from_db.role.clone().into(),
+            org_id: user_from_db.org.clone(),
+            token: user_from_db.token.clone(),
+            rum_token: user_from_db.rum_token.clone(),
+            created_ts: 0,
+        };
         if is_root_user(&user_from_db.email) {
             USERS_RUM_TOKEN
                 .clone()
-                .insert(format!("{DEFAULT_ORG}/{token}"), user_from_db.clone());
+                .insert(format!("{DEFAULT_ORG}/{token}"), org_user_record);
+        } else {
+            USERS_RUM_TOKEN.clone().insert(key, org_user_record);
         }
-        USERS_RUM_TOKEN.clone().insert(key, user_from_db.clone());
         Some(user_from_db)
     } else {
         log::info!(
@@ -556,15 +615,17 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
-    for user in USERS.iter() {
+    for user in ORG_USERS.iter() {
         if user.key().starts_with(&format!("{org_id}/")) {
-            user_list.push(UserResponse {
-                email: user.value().email.clone(),
-                role: user.value().role.clone(),
-                first_name: user.value().first_name.clone(),
-                last_name: user.value().last_name.clone(),
-                is_external: user.value().is_external,
-            })
+            if let Some(user) = get_user(None, user.value().email.as_str()).await {
+                user_list.push(UserResponse {
+                    email: user.email.clone(),
+                    role: user.role.clone(),
+                    first_name: user.first_name.clone(),
+                    last_name: user.last_name.clone(),
+                    is_external: user.is_external,
+                })
+            }
         }
     }
 
@@ -591,15 +652,26 @@ pub async fn remove_user_from_org(
     email_id: &str,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let initiating_user = if is_root_user(initiator_id) {
-        ROOT_USER.get("root").unwrap().clone()
+    let _initiating_user = if is_root_user(initiator_id) {
+        ROOT_USER.get("root").unwrap().to_owned()
     } else {
         db::user::get(Some(org_id), initiator_id)
             .await
             .unwrap()
             .unwrap()
     };
-    if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
+
+    #[cfg(not(feature = "enterprise"))]
+    let is_allowed = true;
+    #[cfg(feature = "enterprise")]
+    let is_allowed = if get_o2_config().openfga.enabled {
+        // Permission already checked through RBAC
+        true
+    } else {
+        _initiating_user.role.eq(&UserRole::Root) || _initiating_user.role.eq(&UserRole::Admin)
+    };
+
+    if is_allowed {
         let ret_user = db::user::get_db_user(email_id).await;
         match ret_user {
             Ok(mut user) => {
@@ -643,7 +715,6 @@ pub async fn remove_user_from_org(
                         let resp = db::org_users::remove(org_id, email_id).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
-                            USERS.remove(&format!("{org_id}/{email_id}"));
                             #[cfg(feature = "enterprise")]
                             {
                                 use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
@@ -771,22 +842,32 @@ mod tests {
     use infra::db as infra_db;
 
     use super::*;
+    use crate::common::infra::config::USERS;
 
     async fn set_up() {
         USERS.insert(
-            "dummy/admin@zo.dev".to_string(),
-            User {
+            "admin@zo.dev".to_string(),
+            infra::table::users::UserRecord {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),
-                token: "token".to_string(),
-                rum_token: Some("rum_token".to_string()),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
-                org: "dummy".to_string(),
-                is_external: false,
                 password_ext: Some("pass#123".to_string()),
+                user_type: infra::table::users::UserType::Internal,
+                is_root: false,
+                created_ts: 0,
+            },
+        );
+        ORG_USERS.insert(
+            "dummy/admin@zo.dev".to_string(),
+            OrgUserRecord {
+                role: infra::table::org_users::UserRole::Admin,
+                token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
+                org_id: "dummy".to_string(),
+                email: "admin@zo.dev".to_string(),
+                created_ts: 0,
             },
         );
     }
@@ -819,7 +900,10 @@ mod tests {
             UserRequest {
                 email: "user@zo.dev".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: crate::common::meta::user::UserRole::Admin,
+                    custom_role: None,
+                },
                 first_name: "user".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,

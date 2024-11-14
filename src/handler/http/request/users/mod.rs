@@ -98,7 +98,7 @@ pub async fn save(
     let mut user = user.into_inner();
     user.email = user.email.trim().to_string();
 
-    if user.role.eq(&meta::user::UserRole::Root) {
+    if user.role.base_role.eq(&meta::user::UserRole::Root) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -108,7 +108,7 @@ pub async fn save(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role = meta::user::UserRole::Admin;
+        user.role.base_role = meta::user::UserRole::Admin;
     }
     users::post_user(&org_id, user, &initiator_id).await
 }
@@ -184,7 +184,7 @@ pub async fn add_user_to_org(
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let initiator_id = user_email.user_id;
-    let role = role.into_inner().role;
+    let role = role.into_inner();
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 

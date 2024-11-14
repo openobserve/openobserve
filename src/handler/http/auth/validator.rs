@@ -143,7 +143,6 @@ pub async fn validate_credentials(
         match path.find('/') {
             Some(index) => {
                 let org_id = &path[0..index];
-                check_and_create_org(user_id, org_id, method, path).await?;
                 if is_root_user(user_id) {
                     users::get_user(Some(DEFAULT_ORG), user_id).await
                 } else {
@@ -224,7 +223,7 @@ pub async fn validate_credentials_ext(
     in_password: &str,
     path: &str,
     auth_token: AuthTokensExt,
-    method: &Method,
+    _method: &Method,
 ) -> Result<TokenValidationResponse, Error> {
     let config = get_config();
     let password_ext_salt = config.auth.ext_auth_salt.as_str();
@@ -252,9 +251,6 @@ pub async fn validate_credentials_ext(
         match path.find('/') {
             Some(index) => {
                 let org_id = &path[0..index];
-                if let Err(e) = check_and_create_org(user_id, org_id, method, path).await {
-                    return Err(e);
-                }
                 if is_root_user(user_id) {
                     users::get_user(Some(DEFAULT_ORG), user_id).await
                 } else {
@@ -962,7 +958,10 @@ mod tests {
             UserRequest {
                 email: init_user.to_string(),
                 password: pwd.to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: crate::common::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
@@ -975,7 +974,10 @@ mod tests {
             UserRequest {
                 email: user_id.to_string(),
                 password: pwd.to_string(),
-                role: crate::common::meta::user::UserRole::Member,
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: crate::common::meta::user::UserRole::Member,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: true,

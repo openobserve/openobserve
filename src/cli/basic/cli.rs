@@ -208,6 +208,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 "user" => {
                     db::user::cache().await?;
+                    db::org_users::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;

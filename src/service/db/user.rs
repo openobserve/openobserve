@@ -16,27 +16,33 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::table::{org_invites::InvitationRecord, users};
+use infra::{
+    db::{delete_from_db_coordinator, put_into_db_coordinator},
+    table::{org_invites::InvitationRecord, users},
+};
 
-use super::org_users;
+use super::org_users::{self, get_cached_user_org};
 use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         meta::user::{DBUser, User, UserOrg, UserRole},
-        utils::auth::is_root_user,
     },
     service::db,
 };
 
 impl From<&DBUser> for users::UserRecord {
     fn from(user: &DBUser) -> Self {
+        let is_root = user
+            .organizations
+            .iter()
+            .any(|org| org.role.eq(&UserRole::Root));
         users::UserRecord::new(
             &user.email,
             &user.first_name,
             &user.last_name,
             &user.password,
             &user.salt,
-            is_root_user(&user.email),
+            is_root,
             user.password_ext.clone(),
             if user.is_external {
                 users::UserType::External
@@ -95,8 +101,8 @@ pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::E
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     let user = match org_id {
-        None => ROOT_USER.get("root"),
-        Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
+        None => ROOT_USER.get("root").map(|v| v.value().clone()),
+        Some(org_id) => get_cached_user_org(org_id, name),
     };
 
     if let Some(user) = user {
@@ -137,7 +143,7 @@ pub async fn get_by_token(
         Some(org_id) => USERS_RUM_TOKEN
             .clone()
             .get(&format!("{org_id}/{token}"))
-            .map(|v| v.value().clone()),
+            .and_then(|v| get_cached_user_org(org_id, &v.email)),
     };
 
     if let Some(user) = user {
@@ -201,13 +207,16 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     })
 }
 
-pub async fn add(user: &DBUser) -> Result<(), anyhow::Error> {
-    users::add(users::UserRecord::from(user))
+pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
+    let key = format!("/user_record/{}", db_user.email);
+    let user = users::UserRecord::from(db_user);
+    users::add(user.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Error adding user: {e}"))?;
+    let _ = put_into_db_coordinator(&key, json::to_vec(&user).unwrap().into(), true, None).await;
 
     // Add user to orgs
-    for org in &user.organizations {
+    for org in &db_user.organizations {
         org_users::add(
             &org.name,
             &user.email,
@@ -227,55 +236,29 @@ pub async fn update(
     password: &str,
     password_ext: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    users::update(user_email, first_name, last_name, password, password_ext)
+    let key = format!("/user_record/{user_email}");
+    let updated_user = users::update(user_email, first_name, last_name, password, password_ext)
         .await
-        .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))
+        .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
+    let _ = put_into_db_coordinator(
+        &key,
+        json::to_vec(&updated_user).unwrap().into(),
+        true,
+        None,
+    )
+    .await;
+    Ok(())
 }
 
-// pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
-//     let key = format!("/user/{}", user.email);
-//     db::put(
-//         &key,
-//         json::to_vec(&user).unwrap().into(),
-//         db::NEED_WATCH,
-//         None,
-//     )
-//     .await?;
-
-//     // cache user
-//     for org in &user.organizations {
-//         let user = User {
-//             email: user.email.clone(),
-//             first_name: user.first_name.clone(),
-//             last_name: user.last_name.clone(),
-//             password: user.password.clone(),
-//             role: org.role.clone(),
-//             org: org.name.clone(),
-//             token: org.token.clone(),
-//             rum_token: org.rum_token.clone(),
-//             salt: user.salt.clone(),
-//             is_external: user.is_external,
-//             password_ext: user.password_ext.clone(),
-//         };
-//         USERS.insert(
-//             format!("{}/{}", org.name.clone(), user.email.clone()),
-//             user.clone(),
-//         );
-
-//         if let Some(rum_token) = &org.rum_token {
-//             USERS_RUM_TOKEN
-//                 .clone()
-//                 .insert(format!("{}/{}", org.name, rum_token), user);
-//         }
-//     }
-//     Ok(())
-// }
-
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
+    let key = format!("/user_record/{name}");
     // First delete all org_user entries for this user
     org_users::remove_by_user(name).await?;
     match users::remove(name).await {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            let _ = delete_from_db_coordinator(&key, false, true, None).await;
+            Ok(())
+        }
         Err(e) => {
             log::error!("Error deleting user: {}", e);
             Err(anyhow::anyhow!("Error deleting user: {}", e))
@@ -287,8 +270,16 @@ pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, a
     db::org_invites::list_by_user(user_id).await
 }
 
+pub async fn list_users(
+    limit: Option<i64>,
+) -> Result<Vec<infra::table::users::UserRecord>, anyhow::Error> {
+    users::list(limit)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error listing users: {e}"))
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/user/";
+    let key = "/user_record/";
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -304,78 +295,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-
-                let item_value: DBUser = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
+                let item_value: infra::table::users::UserRecord =
+                    if config::get_config().common.meta_store_external {
+                        match get_user_record(item_key).await {
                             Ok(val) => val,
                             Err(e) => {
                                 log::error!("Error getting value: {}", e);
                                 continue;
                             }
-                        },
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
                         }
-                    }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
-
-                let users = item_value.get_all_users();
-                // Invalidate the entire RUM-TOKEN-CACHE
-                for (_, user) in USERS.clone() {
-                    if user.email.eq(item_key) {
-                        USERS_RUM_TOKEN.clone().remove(&format!(
-                            "{}/{}",
-                            user.org,
-                            user.rum_token.as_ref().unwrap()
-                        ));
-                    }
-                }
-
-                #[cfg(not(feature = "enterprise"))]
-                for mut user in users {
-                    if user.role.eq(&UserRole::Root) {
-                        ROOT_USER.insert("root".to_string(), user.clone());
                     } else {
-                        user.role = UserRole::Admin;
+                        json::from_slice(&ev.value.unwrap()).unwrap()
                     };
-                    USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
-                    if let Some(rum_token) = &user.rum_token {
-                        USERS_RUM_TOKEN
-                            .clone()
-                            .insert(format!("{}/{}", user.org, rum_token), user);
-                    }
-                }
 
-                #[cfg(feature = "enterprise")]
-                for user in users {
-                    if user.role.eq(&UserRole::Root) {
-                        ROOT_USER.insert("root".to_string(), user.clone());
-                    }
-                    USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
-                    if let Some(rum_token) = &user.rum_token {
-                        USERS_RUM_TOKEN
-                            .clone()
-                            .insert(format!("{}/{}", user.org, rum_token), user);
-                    }
-                }
+                USERS.insert(item_key.to_string(), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                for (_, user) in USERS.clone() {
-                    if user.email.eq(item_key) {
-                        USERS.remove(&format!("{}/{}", user.org, user.email));
-                        // Invalidate the entire RUM-TOKEN-CACHE
-                        USERS_RUM_TOKEN.clone().remove(&format!(
-                            "{}/{}",
-                            user.org,
-                            user.rum_token.as_ref().unwrap()
-                        ));
-                    }
-                }
+                USERS.remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -384,65 +321,46 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = "/user/";
-    let ret = db::list(key).await?;
-    for (_, item_value) in ret {
-        // let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: DBUser = json::from_slice(&item_value).unwrap();
-        let users = json_val.get_all_users();
-        #[cfg(not(feature = "enterprise"))]
-        for mut user in users {
-            if user.role.eq(&UserRole::Root) {
-                ROOT_USER.insert("root".to_string(), user.clone());
-            } else {
-                user.role = UserRole::Admin;
-            }
-            USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
-            if let Some(rum_token) = &user.rum_token {
-                USERS_RUM_TOKEN
-                    .clone()
-                    .insert(format!("{}/{}", user.org, rum_token), user);
-            }
-        }
-
-        #[cfg(feature = "enterprise")]
-        for user in users {
-            if user.role.eq(&UserRole::Root) {
-                ROOT_USER.insert("root".to_string(), user.clone());
-            }
-            USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
-            if let Some(rum_token) = &user.rum_token {
-                USERS_RUM_TOKEN
-                    .clone()
-                    .insert(format!("{}/{}", user.org, rum_token), user);
-            }
-        }
+    let users = list_users(None).await?;
+    for user in users {
+        USERS.insert(user.email.clone(), user);
     }
     log::info!("Users Cached");
     Ok(())
 }
 
 pub async fn root_user_exists() -> bool {
-    let key = "/user/";
-    let mut ret = db::list_values(key).await.unwrap_or_default();
-    ret.retain(|item| {
-        let user: DBUser = json::from_slice(item).unwrap();
-        if user.organizations.is_empty() {
-            return false;
+    // Cache into the ROOT_USER
+    match users::get_root_user().await {
+        Ok(user) => {
+            ROOT_USER.insert(
+                "root".to_string(),
+                User {
+                    email: user.email,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    password: user.password,
+                    role: UserRole::Root,
+                    org: "".to_string(),
+                    token: "".to_string(),
+                    rum_token: None,
+                    salt: user.salt,
+                    is_external: false,
+                    password_ext: user.password_ext,
+                },
+            );
+            true
         }
-        user.organizations
-            .first()
-            .as_ref()
-            .unwrap()
-            .role
-            .eq(&crate::common::meta::user::UserRole::Root)
-    });
-    !ret.is_empty()
+        _ => false,
+    }
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/user/";
-    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
+    let _key = "/user_record/";
+    users::clear()
+        .await
+        .map_err(|e| anyhow::anyhow!("Error clearing users: {e}"))?;
+    // TODO: Clear all coordinator keys
     Ok(())
 }
 

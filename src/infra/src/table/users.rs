@@ -17,6 +17,7 @@ use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
     FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
+use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
@@ -25,8 +26,9 @@ use crate::{
 };
 
 // define the organizations type
-#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
+#[serde(rename_all = "snake_case")]
 pub enum UserType {
     Internal = 0,
     /// Is the user authenticated and created via LDAP
@@ -65,7 +67,7 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug)]
+#[derive(FromQueryResult, Clone, Debug, Serialize, Deserialize)]
 pub struct UserRecord {
     pub email: String,
     pub first_name: String,
@@ -73,6 +75,7 @@ pub struct UserRecord {
     pub password: String,
     pub salt: String,
     pub is_root: bool,
+    #[serde(default)]
     pub password_ext: Option<String>,
     pub user_type: UserType,
     pub created_ts: i64,
@@ -182,7 +185,7 @@ pub async fn update(
     last_name: &str,
     password: &str,
     password_ext: Option<String>,
-) -> Result<(), errors::Error> {
+) -> Result<UserRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = ActiveModel {
         first_name: Set(first_name.to_string()),
@@ -192,13 +195,23 @@ pub async fn update(
         ..Default::default()
     };
 
-    Entity::update(record)
+    let result = Entity::update(record)
         .filter(Column::Email.eq(email))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(())
+    Ok(UserRecord {
+        email: result.email,
+        first_name: result.first_name,
+        last_name: result.last_name,
+        password: result.password,
+        salt: result.salt,
+        is_root: result.is_root,
+        password_ext: result.password_ext,
+        user_type: result.user_type,
+        created_ts: result.created_ts,
+    })
 }
 
 pub async fn remove(email: &str) -> Result<(), errors::Error> {
@@ -234,6 +247,29 @@ pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("User not found".to_string())))?;
+
+    Ok(record)
+}
+
+pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .select_only()
+        .column(Column::Email)
+        .column(Column::FirstName)
+        .column(Column::LastName)
+        .column(Column::Password)
+        .column(Column::Salt)
+        .column(Column::IsRoot)
+        .column(Column::PasswordExt)
+        .column(Column::UserType)
+        .column(Column::CreatedTs)
+        .filter(Column::IsRoot.eq(true))
+        .into_model::<UserRecord>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Root user not found".to_string())))?;
 
     Ok(record)
 }

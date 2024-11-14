@@ -28,7 +28,7 @@ pub struct UserRequest {
     pub last_name: String,
     pub password: String,
     #[serde(skip_serializing)]
-    pub role: UserRole,
+    pub role: UserOrgRole,
     /// Is the user created via ldap flow.
     #[serde(default)]
     pub is_external: bool,
@@ -56,7 +56,7 @@ impl UserRequest {
                 name: org,
                 token,
                 rum_token: Some(rum_token),
-                role: self.role.clone(),
+                role: self.role.base_role.clone(),
             }],
             is_external,
             password_ext: Some(password_ext),
@@ -172,7 +172,10 @@ impl PartialEq for UserOrg {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserOrgRole {
-    pub role: UserRole,
+    #[serde(rename = "role")]
+    pub base_role: UserRole,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub custom_role: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]

@@ -15,7 +15,7 @@
 
 use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
-    FromQueryResult, PaginatorTrait, QueryFilter, QuerySelect, Schema, Set,
+    FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
 
 use super::get_lock;
@@ -84,7 +84,7 @@ impl Related<super::organizations::Entity> for Entity {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug)]
+#[derive(FromQueryResult, Debug, Clone)]
 pub struct OrgUserRecord {
     pub email: String,
     pub org_id: String,
@@ -121,7 +121,6 @@ pub struct UserOrgExpandedRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_ts: i64,
-    pub identifier: String,
     pub org_name: String,
     pub org_type: super::organizations::OrganizationType,
 }
@@ -428,6 +427,29 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
         .filter(Column::Email.eq(email))
         .inner_join(super::organizations::Entity)
         .into_model::<UserOrgExpandedRecord>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records)
+}
+
+pub async fn list(limit: Option<i64>) -> Result<Vec<OrgUserRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut res = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Email)
+        .column(Column::Role)
+        .column(Column::Token)
+        .column(Column::RumToken)
+        .column(Column::CreatedTs)
+        .order_by(Column::CreatedTs, Order::Desc);
+    if let Some(limit) = limit {
+        res = res.limit(limit as u64);
+    }
+    let records = res
+        .into_model::<OrgUserRecord>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
