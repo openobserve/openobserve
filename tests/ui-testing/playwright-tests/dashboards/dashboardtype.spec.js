@@ -1,4 +1,4 @@
-import { test, expect } from "../baseFixtures";
+import { test, expect } from "./baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
