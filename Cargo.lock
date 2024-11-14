@@ -9005,6 +9005,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "bytes",
+ "config",
  "crc32fast",
  "criterion",
  "parking_lot",
