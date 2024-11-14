@@ -2471,7 +2471,6 @@ dependencies = [
  "aws-config",
  "aws-sdk-sns",
  "base64 0.21.7",
- "bitflags 2.6.0",
  "bitvec",
  "byteorder",
  "bytes",
@@ -2513,7 +2512,6 @@ dependencies = [
  "sqlx",
  "svix-ksuid",
  "sysinfo",
- "tantivy",
  "tokio",
  "tokio-util",
  "tracing",
@@ -2522,7 +2520,6 @@ dependencies = [
  "urlencoding",
  "utoipa",
  "vrl",
- "zstd",
 ]
 
 [[package]]
@@ -6090,6 +6087,7 @@ dependencies = [
  "awc",
  "aws-sdk-sns",
  "base64 0.21.7",
+ "bitflags 2.6.0",
  "bitvec",
  "blake3",
  "bytes",

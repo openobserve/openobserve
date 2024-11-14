@@ -19,14 +19,13 @@ use std::{
     sync::Arc,
 };
 
-use futures::executor::block_on;
 use hashbrown::HashMap;
 use tantivy::{
     directory::{error::OpenReadError, Directory, FileHandle, OwnedBytes},
     HasLen,
 };
 
-use crate::meta::{
+use crate::service::search::tantivy::{
     puffin::{reader::PuffinBytesReader, BlobMetadata},
     puffin_directory::{
         get_file_from_empty_puffin_dir_with_ext, EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID,
@@ -41,11 +40,8 @@ pub struct PuffinDirReader {
 }
 
 impl PuffinDirReader {
-    pub async fn from_path(
-        store: Arc<dyn object_store::ObjectStore>,
-        source: object_store::ObjectMeta,
-    ) -> io::Result<Self> {
-        let mut source = PuffinBytesReader::new(store, source);
+    pub async fn from_path(source: object_store::ObjectMeta) -> io::Result<Self> {
+        let mut source = PuffinBytesReader::new(source);
         let Some(metadata) = source.get_metadata().await.map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -116,7 +112,9 @@ impl FileHandle for PuffinSliceHandle {
             return Ok(OwnedBytes::empty());
         }
 
-        block_on(async { self.read_bytes_async(byte_range).await })
+        tokio::task::block_in_place(move || {
+            crate::service::search::DATAFUSION_RUNTIME.block_on(self.read_bytes_async(byte_range))
+        })
     }
 
     async fn read_bytes_async(

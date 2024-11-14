@@ -21,7 +21,6 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        puffin_directory::reader::PuffinDirReader,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
@@ -46,7 +45,10 @@ use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, generate_filter_from_equal_items, generate_search_schema_diff},
+    search::{
+        datafusion::exec, generate_filter_from_equal_items, generate_search_schema_diff,
+        tantivy::puffin_directory::reader::PuffinDirReader,
+    },
 };
 
 type CachedFiles = (usize, usize);
@@ -604,7 +606,6 @@ pub async fn get_tantivy_directory(
     file_name: &str,
     file_size: usize,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    let store = Arc::new(infra::cache::storage::CacheFS::new_store());
     let source = object_store::ObjectMeta {
         location: file_name.into(),
         last_modified: *BASE_TIME,
@@ -612,7 +613,7 @@ pub async fn get_tantivy_directory(
         e_tag: None,
         version: None,
     };
-    let puffin_dir = PuffinDirReader::from_path(store, source).await?;
+    let puffin_dir = PuffinDirReader::from_path(source).await?;
     Ok(Box::new(puffin_dir))
 }
 

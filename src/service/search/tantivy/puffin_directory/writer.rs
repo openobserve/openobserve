@@ -26,7 +26,7 @@ use tantivy::{
     HasLen,
 };
 
-use crate::meta::{
+use crate::service::search::tantivy::{
     puffin::{writer::PuffinBytesWriter, BlobTypes},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
 };

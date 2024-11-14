@@ -22,18 +22,13 @@ use super::*;
 
 #[derive(Debug)]
 pub struct PuffinBytesReader {
-    store: Arc<dyn object_store::ObjectStore>,
     source: Arc<object_store::ObjectMeta>,
     metadata: Option<PuffinMeta>,
 }
 
 impl PuffinBytesReader {
-    pub fn new(
-        store: Arc<dyn object_store::ObjectStore>,
-        source: object_store::ObjectMeta,
-    ) -> Self {
+    pub fn new(source: object_store::ObjectMeta) -> Self {
         Self {
-            store,
             source: Arc::new(source),
             metadata: None,
         }
@@ -46,10 +41,11 @@ impl PuffinBytesReader {
         blob_metadata: &BlobMetadata,
         range: Option<core::ops::Range<usize>>,
     ) -> Result<bytes::Bytes> {
-        let raw_data = self
-            .store
-            .get_range(&self.source.location, blob_metadata.get_offset(range))
-            .await?;
+        let raw_data = infra::cache::storage::get_range(
+            &self.source.location,
+            blob_metadata.get_offset(range),
+        )
+        .await?;
 
         let decompressed = match blob_metadata.compression_codec {
             Some(CompressionCodec::Lz4) => {
@@ -95,13 +91,11 @@ impl PuffinBytesReader {
         }
 
         // check MAGIC
-        let magic = self
-            .store
-            .get_range(&self.source.location, 0..MAGIC_SIZE as usize)
-            .await?;
+        let magic =
+            infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE as usize).await?;
         ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
 
-        let puffin_meta = PuffinFooterBytesReader::new(self.store.clone(), self.source.clone())
+        let puffin_meta = PuffinFooterBytesReader::new(self.source.clone())
             .parse()
             .await?;
         self.metadata = Some(puffin_meta);
@@ -112,7 +106,6 @@ impl PuffinBytesReader {
 /// Footer layout: HeadMagic Payload PayloadSize Flags FootMagic
 ///                [4]       [?]     [4]         [4]   [4]
 struct PuffinFooterBytesReader {
-    store: Arc<dyn object_store::ObjectStore>,
     source: Arc<object_store::ObjectMeta>,
     flags: PuffinFooterFlags,
     payload_size: u64,
@@ -120,12 +113,8 @@ struct PuffinFooterBytesReader {
 }
 
 impl PuffinFooterBytesReader {
-    fn new(
-        store: Arc<dyn object_store::ObjectStore>,
-        source: Arc<object_store::ObjectMeta>,
-    ) -> Self {
+    fn new(source: Arc<object_store::ObjectMeta>) -> Self {
         Self {
-            store,
             source,
             flags: PuffinFooterFlags::empty(),
             payload_size: 0,
@@ -137,13 +126,11 @@ impl PuffinFooterBytesReader {
 impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
         // read footer
-        let footer = self
-            .store
-            .get_range(
-                &self.source.location,
-                (self.source.size - FOOTER_SIZE as usize)..self.source.size,
-            )
-            .await?;
+        let footer = infra::cache::storage::get_range(
+            &self.source.location,
+            (self.source.size - FOOTER_SIZE as usize)..self.source.size,
+        )
+        .await?;
 
         // check the footer magic
         ensure!(
@@ -173,17 +160,14 @@ impl PuffinFooterBytesReader {
         self.payload_size = i32::from_le_bytes(payload_size) as u64;
 
         // read the payload
-        let payload = self
-            .store
-            .get_range(
-                &self.source.location,
-                (self.source.size
-                    - FOOTER_SIZE as usize
-                    - self.payload_size as usize
-                    - MAGIC_SIZE as usize)
-                    ..(self.source.size - FOOTER_SIZE as usize),
-            )
-            .await?;
+        let payload = infra::cache::storage::get_range(
+            &self.source.location,
+            (self.source.size
+                - FOOTER_SIZE as usize
+                - self.payload_size as usize
+                - MAGIC_SIZE as usize)..(self.source.size - FOOTER_SIZE as usize),
+        )
+        .await?;
 
         // check the footer magic
         ensure!(
