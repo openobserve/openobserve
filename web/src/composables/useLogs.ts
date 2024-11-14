@@ -4161,7 +4161,7 @@ const useLogs = () => {
     }
   };
 
-  const setSelectedStreams = () => {
+  const setSelectedStreams = (value: string) => {
     const parsedSQL = fnParsedSQL();
 
     let newSelectedStreams: string[] = [];
@@ -4190,6 +4190,7 @@ const useLogs = () => {
       !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams)
     ) {
       searchObj.data.stream.selectedStream = newSelectedStreams;
+      onStreamChange(value);
     }
   };
 

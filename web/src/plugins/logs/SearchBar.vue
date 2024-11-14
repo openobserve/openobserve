@@ -1258,8 +1258,8 @@ export default defineComponent({
           searchObj.meta.sqlMode === true &&
           Object.hasOwn(parsedSQL, "from")
         ) {
-          setSelectedStreams();
-          onStreamChange(value);
+          setSelectedStreams(value);
+          // onStreamChange(value);
         }
         if (parsedSQL != undefined && parsedSQL?.columns?.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
@@ -1307,8 +1307,8 @@ export default defineComponent({
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
         if (Object.hasOwn(parsedSQL, "from")) {
-          setSelectedStreams();
-          onStreamChange(value);
+          setSelectedStreams(value);
+          // onStreamChange(value);
         }
       }
 
