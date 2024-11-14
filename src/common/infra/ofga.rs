@@ -31,7 +31,7 @@ use o2_enterprise::enterprise::{
 
 use crate::{
     common::{
-        infra::config::USERS,
+        infra::config::{ORG_USERS, USERS},
         meta::{organization::DEFAULT_ORG, user::UserRole},
     },
     service::db,
@@ -179,18 +179,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     .await;
                 }
 
-                for user_key_val in USERS.iter() {
-                    let user = user_key_val.value();
+                for user_key_val in ORG_USERS.iter() {
+                    let org_user = user_key_val.value();
+                    let user = USERS.get(org_user.email.as_str()).unwrap();
                     if user.is_external {
                         continue;
                     } else {
-                        let role = if user.role.eq(&UserRole::Root) {
+                        let role = if user.is_root {
                             UserRole::Admin.to_string()
                         } else {
-                            user.role.to_string()
+                            org_user.role.to_string()
                         };
 
-                        get_user_role_tuple(&role, &user.email, &user.org, &mut tuples);
+                        get_user_role_tuple(&role, &org_user.email, &org_user.org_id, &mut tuples);
                     }
                 }
             } else {

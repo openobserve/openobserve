@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use config::utils::json;
 use infra::{
+    db::put_into_db_coordinator,
     errors::{self, Error},
     table::organizations,
 };
@@ -32,7 +33,7 @@ use crate::{
 // DBKey to set settings for an org
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
-pub const ORG_KEY_PREFIX: &str = "/organization/org";
+pub const ORG_KEY_PREFIX: &str = "/organization/org/";
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
@@ -130,11 +131,13 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
 
 /// Cache the existing orgs in the beginning
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let prefix = ORG_KEY_PREFIX;
-    let ret = db::list(prefix).await?;
-    for (key, item_value) in ret {
-        let json_val: Organization = json::from_slice(&item_value).unwrap();
-        ORGANIZATIONS.clone().write().await.insert(key, json_val);
+    let orgs = list(None).await?;
+    for org in orgs {
+        ORGANIZATIONS
+            .clone()
+            .write()
+            .await
+            .insert(org.identifier.clone(), org);
     }
     log::info!("Organizations Cached");
     Ok(())
@@ -156,17 +159,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
 
         if let db::Event::Put(ev) = ev {
-            let item_key = ev.key;
+            let item_key = ev.key.strip_prefix(key).unwrap();
             let item_value = ev.value.unwrap();
             let json_val: Organization = if config::get_config().common.meta_store_external {
-                match db::get(&item_key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
+                match get_org(&item_key).await {
+                    Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
                         continue;
@@ -179,13 +176,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 .clone()
                 .write()
                 .await
-                .insert(item_key, json_val);
+                .insert(item_key.to_string(), json_val);
         }
     }
 }
 
 pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
-    // TODO: Handle caching
     if let Err(e) = organizations::add(
         &entry.identifier,
         &entry.name,
@@ -196,6 +192,9 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
         log::error!("Error saving org: {}", e);
         return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
+
+    let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);
+    let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;
     Ok(())
 }
 

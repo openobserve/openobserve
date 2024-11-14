@@ -28,11 +28,11 @@ use crate::common::infra::config::USER_SESSIONS;
 #[cfg(feature = "enterprise")]
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
-    infra::config::{PASSWORD_HASH, USERS},
+    infra::config::{ORG_USERS, PASSWORD_HASH},
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
-        user::{AuthTokens, UserRole},
+        user::{AuthTokens, UserOrgRole, UserRole},
     },
 };
 
@@ -91,8 +91,8 @@ pub fn generate_invite_token() -> String {
 }
 
 pub(crate) fn is_root_user(user_id: &str) -> bool {
-    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
-        Some(user) => user.role.eq(&UserRole::Root),
+    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
+        Some(user) => user.role.eq(&infra::table::org_users::UserRole::Root),
         None => false,
     }
 }
@@ -122,15 +122,18 @@ pub async fn delete_org_tuples(org_id: &str) {
 pub async fn delete_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
-pub fn get_role(role: UserRole) -> UserRole {
+pub fn get_role(role: &UserOrgRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_enterprise::enterprise::openfga::authorizer::roles::get_role(format!("{role}"));
+    let role = o2_enterprise::enterprise::openfga::authorizer::roles::get_role(format!(
+        "{}",
+        role.base_role
+    ));
     UserRole::from_str(&role).unwrap()
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub fn get_role(_role: UserRole) -> UserRole {
+pub fn get_role(_role: &UserOrgRole) -> UserRole {
     UserRole::Admin
 }
 
@@ -684,7 +687,10 @@ mod tests {
             UserRequest {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: UserOrgRole {
+                    base_role: crate::common::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,

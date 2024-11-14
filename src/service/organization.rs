@@ -27,7 +27,7 @@ use super::{
 };
 use crate::{
     common::{
-        infra::config::USERS_RUM_TOKEN,
+        // infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
                 IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
@@ -390,7 +390,10 @@ mod tests {
             UserRequest {
                 email: init_user.to_string(),
                 password: pwd.to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: crate::common::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
@@ -404,7 +407,10 @@ mod tests {
             UserRequest {
                 email: user_id.to_string(),
                 password: "pass".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: crate::common::meta::user::UserRole::Admin,
+                    custom_role: None,
+                },
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
