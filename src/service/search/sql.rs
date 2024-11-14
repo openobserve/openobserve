@@ -198,13 +198,15 @@ impl Sql {
             }
         }
 
+        // TODO: only can do this if the stream is create after this change
         // 10. generate tantivy query
         let mut tantivy_query = "".to_string();
-        if config::get_config()
+        if get_config()
             .common
             .inverted_index_search_format
             .eq("tantivy")
-            || stream_names.len() == 1
+            && stream_names.len() == 1
+            && get_config().common.full_text_search_type.as_str() != "contains"
         {
             let mut index_visitor = IndexVisitor::new(&used_schemas);
             statement.visit(&mut index_visitor);

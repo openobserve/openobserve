@@ -65,9 +65,16 @@ impl IndexCondition {
 
 impl Condition {
     pub fn to_query(&self) -> String {
+        let cfg = config::get_config();
+        let (prefix, suffix) = match cfg.common.full_text_search_type.as_str() {
+            "eq" => ("", ""),
+            "contains" => ("*", "*"), // tantivy don't support this
+            // Default to prefix search
+            _ => ("", "*"),
+        };
         match self {
-            Condition::Equal(field, value) => format!("{}:{}", field, value),
-            Condition::MatchAll(value) => value.to_string(),
+            Condition::Equal(field, value) => format!("{}:{}{}{}", field, prefix, value, suffix),
+            Condition::MatchAll(value) => format!("{}{}{}", prefix, value, suffix),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
