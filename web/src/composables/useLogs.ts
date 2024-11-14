@@ -3877,7 +3877,7 @@ const useLogs = () => {
         );
 
         if (streamData.schema != undefined) {
-          searchObj.data.stream.selectedStreamFields.push(streamData.schema);
+          searchObj.data.stream.selectedStreamFields.push(...streamData.schema);
         }
       }
 
@@ -3890,10 +3890,10 @@ const useLogs = () => {
         return;
       }
       const streamFieldNames: any = [];
-      searchObj.data.stream.selectedStreamFields.forEach((subArray: any) => {
-        subArray.forEach((item: any) => {
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        // subArray.forEach((item: any) => {
           streamFieldNames.push(item.name);
-        });
+        // });
       });
 
       for (
