@@ -121,7 +121,7 @@
                   :dashboard-id="dashboardId"
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                  :variablesData="variablesData"
+                  :variablesData="refreshVariableDataRef"
                   :width="6"
                   :searchType="searchType"
                   @error="handleChartApiError"
@@ -220,6 +220,9 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    const refreshVariableDataRef: any = reactive({});
+
     let parser: any;
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -236,6 +239,26 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
+
+      // Check if any value has changed before assigning to `refreshVariableDataRef`
+      const isValueChanged = refreshVariableDataRef?.values?.length > 0 &&
+        data.values.every((variable: any, index: number) => {
+          const prevValue = refreshVariableDataRef.values[index]?.value;
+          const newValue = variable.value;
+          // Compare current and previous values; handle both string and array cases
+          return Array.isArray(newValue)
+            ? JSON.stringify(prevValue) === JSON.stringify(newValue)
+            : prevValue === newValue;
+        });
+      // when this is called 1st time, we need to set the data for the updated variables data as well
+      // from the second time, it will only be updated after the apply button is clicked
+      if (
+        (!refreshVariableDataRef?.values?.length || isValueChanged) && // Previous value of variables is empty
+        variablesData?.values?.length > 0 // new values of variables is NOT empty
+      ) {
+        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+        Object.assign(refreshVariableDataRef, variablesData);
+      }
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
@@ -424,6 +447,10 @@ export default defineComponent({
     const refreshData = () => {
       if (!disable.value) {
         dateTimePickerRef.value.refresh();
+        Object.assign(
+        refreshVariableDataRef,
+        JSON.parse(JSON.stringify(variablesData))
+      );
       }
     };
 
@@ -568,6 +595,7 @@ export default defineComponent({
       cancelViewPanelQuery,
       disable,
       config,
+      refreshVariableDataRef,
     };
   },
 });
