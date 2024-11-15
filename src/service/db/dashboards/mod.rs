@@ -108,6 +108,10 @@ macro_rules! update_distinct_variables {
                 let mut _new_added = false;
 
                 for f in fields.iter() {
+                    // we ignore full text search no matter what
+                    if stream_settings.full_text_search_keys.contains(&f) {
+                        continue;
+                    }
                     // we add entry for all the fields, because we need mappings for each individual
                     // origin-stream-field mapping. The duplicates are handled in add function, so
                     // we can call it for each field without issues

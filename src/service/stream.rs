@@ -29,6 +29,7 @@ use infra::{
         unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
         STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
+    table::distinct_values::{self, DistinctFieldRecord, OriginType},
 };
 
 use crate::{
@@ -354,12 +355,78 @@ pub async fn update_stream_settings(
             }
 
             if !update_settings.distinct_value_fields.add.is_empty() {
-                settings
-                    .distinct_value_fields
-                    .extend(update_settings.distinct_value_fields.add);
+                for f in &update_settings.distinct_value_fields.add {
+                    // we ignore full text search fields
+                    if settings.full_text_search_keys.contains(&f)
+                        || update_settings.full_text_search_keys.add.contains(&f)
+                    {
+                        continue;
+                    }
+                    let record = DistinctFieldRecord::new(
+                        OriginType::Stream,
+                        stream_name,
+                        org_id,
+                        stream_name,
+                        stream_type.to_string(),
+                        f,
+                    );
+                    if let Err(e) = distinct_values::add(record).await {
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                format!("error in updating settings : {e}"),
+                            ),
+                        ));
+                    }
+                    // we cannot allow duplicate entries here
+                    if !settings.distinct_value_fields.contains(f) {
+                        settings.distinct_value_fields.push(f.to_owned());
+                    }
+                }
             }
 
             if !update_settings.distinct_value_fields.remove.is_empty() {
+                for f in &update_settings.distinct_value_fields.remove {
+                    let usage = match distinct_values::check_field_use(
+                        org_id,
+                        stream_name,
+                        stream_type.as_str(),
+                        f,
+                    )
+                    .await
+                    {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    format!("error in updating settings : {e}"),
+                                ),
+                            ));
+                        }
+                    };
+                    if !usage.is_empty() || usage.len() > 1 {
+                        return Ok(HttpResponse::BadRequest().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::BAD_REQUEST.into(),
+                                format!("error in removing distinct field : field {f} if used in dashboards/reports"),
+                            ),
+                        ));
+                    }
+                    // here we can be sure that usage is at most 1 record
+                    if let Some(entry) = usage.get(0) {
+                        if entry.origin != OriginType::Stream {
+                            return Ok(HttpResponse::BadRequest().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::BAD_REQUEST.into(),
+                                    format!("error in removing distinct field : field {f} if used in dashboards/reports"),
+                                ),
+                            ));
+                        }
+                    }
+                }
+                // here we are sure that all fields to be removed can be removed,
+                // so we bulk filter
                 settings
                     .distinct_value_fields
                     .retain(|field| !update_settings.distinct_value_fields.remove.contains(field));
