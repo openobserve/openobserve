@@ -21,14 +21,13 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        puffin_directory::reader::RamDirectoryReader,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json},
+    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json, time::BASE_TIME},
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
-use futures::{future::try_join_all, io::Cursor};
+use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
@@ -42,7 +41,12 @@ use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, generate_search_schema_diff, index::IndexCondition},
+    search::{
+        datafusion::exec,
+        generate_search_schema_diff,
+        index::IndexCondition,
+        tantivy::puffin_directory::reader::{warm_up_terms, PuffinDirReader},
+    },
 };
 
 type CachedFiles = (usize, usize);
@@ -461,13 +465,15 @@ async fn filter_file_list_by_tantivy_index(
 
     for (parquet_file, _ttv_file, records) in index_file_names {
         let file = parquet_file;
+        let file_size = file_list_map.get(&file).unwrap().meta.index_size as usize;
         let trace_id = query.trace_id.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
         let tantivy_query = tantivy_query.to_string();
         let task = tokio::task::spawn(async move {
-            let res = search_tantivy_index(&trace_id, &file, &tantivy_query, records).await;
+            let res =
+                search_tantivy_index(&trace_id, &file, &tantivy_query, records, file_size).await;
             drop(permit);
             res
         });
@@ -530,11 +536,18 @@ async fn filter_file_list_by_tantivy_index(
 }
 
 pub async fn get_tantivy_directory(
-    trace_id: &str,
+    _trace_id: &str,
     file_name: &str,
+    file_size: usize,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    let index_file_bytes = infra::cache::file_data::get(trace_id, file_name, None).await?;
-    let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
+    let source = object_store::ObjectMeta {
+        location: file_name.into(),
+        last_modified: *BASE_TIME,
+        size: file_size,
+        e_tag: None,
+        version: None,
+    };
+    let puffin_dir = PuffinDirReader::from_path(source).await?;
     Ok(Box::new(puffin_dir))
 }
 
@@ -543,6 +556,7 @@ async fn search_tantivy_index(
     parquet_file_name: &str,
     tantivy_query: &str,
     records: i64,
+    file_size: usize,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
     let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
@@ -552,15 +566,32 @@ async fn search_tantivy_index(
         ));
     };
 
-    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name).await?;
+    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;
     let tantivy_searcher = tantivy_reader.searcher();
     let fts_field = tantivy_schema.get_field("_all").unwrap();
+
+    // generate the tantivy query
     let condition: IndexCondition = json::from_str(tantivy_query)?;
     let query = condition.to_tantivy_query(tantivy_schema, fts_field);
-    let matched_docs = tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)?;
+
+    // warm up the terms in the query
+    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
+        HashMap::new();
+    query.query_terms(&mut |term, need_position| {
+        let field = term.field();
+        let entry = warm_terms.entry(field).or_default();
+        entry.insert(term.clone(), need_position);
+    });
+    warm_up_terms(&tantivy_searcher, &warm_terms).await?;
+
+    // search the index
+    let matched_docs = tokio::task::spawn_blocking(move || {
+        tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
+    })
+    .await??;
 
     // return early if no matches in tantivy
     if matched_docs.is_empty() {
