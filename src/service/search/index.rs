@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use config::INDEX_FIELD_NAME_FOR_ALL;
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
@@ -81,6 +82,15 @@ impl IndexCondition {
             })
             .collect::<Vec<_>>();
         Box::new(BooleanQuery::from(queries))
+    }
+
+    pub fn get_fields(&self) -> HashSet<String> {
+        self.conditions
+            .iter()
+            .fold(HashSet::new(), |mut acc, condition| {
+                acc.extend(condition.get_fields());
+                acc
+            })
     }
 }
 
@@ -202,6 +212,23 @@ impl Condition {
                 ]))
             }
         }
+    }
+
+    pub fn get_fields(&self) -> HashSet<String> {
+        let mut fields = HashSet::new();
+        match self {
+            Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::MatchAll(_) => {
+                fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
+            }
+            Condition::Or(left, right) | Condition::And(left, right) => {
+                fields.extend(left.get_fields());
+                fields.extend(right.get_fields());
+            }
+        }
+        fields
     }
 }
 

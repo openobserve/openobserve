@@ -25,6 +25,7 @@ use config::{
         stream::FileKey,
     },
     utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json, time::BASE_TIME},
+    INDEX_FIELD_NAME_FOR_ALL,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
@@ -571,11 +572,11 @@ async fn search_tantivy_index(
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;
     let tantivy_searcher = tantivy_reader.searcher();
-    let fts_field = tantivy_schema.get_field("_all").unwrap();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
 
     // generate the tantivy query
     let condition: IndexCondition = json::from_str(index_condition)?;
-    let query = condition.to_tantivy_query(tantivy_schema, fts_field);
+    let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field);
 
     // warm up the terms in the query
     let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
@@ -585,6 +586,13 @@ async fn search_tantivy_index(
         let entry = warm_terms.entry(field).or_default();
         entry.insert(term.clone(), need_position);
     });
+    // if no terms are found in the query, warm up all fields
+    if warm_terms.is_empty() {
+        for field in condition.get_fields() {
+            let field = tantivy_schema.get_field(&field).unwrap();
+            warm_terms.insert(field, HashMap::new());
+        }
+    }
     warm_up_terms(&tantivy_searcher, &warm_terms).await?;
 
     // search the index
