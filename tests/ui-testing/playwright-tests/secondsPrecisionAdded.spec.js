@@ -1,5 +1,5 @@
 // Implementation test.spec.js
-import { test, expect } from '@playwright/test';
+import { test, expect } from "./baseFixtures";
 import { LoginPage } from '../pages/loginPage.js';
 import { LogsPage } from '../pages/logsPage.js';
 //import { TracesPage } from '../pages/tracesPage.js';
