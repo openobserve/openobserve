@@ -25,6 +25,7 @@ import { DateTime as _DateTime } from "luxon";
 
 let moment: any;
 let momentInitialized = false;
+let organizationData = ref({});
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -246,7 +247,10 @@ export const getSessionStorageVal = (key: string) => {
 };
 
 export const useLocalOrganization = (val: any = "", isDelete = false) => {
-  return useLocalStorage("organization", val, isDelete, true);
+  if (val != "") {
+    organizationData.value = val;
+  }
+  return organizationData;
 };
 
 export const useLocalCurrentUser = (val = "", isDelete = false) => {
