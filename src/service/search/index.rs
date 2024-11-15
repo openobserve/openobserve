@@ -110,14 +110,14 @@ impl Condition {
                 op: BinaryOperator::Eq,
                 right,
             } => {
-                let field = if is_value(left) && is_field(right) {
-                    trim_quotes(get_field_name(right).as_str())
+                let (field, value) = if is_value(left) && is_field(right) {
+                    (get_field_name(right), get_value(left))
                 } else if is_value(right) && is_field(left) {
-                    trim_quotes(get_field_name(left).as_str())
+                    (get_field_name(left), get_value(right))
                 } else {
                     unreachable!()
                 };
-                Condition::Equal(field, trim_quotes(right.to_string().as_str()))
+                Condition::Equal(field, value)
             }
             Expr::Function(func) => {
                 if !func
@@ -263,6 +263,13 @@ fn get_field_name(expr: &Expr) -> String {
     match expr {
         Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
         Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
+        _ => unreachable!(),
+    }
+}
+
+fn get_value(expr: &Expr) -> String {
+    match expr {
+        Expr::Value(value) => trim_quotes(value.to_string().as_str()),
         _ => unreachable!(),
     }
 }
