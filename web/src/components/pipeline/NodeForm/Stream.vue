@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <label class="q-mb-xs q-mt-none text-bold" style="color: #BABABA;">
             {{ t('alerts.stream_name') + ' *' }}
           </label>
+          
           <q-icon
             :name="outlinedInfo"
             size="17px"
@@ -167,6 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="padding-top: 4px !important;"
            
             />
+
+
 
           </div>
         </div>
@@ -306,12 +309,11 @@ watch(selected, (newValue:any) => {
 watch(() => dynamic_stream_name.value,
 ()=>{
   if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== ""){
-    const regex = /\{\{.+\}\}/;
+    const regex = /\{(?!\{)[^{}]+\}(?!\})/g;
 
 // Check if there is any value between {{ stream_name }}
       if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
         saveDynamicStream();
-        console.log(dynamic_stream_name.value, "val");
       }
    
   }
