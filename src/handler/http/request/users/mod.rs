@@ -41,8 +41,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
-                UserRequest, UserRole,
+                AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
+                UserOrgRole, UserRequest, UserRole, UserRoleRequest,
             },
         },
         utils::auth::{generate_presigned_url, UserEmail},
@@ -90,13 +90,13 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 #[post("/{org_id}/users")]
 pub async fn save(
     org_id: web::Path<String>,
-    user: web::Json<UserRequest>,
+    user: web::Json<PostUserRequest>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
-    let mut user = user.into_inner();
-    user.email = user.email.trim().to_string();
+    let mut user = UserRequest::from(&user.into_inner());
+    user.email = user.email.trim().to_lowercase();
 
     if user.role.base_role.eq(&meta::user::UserRole::Root) {
         return Ok(
@@ -179,12 +179,12 @@ pub async fn update(
 #[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
-    role: web::Json<UserOrgRole>,
+    role: web::Json<UserRoleRequest>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let initiator_id = user_email.user_id;
-    let role = role.into_inner();
+    let role = UserOrgRole::from(&role.into_inner());
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
@@ -253,7 +253,6 @@ pub async fn authentication(
     let native_login_enabled = get_o2_config().dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
-    log::debug!("hello from llogin api: {:#?}", auth);
 
     if !native_login_enabled {
         return Ok(HttpResponse::Forbidden().json("Not Supported"));
@@ -274,7 +273,11 @@ pub async fn authentication(
 
     let mut resp = SignInResponse::default();
     let auth = match auth {
-        Some(auth) => auth.into_inner(),
+        Some(auth) => {
+            let mut auth = auth.into_inner();
+            auth.name = auth.name.to_lowercase();
+            auth
+        }
         None => {
             // get Authorization header from request
             #[cfg(feature = "enterprise")]
@@ -287,7 +290,6 @@ pub async fn authentication(
                             auth_header,
                         )
                     {
-                        log::info!("inside login with auth header enterprise: {name}, {password}");
                         SignInUser { name, password }
                     } else {
                         audit_unauthorized_error(audit_message).await;
@@ -623,20 +625,25 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 #[get("/{org_id}/users/roles")]
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let roles = UserRole::iter()
-        .filter_map(|role| {
-            if role.eq(&UserRole::Root) || role.eq(&UserRole::Member) {
-                None
-            } else {
-                Some(RolesResponse {
-                    label: role.get_label(),
-                    value: role.to_string(),
-                })
-            }
-        })
+        .filter_map(|role| check_role_available(&role))
         .collect::<Vec<RolesResponse>>();
 
-    // TODO: Return custom roles here
     Ok(HttpResponse::Ok().json(roles))
+}
+
+fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
+    if role.eq(&UserRole::Root) || role.eq(&UserRole::Member) {
+        None
+    } else {
+        #[cfg(feature = "enterprise")]
+        if !get_o2_config().openfga.enabled && role.ne(&UserRole::Admin) {
+            return None;
+        }
+        Some(RolesResponse {
+            label: role.get_label(),
+            value: role.to_string(),
+        })
+    }
 }
 
 fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {

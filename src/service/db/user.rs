@@ -36,8 +36,9 @@ impl From<&DBUser> for users::UserRecord {
             .organizations
             .iter()
             .any(|org| org.role.eq(&UserRole::Root));
+        let email = user.email.to_lowercase();
         users::UserRecord::new(
-            &user.email,
+            &email,
             &user.first_name,
             &user.last_name,
             &user.password,
@@ -94,15 +95,17 @@ impl Into<UserRole> for infra::table::org_users::UserRole {
 }
 
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {
-    users::get(email)
+    let email = email.to_lowercase();
+    users::get(&email)
         .await
         .map_err(|e| anyhow::anyhow!("Error getting user record: {e}"))
 }
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
+    let name = name.to_lowercase();
     let user = match org_id {
         None => ROOT_USER.get("root").map(|v| v.value().clone()),
-        Some(org_id) => get_cached_user_org(org_id, name),
+        Some(org_id) => get_cached_user_org(org_id, &name),
     };
 
     if let Some(user) = user {
@@ -113,7 +116,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     }
 
     let org_id = org_id.unwrap();
-    let user = org_users::get_expanded_user_org(org_id, name).await?;
+    let user = org_users::get_expanded_user_org(org_id, &name).await?;
 
     Ok(Some(User {
         email: user.email,
@@ -175,7 +178,8 @@ pub async fn get_by_token(
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let user = match users::get(name).await {
+    let name = name.to_lowercase();
+    let user = match users::get(&name).await {
         Ok(user) => user,
         Err(e) => {
             log::error!("Error retrieving user from db: {e}");
@@ -185,7 +189,7 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
 
     log::debug!("User: {:#?}", user);
     log::debug!("User name: {}", user.email);
-    let orgs = org_users::list_orgs_by_user(name).await?;
+    let orgs = org_users::list_orgs_by_user(&name).await?;
     Ok(DBUser {
         email: user.email,
         password: user.password,
@@ -238,8 +242,9 @@ pub async fn update(
     password: &str,
     password_ext: Option<String>,
 ) -> Result<(), anyhow::Error> {
+    let user_email = user_email.to_lowercase();
     let key = format!("/user_record/{user_email}");
-    let updated_user = users::update(user_email, first_name, last_name, password, password_ext)
+    let updated_user = users::update(&user_email, first_name, last_name, password, password_ext)
         .await
         .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
     let _ = put_into_db_coordinator(
@@ -253,10 +258,11 @@ pub async fn update(
 }
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
+    let name = name.to_lowercase();
     let key = format!("/user_record/{name}");
     // First delete all org_user entries for this user
-    org_users::remove_by_user(name).await?;
-    match users::remove(name).await {
+    org_users::remove_by_user(&name).await?;
+    match users::remove(&name).await {
         Ok(_) => {
             let _ = delete_from_db_coordinator(&key, false, true, None).await;
             Ok(())
@@ -269,7 +275,8 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, anyhow::Error> {
-    db::org_invites::list_by_user(user_id).await
+    let user_id = user_id.to_lowercase();
+    db::org_invites::list_by_user(&user_id).await
 }
 
 pub async fn list_users(

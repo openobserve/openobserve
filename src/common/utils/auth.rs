@@ -203,7 +203,7 @@ impl FromRequest for UserEmail {
         if let Some(auth_header) = req.headers().get("user_id") {
             if let Ok(user_str) = auth_header.to_str() {
                 return ready(Ok(UserEmail {
-                    user_id: user_str.to_owned(),
+                    user_id: user_str.to_lowercase(),
                 }));
             }
         }

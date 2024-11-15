@@ -16,7 +16,7 @@
 use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
-use strum::EnumIter;
+use strum::{EnumIter, IntoEnumIterator};
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -60,6 +60,34 @@ impl UserRequest {
             }],
             is_external,
             password_ext: Some(password_ext),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PostUserRequest {
+    pub email: String,
+    #[serde(default)]
+    pub first_name: String,
+    #[serde(default)]
+    pub last_name: String,
+    pub password: String,
+    #[serde(skip_serializing)]
+    pub role: UserRoleRequest,
+    /// Is the user created via ldap flow.
+    #[serde(default)]
+    pub is_external: bool,
+}
+
+impl From<&PostUserRequest> for UserRequest {
+    fn from(user: &PostUserRequest) -> Self {
+        UserRequest {
+            email: user.email.clone(),
+            first_name: user.first_name.clone(),
+            last_name: user.last_name.clone(),
+            password: user.password.clone(),
+            role: UserOrgRole::from(&user.role),
+            is_external: user.is_external,
         }
     }
 }
@@ -196,10 +224,9 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
 pub enum UserRole {
     #[serde(rename = "admin")]
-    #[default]
     Admin,
     #[serde(rename = "member")] // admin in OpenSource
     Member,
@@ -217,6 +244,20 @@ pub enum UserRole {
     #[cfg(feature = "enterprise")]
     #[serde(rename = "service_account")]
     ServiceAccount,
+}
+
+impl Default for UserRole {
+    fn default() -> Self {
+        let mut role = UserRole::Admin;
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+            if get_o2_config().openfga.enabled {
+                role = get_o2_config().dex.default_role.parse().unwrap();
+            }
+        }
+        role
+    }
 }
 
 impl fmt::Display for UserRole {
@@ -501,6 +542,30 @@ pub struct UserGroupRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UserRoleRequest {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom: Option<String>,
+}
+
+impl From<&UserRoleRequest> for UserOrgRole {
+    fn from(role: &UserRoleRequest) -> Self {
+        let mut standard_role = UserRole::default();
+        let mut custom_role = role.custom.clone();
+        let mut is_role_name_standard = false;
+        for user_role in UserRole::iter() {
+            if user_role.to_string().eq(&role.name) {
+                standard_role = user_role;
+                is_role_name_standard = true;
+                break;
+            }
+        }
+        if !is_role_name_standard && custom_role.is_none() {
+            custom_role = Some(role.name.clone());
+        }
+        UserOrgRole {
+            base_role: standard_role,
+            custom_role,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
