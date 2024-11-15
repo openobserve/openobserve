@@ -354,6 +354,9 @@ pub async fn get_expanded_user_org(
 ) -> Result<OrgUserExpandedRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Email.eq(email))
+        .inner_join(super::users::Entity)
         .select_only()
         .column(super::users::Column::Email)
         .column(super::users::Column::FirstName)
@@ -367,9 +370,6 @@ pub async fn get_expanded_user_org(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedTs)
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
-        .inner_join(super::users::Entity)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -389,6 +389,9 @@ pub async fn get_user_by_rum_token(
 ) -> Result<OrgUserExpandedRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
+        .filter(Column::RumToken.eq(rum_token))
+        .filter(Column::OrgId.eq(org_id))
+        .inner_join(super::users::Entity)
         .select_only()
         .column(super::users::Column::Email)
         .column(super::users::Column::FirstName)
@@ -402,9 +405,6 @@ pub async fn get_user_by_rum_token(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedTs)
-        .filter(Column::RumToken.eq(rum_token))
-        .filter(Column::OrgId.eq(org_id))
-        .inner_join(super::users::Entity)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
