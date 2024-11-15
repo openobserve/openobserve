@@ -52,9 +52,9 @@ pub(crate) async fn verify_decode_token(
                 )?;
 
                 let user_email = if let Some(email) = decoded_token.claims.get("email") {
-                    email.as_str().unwrap()
+                    email.as_str().unwrap().to_lowercase()
                 } else {
-                    ""
+                    "".to_string()
                 };
 
                 let user_name = if let Some(name) = decoded_token.claims.get("name") {
@@ -79,7 +79,7 @@ pub(crate) async fn verify_decode_token(
                 Ok((
                     TokenValidationResponse {
                         is_valid: true,
-                        user_email: user_email.to_owned(),
+                        user_email,
                         user_name: user_name.to_owned(),
                         family_name: family_name.to_owned(),
                         given_name: given_name.to_owned(),

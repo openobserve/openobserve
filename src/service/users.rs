@@ -660,10 +660,12 @@ pub async fn remove_user_from_org(
     email_id: &str,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let _initiating_user = if is_root_user(initiator_id) {
+    let email_id = email_id.to_lowercase();
+    let initiator_id = initiator_id.to_lowercase();
+    let _initiating_user = if is_root_user(&initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
     } else {
-        db::user::get(Some(org_id), initiator_id)
+        db::user::get(Some(org_id), &initiator_id)
             .await
             .unwrap()
             .unwrap()
@@ -680,13 +682,13 @@ pub async fn remove_user_from_org(
     };
 
     if is_allowed {
-        let ret_user = db::user::get_db_user(email_id).await;
+        let ret_user = db::user::get_db_user(&email_id).await;
         match ret_user {
             Ok(mut user) => {
                 if !user.organizations.is_empty() {
                     let mut orgs = user.clone().organizations;
                     if orgs.len() == 1 {
-                        let _ = db::user::delete(email_id).await;
+                        let _ = db::user::delete(&email_id).await;
                         #[cfg(feature = "enterprise")]
                         {
                             use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
@@ -700,7 +702,7 @@ pub async fn remove_user_from_org(
                             };
                             if get_o2_config().openfga.enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
-                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
+                                delete_user_from_org(org_id, &email_id, &user_fga_role).await;
                             }
                         }
                     } else {
@@ -720,7 +722,7 @@ pub async fn remove_user_from_org(
                         }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                         user.organizations = orgs;
-                        let resp = db::org_users::remove(org_id, email_id).await;
+                        let resp = db::org_users::remove(org_id, &email_id).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
                             #[cfg(feature = "enterprise")]
@@ -733,7 +735,7 @@ pub async fn remove_user_from_org(
                                 if get_o2_config().openfga.enabled && _user_fga_role.is_some() {
                                     delete_user_from_org(
                                         org_id,
-                                        email_id,
+                                        &email_id,
                                         _user_fga_role.unwrap().as_str(),
                                     )
                                     .await;
