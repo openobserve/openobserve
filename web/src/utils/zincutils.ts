@@ -246,9 +246,24 @@ export const getSessionStorageVal = (key: string) => {
   }
 };
 
-export const useLocalOrganization = (val: any = "", isDelete = false) => {
-  if (val != "") {
-    organizationData.value = val;
+export const useLocalOrganization = (
+  val: Record<string, unknown> = {},
+  isDelete = false,
+) => {
+  try {
+    if (typeof val === "object") {
+      if (Object.keys(val).length > 0) {
+        organizationDataLocal.value = val;
+      } else if (isDelete) {
+        organizationDataLocal.value = {};
+      }
+      return organizationDataLocal;
+    } else {
+      throw new Error("Invalid organization data format");
+    }
+  } catch (e) {
+    console.log(`Error: Error in useLocalOrganization: ${e}`);
+    return ref({});
   }
   return organizationData;
 };
