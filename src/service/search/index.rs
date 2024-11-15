@@ -8,7 +8,7 @@ use tantivy::{
     Term,
 };
 
-use super::utlis::{conjunction, is_field, is_value, split_conjunction, trim_quotes};
+use super::utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes};
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,

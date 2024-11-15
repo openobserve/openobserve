@@ -57,7 +57,7 @@ use crate::{
         generate_filter_from_equal_items,
         request::Request,
         sql::Sql,
-        utlis::{AsyncDefer, ScanStatsVisitor},
+        utils::{AsyncDefer, ScanStatsVisitor},
         DATAFUSION_RUNTIME,
     },
 };

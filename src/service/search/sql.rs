@@ -53,7 +53,7 @@ use sqlparser::{
 use super::{
     index::{get_index_condition_from_expr, IndexCondition},
     request::Request,
-    utlis::{is_field, is_value, split_conjunction, trim_quotes},
+    utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
