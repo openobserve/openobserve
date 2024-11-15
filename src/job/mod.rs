@@ -85,7 +85,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     // cache users
     tokio::task::spawn(async move { db::user::watch().await });
+    tokio::task::spawn(async move { db::org_users::watch().await });
+    tokio::task::spawn(async move { db::organization::watch().await });
+
     db::user::cache().await.expect("user cache failed");
+    db::organization::cache()
+        .await
+        .expect("organizations cache failed");
     db::org_users::cache().await.expect("org user cache failed");
 
     db::organization::org_settings_cache()

@@ -624,12 +624,8 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     log::debug!("Listing users for org: {}", org_id);
     for user in ORG_USERS.iter() {
-        log::debug!(
-            "Listing user from org_users cache: User: {:?}",
-            user.value()
-        );
         if user.key().starts_with(&format!("{org_id}/")) {
-            if let Some(user) = get_user(None, user.value().email.as_str()).await {
+            if let Some(user) = get_user(Some(org_id), user.value().email.as_str()).await {
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.clone(),
