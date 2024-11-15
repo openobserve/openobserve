@@ -241,16 +241,13 @@ impl ObjectStore for CacheFS {
     }
 }
 
-pub async fn get(location: &Path) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get(location: &Path) -> object_store::Result<bytes::Bytes> {
     let data = DEFAULT.get(location).await?;
     let data = data.bytes().await?;
     Ok(data)
 }
 
-pub async fn get_range(
-    location: &Path,
-    range: Range<usize>,
-) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get_range(location: &Path, range: Range<usize>) -> object_store::Result<bytes::Bytes> {
     let data = DEFAULT.get_range(location, range).await?;
     Ok(data)
 }

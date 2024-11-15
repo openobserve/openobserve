@@ -25,28 +25,8 @@ use object_store::{
     path::Path, Attributes, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
     ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
 };
-use thiserror::Error as ThisError;
 
 use super::GetRangeExt;
-
-/// A specialized `Error` for in-memory object store-related errors
-#[derive(ThisError, Debug)]
-#[allow(missing_docs)]
-enum Error {
-    #[error("Out of range")]
-    OutOfRange(String),
-    #[error("Bad range")]
-    BadRange(String),
-}
-
-impl From<Error> for object_store::Error {
-    fn from(source: Error) -> Self {
-        Self::Generic {
-            store: "tmpfs",
-            source: Box::new(source),
-        }
-    }
-}
 
 /// Tmpfs storage suitable for testing or for opting out of using a cloud
 /// storage provider.
@@ -118,10 +98,10 @@ impl ObjectStore for Tmpfs {
         // log::info!("get_range: {}, {:?}", location, range);
         let data = self.get_bytes(location).await?;
         if range.end > data.len() {
-            return Err(Error::OutOfRange(location.to_string()).into());
+            return Err(super::Error::OutOfRange(location.to_string()).into());
         }
         if range.start > range.end {
-            return Err(Error::BadRange(location.to_string()).into());
+            return Err(super::Error::BadRange(location.to_string()).into());
         }
         Ok(data.slice(range))
     }
@@ -133,10 +113,10 @@ impl ObjectStore for Tmpfs {
             .iter()
             .map(|range| {
                 if range.end > data.len() {
-                    return Err(Error::OutOfRange(location.to_string()).into());
+                    return Err(super::Error::OutOfRange(location.to_string()).into());
                 }
                 if range.start > range.end {
-                    return Err(Error::BadRange(location.to_string()).into());
+                    return Err(super::Error::BadRange(location.to_string()).into());
                 }
                 Ok(data.slice(range.clone()))
             })
