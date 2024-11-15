@@ -405,6 +405,7 @@ async fn write_logs(
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
+                let end_time = chrono::Utc::now().timestamp_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -418,7 +419,9 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val), None).await {
+                    if let Ok((Some(v), _)) =
+                        alert.evaluate(Some(&record_val), (None, end_time)).await
+                    {
                         triggers.push((alert.clone(), v));
                         evaluated_alerts.insert(key);
                     }
