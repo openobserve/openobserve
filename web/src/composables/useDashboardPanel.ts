@@ -3140,13 +3140,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           );
         }
         if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(
-            /\$(\w+|\{\w+\})/g,
-            "VARIABLE_PLACEHOLDER",
+          const isLimitClause = dashboardPanelData.meta.parsedQuery?.limit?.value?.every(
+            (val: any) => val.value === 0
           );
-        }
-
-        dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
+          currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, () => {
+            if (isLimitClause) {
+              return "0"; 
+            } else {
+              return "VARIABLE_PLACEHOLDER"; 
+            }
+          });
+        } 
+        dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);        
       } catch (e) {
         // exit as there is an invalid query
         dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
