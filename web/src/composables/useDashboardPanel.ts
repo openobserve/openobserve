@@ -3227,19 +3227,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           store.state.zoConfig.timestamp_column ?? "_timestamp",
         );
 
-        fields.forEach((field: any) => {
-          const fieldAlias = field.alias ?? field.column;
-          if (
-            !dashboardPanelData.meta.stream.customQueryFields.find(
-              (it: any) => it.name == fieldAlias,
-            )
-          ) {
-            dashboardPanelData.meta.stream.customQueryFields.push({
-              name: fieldAlias,
-              type: "",
-            });
-          }
-        });
+        if (Array.isArray(fields)) {
+          fields.forEach((field: any) => {
+            const fieldAlias = field.alias ?? field.column;
+            if (
+              !dashboardPanelData.meta.stream.customQueryFields.find(
+                (it: any) => it.name == fieldAlias,
+              )
+            ) {
+              dashboardPanelData.meta.stream.customQueryFields.push({
+                name: fieldAlias,
+                type: "",
+              });
+            }
+          });
+        }
 
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
