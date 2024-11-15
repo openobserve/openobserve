@@ -44,6 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="button button-right"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
+                :disabled="isVisualizeToggleAllowed"
+                :title="[
+                  isVisualizeToggleAllowed
+                    ? 'Visualization is disabled for multi stream'
+                    : '',
+                ]"
               >
                 Visualize
               </button>
@@ -2561,6 +2567,10 @@ export default defineComponent({
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
 
+    const isVisualizeToggleAllowed = computed(() => {
+      return searchObj.data.stream.selectedStream.length > 1;
+    });
+
     const changeLogsVisualizeToggle = () => {
       // change logs visualize toggle
       searchObj.meta.logsVisualizeToggle = "logs";
@@ -2715,6 +2725,7 @@ export default defineComponent({
       cancelQuery,
       confirmLogsVisualizeModeChangeDialog,
       changeLogsVisualizeToggle,
+      isVisualizeToggleAllowed,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
       disable,
