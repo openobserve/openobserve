@@ -18,7 +18,9 @@ use std::io::Error;
 use actix_web::{http, http::StatusCode, HttpResponse};
 use config::{
     is_local_disk_storage,
-    meta::stream::{StreamParams, StreamSettings, StreamStats, StreamType, UpdateStreamSettings},
+    meta::stream::{
+        DistinctField, StreamParams, StreamSettings, StreamStats, StreamType, UpdateStreamSettings,
+    },
     utils::json,
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -357,8 +359,8 @@ pub async fn update_stream_settings(
             if !update_settings.distinct_value_fields.add.is_empty() {
                 for f in &update_settings.distinct_value_fields.add {
                     // we ignore full text search fields
-                    if settings.full_text_search_keys.contains(&f)
-                        || update_settings.full_text_search_keys.add.contains(&f)
+                    if settings.full_text_search_keys.contains(f)
+                        || update_settings.full_text_search_keys.add.contains(f)
                     {
                         continue;
                     }
@@ -379,8 +381,12 @@ pub async fn update_stream_settings(
                         ));
                     }
                     // we cannot allow duplicate entries here
-                    if !settings.distinct_value_fields.contains(f) {
-                        settings.distinct_value_fields.push(f.to_owned());
+                    let temp = DistinctField {
+                        name: f.to_owned(),
+                        added_ts: chrono::Utc::now().timestamp_micros(),
+                    };
+                    if !settings.distinct_value_fields.contains(&temp) {
+                        settings.distinct_value_fields.push(temp);
                     }
                 }
             }
@@ -414,7 +420,7 @@ pub async fn update_stream_settings(
                         ));
                     }
                     // here we can be sure that usage is at most 1 record
-                    if let Some(entry) = usage.get(0) {
+                    if let Some(entry) = usage.first() {
                         if entry.origin != OriginType::Stream {
                             return Ok(HttpResponse::BadRequest().json(
                                 MetaHttpResponse::error(
@@ -427,9 +433,12 @@ pub async fn update_stream_settings(
                 }
                 // here we are sure that all fields to be removed can be removed,
                 // so we bulk filter
-                settings
-                    .distinct_value_fields
-                    .retain(|field| !update_settings.distinct_value_fields.remove.contains(field));
+                settings.distinct_value_fields.retain(|field| {
+                    !update_settings
+                        .distinct_value_fields
+                        .remove
+                        .contains(&field.name)
+                });
             }
 
             if !update_settings.full_text_search_keys.add.is_empty() {

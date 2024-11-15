@@ -538,6 +538,21 @@ pub struct UpdateStreamSettings {
     pub approx_partition: Option<bool>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+/// WARNING: this implements Eq trait based only on the name,
+/// so the timestamp will not be considered when comparing two entries
+pub struct DistinctField {
+    pub name: String,
+    pub added_ts: i64,
+}
+
+impl PartialEq for DistinctField {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Eq for DistinctField {}
+
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
@@ -567,7 +582,7 @@ pub struct StreamSettings {
     pub approx_partition: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
-    pub distinct_value_fields: Vec<String>,
+    pub distinct_value_fields: Vec<DistinctField>,
 }
 
 impl Serialize for StreamSettings {
@@ -713,7 +728,7 @@ impl From<&str> for StreamSettings {
         if let Some(value) = fields {
             let v: Vec<_> = value.as_array().unwrap().iter().collect();
             for item in v {
-                distinct_value_fields.push(item.as_str().unwrap().to_string())
+                distinct_value_fields.push(serde_json::from_value(item.clone()).unwrap())
             }
         }
 

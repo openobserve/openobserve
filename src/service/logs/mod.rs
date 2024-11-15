@@ -436,10 +436,12 @@ async fn write_logs(
 
         // get distinct_value items
         let mut map = Map::new();
-        for field in DISTINCT_FIELDS
-            .iter()
-            .chain(stream_settings.distinct_value_fields.iter())
-        {
+        for field in DISTINCT_FIELDS.iter().chain(
+            stream_settings
+                .distinct_value_fields
+                .iter()
+                .map(|f| &f.name),
+        ) {
             if let Some(val) = record_val.get(field) {
                 map.insert(field.clone(), val.clone());
             }

@@ -15,7 +15,7 @@
 
 use actix_web::web;
 use config::{
-    meta::stream::StreamType,
+    meta::stream::{DistinctField, StreamType},
     utils::{hash::Sum64, json},
 };
 use hashbrown::HashMap;
@@ -123,9 +123,12 @@ macro_rules! update_distinct_variables {
                         &f,
                     )
                     .await?;
-
-                    if !stream_settings.distinct_value_fields.contains(&f) {
-                        stream_settings.distinct_value_fields.push(f.to_owned());
+                    let _temp = DistinctField {
+                        name: f.to_owned(),
+                        added_ts: chrono::Utc::now().timestamp_micros(),
+                    };
+                    if !stream_settings.distinct_value_fields.contains(&_temp) {
+                        stream_settings.distinct_value_fields.push(_temp);
                         _new_added = true;
                     }
                 }
@@ -485,7 +488,7 @@ pub(crate) async fn delete(
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
-    let ids: Vec<_> = db::list(&key)
+    let ids: Vec<_> = db::list(key)
         .await?
         .into_values()
         .map(|val| {

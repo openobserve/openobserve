@@ -56,6 +56,48 @@ pub mod job;
 pub mod multi_streams;
 pub mod saved_view;
 
+async fn can_use_distinct_stream(
+    org: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    fields: &[String],
+    start_time: i64,
+) -> bool {
+    if fields.len() != 1 {
+        return false;
+    }
+    if !matches!(stream_type, StreamType::Logs | StreamType::Traces) {
+        return false;
+    }
+    let field = &fields[0];
+    if DISTINCT_FIELDS.contains(field) {
+        // if this is set on a global level, we have to assume
+        // it has been set for long enough.
+        return true;
+    }
+
+    let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+
+    let settings_entries: Vec<_> = stream_settings
+        .distinct_value_fields
+        .iter()
+        .filter(|f| f.name == *field)
+        .collect();
+
+    if settings_entries.is_empty() {
+        return false;
+    }
+    if let Some(entry) = settings_entries.first() {
+        // if the  field has been added before our search start time, we can use the
+        // distinct stream, otherwise not.
+        entry.added_ts < start_time
+    } else {
+        false
+    }
+}
+
 /// SearchStreamData
 #[utoipa::path(
     context_path = "/api",
@@ -659,10 +701,6 @@ pub async fn values(
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, StreamType::Logs)
-        .await
-        .unwrap_or_default();
-
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
@@ -695,23 +733,27 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    // check that  we have exactly one field, it is either in the default distinct fields or
-    // stream specific distinct fields and the sql doesn't have where clause
-    let is_distinct_field = fields.len() == 1
-        && (DISTINCT_FIELDS.contains(&fields[0])
-            || stream_settings.distinct_value_fields.contains(&fields[0]));
-    let stream_is_log_or_trace = matches!(stream_type, StreamType::Logs | StreamType::Traces);
+    let start_time = query
+        .get("start_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    if is_distinct_field && stream_is_log_or_trace && !query_sql.to_lowercase().contains(" where ")
-    {
+    let use_distinct_stream =
+        can_use_distinct_stream(&org_id, &stream_name, stream_type, &fields, start_time).await;
+
+    if use_distinct_stream && !query_sql.to_lowercase().contains(" where ") {
         if let Some(v) = query.get("filter") {
             if !v.is_empty() {
                 let column = v.splitn(2, '=').collect::<Vec<_>>();
                 let filter_field = column[0].to_string();
-                let filter_is_distinct_field = DISTINCT_FIELDS.contains(&filter_field)
-                    || stream_settings
-                        .distinct_value_fields
-                        .contains(&filter_field);
+
+                let filter_is_distinct_field = can_use_distinct_stream(
+                    &org_id,
+                    &stream_name,
+                    stream_type,
+                    &[filter_field],
+                    start_time,
+                )
+                .await;
 
                 if filter_is_distinct_field {
                     // has filter and the filter can be used to distinct_values
@@ -1223,7 +1265,6 @@ async fn values_v2(
         .with_label_values(&[org_id])
         .dec();
 
-    log::warn!("{query_sql}");
     // search
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1280,7 +1321,6 @@ async fn values_v2(
             });
         }
     };
-    log::warn!("{:?}", resp_search);
 
     let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();

@@ -717,10 +717,12 @@ async fn write_traces(
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
         let mut map = Map::new();
-        for field in DISTINCT_FIELDS
-            .iter()
-            .chain(stream_settings.distinct_value_fields.iter())
-        {
+        for field in DISTINCT_FIELDS.iter().chain(
+            stream_settings
+                .distinct_value_fields
+                .iter()
+                .map(|f| &f.name),
+        ) {
             if let Some(val) = record_val.get(field) {
                 map.insert(field.clone(), val.clone());
             }
