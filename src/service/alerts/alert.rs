@@ -352,7 +352,7 @@ pub trait AlertExt: Sync + Send + 'static {
     async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-        start_time: Option<i64>,
+        (start_time, end_time): (Option<i64>, i64),
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
@@ -370,7 +370,7 @@ impl AlertExt for Alert {
     async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-        start_time: Option<i64>,
+        (start_time, end_time): (Option<i64>, i64),
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
@@ -385,7 +385,7 @@ impl AlertExt for Alert {
                     Some(&self.stream_name),
                     self.stream_type,
                     &self.trigger_condition,
-                    start_time,
+                    (start_time, end_time),
                     Some(SearchEventType::Alerts),
                     Some(search_event_ctx),
                 )
