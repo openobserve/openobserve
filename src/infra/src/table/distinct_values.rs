@@ -35,21 +35,23 @@ pub enum OriginType {
     Report,
 }
 
-// define the distinct fields table
+/// Define the distinct fields table
+/// Primary key for this is composite of all fields, i.e.
+/// There will always be only one entry for specific origin-stream-field combination
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "distinct_value_fields")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = true)]
-    pub id: i64,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "Text")]
     pub origin: OriginType,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "Text")]
     pub origin_id: String,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "Text")]
     pub org_name: String,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "Text")]
     pub stream_name: String,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "Text")]
+    pub stream_type: String,
+    #[sea_orm(primary_key, column_type = "Text")]
     pub field_name: String,
 }
 
@@ -70,16 +72,25 @@ pub struct DistinctFieldRecord {
     pub origin_id: String,
     pub org_name: String,
     pub stream_name: String,
+    pub stream_type: String,
     pub field_name: String,
 }
 
 impl DistinctFieldRecord {
-    pub fn new(origin: OriginType, origin_id: &str, org: &str, stream: &str, field: &str) -> Self {
+    pub fn new(
+        origin: OriginType,
+        origin_id: &str,
+        org: &str,
+        stream: &str,
+        stream_type: String,
+        field: &str,
+    ) -> Self {
         Self {
             origin,
             origin_id: origin_id.to_owned(),
             org_name: org.to_owned(),
             stream_name: stream.to_owned(),
+            stream_type,
             field_name: field.to_owned(),
         }
     }
@@ -114,20 +125,29 @@ pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
         origin_id: Set(record.origin_id),
         org_name: Set(record.org_name),
         stream_name: Set(record.stream_name),
+        stream_type: Set(record.stream_type),
         field_name: Set(record.field_name),
-        ..Default::default()
     };
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record)
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let res = Entity::insert(record).exec(client).await;
 
-    Ok(())
+    match res {
+        Ok(_) => Ok(()),
+        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+            // unique violation will occur when we try to re-insert the same combination
+            // which is ok, because what we want is already there.
+            if e.is_unique_violation() {
+                Ok(())
+            } else {
+                Err(Error::DbError(DbError::SeaORMError(e.to_string())))
+            }
+        }
+        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+    }
 }
 
 pub async fn remove(record: DistinctFieldRecord) -> Result<(), errors::Error> {
@@ -139,8 +159,8 @@ pub async fn remove(record: DistinctFieldRecord) -> Result<(), errors::Error> {
         origin_id: Set(record.origin_id),
         org_name: Set(record.org_name),
         stream_name: Set(record.stream_name),
+        stream_type: Set(record.stream_type),
         field_name: Set(record.field_name),
-        ..Default::default()
     };
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -155,12 +175,14 @@ pub async fn remove(record: DistinctFieldRecord) -> Result<(), errors::Error> {
 pub async fn check_field_use(
     org_name: &str,
     stream_name: &str,
+    stream_type: &str,
     field_name: &str,
 ) -> Result<Vec<DistinctFieldRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let records = Entity::find()
         .filter(Column::OrgName.eq(org_name))
         .filter(Column::StreamName.eq(stream_name))
+        .filter(Column::StreamName.eq(stream_type))
         .filter(Column::FieldName.eq(field_name))
         .into_model::<DistinctFieldRecord>()
         .all(client)
@@ -169,6 +191,8 @@ pub async fn check_field_use(
     Ok(records)
 }
 
+/// This is specifically for the case when a dashboard is deleted, we can bulk remove
+/// the dependencies, without having to go through one by one
 pub async fn batch_remove(origin: OriginType, origin_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;

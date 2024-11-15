@@ -697,15 +697,23 @@ pub async fn values(
 
     // check that  we have exactly one field, it is either in the default distinct fields or
     // stream specific distinct fields and the sql doesn't have where clause
-    if fields.len() == 1
+    let is_distinct_field = fields.len() == 1
         && (DISTINCT_FIELDS.contains(&fields[0])
-            || stream_settings.distinct_value_fields.contains(&fields[0]))
-        && !query_sql.to_lowercase().contains(" where ")
+            || stream_settings.distinct_value_fields.contains(&fields[0]));
+    let stream_is_log_or_trace = matches!(stream_type, StreamType::Logs | StreamType::Traces);
+
+    if is_distinct_field && stream_is_log_or_trace && !query_sql.to_lowercase().contains(" where ")
     {
         if let Some(v) = query.get("filter") {
             if !v.is_empty() {
                 let column = v.splitn(2, '=').collect::<Vec<_>>();
-                if DISTINCT_FIELDS.contains(&column[0].to_string()) {
+                let filter_field = column[0].to_string();
+                let filter_is_distinct_field = DISTINCT_FIELDS.contains(&filter_field)
+                    || stream_settings
+                        .distinct_value_fields
+                        .contains(&filter_field);
+
+                if filter_is_distinct_field {
                     // has filter and the filter can be used to distinct_values
                     return values_v2(
                         &org_id,
@@ -720,6 +728,8 @@ pub async fn values(
                     )
                     .await;
                 }
+                // if filter is not a distinct field, we fallback to v1 outside
+                // the containing if-block
             } else {
                 // no filter
                 return values_v2(
