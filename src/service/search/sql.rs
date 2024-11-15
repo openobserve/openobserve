@@ -206,7 +206,8 @@ impl Sql {
             .inverted_index_search_format
             .eq("tantivy")
             && stream_names.len() == 1
-            && get_config().common.full_text_search_type.as_str() != "contains"
+            && get_config().common.inverted_index_enabled
+            && use_inverted_index
         {
             let mut index_visitor = IndexVisitor::new(&used_schemas);
             statement.visit(&mut index_visitor);
