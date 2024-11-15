@@ -198,7 +198,6 @@ impl Sql {
             }
         }
 
-        // TODO: only can do this if the stream is create after this change
         // 10. generate tantivy query
         let mut tantivy_query = None;
         if get_config()
@@ -209,7 +208,8 @@ impl Sql {
             && get_config().common.inverted_index_enabled
             && use_inverted_index
         {
-            let mut index_visitor = IndexVisitor::new(&used_schemas);
+            let is_remove_filter = get_config().common.feature_query_remove_filter_with_index;
+            let mut index_visitor = IndexVisitor::new(&used_schemas, is_remove_filter);
             statement.visit(&mut index_visitor);
             tantivy_query = index_visitor.tantivy_query;
         }
@@ -523,11 +523,12 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
 // generate tantivy from sql and remove filter when we can
 struct IndexVisitor {
     index_fields: HashSet<String>,
+    is_remove_filter: bool,
     tantivy_query: Option<IndexCondition>,
 }
 
 impl IndexVisitor {
-    fn new(schemas: &HashMap<String, Arc<SchemaCache>>) -> Self {
+    fn new(schemas: &HashMap<String, Arc<SchemaCache>>, is_remove_filter: bool) -> Self {
         let index_fields = if let Some((_, schema)) = schemas.iter().next() {
             let stream_settings = unwrap_stream_settings(schema.schema());
             let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -537,14 +538,16 @@ impl IndexVisitor {
         };
         Self {
             index_fields,
+            is_remove_filter,
             tantivy_query: None,
         }
     }
 
     #[allow(dead_code)]
-    fn new_from_index_fields(index_fields: HashSet<String>) -> Self {
+    fn new_from_index_fields(index_fields: HashSet<String>, is_remove_filter: bool) -> Self {
         Self {
             index_fields,
+            is_remove_filter,
             tantivy_query: None,
         }
     }
@@ -558,7 +561,7 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.tantivy_query = Some(index);
-                if get_config().common.feature_query_remove_filter_with_index {
+                if self.is_remove_filter {
                     select.selection = other_expr;
                 }
             }
@@ -1254,7 +1257,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "name:a AND (name:b OR (good* AND bar*))";
         let expected_sql = "SELECT * FROM t WHERE age = 1 AND (match_all('foo') OR age = 2)";
@@ -1274,7 +1277,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "";
         let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND (age > 1) AND (match_all('foo') OR abs(age) = 2)";
@@ -1298,7 +1301,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "";
         let expected_sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
@@ -1322,7 +1325,7 @@ mod tests {
             .unwrap();
         let mut index_fields = HashSet::new();
         index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
         statement.visit(&mut index_visitor);
         let expected = "((name:b OR (good* AND bar*)) OR (foo* AND name:c))";
         let expected_sql = "SELECT * FROM t";
