@@ -15,10 +15,13 @@
 
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use config::meta::{
-    cluster::{IntoArcVec, RoleGroup},
-    search::{ScanStats, SearchEventType},
-    stream::FileKey,
+use config::{
+    meta::{
+        cluster::{IntoArcVec, RoleGroup},
+        search::{ScanStats, SearchEventType},
+        stream::FileKey,
+    },
+    utils::json,
 };
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::ExecutionPlan, prelude::SessionContext,
@@ -46,8 +49,9 @@ use crate::service::search::{
         exec::prepare_datafusion_context,
     },
     generate_filter_from_equal_items,
+    index::IndexCondition,
     request::Request,
-    utlis::AsyncDefer,
+    utils::AsyncDefer,
 };
 
 /// in cluster search function only single stream take part in
@@ -204,6 +208,12 @@ pub async fn search(
         )
         .await;
 
+    let index_condition: Option<IndexCondition> =
+        match json::from_str(&flight_request.index_condition) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        };
+
     let context = tracing::Span::current().context();
     // add sort preserving merge node to preserving the order
     if physical_plan.name() == "SortPreservingMergeExec" {
@@ -214,6 +224,7 @@ pub async fn search(
             idx_file_list,
             flight_request.equal_keys.clone(),
             flight_request.match_all_keys.clone(),
+            index_condition,
             false,
             req.clone(),
             nodes.into_arc_vec(),
@@ -227,6 +238,7 @@ pub async fn search(
             idx_file_list,
             flight_request.equal_keys.clone(),
             flight_request.match_all_keys.clone(),
+            index_condition,
             false,
             req.clone(),
             nodes.into_arc_vec(),
