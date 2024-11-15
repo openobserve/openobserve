@@ -236,7 +236,7 @@ pub async fn delete(
 
 /// AuthenticateUser
 #[utoipa::path(
-    context_path = "/auth",
+context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
@@ -253,6 +253,7 @@ pub async fn authentication(
     let native_login_enabled = get_o2_config().dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
+    log::debug!("hello from llogin api: {:#?}", auth);
 
     if !native_login_enabled {
         return Ok(HttpResponse::Forbidden().json("Not Supported"));
@@ -286,6 +287,7 @@ pub async fn authentication(
                             auth_header,
                         )
                     {
+                        log::info!("inside login with auth header enterprise: {name}, {password}");
                         SignInUser { name, password }
                     } else {
                         audit_unauthorized_error(audit_message).await;
@@ -307,7 +309,6 @@ pub async fn authentication(
     {
         audit_message.user_email = auth.name.clone();
     }
-
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {

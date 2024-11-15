@@ -40,6 +40,7 @@ pub async fn add(
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add user to org: {}", e))?;
 
+    log::debug!("Put into db_coordinator: {user_email}");
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     Ok(())
 }
@@ -198,6 +199,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
+                log::info!("Put event org_user: {:?}", ev);
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 if item_key.starts_with("single") {
                     let item_key = item_key.strip_prefix("single/").unwrap();
