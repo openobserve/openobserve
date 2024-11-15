@@ -64,6 +64,7 @@ pub async fn validator(
         None => req.request().path(),
     };
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
+        log::debug!("Inside validator auth_ext");
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
         validate_credentials_ext(user_id, password, path, auth_token, req.method()).await
@@ -71,6 +72,7 @@ pub async fn validator(
         validate_credentials(user_id, password.trim(), path, req.method()).await
     } {
         Ok(res) => {
+            log::debug!("Token Validation Response: {:#?}", res);
             if res.is_valid {
                 // / Hack for prometheus, need support POST and check the header
                 let mut req = req;
@@ -96,7 +98,10 @@ pub async fn validator(
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
             }
         }
-        Err(err) => Err((err, req)),
+        Err(err) => {
+            log::debug!("Token Validation Error: {:#?}", err);
+            Err((err, req))
+        }
     }
 }
 
@@ -128,6 +133,7 @@ pub async fn validate_credentials(
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
+        log::debug!("DB User: {:#?}", db_user);
         match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
@@ -137,7 +143,10 @@ pub async fn validate_credentials(
                     all_users.first().cloned()
                 }
             }
-            Err(_) => None,
+            Err(e) => {
+                log::debug!("Error getting user in validate_credentials: {}", e);
+                None
+            }
         }
     } else {
         match path.find('/') {
@@ -236,6 +245,7 @@ pub async fn validate_credentials_ext(
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
+        log::debug!("DB User ext: {:#?}", db_user);
         match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
@@ -580,13 +590,16 @@ async fn oo_validator_internal(
         };
         validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
+        log::debug!("Bearer token found");
         super::token::token_validator(req, auth_info).await
     } else if auth_info.auth.starts_with("{\"auth_ext\":") {
+        log::debug!("Auth ext token found");
         let auth_tokens: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
         if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
             Err((ErrorUnauthorized("Unauthorized Access"), req))
         } else {
+            log::debug!("Auth ext token found: decoding");
             let decoded = match base64::decode(
                 auth_tokens
                     .auth_ext
@@ -601,6 +614,7 @@ async fn oo_validator_internal(
                 Some(value) => value,
                 None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
             };
+            log::info!("Auth ext token found: validating: {username} {password}");
             validator(req, &username, &password, auth_info, path_prefix).await
         }
     } else {
@@ -695,6 +709,7 @@ pub async fn oo_validator(
             };
         }
     };
+    log::debug!("Auth info: {:#?}", auth_info);
 
     match oo_validator_internal(req, auth_info, path_prefix).await {
         Ok(service_req) => Ok(service_req),
@@ -740,6 +755,8 @@ pub(crate) async fn check_permissions(
     }
 
     let object_str = auth_info.o2_type;
+    log::debug!("Checking permissions for user {user_id} with object {object_str}");
+    log::debug!("Role of user {user_id} is {:#?}", role);
     let obj_str = if object_str.contains("##user_id##") {
         object_str.replace("##user_id##", user_id)
     } else {
