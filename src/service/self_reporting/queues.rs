@@ -19,7 +19,8 @@ use config::{
     get_config,
     meta::{
         self_reporting::{
-            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM},
+            error::ErrorData,
+            usage::{TriggerData, ERROR_STREAM, TRIGGERS_USAGE_STREAM},
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
         },
         stream::{StreamParams, StreamType},
@@ -168,11 +169,46 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             TRIGGERS_USAGE_STREAM,
             StreamType::Logs,
         );
-        super::ingestion::ingest_reporting_data(triggers, trigger_stream).await;
+        // on error in ingesting usage data, push back the data
+        if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
+            .await
+            .is_err()
+            && &cfg.common.usage_reporting_mode != "both"
+        {
+            // on error in ingesting usage data, push back the data
+            for trigger_json in triggers {
+                let trigger: TriggerData = json::from_value(trigger_json).unwrap();
+                if let Err(e) = USAGE_QUEUE
+                    .enqueue(ReportingData::Trigger(Box::new(trigger)))
+                    .await
+                {
+                    log::error!(
+                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                    );
+                }
+            }
+        }
     }
 
     if !errors.is_empty() {
         let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
-        super::ingestion::ingest_reporting_data(errors, error_stream).await;
+        if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
+            .await
+            .is_err()
+            && &cfg.common.usage_reporting_mode != "both"
+        {
+            // on error in ingesting usage data, push back the data
+            for error_json in errors {
+                let error: ErrorData = json::from_value(error_json).unwrap();
+                if let Err(e) = USAGE_QUEUE
+                    .enqueue(ReportingData::Error(Box::new(error)))
+                    .await
+                {
+                    log::error!(
+                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                    );
+                }
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use anyhow::{anyhow, Result};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -155,29 +156,34 @@ pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
             .collect::<Vec<_>>();
         // report usage data
         let usage_stream = StreamParams::new(&cfg.common.usage_org, USAGE_STREAM, StreamType::Logs);
-        ingest_reporting_data(report_data, usage_stream).await;
-        // // on error in ingesting usage data, push back the data
-        // for usage_data in curr_usages {
-        //     if let Err(e) = super::queues::USAGE_QUEUE
-        //         .enqueue(ReportingData::Usage(Box::new(usage_data)))
-        //         .await
-        //     {
-        //         log::error!(
-        //             "[SELF-REPORTING] Error in pushing back un-ingested Usage data to
-        // UsageQueuer: {e}"         );
-        //     }
-        // }
+        if ingest_reporting_data(report_data, usage_stream)
+            .await
+            .is_err()
+            && &cfg.common.usage_reporting_mode != "both"
+        {
+            // on error in ingesting usage data, push back the data
+            for usage_data in curr_usages {
+                if let Err(e) = super::queues::USAGE_QUEUE
+                    .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                    .await
+                {
+                    log::error!(
+                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                    );
+                }
+            }
+        }
     }
 }
 
-// TODO(taiming): handle errors. maybe retries?
+// TODO(taiming): should trigger and error data consider the usage_reporting_mode the same way?
 pub(super) async fn ingest_reporting_data(
     reporting_data_json: Vec<json::Value>,
     stream_params: StreamParams,
-) {
+) -> Result<()> {
     if reporting_data_json.is_empty() {
         log::info!("[SELF-REPORTING] Returning as no errors reported");
-        return;
+        return Ok(());
     }
 
     if LOCAL_NODE.is_ingester() {
@@ -193,13 +199,15 @@ pub(super) async fn ingest_reporting_data(
                 log::info!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
+                Ok(())
             }
             error => {
                 let err =
                     error.map_or_else(|e| e.to_string(), |resp| resp.error.unwrap_or_default());
                 log::error!(
-                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}. Error: {err}"
+                    "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
                 );
+                Err(anyhow!("{err}"))
             }
         }
     } else {
@@ -223,12 +231,14 @@ pub(super) async fn ingest_reporting_data(
                 log::info!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
+                Ok(())
             }
             error => {
                 let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
                 log::error!(
-                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}. Error: {err}"
+                    "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
                 );
+                Err(anyhow!("{err}"))
             }
         }
     }
