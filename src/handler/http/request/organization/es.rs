@@ -34,6 +34,10 @@ async fn org_index(_org_id: web::Path<String>, req: HttpRequest) -> Result<HttpR
             None => "8.1.0",
         };
     }
+    let es_config_version = config::get_config().common.es_version.to_string();
+    if !es_config_version.is_empty() {
+        version = &es_config_version;
+    }
     let es_info = r#"{"name":"opensearch","cluster_name":"opensearch-cluster","cluster_uuid":"h3nGzoJ1R12fZz","version":{"number":"0.0.0","build_flavor":"default","build_hash":"0","build_date":"0","build_snapshot":false,"lucene_version":"8.9.0","minimum_wire_version":"7.10.0","minimum_index_compatibility":"8.1.0"},"tagline":"You Know, for Search"}"#;
     let es_info = es_info.replace("0.0.0", version);
     Ok(HttpResponse::Ok()
