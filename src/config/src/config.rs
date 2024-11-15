@@ -741,7 +741,7 @@ pub struct Common {
     pub inverted_index_search_format: String,
     #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
-        default = "prefix",
+        default = "eq",
         help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
     )]
     pub full_text_search_type: String,
