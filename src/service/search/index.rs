@@ -1,6 +1,12 @@
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
+use tantivy::{
+    query::{BooleanQuery, Occur, Query, RegexQuery, TermQuery},
+    schema::{Field, IndexRecordOption, Schema},
+    Term,
+};
 
 use super::utlis::{conjunction, is_field, is_value, split_conjunction, trim_quotes};
 
@@ -26,7 +32,7 @@ pub fn get_index_condition_from_expr(
 }
 
 // note the condition in IndexCondition is connection by AND operator
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct IndexCondition {
     pub conditions: Vec<Condition>,
 }
@@ -44,7 +50,7 @@ impl IndexCondition {
 }
 
 // single condition
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Condition {
     // field, value
     Equal(String, String),
@@ -54,6 +60,7 @@ pub enum Condition {
 }
 
 impl IndexCondition {
+    // this only use for display the query
     pub fn to_query(&self) -> String {
         self.conditions
             .iter()
@@ -61,19 +68,33 @@ impl IndexCondition {
             .collect::<Vec<_>>()
             .join(" AND ")
     }
+
+    pub fn to_tantivy_query(&self, schema: Schema, default_fields: Field) -> Box<dyn Query> {
+        let queries = self
+            .conditions
+            .iter()
+            .map(|condition| {
+                (
+                    Occur::Must,
+                    condition.to_tantivy_query(&schema, default_fields),
+                )
+            })
+            .collect::<Vec<_>>();
+        Box::new(BooleanQuery::from(queries))
+    }
 }
 
 impl Condition {
+    // this only use for display the query
     pub fn to_query(&self) -> String {
         let cfg = config::get_config();
         let (prefix, suffix) = match cfg.common.full_text_search_type.as_str() {
             "eq" => ("", ""),
-            "contains" => ("*", "*"), // tantivy don't support this
-            // Default to prefix search
+            "contains" => ("*", "*"),
             _ => ("", "*"),
         };
         match self {
-            Condition::Equal(field, value) => format!("{}:{}{}{}", field, prefix, value, suffix),
+            Condition::Equal(field, value) => format!("{}:{}", field, value),
             Condition::MatchAll(value) => format!("{}{}{}", prefix, value, suffix),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
@@ -134,6 +155,52 @@ impl Condition {
             ),
             Expr::Nested(expr) => Condition::from_expr(expr),
             _ => unreachable!(),
+        }
+    }
+
+    pub fn to_tantivy_query(&self, schema: &Schema, default_fields: Field) -> Box<dyn Query> {
+        match self {
+            Condition::Equal(field, value) => {
+                let field = schema.get_field(field).unwrap();
+                let term = Term::from_field_text(field, value);
+                Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+            }
+            Condition::MatchAll(value) => {
+                let cfg = config::get_config();
+                match cfg.common.full_text_search_type.as_str() {
+                    "eq" => {
+                        let term = Term::from_field_text(default_fields, value);
+                        Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+                    }
+                    "contains" => Box::new(
+                        RegexQuery::from_pattern(&format!(".*{}.*", value), default_fields)
+                            .unwrap(),
+                    ),
+                    // default to prefix search
+                    _ => {
+                        let term = tantivy::Term::from_field_text(default_fields, value);
+                        Box::new(tantivy::query::PhrasePrefixQuery::new_with_offset(vec![(
+                            0, term,
+                        )]))
+                    }
+                }
+            }
+            Condition::Or(left, right) => {
+                let left_query = left.to_tantivy_query(schema, default_fields);
+                let right_query = right.to_tantivy_query(schema, default_fields);
+                Box::new(tantivy::query::BooleanQuery::new(vec![
+                    (tantivy::query::Occur::Should, left_query),
+                    (tantivy::query::Occur::Should, right_query),
+                ]))
+            }
+            Condition::And(left, right) => {
+                let left_query = left.to_tantivy_query(schema, default_fields);
+                let right_query = right.to_tantivy_query(schema, default_fields);
+                Box::new(tantivy::query::BooleanQuery::new(vec![
+                    (tantivy::query::Occur::Must, left_query),
+                    (tantivy::query::Occur::Must, right_query),
+                ]))
+            }
         }
     }
 }

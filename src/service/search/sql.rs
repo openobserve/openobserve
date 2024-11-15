@@ -51,7 +51,7 @@ use sqlparser::{
 };
 
 use super::{
-    index::get_index_condition_from_expr,
+    index::{get_index_condition_from_expr, IndexCondition},
     request::Request,
     utlis::{is_field, is_value, split_conjunction, trim_quotes},
 };
@@ -81,9 +81,9 @@ pub struct Sql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
-    pub sorted_by_time: bool,     // if only order by _timestamp
-    pub use_inverted_index: bool, // if can use inverted index
-    pub tantivy_query: String,    // use for tantivy index
+    pub sorted_by_time: bool,                  // if only order by _timestamp
+    pub use_inverted_index: bool,              // if can use inverted index
+    pub tantivy_query: Option<IndexCondition>, // use for tantivy index
 }
 
 impl Sql {
@@ -200,7 +200,7 @@ impl Sql {
 
         // TODO: only can do this if the stream is create after this change
         // 10. generate tantivy query
-        let mut tantivy_query = "".to_string();
+        let mut tantivy_query = None;
         if get_config()
             .common
             .inverted_index_search_format
@@ -241,7 +241,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, tantivy_query: {}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -257,7 +257,6 @@ impl std::fmt::Display for Sql {
             self.order_by,
             self.histogram_interval,
             self.sorted_by_time,
-            self.tantivy_query
         )
     }
 }
@@ -517,7 +516,7 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
 // generate tantivy from sql and remove filter when we can
 struct IndexVisitor {
     index_fields: HashSet<String>,
-    tantivy_query: String,
+    tantivy_query: Option<IndexCondition>,
 }
 
 impl IndexVisitor {
@@ -531,7 +530,7 @@ impl IndexVisitor {
         };
         Self {
             index_fields,
-            tantivy_query: "".to_string(),
+            tantivy_query: None,
         }
     }
 
@@ -539,7 +538,7 @@ impl IndexVisitor {
     fn new_from_index_fields(index_fields: HashSet<String>) -> Self {
         Self {
             index_fields,
-            tantivy_query: "".to_string(),
+            tantivy_query: None,
         }
     }
 }
@@ -551,7 +550,7 @@ impl VisitorMut for IndexVisitor {
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
-                self.tantivy_query = index.to_query();
+                self.tantivy_query = Some(index);
                 select.selection = other_expr;
             }
         }
@@ -1248,9 +1247,12 @@ mod tests {
         index_fields.insert("name".to_string());
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
         statement.visit(&mut index_visitor);
-        let expected = "name:a* AND (name:b* OR (good* AND bar*))";
+        let expected = "name:a AND (name:b OR (good* AND bar*))";
         let expected_sql = "SELECT * FROM t WHERE age = 1 AND (match_all('foo') OR age = 2)";
-        assert_eq!(index_visitor.tantivy_query, expected);
+        assert_eq!(
+            index_visitor.tantivy_query.clone().unwrap().to_query(),
+            expected
+        );
         assert_eq!(statement.to_string(), expected_sql);
     }
 
@@ -1267,7 +1269,14 @@ mod tests {
         statement.visit(&mut index_visitor);
         let expected = "";
         let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND (age > 1) AND (match_all('foo') OR abs(age) = 2)";
-        assert_eq!(index_visitor.tantivy_query, expected);
+        assert_eq!(
+            index_visitor
+                .tantivy_query
+                .clone()
+                .unwrap_or_default()
+                .to_query(),
+            expected
+        );
         assert_eq!(statement.to_string(), expected_sql);
     }
 
@@ -1284,7 +1293,14 @@ mod tests {
         statement.visit(&mut index_visitor);
         let expected = "";
         let expected_sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
-        assert_eq!(index_visitor.tantivy_query, expected);
+        assert_eq!(
+            index_visitor
+                .tantivy_query
+                .clone()
+                .unwrap_or_default()
+                .to_query(),
+            expected
+        );
         assert_eq!(statement.to_string(), expected_sql);
     }
 
@@ -1299,9 +1315,12 @@ mod tests {
         index_fields.insert("name".to_string());
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields);
         statement.visit(&mut index_visitor);
-        let expected = "((name:b* OR (good* AND bar*)) OR (foo* AND name:c*))";
+        let expected = "((name:b OR (good* AND bar*)) OR (foo* AND name:c))";
         let expected_sql = "SELECT * FROM t";
-        assert_eq!(index_visitor.tantivy_query, expected);
+        assert_eq!(
+            index_visitor.tantivy_query.clone().unwrap().to_query(),
+            expected
+        );
         assert_eq!(statement.to_string(), expected_sql);
     }
 }

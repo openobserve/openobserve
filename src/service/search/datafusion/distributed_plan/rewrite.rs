@@ -27,7 +27,7 @@ use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
-use crate::service::search::request::Request;
+use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -37,7 +37,7 @@ pub struct RemoteScanRewriter {
     pub idx_file_list: Vec<FileKey>,
     pub equal_keys: HashMap<String, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
-    pub tantivy_query: String,
+    pub tantivy_query: Option<IndexCondition>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
     pub context: opentelemetry::Context,
@@ -52,7 +52,7 @@ impl RemoteScanRewriter {
         idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
-        tantivy_query: String,
+        tantivy_query: Option<IndexCondition>,
         is_leader: bool,
         context: opentelemetry::Context,
     ) -> Self {

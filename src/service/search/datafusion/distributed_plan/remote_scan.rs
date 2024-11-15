@@ -26,7 +26,10 @@ use arrow_flight::{
     Ticket,
 };
 use arrow_schema::{Schema, SchemaRef};
-use config::meta::{cluster::NodeInfo, search::ScanStats, stream::FileKey};
+use config::{
+    meta::{cluster::NodeInfo, search::ScanStats, stream::FileKey},
+    utils::json,
+};
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -50,7 +53,7 @@ use tonic::{
 use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
 use crate::service::{
     grpc::get_cached_channel,
-    search::{request::Request, MetadataMap},
+    search::{index::IndexCondition, request::Request, MetadataMap},
 };
 
 /// Execution plan for empty relation with produce_one_row=false
@@ -61,7 +64,7 @@ pub struct RemoteScanExec {
     idx_file_list: Vec<FileKey>,
     equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
-    tantivy_query: String,
+    tantivy_query: Option<IndexCondition>,
     is_super_cluster: bool,
     req: Request,
     nodes: Vec<Arc<dyn NodeInfo>>,
@@ -81,7 +84,7 @@ impl RemoteScanExec {
         idx_file_list: Vec<FileKey>,
         equal_keys: Vec<KvItem>,
         match_all_keys: Vec<String>,
-        tantivy_query: String,
+        tantivy_query: Option<IndexCondition>,
         is_super_cluster: bool,
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
@@ -216,7 +219,7 @@ async fn get_remote_batch(
     idx_file_list: Vec<FileKey>,
     equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
-    tantivy_query: String,
+    tantivy_query: Option<IndexCondition>,
     is_super_cluster: bool,
     req: Request,
     scan_stats: Arc<Mutex<ScanStats>>,
@@ -240,6 +243,11 @@ async fn get_remote_batch(
             .collect()
     } else {
         vec![]
+    };
+
+    let tantivy_query = match tantivy_query {
+        Some(tantivy_query) => json::to_string(&tantivy_query).unwrap(),
+        None => "".to_string(),
     };
 
     let request = FlightSearchRequest {

@@ -25,7 +25,7 @@ use config::{
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json},
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::{future::try_join_all, io::Cursor};
@@ -36,13 +36,13 @@ use infra::{
 };
 use itertools::Itertools;
 use proto::cluster_rpc::KvItem;
-use tantivy::{query::QueryParser, Directory};
+use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, generate_search_schema_diff},
+    search::{datafusion::exec, generate_search_schema_diff, index::IndexCondition},
 };
 
 type CachedFiles = (usize, usize);
@@ -558,8 +558,8 @@ async fn search_tantivy_index(
     let tantivy_reader = tantivy_index.reader()?;
     let tantivy_searcher = tantivy_reader.searcher();
     let fts_field = tantivy_schema.get_field("_all").unwrap();
-    let query_parser = QueryParser::for_index(&tantivy_index, vec![fts_field]);
-    let query = query_parser.parse_query(tantivy_query)?;
+    let condition: IndexCondition = json::from_str(tantivy_query)?;
+    let query = condition.to_tantivy_query(tantivy_schema, fts_field);
     let matched_docs = tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)?;
 
     // return early if no matches in tantivy
