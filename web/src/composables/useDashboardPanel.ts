@@ -2892,7 +2892,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
         const fields = extractFields(
           dashboardPanelData.meta.parsedQuery,
-          "_timestamp",
+          store.state.zoConfig.timestamp_column ?? "_timestamp",
         );
 
         fields.forEach((field: any) => {
