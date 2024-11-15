@@ -37,7 +37,7 @@ use crate::service::search::{
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     request::Request,
     sql::Sql,
-    utlis::ScanStatsVisitor,
+    utils::ScanStatsVisitor,
     DATAFUSION_RUNTIME,
 };
 
@@ -217,6 +217,7 @@ async fn run_datafusion(
         Vec::new(),
         partition_keys,
         match_all_keys,
+        sql.index_condition.clone(),
         true,
         context,
     );
@@ -240,6 +241,7 @@ async fn run_datafusion(
                 .cloned()
                 .unwrap_or_default(),
             rewrite.match_all_keys.clone(),
+            rewrite.index_condition,
             false,
             rewrite.req,
             rewrite.nodes,
