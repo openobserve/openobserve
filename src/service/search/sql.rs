@@ -239,9 +239,13 @@ impl Sql {
 
 impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let tantivy_query = match &self.tantivy_query {
+            Some(query) => query.to_query(),
+            None => "".to_string(),
+        };
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, used_inverted_index: {}, tantivy_query: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -257,6 +261,8 @@ impl std::fmt::Display for Sql {
             self.order_by,
             self.histogram_interval,
             self.sorted_by_time,
+            self.use_inverted_index,
+            tantivy_query,
         )
     }
 }
