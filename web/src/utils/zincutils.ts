@@ -25,7 +25,7 @@ import { DateTime as _DateTime } from "luxon";
 
 let moment: any;
 let momentInitialized = false;
-const organizationDataLocal = ref<Record<string, unknown>>({});
+let organizationData = ref({});
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -246,23 +246,11 @@ export const getSessionStorageVal = (key: string) => {
   }
 };
 
-export const useLocalOrganization = (
-  val: Record<string, unknown> = {},
-  isDelete = false,
-) => {
-  try {
-    if (typeof val === "object") {
-      if (Object.keys(val).length > 0) {
-        organizationDataLocal.value = val;
-      }
-      return organizationDataLocal;
-    } else {
-      throw new Error("Invalid organization data format");
-    }
-  } catch (e) {
-    console.log(`Error: Error in useLocalOrganization: ${e}`);
-    return ref({});
+export const useLocalOrganization = (val: any = "", isDelete = false) => {
+  if (val != "") {
+    organizationData.value = val;
   }
+  return organizationData;
 };
 
 export const useLocalCurrentUser = (val = "", isDelete = false) => {
