@@ -557,7 +557,9 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.tantivy_query = Some(index);
-                select.selection = other_expr;
+                if get_config().common.feature_query_remove_filter_with_index {
+                    select.selection = other_expr;
+                }
             }
         }
         ControlFlow::Continue(())
