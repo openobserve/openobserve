@@ -777,15 +777,15 @@ pub async fn merge_files(
 
     // clear session data
     crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+    // clear cached data
+    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
+    for file in files.iter() {
+        let _ = file_data::disk::remove(&trace_id, file).await;
+    }
 
     let (_new_schema, buf) = match merge_result {
         Ok(v) => v,
         Err(e) => {
-            // clear cached data, maybe the data is currupted
-            let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-            for file in files.iter() {
-                let _ = file_data::disk::remove(&trace_id, file).await;
-            }
             log::error!(
                 "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
                 e,
@@ -1065,7 +1065,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     };
 
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_name = file.key.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -1083,13 +1083,15 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     || e.to_string().to_lowercase().contains("data size is zero")
                 {
                     // delete file from file list
-                    log::warn!("found invalid file: {}", file_name);
+                    log::error!("found invalid file: {}", file_name);
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                         log::error!("[COMPACT] delete from file_list err: {}", e);
                     }
                     Some(file_name)
                 } else {
-                    log::warn!("[COMPACT] download file to cache err: {}", e);
+                    log::error!("[COMPACT] download file to cache err: {}", e);
+                    // remove downloaded file
+                    let _ = file_data::disk::remove("", &file_name).await;
                     None
                 }
             } else {
