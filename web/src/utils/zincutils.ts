@@ -265,7 +265,6 @@ export const useLocalOrganization = (
     console.log(`Error: Error in useLocalOrganization: ${e}`);
     return ref({});
   }
-  return organizationData;
 };
 
 export const useLocalCurrentUser = (val = "", isDelete = false) => {
