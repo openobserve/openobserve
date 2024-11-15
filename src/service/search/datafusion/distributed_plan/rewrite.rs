@@ -37,7 +37,7 @@ pub struct RemoteScanRewriter {
     pub idx_file_list: Vec<FileKey>,
     pub equal_keys: HashMap<String, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
-    pub tantivy_query: Option<IndexCondition>,
+    pub index_condition: Option<IndexCondition>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
     pub context: opentelemetry::Context,
@@ -52,7 +52,7 @@ impl RemoteScanRewriter {
         idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
-        tantivy_query: Option<IndexCondition>,
+        index_condition: Option<IndexCondition>,
         is_leader: bool,
         context: opentelemetry::Context,
     ) -> Self {
@@ -63,7 +63,7 @@ impl RemoteScanRewriter {
             idx_file_list,
             equal_keys,
             match_all_keys,
-            tantivy_query,
+            index_condition,
             is_leader,
             is_changed: false,
             context,
@@ -95,7 +95,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .unwrap_or(&empty_keys)
                         .clone(),
                     self.match_all_keys.clone(),
-                    self.tantivy_query.clone(),
+                    self.index_condition.clone(),
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),
@@ -128,7 +128,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .unwrap_or(&empty_keys)
                         .clone(),
                     self.match_all_keys.clone(),
-                    self.tantivy_query.clone(),
+                    self.index_condition.clone(),
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),

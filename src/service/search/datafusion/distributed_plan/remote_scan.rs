@@ -64,7 +64,7 @@ pub struct RemoteScanExec {
     idx_file_list: Vec<FileKey>,
     equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
-    tantivy_query: Option<IndexCondition>,
+    index_condition: Option<IndexCondition>,
     is_super_cluster: bool,
     req: Request,
     nodes: Vec<Arc<dyn NodeInfo>>,
@@ -84,7 +84,7 @@ impl RemoteScanExec {
         idx_file_list: Vec<FileKey>,
         equal_keys: Vec<KvItem>,
         match_all_keys: Vec<String>,
-        tantivy_query: Option<IndexCondition>,
+        index_condition: Option<IndexCondition>,
         is_super_cluster: bool,
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
@@ -99,7 +99,7 @@ impl RemoteScanExec {
             idx_file_list,
             equal_keys,
             match_all_keys,
-            tantivy_query,
+            index_condition,
             is_super_cluster,
             nodes,
             partitions: output_partitions,
@@ -191,7 +191,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.idx_file_list.clone(),
             self.equal_keys.clone(),
             self.match_all_keys.clone(),
-            self.tantivy_query.clone(),
+            self.index_condition.clone(),
             self.is_super_cluster,
             req,
             self.scan_stats.clone(),
@@ -219,7 +219,7 @@ async fn get_remote_batch(
     idx_file_list: Vec<FileKey>,
     equal_keys: Vec<KvItem>,
     match_all_keys: Vec<String>,
-    tantivy_query: Option<IndexCondition>,
+    index_condition: Option<IndexCondition>,
     is_super_cluster: bool,
     req: Request,
     scan_stats: Arc<Mutex<ScanStats>>,
@@ -245,8 +245,8 @@ async fn get_remote_batch(
         vec![]
     };
 
-    let tantivy_query = match tantivy_query {
-        Some(tantivy_query) => json::to_string(&tantivy_query).unwrap(),
+    let index_condition = match index_condition {
+        Some(index_condition) => json::to_string(&index_condition).unwrap(),
         None => "".to_string(),
     };
 
@@ -268,7 +268,7 @@ async fn get_remote_batch(
         user_id: req.user_id.clone(),
         search_event_type: req.search_event_type,
         use_inverted_index: req.use_inverted_index,
-        tantivy_query,
+        index_condition,
     };
 
     log::info!(

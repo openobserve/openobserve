@@ -2809,7 +2809,7 @@ pub struct FlightSearchRequest {
     #[prost(string, optional, tag = "19")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, tag = "20")]
-    pub tantivy_query: ::prost::alloc::string::String,
+    pub index_condition: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

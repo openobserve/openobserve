@@ -60,7 +60,7 @@ pub async fn search(
     file_list: &[FileKey],
     _req_equal_terms: &[KvItem],
     _req_match_terms: &[String],
-    tantivy_query: &str,
+    index_condition: &str,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
@@ -126,7 +126,7 @@ pub async fn search(
     let mut idx_took = 0;
     if use_inverted_index {
         idx_took =
-            filter_file_list_by_tantivy_index(query.clone(), &mut files, tantivy_query).await?;
+            filter_file_list_by_tantivy_index(query.clone(), &mut files, index_condition).await?;
         log::info!(
             "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {} ms",
             query.trace_id,
@@ -413,7 +413,7 @@ async fn cache_files(
 async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
-    tantivy_query: &str,
+    index_condition: &str,
 ) -> Result<usize, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -470,10 +470,10 @@ async fn filter_file_list_by_tantivy_index(
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
-        let tantivy_query = tantivy_query.to_string();
+        let index_condition = index_condition.to_string();
         let task = tokio::task::spawn(async move {
             let res =
-                search_tantivy_index(&trace_id, &file, &tantivy_query, records, file_size).await;
+                search_tantivy_index(&trace_id, &file, &index_condition, records, file_size).await;
             drop(permit);
             res
         });
@@ -499,9 +499,9 @@ async fn filter_file_list_by_tantivy_index(
                     total_hits += hits_per_file;
                     file.segment_ids = Some(res.into_vec());
                     log::debug!(
-                        "[trace_id {}] search->storage: hits for tantivy_query: {:?} found {} in {}",
+                        "[trace_id {}] search->storage: hits for index_condition: {:?} found {} in {}",
                         query.trace_id,
-                        tantivy_query,
+                        index_condition,
                         hits_per_file,
                         file_name
                     );
@@ -526,9 +526,9 @@ async fn filter_file_list_by_tantivy_index(
         }
     }
     log::info!(
-        "[trace_id {}] search->storage: total hits for tantivy_query: {:?} found {}",
+        "[trace_id {}] search->storage: total hits for index_condition: {:?} found {}",
         query.trace_id,
-        tantivy_query,
+        index_condition,
         total_hits
     );
     file_list.extend(file_list_map.into_values());
@@ -554,7 +554,7 @@ pub async fn get_tantivy_directory(
 async fn search_tantivy_index(
     trace_id: &str,
     parquet_file_name: &str,
-    tantivy_query: &str,
+    index_condition: &str,
     records: i64,
     file_size: usize,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
@@ -574,7 +574,7 @@ async fn search_tantivy_index(
     let fts_field = tantivy_schema.get_field("_all").unwrap();
 
     // generate the tantivy query
-    let condition: IndexCondition = json::from_str(tantivy_query)?;
+    let condition: IndexCondition = json::from_str(index_condition)?;
     let query = condition.to_tantivy_query(tantivy_schema, fts_field);
 
     // warm up the terms in the query
