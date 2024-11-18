@@ -843,8 +843,8 @@ pub struct Common {
     pub result_cache_discard_duration: i64,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
-    #[env_config(name = "ZO_ES_VERSION", default = "")]
-    pub es_version: String,
+    #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
+    pub fake_es_version: String,
 }
 
 #[derive(EnvConfig)]

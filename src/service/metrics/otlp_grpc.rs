@@ -472,8 +472,11 @@ pub async fn handle_grpc_request(
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
+                    let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await {
+                        if let Ok((Some(v), _)) =
+                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
+                        {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }
