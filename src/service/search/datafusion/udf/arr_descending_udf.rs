@@ -39,7 +39,7 @@ pub(crate) static ARR_DESCENDING_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects three string
         vec![DataType::Utf8],
         // returns string
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         Arc::new(arr_descending_impl),
     )

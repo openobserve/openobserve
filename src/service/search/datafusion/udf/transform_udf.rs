@@ -40,7 +40,7 @@ fn create_user_df(fn_name: &str, num_args: u8, pow_scalar: FnType) -> ScalarUDF 
     create_udf(
         fn_name,
         input_vec,
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         pow_scalar,
     )

@@ -35,11 +35,7 @@ pub(crate) static STRING_TO_ARRAY_V2_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         STRING_TO_ARRAY_V2_UDF_NAME,
         // takes two arguments: regex, pattern
         vec![DataType::Utf8, DataType::Utf8],
-        Arc::new(DataType::List(Arc::new(Field::new(
-            "item",
-            DataType::Utf8,
-            true,
-        )))),
+        DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
         Volatility::Immutable,
         Arc::new(string_to_array_v2_impl),
     )

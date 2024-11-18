@@ -23,7 +23,7 @@ use datafusion::{
     common::{project_schema, Constraints, Result},
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
-    physical_expr::PhysicalSortExpr,
+    physical_expr::{LexOrdering, PhysicalSortExpr},
     physical_plan::{
         expressions::{CastExpr, Column},
         projection::ProjectionExec,
@@ -33,6 +33,7 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 
+#[derive(Debug)]
 pub(crate) struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
@@ -115,15 +116,6 @@ impl TableProvider for NewMemTable {
         })
     }
 
-    async fn insert_into(
-        &self,
-        state: &dyn Session,
-        input: Arc<dyn ExecutionPlan>,
-        overwrite: bool,
-    ) -> Result<Arc<dyn ExecutionPlan>> {
-        self.mem_table.insert_into(state, input, overwrite).await
-    }
-
     fn get_column_default(&self, column: &str) -> Option<&Expr> {
         self.mem_table.get_column_default(column)
     }
@@ -135,13 +127,13 @@ fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
     let index = exec.schema().index_of(&column_timestamp);
     (match index {
         Ok(index) => {
-            let ordering = vec![PhysicalSortExpr {
+            let ordering = LexOrdering::new(vec![PhysicalSortExpr {
                 expr: Arc::new(Column::new(&column_timestamp, index)),
                 options: SortOptions {
                     descending: true,
                     nulls_first: false,
                 },
-            }];
+            }]);
             Arc::new(SortExec::new(ordering, exec))
         }
         Err(_) => exec,
