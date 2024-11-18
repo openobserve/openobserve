@@ -852,7 +852,7 @@ export default defineComponent({
           values: [],
           errMsg: "",
         };
-        
+
         let query_context = "";
         let query = searchObj.data.query;
         let whereClause = "";
@@ -952,6 +952,7 @@ export default defineComponent({
             query_context = queries[selectedStream];
           }
           if (query_context !== "") {
+            query_context = query_context == undefined ? "" : query_context;
             await streamService
               .fieldValues({
                 org_identifier: store.state.selectedOrganization.identifier,
@@ -985,7 +986,7 @@ export default defineComponent({
                           fieldValues.value[name]["values"][index].count =
                             parseInt(subItem.zo_sql_num) +
                             fieldValues.value[name]["values"][index].count;
-                          } else {
+                        } else {
                           fieldValues.value[name]["values"].push({
                             key: subItem.zo_sql_key,
                             count: subItem.zo_sql_num,
@@ -1003,13 +1004,15 @@ export default defineComponent({
                     fieldValues.value[name]["values"].sort(
                       (a, b) => b.count - a.count,
                     ); // Sort the array based on count in descending order
-                    fieldValues.value[name]["values"] = fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
+                    fieldValues.value[name]["values"] = fieldValues.value[name][
+                      "values"
+                    ].slice(0, 10); // Return the first 10 elements
                   }
                 }
               })
               .catch((err: any) => {
-                console.error('Failed to fetch field values:', err);
-                fieldValues.value[name].errMsg = 'Failed to fetch field values';
+                console.error("Failed to fetch field values:", err);
+                fieldValues.value[name].errMsg = "Failed to fetch field values";
               })
               .finally(() => {
                 countTotal--;
