@@ -34,7 +34,7 @@ async fn org_index(_org_id: web::Path<String>, req: HttpRequest) -> Result<HttpR
             None => "8.1.0",
         };
     }
-    let es_config_version = config::get_config().common.es_version.to_string();
+    let es_config_version = config::get_config().common.fake_es_version.to_string();
     if !es_config_version.is_empty() {
         version = &es_config_version;
     }
@@ -64,11 +64,22 @@ async fn org_xpack(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         .body(es_info))
 }
 
+#[route("/{org_id}/_ilm/policy/{name}", method = "GET", method = "HEAD")]
+async fn org_ilm_policy(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (_, name) = path.into_inner();
+    let es_info = r#"{"__PH__":{"version":1,"modified_date":82392349,"policy":{"phases":{"warm":{"min_age":"10d","actions":{"forcemerge":{"max_num_segments":1}}},"delete":{"min_age":"30d","actions":{"delete":{"delete_searchable_snapshot":true}}}}},"in_use_by":{"indices":[],"data_streams":[],"composable_templates":[]}}}"#;
+    let es_info = es_info.replace("__PH__", &name);
+    Ok(HttpResponse::Ok()
+        .content_type(http::header::ContentType::json())
+        .insert_header(("X-Elastic-Product", "Elasticsearch"))
+        .body(es_info))
+}
+
 #[route("/{org_id}/_index_template/{name}", method = "GET", method = "HEAD")]
 async fn org_index_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (_org_id, name) = path.into_inner();
-    let es_info = r#"{"index_patterns":["log-*"],"name":"logs","priority":1,"template":{"mappings":{"properties":{"_timestamp":{"aggregatable":false,"highlightable":false,"index":true,"sortable":false,"store":false,"type":"date"}}},"settings":{"number_of_replicas":1,"number_of_shards":3}}}"#;
-    let es_info = es_info.replace("logs", &name);
+    let es_info = r#"{"index_patterns":["__PH__-*"],"name":"__PH__","priority":1,"template":{"mappings":{"properties":{"_timestamp":{"aggregatable":false,"highlightable":false,"index":true,"sortable":false,"store":false,"type":"date"}}},"settings":{"number_of_replicas":1,"number_of_shards":3}}}"#;
+    let es_info = es_info.replace("__PH__", &name);
     Ok(HttpResponse::Ok()
         .content_type(http::header::ContentType::json())
         .insert_header(("X-Elastic-Product", "Elasticsearch"))
@@ -81,8 +92,8 @@ async fn org_index_template_create(
     _body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, name) = path.into_inner();
-    let es_info = r#"{"name":"logs","message":"ok"}"#;
-    let es_info = es_info.replace("logs", &name);
+    let es_info = r#"{"name":"__PH__","message":"ok"}"#;
+    let es_info = es_info.replace("__PH__", &name);
     Ok(HttpResponse::Ok()
         .content_type(http::header::ContentType::json())
         .insert_header(("X-Elastic-Product", "Elasticsearch"))
@@ -92,8 +103,8 @@ async fn org_index_template_create(
 #[route("/{org_id}/_data_stream/{name}", method = "GET", method = "HEAD")]
 async fn org_data_stream(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (_org_id, name) = path.into_inner();
-    let es_info = r#"{"data_streams":{"name":"logs","timestamp_field":{"name":"_timestamp"}}}"#;
-    let es_info = es_info.replace("logs", &name);
+    let es_info = r#"{"data_streams":{"name":"__PH__","timestamp_field":{"name":"_timestamp"}}}"#;
+    let es_info = es_info.replace("__PH__", &name);
     Ok(HttpResponse::Ok()
         .content_type(http::header::ContentType::json())
         .insert_header(("X-Elastic-Product", "Elasticsearch"))
@@ -106,8 +117,33 @@ async fn org_data_stream_create(
     _body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, name) = path.into_inner();
-    let es_info = r#"{"name":"logs","message":"ok"}"#;
-    let es_info = es_info.replace("logs", &name);
+    let es_info = r#"{"name":"__PH__","message":"ok"}"#;
+    let es_info = es_info.replace("__PH__", &name);
+    Ok(HttpResponse::Ok()
+        .content_type(http::header::ContentType::json())
+        .insert_header(("X-Elastic-Product", "Elasticsearch"))
+        .body(es_info))
+}
+
+#[route("/{org_id}/_ingest/pipeline/{name}", method = "GET", method = "HEAD")]
+async fn org_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (_org_id, name) = path.into_inner();
+    let es_info = r#"{"__PH__":{"description":"describe pipeline","version":123,"processors":[{"set":{"field":"foo","value":"bar"}}]}}"#;
+    let es_info = es_info.replace("__PH__", &name);
+    Ok(HttpResponse::Ok()
+        .content_type(http::header::ContentType::json())
+        .insert_header(("X-Elastic-Product", "Elasticsearch"))
+        .body(es_info))
+}
+
+#[put("/{org_id}/_ingest/pipeline/{name}")]
+async fn org_pipeline_create(
+    path: web::Path<(String, String)>,
+    _body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, name) = path.into_inner();
+    let es_info = r#"{"name":"__PH__","message":"ok"}"#;
+    let es_info = es_info.replace("__PH__", &name);
     Ok(HttpResponse::Ok()
         .content_type(http::header::ContentType::json())
         .insert_header(("X-Elastic-Product", "Elasticsearch"))
