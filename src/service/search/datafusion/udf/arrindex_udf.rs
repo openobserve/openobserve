@@ -40,7 +40,7 @@ pub(crate) static ARR_INDEX_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects a string (the array field) and two integers - start index and end index
         vec![DataType::Utf8, DataType::Int64, DataType::Int64],
         // returns string
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         Arc::new(arr_index_impl),
     )

@@ -21,7 +21,7 @@ use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{internal_err, Result, Statistics},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning, PhysicalSortExpr},
+    physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
         common, expressions::Column, memory::MemoryStream, DisplayAs, DisplayFormatType,
         ExecutionMode, ExecutionPlan, PlanProperties,
@@ -95,13 +95,13 @@ impl NewEmptyExec {
         } else {
             match index {
                 Ok(index) => {
-                    let ordering = vec![vec![PhysicalSortExpr {
+                    let ordering = vec![LexOrdering::new(vec![PhysicalSortExpr {
                         expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
                         options: SortOptions {
                             descending: true,
                             nulls_first: false,
                         },
-                    }]];
+                    }])];
                     EquivalenceProperties::new_with_orderings(schema, &ordering)
                 }
                 Err(_) => EquivalenceProperties::new(schema),

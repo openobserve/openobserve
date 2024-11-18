@@ -38,7 +38,7 @@ pub(crate) static TIME_RANGE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects three string
         vec![DataType::Int64, DataType::Utf8, DataType::Utf8],
         // returns boolean
-        Arc::new(DataType::Boolean),
+        DataType::Boolean,
         Volatility::Immutable,
         Arc::new(time_range_expr_impl),
     )

@@ -34,6 +34,7 @@ use std::{any::Any, cmp::Ordering, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
+use config::get_config;
 use datafusion::{
     catalog::Session,
     common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
@@ -57,16 +58,21 @@ use datafusion::{
         ExecutionPlan, PhysicalExpr,
     },
 };
-use futures::{future, stream, StreamExt};
+use futures::{
+    future::{self, try_join_all},
+    stream, StreamExt,
+};
 use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
+use tokio::sync::Semaphore;
 
 pub mod empty_table;
 mod helpers;
 pub mod memtable;
 pub mod uniontable;
 
+#[derive(Debug)]
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,
     /// File fields only
@@ -160,10 +166,6 @@ impl NewListingTable {
                 if self.options.collect_stat {
                     let statistics = self.do_collect_statistics(ctx, &store, &part_file).await?;
                     part_file.statistics = Some(statistics.clone());
-                    let access_plan = generate_access_plan(&part_file);
-                    if let Some(access_plan) = access_plan {
-                        part_file.extensions = Some(access_plan as _);
-                    }
                     Ok((part_file, Arc::new(statistics)))
                         as Result<(PartitionedFile, Arc<Statistics>)>
                 } else {
@@ -179,6 +181,24 @@ impl NewListingTable {
         let (files, statistics) =
             get_statistics_with_limit(files, self.schema(), limit, self.options.collect_stat)
                 .await?;
+
+        let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.cpu_num));
+        let mut tasks = Vec::with_capacity(files.len());
+        for mut file in files.into_iter() {
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let task = tokio::task::spawn(async move {
+                let access_plan = generate_access_plan(&file);
+                if let Some(access_plan) = access_plan {
+                    file.extensions = Some(access_plan as _);
+                }
+                drop(permit);
+                file
+            });
+            tasks.push(task)
+        }
+        let files = try_join_all(tasks)
+            .await
+            .map_err(|e| DataFusionError::External(Box::new(e)))?;
 
         Ok((
             split_files(files, self.options.target_partitions),
@@ -441,7 +461,7 @@ fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<
 
     for exprs in sort_order {
         // Construct PhysicalSortExpr objects from Expr objects:
-        let mut sort_exprs = vec![];
+        let mut sort_exprs = LexOrdering::default();
         for sort in exprs {
             match &sort.expr {
                 Expr::Column(col) => match expressions::col(&col.name, schema) {

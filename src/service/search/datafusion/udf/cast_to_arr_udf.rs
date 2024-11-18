@@ -37,11 +37,7 @@ pub(crate) static CAST_TO_ARR_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         CAST_TO_ARR_UDF_NAME,
         // takes one argument: the field
         vec![DataType::Utf8],
-        Arc::new(DataType::List(Arc::new(Field::new(
-            "item",
-            DataType::Utf8,
-            true,
-        )))),
+        DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
         Volatility::Immutable,
         Arc::new(cast_to_arr_impl),
     )
