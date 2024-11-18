@@ -37,7 +37,7 @@ pub(crate) static ARR_COUNT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects two string - the field and the delimiter
         vec![DataType::Utf8],
         // returns string
-        Arc::new(DataType::UInt64),
+        DataType::UInt64,
         Volatility::Immutable,
         Arc::new(arr_count_impl),
     )

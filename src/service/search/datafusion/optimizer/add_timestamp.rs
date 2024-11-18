@@ -25,7 +25,7 @@ use datafusion::{
 /// Optimization rule that add _timestamp constraint to table scan
 ///
 /// Note: should apply before push down filter rule
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AddTimestampRule {
     filter: Expr,
 }
@@ -308,7 +308,9 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(RuntimeEnv::new(RuntimeConfig::default()).unwrap()))
+            .with_runtime_env(Arc::new(
+                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
+            ))
             .with_default_features()
             .with_optimizer_rules(vec![
                 Arc::new(AddTimestampRule::new(2, 4)),
