@@ -182,7 +182,7 @@ pub async fn check_field_use(
     let records = Entity::find()
         .filter(Column::OrgName.eq(org_name))
         .filter(Column::StreamName.eq(stream_name))
-        .filter(Column::StreamName.eq(stream_type))
+        .filter(Column::StreamType.eq(stream_type))
         .filter(Column::FieldName.eq(field_name))
         .into_model::<DistinctFieldRecord>()
         .all(client)

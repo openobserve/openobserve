@@ -728,7 +728,7 @@ impl From<&str> for StreamSettings {
         if let Some(value) = fields {
             let v: Vec<_> = value.as_array().unwrap().iter().collect();
             for item in v {
-                distinct_value_fields.push(serde_json::from_value(item.clone()).unwrap())
+                distinct_value_fields.push(json::from_value(item.clone()).unwrap())
             }
         }
 

@@ -411,7 +411,8 @@ pub async fn update_stream_settings(
                             ));
                         }
                     };
-                    if !usage.is_empty() || usage.len() > 1 {
+                    // if there are multiple uses, we cannot allow it to be removed
+                    if usage.len() > 1 {
                         return Ok(HttpResponse::BadRequest().json(
                             MetaHttpResponse::error(
                                 http::StatusCode::BAD_REQUEST.into(),

@@ -645,7 +645,7 @@ async fn write_traces(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
         .await
         .unwrap_or_default();
 

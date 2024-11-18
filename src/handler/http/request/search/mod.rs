@@ -1165,8 +1165,8 @@ async fn values_v2(
         )
     } else {
         format!(
-            "SELECT DISTINCT {} AS zo_sql_key, SUM(count) as zo_sql_num FROM {}",
-            field, distinct_stream_name,
+            "SELECT {} AS zo_sql_key, SUM(count) as zo_sql_num FROM {} GROUP BY {}",
+            field, distinct_stream_name, field
         )
     };
     if let Some((key, val)) = filter {

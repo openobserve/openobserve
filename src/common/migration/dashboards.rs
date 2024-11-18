@@ -63,6 +63,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
             // key format is dashboard/org_id/folder/id
             let parts = local_key.split('/').collect::<Vec<_>>();
+            if parts.len() < 4 {
+                log::error!("invalid key {local_key}, skipping");
+                continue;
+            }
             let org_id = parts.get(1).unwrap();
             let dashboard_id = parts.get(3).unwrap();
 
@@ -113,6 +117,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         for ((org_id, stream, stype), settings) in settings_cache {
             save_stream_settings(&org_id, &stream, stype, settings).await?;
         }
+
+        log::info!("dashboard distinct value migration completed");
     }
 
     Ok(())
