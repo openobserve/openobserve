@@ -1117,7 +1117,11 @@ export const convertSQLData = async (
     return seriesData;
   };
 
-  const getSeriesObj = (yAxisName: string, seriesData: any[] = []) => {
+  const getSeriesObj = (
+    yAxisName: string,
+    seriesData: any[] = [],
+    seriesConfig: Record<string, any>,
+  ) => {
     return {
       //only append if yaxiskeys length is more than 1
       name: yAxisName,
@@ -1137,6 +1141,7 @@ export const convertSQLData = async (
           chartMax,
         ) ?? null,
       data: seriesData,
+      ...seriesConfig,
     };
   };
 
@@ -1158,7 +1163,7 @@ export const convertSQLData = async (
     return label;
   };
 
-  const getSeries = () => {
+  const getSeries = (seriesConfig: Record<string, any> = {}) => {
     let stackedXAxisUniqueValue = [];
     let breakdownKey = "";
 
@@ -1180,11 +1185,11 @@ export const convertSQLData = async (
               yAxisName = getYAxisLabel(yAxis, key);
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData);
+              return getSeriesObj(yAxisName, seriesData, seriesConfig);
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            return getSeriesObj(yAxisName, seriesData);
+            return getSeriesObj(yAxisName, seriesData, seriesConfig);
           }
         })
         .flat() || []
@@ -1355,7 +1360,7 @@ export const convertSQLData = async (
       break;
     }
     case "bar": {
-      options.series = getSeries();
+      options.series = getSeries({ barMinHeight: 1 });
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
         updateTrellisConfig();
@@ -1373,7 +1378,7 @@ export const convertSQLData = async (
     }
     case "h-bar": {
       //generate trace based on the y axis keys
-      options.series = getSeries();
+      options.series = getSeries({ barMinHeight: 1 });
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
         updateTrellisConfig();
@@ -1606,7 +1611,7 @@ export const convertSQLData = async (
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      options.series = getSeries();
+      options.series = getSeries({ barMinHeight: 1 });
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
         updateTrellisConfig();
@@ -1796,7 +1801,7 @@ export const convertSQLData = async (
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      options.series = getSeries();
+      options.series = getSeries({ barMinHeight: 1 });
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
         updateTrellisConfig();
