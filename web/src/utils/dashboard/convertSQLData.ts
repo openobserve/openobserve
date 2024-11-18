@@ -1117,17 +1117,10 @@ export const convertSQLData = async (
     return seriesData;
   };
 
-  const getSeriesObj = (
-    yAxisName: string,
-    seriesKey: string,
-    seriesData: any[] = [],
-  ) => {
-    const name =
-      yAxisKeys.length == 1 ? seriesKey : seriesKey + " (" + yAxisName + ")";
-
+  const getSeriesObj = (yAxisName: string, seriesData: any[] = []) => {
     return {
       //only append if yaxiskeys length is more than 1
-      name,
+      name: yAxisName,
       ...defaultSeriesProps,
       label: getSeriesLabel(),
       // markLine if exist
@@ -1138,7 +1131,7 @@ export const convertSQLData = async (
       color:
         getSeriesColor(
           panelSchema.config.color,
-          name,
+          yAxisName,
           seriesData,
           chartMin,
           chartMax,
@@ -1147,10 +1140,22 @@ export const convertSQLData = async (
     };
   };
 
-  const getYAxisLabel = (yAxisKey: string) => {
-    return panelSchema?.queries[0]?.fields?.y.find(
+  const getYAxisLabel = (yAxisKey: string, xAXisKey: string = "") => {
+    const label = panelSchema?.queries[0]?.fields?.y.find(
       (it: any) => it.alias == yAxisKey,
     ).label;
+
+    if (
+      panelSchema.type == "area-stacked" ||
+      ((panelSchema.type == "line" ||
+        panelSchema.type == "area" ||
+        panelSchema.type == "scatter") &&
+        panelSchema.queries[0].fields.breakdown?.length)
+    ) {
+      return yAxisKeys.length === 1 ? xAXisKey : `${xAXisKey} (${label})`;
+    }
+
+    return label;
   };
 
   const getSeries = () => {
@@ -1167,18 +1172,19 @@ export const convertSQLData = async (
     return (
       yAxisKeys
         .map((yAxis: any) => {
-          const yAxisName = getYAxisLabel(yAxis);
+          let yAxisName = getYAxisLabel(yAxis);
 
           if (breakDownKeys.length) {
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+              yAxisName = getYAxisLabel(yAxis, key);
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
               // Can create different method to get series
-              return getSeriesObj(yAxisName, key, seriesData);
+              return getSeriesObj(yAxisName, seriesData);
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            return getSeriesObj(yAxisName, yAxis, seriesData);
+            return getSeriesObj(yAxisName, seriesData);
           }
         })
         .flat() || []
