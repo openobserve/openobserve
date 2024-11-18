@@ -207,3 +207,12 @@ pub async fn batch_remove(origin: OriginType, origin_id: &str) -> Result<(), err
 
     Ok(())
 }
+
+pub async fn len() -> Result<u64, errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::find()
+        .count(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}

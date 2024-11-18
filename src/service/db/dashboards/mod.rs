@@ -188,7 +188,7 @@ macro_rules! _get_variables {
     };
 }
 
-fn get_query_variables(
+pub fn get_query_variables(
     dashboard: Option<web::Bytes>,
 ) -> HashMap<(String, StreamType), Vec<String>> {
     let mut map: HashMap<(String, StreamType), Vec<String>> = HashMap::new();

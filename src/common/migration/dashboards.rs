@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::db as infra_db;
+use config::meta::stream::{DistinctField, StreamSettings, StreamType};
+use hashbrown::HashMap;
+use infra::{
+    db as infra_db,
+    schema::get_settings,
+    table::distinct_values::{self, DistinctFieldRecord, OriginType},
+};
+
+use crate::service::{db::dashboards::get_query_variables, stream::save_stream_settings};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load dashboards list
@@ -39,6 +47,71 @@ pub async fn run() -> Result<(), anyhow::Error> {
             Err(_) => {
                 println!("Failed to migrate dashboard: {}", new_key);
             }
+        }
+    }
+
+    if distinct_values::len().await? > 0 {
+        log::info!("dashboard distinct values migration already done.");
+    } else {
+        let data = db.list(&db_key).await?;
+
+        let mut settings_cache: HashMap<(String, String, StreamType), StreamSettings> =
+            HashMap::new();
+
+        for (key, value) in data {
+            let local_key = key.strip_prefix('/').unwrap_or(&key);
+
+            // key format is dashboard/org_id/folder/id
+            let parts = local_key.split('/').collect::<Vec<_>>();
+            let org_id = parts.get(1).unwrap();
+            let dashboard_id = parts.get(3).unwrap();
+
+            let variables = get_query_variables(Some(value));
+
+            for ((stream, stype), fields) in variables {
+                let cache_key = (org_id.to_string(), stream.clone(), stype);
+
+                let stream_settings = match settings_cache.get_mut(&cache_key) {
+                    Some(s) => s,
+                    None => {
+                        let settings = get_settings(org_id, &stream, stype)
+                            .await
+                            .unwrap_or_default();
+                        settings_cache.insert(cache_key.clone(), settings);
+                        settings_cache.get_mut(&cache_key).unwrap()
+                    }
+                };
+
+                for f in fields {
+                    let record = DistinctFieldRecord::new(
+                        OriginType::Dashboard,
+                        dashboard_id,
+                        org_id,
+                        &stream,
+                        stype.to_string(),
+                        &f,
+                    );
+
+                    let temp = DistinctField {
+                        name: f,
+                        added_ts: chrono::Utc::now().timestamp_micros(),
+                    };
+
+                    if !stream_settings.distinct_value_fields.contains(&temp) {
+                        stream_settings.distinct_value_fields.push(temp);
+                    }
+
+                    distinct_values::add(record)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                }
+            }
+
+            log::info!("dashboard {local_key} migrated for distinct values");
+        }
+
+        for ((org_id, stream, stype), settings) in settings_cache {
+            save_stream_settings(&org_id, &stream, stype, settings).await?;
         }
     }
 
