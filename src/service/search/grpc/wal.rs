@@ -392,7 +392,7 @@ pub async fn search_memtable(
         }
 
         let table = Arc::new(NewMemTable::try_new(
-            schema_latest.clone(),
+            record_batches[0].schema().clone(),
             vec![record_batches],
             diff_fields,
             sorted_by_time,
@@ -516,17 +516,21 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(table_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+pub fn adapt_batch(schema_latest: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
-    let mut cols: Vec<ArrayRef> = Vec::with_capacity(table_schema.fields().len());
-    for table_field in table_schema.fields() {
-        if let Some((batch_idx, _)) = batch_schema.column_with_name(table_field.name().as_str()) {
-            cols.push(Arc::clone(&batch_cols[batch_idx]));
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema_latest.fields().len());
+    let mut fields = Vec::with_capacity(schema_latest.fields().len());
+    for field_latest in schema_latest.fields() {
+        if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
+            cols.push(Arc::clone(&batch_cols[idx]));
+            fields.push(field.clone());
         } else {
-            cols.push(new_null_array(table_field.data_type(), batch.num_rows()))
+            cols.push(new_null_array(field_latest.data_type(), batch.num_rows()));
+            fields.push(field_latest.as_ref().clone());
         }
     }
-    RecordBatch::try_new(table_schema, cols).unwrap()
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, cols).unwrap()
 }
