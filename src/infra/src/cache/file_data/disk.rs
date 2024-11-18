@@ -22,12 +22,14 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    get_config, is_local_disk_storage, metrics,
+    get_config, is_local_disk_storage,
+    meta::inverted_index::InvertedIndexTantivyMode,
+    metrics,
     utils::{
         asynchronism::file::*,
         hash::{gxhash, Sum64},
     },
-    RwAHashMap,
+    RwAHashMap, FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -170,6 +172,7 @@ impl FileData {
     }
 
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let cfg = get_config();
         log::info!(
             "[trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
@@ -201,6 +204,21 @@ impl FileData {
                     e
                 );
             }
+
+            // Handle for tantivy index
+            if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Mmap.to_string()
+                && file_path.ends_with(FILE_EXT_TANTIVY)
+            {
+                let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
+                if let Err(e) = fs::remove_dir_all(&file_path).await {
+                    log::error!(
+                        "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                        file_path,
+                        e
+                    );
+                }
+            }
+
             if key.starts_with("results/") {
                 let columns = key.split('/').collect::<Vec<&str>>();
                 let query_key = format!(
@@ -404,7 +422,7 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
 
 #[inline]
 pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
-    if !get_config().disk_cache.enabled || is_local_disk_storage() {
+    if !get_config().disk_cache.enabled {
         return Ok(());
     }
     let idx = get_bucket_idx(file);

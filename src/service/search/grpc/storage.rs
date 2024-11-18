@@ -21,11 +21,15 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
+        inverted_index::InvertedIndexTantivyMode,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json, time::BASE_TIME},
-    INDEX_FIELD_NAME_FOR_ALL,
+    utils::{
+        file::is_exists, inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json,
+        time::BASE_TIME,
+    },
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
@@ -46,7 +50,10 @@ use crate::service::{
         datafusion::exec,
         generate_search_schema_diff,
         index::IndexCondition,
-        tantivy::puffin_directory::reader::{warm_up_terms, PuffinDirReader},
+        tantivy::puffin_directory::{
+            convert_puffin_file_to_tantivy_dir,
+            reader::{warm_up_terms, PuffinDirReader},
+        },
     },
 };
 
@@ -540,7 +547,7 @@ pub async fn get_tantivy_directory(
     _trace_id: &str,
     file_name: &str,
     file_size: usize,
-) -> anyhow::Result<Box<dyn Directory>> {
+) -> anyhow::Result<PuffinDirReader> {
     let source = object_store::ObjectMeta {
         location: file_name.into(),
         last_modified: *BASE_TIME,
@@ -548,8 +555,7 @@ pub async fn get_tantivy_directory(
         e_tag: None,
         version: None,
     };
-    let puffin_dir = PuffinDirReader::from_path(source).await?;
-    Ok(Box::new(puffin_dir))
+    Ok(PuffinDirReader::from_path(source).await?)
 }
 
 async fn search_tantivy_index(
@@ -567,11 +573,31 @@ async fn search_tantivy_index(
         ));
     };
 
-    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
+    let cfg = get_config();
+    let puffin_dir: Box<dyn Directory> =
+        if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Mmap.to_string() {
+            let puffin_dir_path = format!(
+                "{}{}",
+                cfg.common.data_cache_dir,
+                ttv_file_name.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER)
+            );
+            if !is_exists(&puffin_dir_path) {
+                let read_dir = get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
+                let _ = convert_puffin_file_to_tantivy_dir(read_dir, &puffin_dir_path).await?;
+            }
+            Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
+        } else {
+            Box::new(get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?)
+        };
+
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
-    let tantivy_schema = tantivy_index.schema();
-    let tantivy_reader = tantivy_index.reader()?;
+    let tantivy_reader = tantivy_index
+        .reader_builder()
+        .reload_policy(tantivy::ReloadPolicy::Manual)
+        .num_warming_threads(0)
+        .try_into()?;
     let tantivy_searcher = tantivy_reader.searcher();
+    let tantivy_schema = tantivy_index.schema();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
 
     // generate the tantivy query
@@ -579,21 +605,23 @@ async fn search_tantivy_index(
     let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field);
 
     // warm up the terms in the query
-    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
-        HashMap::new();
-    query.query_terms(&mut |term, need_position| {
-        let field = term.field();
-        let entry = warm_terms.entry(field).or_default();
-        entry.insert(term.clone(), need_position);
-    });
-    // if no terms are found in the query, warm up all fields
-    if warm_terms.is_empty() {
-        for field in condition.get_fields() {
-            let field = tantivy_schema.get_field(&field).unwrap();
-            warm_terms.insert(field, HashMap::new());
+    if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
+        let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
+            HashMap::new();
+        query.query_terms(&mut |term, need_position| {
+            let field = term.field();
+            let entry = warm_terms.entry(field).or_default();
+            entry.insert(term.clone(), need_position);
+        });
+        // if no terms are found in the query, warm up all fields
+        if warm_terms.is_empty() {
+            for field in condition.get_fields() {
+                let field = tantivy_schema.get_field(&field).unwrap();
+                warm_terms.insert(field, HashMap::new());
+            }
         }
+        warm_up_terms(&tantivy_searcher, &warm_terms).await?;
     }
-    warm_up_terms(&tantivy_searcher, &warm_terms).await?;
 
     // search the index
     let matched_docs = tokio::task::spawn_blocking(move || {
