@@ -2216,6 +2216,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields;
 
+    // Validate required fields
+    if (!name?.column) {
+      console.warn("Map name field is required but not provided");
+      return "";
+    }
+    if (!value_for_maps?.column) {
+      console.warn("Map value field is required but not provided");
+      return "";
+    }
     let query = "";
 
     if (name && value_for_maps) {
@@ -2873,6 +2882,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.value == null
+          ) {
+            errors.push("Add one field for the value");
+          }
+          break;
+        }
+        case "maps": {
+          if (
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.name == null
+          ) {
+            errors.push("Add one field for the name");
+          }
+          if (
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.value_for_maps == null
           ) {
             errors.push("Add one field for the value");
           }

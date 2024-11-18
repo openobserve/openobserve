@@ -249,7 +249,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
     backgroundColor: "rgba(255,255,255,0.8)",
     formatter: function (params: any) {
       let formattedValue = params.value;
-      if (formattedValue === "-" || isNaN(formattedValue)) {
+      if (formattedValue === "-" || Number.isNaN(formattedValue)) {
         formattedValue = "-";
       } else if (getUnitValue && formatUnitValue) {
         formattedValue = formatUnitValue(
@@ -281,7 +281,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
         "#f46d43",
         "#d73027",
         "#a50026",
-      ],
+      ] as const,
     },
     text: ["High", "Low"],
     calculable: true,
@@ -291,13 +291,13 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
     show: true,
     left: "left",
     top: "top",
-  };
+  } as const;
   options.xAxis = [];
   options.yAxis = [];
   options.series = panelSchema.queries.map((query: any, index: any) => {
     return {
       type: "map",
-      map: "world",
+      map: panelSchema.config?.map_type.type || "world",
       emphasis: {
         label: {
           show: true,
@@ -315,14 +315,8 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
           return { name: countryName, value };
         }
       }),
-      symbolSize: function (val: any) {
-        return val[2];
-      },
       itemStyle: {
         color: "#b02a02",
-      },
-      encode: {
-        value: 2,
       },
     };
   });
@@ -333,8 +327,9 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
   const seriesData = options.series.flatMap((series: any) => series.data);
 
   if (seriesData.length > 0) {
-    const minValue = Math.min(...seriesData.map((item: any) => item.value));
-    const maxValue = Math.max(...seriesData.map((item: any) => item.value));
+    const numericValues = seriesData.map((item: any) => item.value).filter((value: any): value is number => typeof value === 'number' && !Number.isNaN(value) ); 
+    const minValue = Math.min(...numericValues); 
+    const maxValue = Math.max(...numericValues);
 
     options.visualMap.min = minValue;
     options.visualMap.max = maxValue;

@@ -1360,6 +1360,11 @@ export default defineComponent({
       if (!dashboardPanelData.data.config.line_interpolation) {
         dashboardPanelData.data.config.line_interpolation = "smooth";
       }
+
+      // Initialize map_type configuration
+      if(!dashboardPanelData.data.config.map_type) {
+        dashboardPanelData.data.config.map_type = { type: 'world' }
+      }
     });
 
     const legendWidthValue = computed({

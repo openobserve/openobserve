@@ -368,7 +368,7 @@ export default defineComponent({
               maxIndex: string | number,
               obj: {},
               currentIndex: any,
-              array: { [x: string]: {} },
+              array: Array<Record<string, unknown>>,
             ) => {
               const numAttributes = Object.keys(obj).length;
               const maxNumAttributes = Object.keys(array[maxIndex]).length;
@@ -450,13 +450,13 @@ export default defineComponent({
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias,
+        (it: any) => it.alias || [],
       );
       const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias,
+        (it: any) => it.alias || [],
       );
       const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias,
+        (it: any) => it.alias || [],
       );
 
       switch (panelType) {
@@ -801,6 +801,7 @@ export default defineComponent({
           )?.folderId;
 
           if (!folderId) {
+            console.error(`Folder "${drilldownData.data.folder}" not found`);
             return;
           }
 
@@ -814,6 +815,7 @@ export default defineComponent({
           );
 
           if (!dashboardData) {
+            console.error(`Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`);
             return;
           }
 

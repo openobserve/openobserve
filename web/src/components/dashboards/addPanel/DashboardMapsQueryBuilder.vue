@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.name.label
                     "
-                    :rules="[(val: any) => val > 0 || 'Required']"
+                    :rules="[(val: string) => !!val?.trim() || 'Required']"
                   />
                   <div
                     v-if="
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.value_for_maps.label
                     "
-                    :rules="[(val: any) => val > 0 || 'Required']"
+                    :rules="[(val: string) => !!val?.trim() || 'Required']"
                   />
                   <div
                     v-if="

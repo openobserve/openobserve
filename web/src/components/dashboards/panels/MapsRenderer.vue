@@ -52,24 +52,18 @@ export default defineComponent({
       }
     };
 
+    const DEFAULT_MAP_OPTIONS = {
+      tooltip: {},
+      series: [{ type: "map", map: "world", data: [] }],
+    };
     const initChart = async () => {
       if (chartRef.value) {
         chart = echarts.init(chartRef.value);
         echarts.registerMap("world", worldMap as any);
 
         // Default empty chart configuration to ensure map is visible
-        const defaultOptions = {
-          tooltip: {},
-          series: [
-            {
-              type: "map",
-              map: "world",
-              data: [],
-            },
-          ],
-        };
-
-        chart.setOption(defaultOptions, true);
+    
+        chart.setOption(DEFAULT_MAP_OPTIONS, true);
       }
     };
 
@@ -98,16 +92,8 @@ export default defineComponent({
             chart?.setOption(newOptions, true);
           } else {
             // If no data provided, set a default empty map
-            const defaultOptions = {
-              series: [
-                {
-                  type: "map",
-                  map: "world",
-                  data: [],
-                },
-              ],
-            };
-            chart?.setOption(defaultOptions, true);
+            
+            chart?.setOption(DEFAULT_MAP_OPTIONS, true);
           }
         }
       },
