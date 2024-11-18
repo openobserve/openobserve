@@ -958,6 +958,7 @@ fn is_complex_query(statement: &mut Statement) -> bool {
 // 2. has join
 // 3. has group by
 // 4. has aggregate
+// 5. has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
 struct ComplexQueryVisitor {
     pub is_complex: bool,
 }
@@ -972,19 +973,27 @@ impl VisitorMut for ComplexQueryVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            // check if has group by
-            match select.group_by {
-                GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
-                _ => self.is_complex = true,
+        match query.body.as_ref() {
+            sqlparser::ast::SetExpr::Select(select) => {
+                // check if has group by
+                match select.group_by {
+                    GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
+                    _ => self.is_complex = true,
+                }
+                // check if has join
+                if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                    self.is_complex = true;
+                }
+                if self.is_complex {
+                    return ControlFlow::Break(());
+                }
             }
-            // check if has join
-            if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+            // check if SetOperation
+            sqlparser::ast::SetExpr::SetOperation { .. } => {
                 self.is_complex = true;
-            }
-            if self.is_complex {
                 return ControlFlow::Break(());
             }
+            _ => {}
         }
         ControlFlow::Continue(())
     }

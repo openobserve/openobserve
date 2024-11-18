@@ -139,6 +139,7 @@ fn is_complex_query(plan: &LogicalPlan) -> bool {
             | LogicalPlan::SubqueryAlias(_)
             | LogicalPlan::Subquery(_)
             | LogicalPlan::Window(_)
+            | LogicalPlan::Union(_)
     )
 }
 
