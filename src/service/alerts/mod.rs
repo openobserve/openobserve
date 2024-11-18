@@ -53,7 +53,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         stream_name: Option<&str>,
         stream_type: StreamType,
         trigger_condition: &TriggerCondition,
-        start_time: Option<i64>,
+        (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
@@ -93,46 +93,46 @@ impl QueryConditionExt for QueryCondition {
         stream_name: Option<&str>,
         stream_type: StreamType,
         trigger_condition: &TriggerCondition,
-        start_time: Option<i64>,
+        (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
-        let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
                 let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
                     // CustomQuery type needs to provide source StreamName.
                     // CustomQuery is only used by Alerts' triggers.
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 };
                 build_sql(org_id, stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 };
                 if v.is_empty() {
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 } else {
                     v.to_string()
                 }
             }
             QueryType::PromQL => {
                 let Some(v) = self.promql.as_ref() else {
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 };
                 if v.is_empty() {
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 }
                 let start = if let Some(start_time) = start_time {
                     start_time
                 } else {
-                    now - Duration::try_minutes(trigger_condition.period)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
+                    end_time
+                        - Duration::try_minutes(trigger_condition.period)
+                            .unwrap()
+                            .num_microseconds()
+                            .unwrap()
                 };
-                let end = now;
+                let end = end_time;
                 let condition = self.promql_condition.as_ref().unwrap();
                 let req = promql::MetricsQueryRequest {
                     query: format!(
@@ -154,7 +154,7 @@ impl QueryConditionExt for QueryCondition {
                 let resp = match promql::search::search(org_id, &req, 0, "").await {
                     Ok(v) => v,
                     Err(_) => {
-                        return Ok((None, now));
+                        return Ok((None, end_time));
                     }
                 };
                 let promql::value::Value::Matrix(value) = resp else {
@@ -163,7 +163,7 @@ impl QueryConditionExt for QueryCondition {
                         v,
                         resp
                     );
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 };
                 // TODO calculate the sample in a row, suddenly a sample can be ignored
                 let value = value
@@ -171,7 +171,7 @@ impl QueryConditionExt for QueryCondition {
                     .filter(|f| f.samples.len() >= trigger_condition.threshold as usize)
                     .collect::<Vec<_>>();
                 return if value.is_empty() {
-                    return Ok((None, now));
+                    return Ok((None, end_time));
                 } else {
                     Ok((
                         Some(
@@ -195,7 +195,7 @@ impl QueryConditionExt for QueryCondition {
                                 })
                                 .collect(),
                         ),
-                        now,
+                        end_time,
                     ))
                 };
             }
@@ -206,10 +206,10 @@ impl QueryConditionExt for QueryCondition {
             .num_microseconds()
             .unwrap();
         let start_time = if let Some(start_time) = start_time {
-            time_diff = now - start_time;
+            time_diff = end_time - start_time;
             Some(start_time)
         } else {
-            Some(now - time_diff)
+            Some(end_time - time_diff)
         };
         let size = if self.search_event_type.is_some() {
             -1
@@ -228,7 +228,7 @@ impl QueryConditionExt for QueryCondition {
                     sqls.push(SqlQuery {
                         sql: sql.clone(),
                         start_time,
-                        end_time: Some(now),
+                        end_time: Some(end_time),
                         query_fn: None,
                         is_old_format: false,
                     });
@@ -238,35 +238,40 @@ impl QueryConditionExt for QueryCondition {
                         let offset = offset.parse::<i64>().unwrap_or(1);
                         let end_time = match unit {
                             "h" => {
-                                now - Duration::try_hours(offset)
-                                    .unwrap()
-                                    .num_microseconds()
-                                    .unwrap()
+                                end_time
+                                    - Duration::try_hours(offset)
+                                        .unwrap()
+                                        .num_microseconds()
+                                        .unwrap()
                             }
                             "d" => {
-                                now - Duration::try_days(offset)
-                                    .unwrap()
-                                    .num_microseconds()
-                                    .unwrap()
+                                end_time
+                                    - Duration::try_days(offset)
+                                        .unwrap()
+                                        .num_microseconds()
+                                        .unwrap()
                             }
                             "w" => {
-                                now - Duration::try_weeks(offset)
-                                    .unwrap()
-                                    .num_microseconds()
-                                    .unwrap()
+                                end_time
+                                    - Duration::try_weeks(offset)
+                                        .unwrap()
+                                        .num_microseconds()
+                                        .unwrap()
                             }
                             "M" => {
-                                now - Duration::try_days(offset * 30)
-                                    .unwrap()
-                                    .num_microseconds()
-                                    .unwrap()
+                                end_time
+                                    - Duration::try_days(offset * 30)
+                                        .unwrap()
+                                        .num_microseconds()
+                                        .unwrap()
                             }
                             // Default to minutes
                             _ => {
-                                now - Duration::try_minutes(offset)
-                                    .unwrap()
-                                    .num_microseconds()
-                                    .unwrap()
+                                end_time
+                                    - Duration::try_minutes(offset)
+                                        .unwrap()
+                                        .num_microseconds()
+                                        .unwrap()
                             }
                         };
                         sqls.push(SqlQuery {
@@ -309,7 +314,7 @@ impl QueryConditionExt for QueryCondition {
                     from: 0,
                     size,
                     start_time: start_time.unwrap(),
-                    end_time: now,
+                    end_time,
                     sort_by: None,
                     quick_mode: false,
                     query_type: "".to_string(),
@@ -379,39 +384,39 @@ impl QueryConditionExt for QueryCondition {
             match trigger_condition.operator {
                 Operator::EqualTo => {
                     if records.as_ref().unwrap().len() == threshold {
-                        return Ok((records, now));
+                        return Ok((records, end_time));
                     }
                 }
                 Operator::NotEqualTo => {
                     if records.as_ref().unwrap().len() != threshold {
-                        return Ok((records, now));
+                        return Ok((records, end_time));
                     }
                 }
                 Operator::GreaterThan => {
                     if records.as_ref().unwrap().len() > threshold {
-                        return Ok((records, now));
+                        return Ok((records, end_time));
                     }
                 }
                 Operator::GreaterThanEquals => {
                     if records.as_ref().unwrap().len() >= threshold {
-                        return Ok((records, now));
+                        return Ok((records, end_time));
                     }
                 }
                 Operator::LessThan => {
                     if records.as_ref().unwrap().len() < threshold {
-                        return Ok((records, now));
+                        return Ok((records, end_time));
                     }
                 }
                 Operator::LessThanEquals => {
                     if records.as_ref().unwrap().len() <= threshold {
-                        return Ok((records, now));
+                        return Ok((records, end_time));
                     }
                 }
                 _ => {}
             }
-            Ok((None, now))
+            Ok((None, end_time))
         } else {
-            Ok((records, now))
+            Ok((records, end_time))
         }
     }
 }

@@ -411,8 +411,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
+                    let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) = alert.evaluate(Some(record), None).await {
+                        if let Ok((Some(v), _)) =
+                            alert.evaluate(Some(record), (None, alert_end_time)).await
+                        {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }
