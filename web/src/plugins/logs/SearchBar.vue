@@ -1318,7 +1318,6 @@ export default defineComponent({
         }
       }
 
-
       updateAutoComplete(value);
       try {
         if (searchObj.meta.sqlMode === true) {
@@ -2733,6 +2732,7 @@ export default defineComponent({
       isFocused,
       backgroundColorStyle,
       editorWidthToggleFunction,
+      fnParsedSQL,
     };
   },
   computed: {
@@ -2805,7 +2805,12 @@ export default defineComponent({
                 unionType == "" &&
                 this.searchObj.data.stream.selectedStream.length > 1
               ) {
-                filter = `"${this.searchObj.data.stream.selectedStream[0]}".${filter}`;
+                const parsedSQL = this.fnParsedSQL();
+                const streamPrefix: string =
+                  parsedSQL.from[0].as != null
+                    ? parsedSQL.from[0].as
+                    : parsedSQL.from[0].table;
+                filter = `"${streamPrefix}".${filter}`;
               }
 
               // if query contains order by clause or limit clause then add where clause before that
