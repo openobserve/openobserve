@@ -195,10 +195,10 @@ mod tests {
         let expected = "Projection: test.name\
         \n  Filter: test.name IN (<subquery>) AND test.id = UInt32(1) AND test.id < UInt32(30)\
         \n    Subquery:\
-        \n      TableScan: sq\
+        \n      Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
+        \n        TableScan: sq\
         \n    Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
         \n      TableScan: test";
-
         // after DecorrelatePredicateSubquery, the plan look like below
         // let expected = "Projection: test.name
         // \n  Filter: test.id = UInt32(1) AND test.id < UInt32(30)
