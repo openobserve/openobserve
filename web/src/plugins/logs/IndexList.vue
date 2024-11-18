@@ -985,7 +985,7 @@ export default defineComponent({
                           fieldValues.value[name]["values"][index].count =
                             parseInt(subItem.zo_sql_num) +
                             fieldValues.value[name]["values"][index].count;
-                          } else {
+                        } else {
                           fieldValues.value[name]["values"].push({
                             key: subItem.zo_sql_key,
                             count: subItem.zo_sql_num,
