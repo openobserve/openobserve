@@ -1165,8 +1165,8 @@ async fn values_v2(
         )
     } else {
         format!(
-            "SELECT {} AS zo_sql_key, SUM(count) as zo_sql_num FROM {} GROUP BY {}",
-            field, distinct_stream_name, field
+            "SELECT {} AS zo_sql_key, SUM(count) as zo_sql_num FROM {}",
+            field, distinct_stream_name
         )
     };
     if let Some((key, val)) = filter {
@@ -1215,6 +1215,7 @@ async fn values_v2(
     } else {
         (start_time, end_time)
     };
+
     if no_count {
         query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {size}")
     } else {
