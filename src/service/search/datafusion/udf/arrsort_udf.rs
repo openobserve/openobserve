@@ -39,7 +39,7 @@ pub(crate) static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects one string - the array field
         vec![DataType::Utf8],
         // returns string
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         Arc::new(arr_sort_impl),
     )

@@ -41,7 +41,7 @@ pub(crate) static TO_ARR_STRING: Lazy<ScalarUDF> = Lazy::new(|| {
             DataType::Utf8,
             true,
         )))],
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         Arc::new(to_arr_string_impl),
     )
