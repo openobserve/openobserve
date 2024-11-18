@@ -1498,11 +1498,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.value_for_maps = null;
       }
-      console.log(
-        "dashboardPanelData.meta.stream.customQueryFields",
-        dashboardPanelData.meta.stream.customQueryFields,
-      );
-
+      
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach(
         (it: any, index: number) => {
