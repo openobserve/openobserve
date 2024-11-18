@@ -1,5 +1,3 @@
-import { RFC_2822 } from "moment";
-
 // it is used to create grid array for gauge chart
 export function calculateGridPositions(width: any, height: any, numGrids: any) {
   const gridArray: any = [];
@@ -50,18 +48,23 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
 
 // it is used to create grid array for trellis chart
 export function getTrellisGrid(
-  width: any,
-  height: any,
-  numGrids: any,
+  width: number,
+  height: number,
+  numGrids: number,
   leftMargin: number,
   numOfColumns: number = -1,
 ) {
+  if (width <= 0 || height <= 0) {
+    throw new Error("Width and height must be positive numbers");
+  }
+
   const gridArray: any = [];
 
   // if no grid then return empty array
   if (numGrids <= 0) {
     return gridArray;
   }
+
   // Calculate the aspect ratio of the available space
   const aspectRatio = width / height;
 
@@ -102,6 +105,9 @@ export function getTrellisGrid(
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {
     for (let col = 0; col < numCols; col++) {
+      if (gridArray.length > numGrids) {
+        break;
+      }
       const grid = {
         left: `${col * cellWidth + col * ((spaceBetweenCharts / width) * 100) + leftPadding}%`,
         top: `${row * cellHeight + row * ((verticalSpacingBetweenCharts / height) * 100) + topPadding}%`,

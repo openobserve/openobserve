@@ -43,9 +43,6 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 
-// TODO: Remove if unused
-import { AnySoaRecord } from "dns";
-
 export const convertMultiSQLData = async (
   panelSchema: any,
   searchQueryData: any,
@@ -582,6 +579,7 @@ export const convertSQLData = async (
         customCols = 1;
       }
 
+      // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
@@ -592,11 +590,13 @@ export const convertSQLData = async (
 
       options.grid = gridData.gridArray;
 
+      // Update axes configuration for trellis layout
       options.xAxis = options.xAxis.slice(0, 1);
       options.yAxis = [options.yAxis];
 
       options.title = [];
 
+      // Configure each series with its corresponding grid index
       options.series.forEach((series: any, index: number) => {
         if (index > 0) {
           options.xAxis.push({
@@ -637,26 +637,8 @@ export const convertSQLData = async (
 
       options.legend.show = false;
     } catch (err) {
-      console.log(err);
+      console.error("Failed to update trellis configuration:", err);
     }
-
-    // //TODO OK : Calculate the width of name and adjust is to center and ellipsis if it is too long
-    // const width =
-    //   (calculateWidthText(seriesObj.name) /
-    //     chartPanelRef.value.offsetWidth) *
-    //   100;
-    // const titleLeft = parseInt(gridData.gridArray[index].left);
-
-    // const whiteSpace = parseInt(gridData.gridArray[index].width) - width;
-
-    // if (whiteSpace > 0) {
-    //   titleLeft =
-    //     titleLeft +
-    //     (parseInt(gridData.gridArray[index].width) - width) / 2;
-    // } else {
-    //   titleLeft =
-    //     titleLeft + (10 / chartPanelRef.value.offsetWidth) * 100;
-    // }
   };
 
   const getYAxisNameGap = () => {
@@ -720,7 +702,7 @@ export const convertSQLData = async (
       it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
       it.axisLabel.show = showAxisLabel ? true : false;
-      !showAxisLabel ? (it.name = "") : null;
+      if (!showAxisLabel) it.name = "";
     });
   };
 
@@ -752,7 +734,7 @@ export const convertSQLData = async (
       it.nameTextStyle.fontSize = 12;
       it.axisLabel.show = showAxisLabel ? true : false;
 
-      !showAxisLabel ? (it.name = "") : null;
+      if (!showAxisLabel) it.name = "";
     });
   };
 
@@ -1427,15 +1409,6 @@ export const convertSQLData = async (
       break;
     }
     case "pie": {
-      // if (panelSchema.config.trellis?.layout) {
-      //   updateTrellisForPieTypeChart();
-      //   options.xAxis = [];
-      //   options.yAxis = [];
-
-      //   console.log(options);
-      //   break;
-      // }
-
       options.tooltip = {
         trigger: "item",
         textStyle: {

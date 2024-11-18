@@ -561,10 +561,14 @@ export default defineComponent({
           route.query.tab,
         );
 
-        Object.assign(
-          dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData ?? {})),
-        );
+        try {
+          Object.assign(
+            dashboardPanelData.data,
+            JSON.parse(JSON.stringify(panelData ?? {})),
+          );
+        } catch (e) {
+          console.error("Error while parsing panel data", e);
+        }
 
         // check if vrl function exists
         if (

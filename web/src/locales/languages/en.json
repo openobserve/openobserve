@@ -716,7 +716,7 @@
     "searchMsg": "Search for Dashboards across Folders",
     "trellisLayout": "Trellis Layout",
     "numOfColumns": "Number of Columns per Row",
-    "trellisLayoutDisabled": "Add Breakdown Field to enable Trellis Layout"
+    "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout"
   },
   "panel": {
     "header": "Panel",

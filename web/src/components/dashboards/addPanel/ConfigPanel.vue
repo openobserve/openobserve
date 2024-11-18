@@ -80,10 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b
-                  >This is only applicable when breakdown field is available.
-                  {{ t("dashboard.trellisLayoutDisabled") }}</b
-                >
+                <b> {{ t("dashboard.trellisTooltip") }}</b>
               </q-tooltip>
             </div>
           </div>
@@ -128,10 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="bottom middle"
                   max-width="250px"
                 >
-                  <b
-                    >This is only applicable when breakdown field is available.
-                    {{ t("dashboard.trellisLayoutDisabled") }}</b
-                  >
+                  <b> {{ t("dashboard.trellisTooltip") }}</b>
                 </q-tooltip>
               </div>
             </div>
