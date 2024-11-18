@@ -55,10 +55,7 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
     const content = `setup.ilm.enabled: false
-setup.template.enabled: true
-setup.template.name: "nginx-log"
-setup.template.pattern: "nginx-log-*"
-setup.template.overwrite: true
+setup.template.enabled: false
 
 filebeat.inputs:
 - type: log
@@ -70,7 +67,7 @@ output.elasticsearch:
   hosts: ["${endpoint.value.protocol}://${endpoint.value.host}:${endpoint.value.port}"]
   timeout: 10
   path: "/api/${store.state.selectedOrganization.identifier}/"
-  index: default
+  index: "default"
   username: "[EMAIL]"
   password: "[PASSCODE]"`;
     return {
