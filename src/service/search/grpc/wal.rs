@@ -367,7 +367,6 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    // construct latest schema map
     let schema_latest = Arc::new(
         schema
             .as_ref()
