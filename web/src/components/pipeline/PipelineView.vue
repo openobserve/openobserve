@@ -14,7 +14,23 @@
           transition: 'background-color 0.2s ease',
         }"
       >
+
       </DropzoneBackground>
+      <template #edge-custom="customEdgeProps">
+      <CustomEdge
+        :id="customEdgeProps.id"
+        :source-x="customEdgeProps.sourceX"
+        :source-y="customEdgeProps.sourceY"
+        :target-x="customEdgeProps.targetX"
+        :target-y="customEdgeProps.targetY"
+        :source-position="customEdgeProps.sourcePosition"
+        :target-position="customEdgeProps.targetPosition"
+        :data="customEdgeProps.data"
+        :marker-end="customEdgeProps.markerEnd"
+        :style="customEdgeProps.style"
+        :is-in-view = true
+      />
+    </template>
        <template #node-input="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="input" />
       </template>
@@ -37,6 +53,7 @@ import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { ref, onMounted, onActivated, watch } from "vue";
 import { ControlButton, Controls } from '@vue-flow/controls'
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
+import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
 import '@vue-flow/controls/dist/style.css'
@@ -53,7 +70,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
     props: {
       pipeline: Object
     },
-    components: { VueFlow, CustomNode, Controls,ControlButton,DropzoneBackground },
+    components: { VueFlow, CustomNode, Controls,ControlButton,DropzoneBackground ,CustomEdge},
     setup(props) {
       const {
       pipelineObj,
@@ -72,6 +89,8 @@ const queryImage = getImageURL("images/pipeline/query.svg");
       });
 
       onMounted(async () => {
+
+        console.log(pipelineObj.currentSelectedPipeline.edges,"edges typw")
 
         
         pipelineObj.nodeTypes = [

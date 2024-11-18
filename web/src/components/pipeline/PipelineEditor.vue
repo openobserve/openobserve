@@ -420,7 +420,7 @@ const getPipeline = () => {
           ...edge.style, // Preserve existing styles
           strokeWidth: 2,
         };
-        edge.type = 'button';
+        edge.type = 'custom';
         edge.animated = true;
       });
 
