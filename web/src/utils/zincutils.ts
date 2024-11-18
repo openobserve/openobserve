@@ -25,7 +25,7 @@ import { DateTime as _DateTime } from "luxon";
 
 let moment: any;
 let momentInitialized = false;
-let organizationData = ref({});
+const organizationDataLocal: any = ref({});
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -247,7 +247,7 @@ export const getSessionStorageVal = (key: string) => {
 };
 
 export const useLocalOrganization = (
-  val: Record<string, unknown> = {},
+  val:any = {},
   isDelete = false,
 ) => {
   try {
