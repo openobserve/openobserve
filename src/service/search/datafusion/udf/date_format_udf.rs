@@ -40,7 +40,7 @@ pub(crate) static DATE_FORMAT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects three string
         vec![DataType::Int64, DataType::Utf8, DataType::Utf8],
         // returns string
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         Arc::new(date_format_expr_impl),
     )

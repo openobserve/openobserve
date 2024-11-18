@@ -30,7 +30,7 @@ use crate::service::search::datafusion::udf::match_all_udf::{
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RewriteMatch {
     fields: Vec<String>,
 }
@@ -262,7 +262,9 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(RuntimeEnv::new(RuntimeConfig::default()).unwrap()))
+            .with_runtime_env(Arc::new(
+                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
+            ))
             .with_default_features()
             .with_optimizer_rules(vec![Arc::new(RewriteMatch::new(fields.clone()))])
             .build();
