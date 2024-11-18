@@ -365,7 +365,7 @@ export default defineComponent({
           // Find the index of the record with max attributes
           const maxAttributesIndex = data.value[0].reduce(
             (
-              maxIndex: string | number,
+              maxIndex: string | number | any,
               obj: {},
               currentIndex: any,
               array: Array<Record<string, unknown>>,
