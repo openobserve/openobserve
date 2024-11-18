@@ -42,7 +42,10 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
-use super::{logs::O2IngestJsonData, pipeline::batch_execution::ExecutablePipelineTraceInputs};
+use super::{
+    logs::O2IngestJsonData, metadata::distinct_values::DISTINCT_STREAM_PREFIX,
+    pipeline::batch_execution::ExecutablePipelineTraceInputs,
+};
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
@@ -807,7 +810,7 @@ async fn write_traces(
     }
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with("distinct_values_") {
+    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }

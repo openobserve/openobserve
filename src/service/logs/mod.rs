@@ -42,7 +42,10 @@ use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use super::{
     db::organization::get_org_setting,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-    metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
+    metadata::{
+        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
+        write, MetadataItem, MetadataType,
+    },
     schema::stream_schema_exists,
 };
 use crate::{
@@ -509,7 +512,7 @@ async fn write_logs(
     }
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with("distinct_values_") {
+    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
