@@ -2734,18 +2734,3 @@ const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
 
   return optimalFontSize; // Return the largest font size that fits
 };
-
-/**
- *
- * @param text
- * @param maxWidth
- * @param calculateWidthText
- * @returns
- */
-function truncateText(text: string, maxWidth: number, calculateWidthText: any) {
-  let truncated = text;
-  while (calculateWidthText(truncated + "...") > maxWidth) {
-    truncated = truncated.slice(0, -1);
-  }
-  return truncated + "...";
-}

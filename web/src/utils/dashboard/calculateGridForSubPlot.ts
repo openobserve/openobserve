@@ -38,6 +38,18 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
   };
 }
 
+// Configuration object for chart spacing and padding
+const SPACING_CONFIG = {
+  horizontal: 4, // Horizontal space between charts (px)
+  vertical: 30, // Vertical space between charts (px)
+  padding: {
+    top: 20, // Top padding for title (px)
+    bottom: 52, // Bottom padding for legend/controls (px)
+    right: 16, // Right padding (px)
+    extraLeft: 16, // Additional left padding beyond margin (px)
+  },
+};
+
 // it is used to create grid array for trellis chart
 export function getTrellisGrid(
   width: number,
@@ -48,6 +60,10 @@ export function getTrellisGrid(
 ) {
   if (width <= 0 || height <= 0) {
     throw new Error("Width and height must be positive numbers");
+  }
+
+  if (leftMargin < 0) {
+    throw new Error("Left margin must be non-negative");
   }
 
   const gridArray: any = [];
@@ -66,18 +82,30 @@ export function getTrellisGrid(
     numOfColumns,
   );
 
-  const spaceBetweenCharts = 4;
-  const verticalSpacingBetweenCharts = 30;
+  // Validate total horizontal spacing doesn't exceed width
+  const totalHorizontalSpacing =
+    SPACING_CONFIG.horizontal * (numCols - 1) + leftMargin + 32;
+  if (totalHorizontalSpacing >= width) {
+    throw new Error("Total horizontal spacing exceeds available width");
+  }
+
+  // Validate total vertical spacing doesn't exceed height
+  const totalVerticalSpacing = SPACING_CONFIG.vertical * (numRows - 1) + 72;
+  if (totalVerticalSpacing >= height) {
+    throw new Error("Total vertical spacing exceeds available height");
+  }
 
   // How many cols
-  const xSpacingBetween = ((spaceBetweenCharts * (numCols - 1)) / width) * 100;
+  const xSpacingBetween =
+    ((SPACING_CONFIG.horizontal * (numCols - 1)) / width) * 100;
   const ySpacingBetween =
-    ((verticalSpacingBetweenCharts * (numRows - 1)) / height) * 100;
-  const topPadding = (20 / height) * 100;
-  const bottomPadding = (52 / height) * 100;
+    ((SPACING_CONFIG.vertical * (numRows - 1)) / height) * 100;
+  const topPadding = (SPACING_CONFIG.padding.top / height) * 100;
+  const bottomPadding = (SPACING_CONFIG.padding.bottom / height) * 100;
 
-  const leftPadding = ((leftMargin + 16) / width) * 100;
-  const rightPadding = (16 / width) * 100;
+  const leftPadding =
+    ((leftMargin + SPACING_CONFIG.padding.extraLeft) / width) * 100;
+  const rightPadding = (SPACING_CONFIG.padding.right / width) * 100;
 
   // width and height for single gauge
   const cellWidth =
@@ -92,8 +120,8 @@ export function getTrellisGrid(
         break;
       }
       const grid = {
-        left: `${col * cellWidth + col * ((spaceBetweenCharts / width) * 100) + leftPadding}%`,
-        top: `${row * cellHeight + row * ((verticalSpacingBetweenCharts / height) * 100) + topPadding}%`,
+        left: `${col * cellWidth + col * ((SPACING_CONFIG.horizontal / width) * 100) + leftPadding}%`,
+        top: `${row * cellHeight + row * ((SPACING_CONFIG.vertical / height) * 100) + topPadding}%`,
         width: `${cellWidth}%`,
         height: `${cellHeight}%`,
       };

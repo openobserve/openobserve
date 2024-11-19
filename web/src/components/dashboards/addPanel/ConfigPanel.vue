@@ -32,19 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
-    <div
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'sankey' &&
-        dashboardPanelData.data.type != 'pie' &&
-        dashboardPanelData.data.type != 'donut'
-      "
-      class="q-mb-sm"
-    >
+    <div v-if="showTrellisConfig" class="q-mb-sm">
       <q-select
         :label="t('dashboard.trellisLayout')"
         data-test="dashboard-trellis-chart"
@@ -1806,6 +1794,20 @@ export default defineComponent({
       ].includes(dashboardPanelData.data.type);
     });
 
+    const showTrellisConfig = computed(() => {
+      const supportedTypes = [
+        "area",
+        "area-stacked",
+        "bar",
+        "h-bar",
+        "line",
+        "scatter",
+        "stacked",
+        "h-stacked",
+      ];
+      return supportedTypes.includes(dashboardPanelData.data.type);
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1829,6 +1831,7 @@ export default defineComponent({
       removeTimeShift,
       showColorPalette,
       trellisOptions,
+      showTrellisConfig,
     };
   },
 });
