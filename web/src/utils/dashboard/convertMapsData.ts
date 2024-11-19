@@ -327,8 +327,15 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
   const seriesData = options.series.flatMap((series: any) => series.data);
 
   if (seriesData.length > 0) {
-    const numericValues = seriesData.map((item: any) => item.value).filter((value: any): value is number => typeof value === 'number' && !Number.isNaN(value) ); 
-    const minValue = Math.min(...numericValues); 
+    const numericValues = seriesData
+      .map((item: any) => item.value)
+      .filter(
+        (value: any): value is number =>
+          typeof value === "number" && !Number.isNaN(value),
+      );
+
+    const minValue =
+      numericValues.length === 1 ? 0 : Math.min(...numericValues); 
     const maxValue = Math.max(...numericValues);
 
     options.visualMap.min = minValue;
