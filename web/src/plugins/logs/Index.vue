@@ -284,49 +284,56 @@ color="primary" size="md" />
         </template>
       </q-splitter>
     </div>
-    <div   v-show="showSearchHistory">
+    <div v-show="showSearchHistory">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
-      <div v-else style="height: 200px;" >
-        <div style="height: 80vh"
-      class=" text-center q-pa-md flex flex-center"
-     >
-    <div>
-      <div>
-        <q-icon
-          name="history"
-          size="100px"
-          color="gray"
-          class="q-mb-md"
-          style="opacity: 0.1;"
-  
-        />
-      </div>
-      <div class="text-h4" style="opacity: 0.8">Search history is not enabled. </div>
-      <div  style="opacity: 0.8" class="q-mt-sm flex items-center justify-center">
-        <q-icon name="info" class="q-mr-xs " size="20px" style="opacity: 0.5;" />
-        <span class="text-h6 text-center ">
-          Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.</span>
-      </div>
+      <div v-else style="height: 200px">
+        <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
+          <div>
+            <div>
+              <q-icon
+                name="history"
+                size="100px"
+                color="gray"
+                class="q-mb-md"
+                style="opacity: 0.1"
+              />
+            </div>
+            <div class="text-h4" style="opacity: 0.8">
+              Search history is not enabled.
+            </div>
+            <div
+              style="opacity: 0.8"
+              class="q-mt-sm flex items-center justify-center"
+            >
+              <q-icon
+                name="info"
+                class="q-mr-xs"
+                size="20px"
+                style="opacity: 0.5"
+              />
+              <span class="text-h6 text-center">
+                Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
+                reporting.</span
+              >
+            </div>
 
-      <q-btn
-        class="q-mt-xl"
-        color="secondary"
-      
-        unelevated
-        :label="t('search.redirect_to_logs_page')"
-        no-caps
-        @click="redirectBackToLogs"
-      />
-    </div>
-  </div>
+            <q-btn
+              class="q-mt-xl"
+              color="secondary"
+              unelevated
+              :label="t('search.redirect_to_logs_page')"
+              no-caps
+              @click="redirectBackToLogs"
+            />
+          </div>
+        </div>
       </div>
     </div>
-
   </q-page>
 </template>
 
@@ -804,7 +811,6 @@ export default defineComponent({
           // const hasSelect =
           //   currentQuery.toLowerCase() === "select" ||
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
-
           if (!hasSelect) {
             if (currentQuery != "") {
               currentQuery = currentQuery.split("|");
@@ -917,7 +923,7 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
-        router.push({
+      router.push({
         name: "logs",
         query: {
           action: "history",
@@ -926,17 +932,16 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
-
     };
 
-    const redirectBackToLogs = () =>{
+    const redirectBackToLogs = () => {
       router.push({
         name: "logs",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-    }
+    };
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
@@ -1010,6 +1015,14 @@ export default defineComponent({
             parsedSQL.columns = filteredData;
           }
         } else {
+          let fieldPrefix = "";
+          if (searchObj.data.stream.selectedStream.length > 1) {
+            if (parsedSQL && parsedSQL.from.length > 1) {
+              fieldPrefix = parsedSQL.from[0].as
+                ? `${parsedSQL.from[0].as}.`
+                : `${parsedSQL.from[0].table}.`;
+            }
+          }
           // Add the field in the query
           if (parsedSQL.columns && parsedSQL.columns.length > 0) {
             // Iterate and remove the * from the query
@@ -1019,7 +1032,7 @@ export default defineComponent({
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
-              column: field.name,
+              column: fieldPrefix + field.name,
             },
             type: "expr",
           });
@@ -1030,7 +1043,7 @@ export default defineComponent({
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
-              column: "*",
+              column: fieldPrefix + "*",
             },
             type: "expr",
           });
