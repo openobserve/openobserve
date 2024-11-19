@@ -16,24 +16,14 @@
 use anyhow::Error;
 use config::meta::cluster::get_internal_grpc_token;
 use proto::cluster_rpc;
-use tonic::{
-    codec::CompressionEncoding,
-    metadata::{MetadataKey, MetadataValue},
-    Request,
-};
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
 
 use crate::service::grpc::get_ingester_channel;
 
 pub async fn ingest(
-    dest_org_id: &str,
     req: cluster_rpc::IngestionRequest,
 ) -> Result<cluster_rpc::IngestionResponse, Error> {
     let cfg = config::get_config();
-    let org_header_key: MetadataKey<_> = cfg
-        .grpc
-        .org_header_key
-        .parse()
-        .map_err(|_| Error::msg("invalid org_header_key".to_string()))?;
     let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::msg("invalid token".to_string()))?;
@@ -42,8 +32,6 @@ pub async fn ingest(
         channel,
         move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
-            req.metadata_mut()
-                .insert(org_header_key.clone(), dest_org_id.parse().unwrap());
             Ok(req)
         },
     );

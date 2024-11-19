@@ -23,7 +23,7 @@ pub mod logger;
 pub mod meta_store;
 pub mod pipeline;
 pub mod search;
+pub mod self_reporting;
 pub mod short_url;
 pub mod sql;
 pub mod stream;
-pub mod usage;

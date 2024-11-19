@@ -23,8 +23,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
@@ -57,7 +57,7 @@ use crate::{
             MetadataType,
         },
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
