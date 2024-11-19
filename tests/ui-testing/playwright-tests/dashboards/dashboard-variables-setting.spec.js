@@ -403,7 +403,7 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-custom-variable-0-checkbox"]').click();
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+    await page.locator('[data-test="dashboard-variable-custom-value-selector"]').click();
   })
 
   test("should verify that multi select is working properly", async ({ page, }) => {

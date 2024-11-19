@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       outlined
       dense
-      v-model="tempSelectedValue"
+      v-model="selectedValue"
       :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
@@ -39,9 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
-      @update:model-value="onValueChange"
-      @blur="clickOutsideOfPopup"
-      @hide="clickOutsideOfPopup"
     >
       <template v-slot:no-option>
         <q-item>
@@ -84,21 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
-
-      <!-- <template v-if="variableItem.multiSelect" v-slot:after-options>
-        <div class="q-pa-sm tw-text-end">
-          <q-btn
-            @click="applySelection"
-            class="no-border q-py-xs"
-            color="secondary"
-            no-caps
-            size="sm"
-            data-test="dashboard-variable-query-value-selector-apply-btn"
-          >
-            Apply
-          </q-btn>
-        </div>
-      </template> -->
     </q-select>
   </div>
 </template>
@@ -112,10 +94,6 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    // Temporary selection value
-    const tempSelectedValue = ref(props.variableItem?.value);
-
-    // Actual selected value used
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -130,7 +108,6 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-        tempSelectedValue.value = selectedValue.value;
       }
     );
 
@@ -138,39 +115,25 @@ export default defineComponent({
     const isAllSelected = computed(() => {
       return (
         fieldsFilteredOptions.value.length > 0 &&
-        tempSelectedValue.value.length === fieldsFilteredOptions.value.length
+        selectedValue.value.length === fieldsFilteredOptions.value.length
       );
     });
 
     // Function to toggle select/deselect all options
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
-        tempSelectedValue.value = fieldsFilteredOptions.value.map(
+        selectedValue.value = fieldsFilteredOptions.value.map(
           (option: any) => option.value
         );
       } else {
-        tempSelectedValue.value = [];
+        selectedValue.value = [];
       }
     };
 
-    // apply the temporary selection to the actual selected value
-    const applySelection = () => {
-      selectedValue.value = tempSelectedValue.value;
+    // update selected value
+    watch(selectedValue, () => {
       emit("update:modelValue", selectedValue.value);
-    };
-    // Update value based on multi-select mode
-    const onValueChange = (value: any) => {
-      if (!props.variableItem.multiSelect) {
-        selectedValue.value = value;
-        emit("update:modelValue", value);
-      } else {
-        tempSelectedValue.value = value;
-      }
-    };
-    const clickOutsideOfPopup = () => {
-      selectedValue.value = tempSelectedValue.value;
-      emit("update:modelValue", selectedValue.value);
-    };
+    });
 
     // Display the selected value
     const displayValue = computed(() => {
@@ -209,10 +172,6 @@ export default defineComponent({
       isAllSelected,
       toggleSelectAll,
       displayValue,
-      tempSelectedValue,
-      applySelection,
-      onValueChange,
-      clickOutsideOfPopup,
     };
   },
 });
