@@ -224,9 +224,9 @@ async fn update_cache(
                 }
                 Ok(exec_pl) => {
                     stream_pl_exec.insert(stream_params.clone(), exec_pl);
+                    log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
                 }
             };
-            log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
         }
     }
 }
