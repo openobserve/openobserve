@@ -1129,7 +1129,7 @@ pub struct MemoryCache {
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
@@ -1165,7 +1165,7 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
@@ -1716,8 +1716,8 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.memory_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
-        // 80% of max_size
-        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 10 * 8;
+        // 50% of max_size
+        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 2;
     } else {
         cfg.memory_cache.skip_size *= 1024 * 1024;
     }
@@ -1831,8 +1831,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
-        // 80% of max_size
-        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 10 * 8;
+        // 50% of max_size
+        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 2;
     } else {
         cfg.disk_cache.skip_size *= 1024 * 1024;
     }
