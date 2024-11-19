@@ -30,7 +30,7 @@ use crate::{
     service::enrichment_table::geoip::{Geoip, GeoipConfig},
 };
 
-static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
+pub static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
@@ -44,7 +44,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 }
 
-async fn run_download_files() {
+pub async fn run_download_files() {
     let cfg = config::get_config();
 
     // send request and await response
