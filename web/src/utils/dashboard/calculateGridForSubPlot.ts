@@ -66,7 +66,12 @@ export function getTrellisGrid(
     throw new Error("Left margin must be non-negative");
   }
 
-  const gridArray: any = [];
+  const gridArray: Array<{
+    left: string;
+    top: string;
+    width: string;
+    height: string;
+  }> = [];
 
   // if no grid then return empty array
   if (numGrids <= 0) {

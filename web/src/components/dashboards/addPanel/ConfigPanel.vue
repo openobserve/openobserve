@@ -46,11 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.trellis?.layout ?? 'None'
         }`"
-        :disable="
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.breakdown?.length == 0
-        "
+        :disable="isBreakdownFieldEmpty"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -1459,8 +1455,8 @@ export default defineComponent({
       }
 
       // Initialize map_type configuration
-      if(!dashboardPanelData.data.config.map_type) {
-        dashboardPanelData.data.config.map_type = { type: 'world' }
+      if (!dashboardPanelData.data.config.map_type) {
+        dashboardPanelData.data.config.map_type = { type: "world" };
       }
     });
 
@@ -1808,6 +1804,14 @@ export default defineComponent({
       return supportedTypes.includes(dashboardPanelData.data.type);
     });
 
+    const isBreakdownFieldEmpty = computed(() => {
+      return (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.breakdown?.length == 0
+      );
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1832,6 +1836,7 @@ export default defineComponent({
       showColorPalette,
       trellisOptions,
       showTrellisConfig,
+      isBreakdownFieldEmpty,
     };
   },
 });

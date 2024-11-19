@@ -816,7 +816,7 @@ export default defineComponent({
 
           if (!dashboardData) {
             console.error(
-              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`,
+              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
             );
             return;
           }

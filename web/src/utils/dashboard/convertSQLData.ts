@@ -564,6 +564,14 @@ export const convertSQLData = async (
 
   const updateTrellisConfig = () => {
     try {
+      if (!chartPanelRef?.value) {
+        throw new Error("Chart panel reference is not available");
+      }
+
+      if (!options.series?.length) {
+        throw new Error("No series data available");
+      }
+
       const yAxisNameGap = getYAxisNameGap();
 
       // If the trellis layout is custom, we need to calculate the number of columns in panel
@@ -572,6 +580,10 @@ export const convertSQLData = async (
         panelSchema.config.trellis?.layout === "custom" &&
         panelSchema.config.trellis?.num_of_columns
       ) {
+        if (panelSchema.config.trellis.num_of_columns <= 0) {
+          throw new Error("Number of columns must be positive");
+        }
+
         customCols = panelSchema.config.trellis?.num_of_columns;
       }
 
@@ -636,8 +648,8 @@ export const convertSQLData = async (
       updateXAxisOption(yAxisNameGap, gridData);
 
       options.legend.show = false;
-    } catch (err) {
-      console.error("Failed to update trellis configuration:", err);
+    } catch (err: any) {
+      console.error(`Trellis configuration failed: ${err?.message}`);
       // Fallback to default single grid configuration
       options.grid = [
         {
@@ -679,9 +691,6 @@ export const convertSQLData = async (
     yAxisNameGap: number,
     gridData: null | any = null,
   ) => {
-    console.log(
-      Math.max(...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat()),
-    );
     const maxYValue = formatUnitValue(
       getUnitValue(
         Math.max(
@@ -692,8 +701,6 @@ export const convertSQLData = async (
         panelSchema.config?.decimals,
       ),
     );
-
-    console.log(maxYValue);
 
     // Update yAxis label properties for each chart yAxis based on the grid position
     options.yAxis.forEach((it: any, index: number) => {
