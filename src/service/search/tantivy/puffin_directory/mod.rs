@@ -103,6 +103,13 @@ pub async fn convert_puffin_file_to_tantivy_dir<T: Into<PathBuf>>(
         }
     }
 
+    // Ensure filename is not empty
+    if filename.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No valid segment files found in 'puffin_dir' to determine filename."
+        ));
+    }
+
     // remove file ext from filename
     filename = filename.split('.').next().unwrap_or_default().to_string();
 

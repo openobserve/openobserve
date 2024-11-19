@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    meta::stream::{FileKey, FileMeta},
-    utils::parquet::parse_file_key_columns,
-};
+use config::meta::stream::{FileKey, FileMeta};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
@@ -25,7 +22,6 @@ pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
-    let (_stream_key, _date_key, _file_name) = parse_file_key_columns(key)?;
     let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
