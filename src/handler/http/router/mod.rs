@@ -30,7 +30,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::ingestion::INGESTION_EP, service::usage::audit},
+    crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
     actix_web::{web::BytesMut, HttpMessage},
     base64::{engine::general_purpose, Engine as _},

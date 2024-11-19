@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 use super::bitvec::BitVec;
 use crate::{
     get_config,
-    meta::usage::Stats,
+    meta::self_reporting::usage::Stats,
     utils::{
         hash::{gxhash, Sum64},
         json::{self, Map, Value},
