@@ -145,9 +145,10 @@ export default {
   })
 
 
-const  buttonClass = () => {
+  const  buttonClass = () => {
       return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
     };
+
     const { setViewport } = useVueFlow()
 
 
@@ -163,7 +164,7 @@ watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
 onMounted(async () => {
      setTimeout(() => {
       if (vueFlowRef.value) {
-        vueFlowRef.value.fitView({ padding: 1});
+        vueFlowRef.value.fitView({ padding: 0.1});
       }
      }, 100);
     });

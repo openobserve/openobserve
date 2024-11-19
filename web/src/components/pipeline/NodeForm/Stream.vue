@@ -272,16 +272,27 @@ onMounted(async () => {
 watch(selected, (newValue:any) => {
       pipelineObj.userSelectedNode = newValue; 
 });
+watch(stream_type, (newValue:any) => {
+  if(newValue){
+    // pipelineObj.currentSelectedNodeData.data.stream_type = newValue;
+    stream_name.value = {label: "", value: "", isDisable: false};
+    
+
+    // pipelineObj.currentSelectedNodeData.data.stream_name = "";
+
+  }
+  getStreamList();
+});
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;
   await pipelineService.getPipelineStreams(org_identifier)
     .then((res: any) => {
-      usedStreams.value[stream_type.value] = res.data.list;
+      usedStreams.value = res.data.list;
     })
 }
 async function getStreamList() {
-  const streamType = pipelineObj.currentSelectedNodeData.hasOwnProperty("stream_type")
-    ? pipelineObj.currentSelectedNodeData.stream_type
+  const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty("stream_type")
+    ? pipelineObj.currentSelectedNodeData.data.stream_type
     : "logs";
   
   
@@ -292,12 +303,13 @@ async function getStreamList() {
     
     if (res.list.length > 0 && pipelineObj.currentSelectedNodeData.hasOwnProperty("type") && pipelineObj.currentSelectedNodeData.type === "input") {
       res.list.forEach((stream : any) => {
-        stream.isDisable = usedStreams.value[streamType].some(
-          (usedStream : any) => usedStream.stream_name === stream.name
+        stream.isDisable = usedStreams.value.some(
+          (usedStream : any) => 
+            (usedStream.stream_name === stream.name  && usedStream.stream_type === stream.stream_type)
+          
         );
       });
     }
-    
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
     indexOptions.value = res.list.map((data : any) => data.name);
@@ -378,7 +390,7 @@ const saveStream = () => {
 };
 
 const filterStreams = (val: string, update: any) => {
-  const streamType = pipelineObj.currentSelectedNodeData.stream_type || 'logs';
+  const streamType = pipelineObj.currentSelectedNodeData.data.stream_type || 'logs';
   if( pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&  pipelineObj.currentSelectedNodeData.type === 'input') {
     const filtered = streams.value[streamType].filter((stream :any) => {
     return stream.name.toLowerCase().includes(val.toLowerCase());

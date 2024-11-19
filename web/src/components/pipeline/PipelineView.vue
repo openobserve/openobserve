@@ -4,8 +4,8 @@
       ref="vueFlowRef"
         v-model:nodes="lockedNodes"
         v-model:edges="pipelineObj.currentSelectedPipeline.edges"
-      :options="{ readOnly: true }"
-      :default-viewport="{ zoom: 0 }"
+        :options="{ readOnly: true }"
+        :default-viewport="{ zoom: 0.5 }"
 
        >
        <DropzoneBackground
@@ -40,7 +40,6 @@
       <template #node-default="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="default" />
       </template>
-      
       </VueFlow>
     </div>
   </template>
@@ -65,6 +64,7 @@ const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
+
   
   export default defineComponent({
     props: {
@@ -90,7 +90,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
 
       onMounted(async () => {
 
-        console.log(pipelineObj.currentSelectedPipeline.edges,"edges typw")
+
 
         
         pipelineObj.nodeTypes = [
@@ -155,7 +155,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
         setTimeout(() => {
           if(vueFlowRef.value)
           vueFlowRef.value.fitView({ padding: 0.1});
-        }, 100);
+        }, 0);
 
       })
   
