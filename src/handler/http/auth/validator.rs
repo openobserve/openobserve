@@ -750,6 +750,7 @@ pub(crate) async fn check_permissions(
     auth_info: AuthExtractor,
     role: Option<UserRole>,
 ) -> bool {
+    let cfg = get_config();
     if !get_o2_config().openfga.enabled {
         return true;
     }
@@ -775,11 +776,12 @@ pub(crate) async fn check_permissions(
     };
     let org_id = if auth_info.org_id.eq("organizations") {
         if auth_info.method.eq("POST") {
-            // The user is trying to create a new org
-            // No need to check permission, return true
-            return true;
+            // The user is trying to create a new organization
+            // Use the usage org to check for permission
+            &cfg.common.usage_org
+        } else {
+            user_id
         }
-        user_id
     } else {
         &auth_info.org_id
     };

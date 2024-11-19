@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use bytes::Bytes;
 use config::utils::json;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
@@ -219,7 +220,7 @@ pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
     users::add(user.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Error adding user: {e}"))?;
-    let _ = put_into_db_coordinator(&key, json::to_vec(&user).unwrap().into(), true, None).await;
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     // Add user to orgs
     for org in &db_user.organizations {
@@ -244,16 +245,10 @@ pub async fn update(
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
     let key = format!("/user_record/{user_email}");
-    let updated_user = users::update(&user_email, first_name, last_name, password, password_ext)
+    users::update(&user_email, first_name, last_name, password, password_ext)
         .await
         .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
-    let _ = put_into_db_coordinator(
-        &key,
-        json::to_vec(&updated_user).unwrap().into(),
-        true,
-        None,
-    )
-    .await;
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     Ok(())
 }
 
@@ -305,16 +300,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: infra::table::users::UserRecord =
-                    if config::get_config().common.meta_store_external {
-                        match get_user_record(item_key).await {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
+                    match get_user_record(item_key).await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
                         }
-                    } else {
-                        json::from_slice(&ev.value.unwrap()).unwrap()
                     };
 
                 USERS.insert(item_key.to_string(), item_value);

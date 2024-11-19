@@ -30,7 +30,7 @@ pub async fn create_role(
     let user_req = user_req.into_inner();
 
     match o2_enterprise::enterprise::openfga::authorizer::roles::create_role(
-        &user_req.name,
+        &user_req.role,
         &org_id,
     )
     .await

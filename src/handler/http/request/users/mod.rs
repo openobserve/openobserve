@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, sync::Arc};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{
     cookie, delete, get,
@@ -66,9 +66,14 @@ use crate::{
     )
 )]
 #[get("/{org_id}/users")]
-pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    users::list_users(&org_id).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let list_all = match query.get("list_all") {
+        Some(v) => v.parse::<bool>().unwrap_or(false),
+        None => false,
+    };
+    users::list_users(&org_id, list_all).await
 }
 
 /// CreateUser

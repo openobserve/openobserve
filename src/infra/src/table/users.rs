@@ -35,6 +35,15 @@ pub enum UserType {
     External = 1,
 }
 
+impl From<UserType> for bool {
+    fn from(user_type: UserType) -> bool {
+        match user_type {
+            UserType::Internal => false,
+            UserType::External => true,
+        }
+    }
+}
+
 // define the organizations table
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "users")]
@@ -185,33 +194,20 @@ pub async fn update(
     last_name: &str,
     password: &str,
     password_ext: Option<String>,
-) -> Result<UserRecord, errors::Error> {
+) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = ActiveModel {
-        first_name: Set(first_name.to_string()),
-        last_name: Set(last_name.to_string()),
-        password: Set(password.to_string()),
-        password_ext: Set(password_ext),
-        ..Default::default()
-    };
 
-    let result = Entity::update(record)
+    let result = Entity::update_many()
+        .col_expr(Column::FirstName, Expr::value(first_name))
+        .col_expr(Column::LastName, Expr::value(last_name))
+        .col_expr(Column::Password, Expr::value(password))
+        .col_expr(Column::PasswordExt, Expr::value(password_ext))
         .filter(Column::Email.eq(email))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(UserRecord {
-        email: result.email,
-        first_name: result.first_name,
-        last_name: result.last_name,
-        password: result.password,
-        salt: result.salt,
-        is_root: result.is_root,
-        password_ext: result.password_ext,
-        user_type: result.user_type,
-        created_ts: result.created_ts,
-    })
+    Ok(result.rows_affected)
 }
 
 pub async fn remove(email: &str) -> Result<(), errors::Error> {

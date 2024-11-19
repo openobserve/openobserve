@@ -72,7 +72,7 @@ pub struct PostUserRequest {
     #[serde(default)]
     pub last_name: String,
     pub password: String,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, flatten)]
     pub role: UserRoleRequest,
     /// Is the user created via ldap flow.
     #[serde(default)]
@@ -218,8 +218,8 @@ pub struct UpdateUser {
     pub old_password: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_password: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<UserRole>,
+    #[serde(skip_serializing_if = "Option::is_none", flatten)]
+    pub role: Option<UserRoleRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
@@ -346,7 +346,7 @@ pub struct UserResponse {
     pub first_name: String,
     #[serde(default)]
     pub last_name: String,
-    pub role: UserRole,
+    pub role: String,
     #[serde(default)]
     pub is_external: bool,
 }
@@ -539,10 +539,14 @@ pub struct UserGroupRequest {
     pub remove_roles: Option<std::collections::HashSet<String>>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 pub struct UserRoleRequest {
-    pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "custom_role"
+    )]
     pub custom: Option<String>,
 }
 
@@ -552,14 +556,14 @@ impl From<&UserRoleRequest> for UserOrgRole {
         let mut custom_role = role.custom.clone();
         let mut is_role_name_standard = false;
         for user_role in UserRole::iter() {
-            if user_role.to_string().eq(&role.name) {
+            if user_role.to_string().eq(&role.role) {
                 standard_role = user_role;
                 is_role_name_standard = true;
                 break;
             }
         }
         if !is_role_name_standard && custom_role.is_none() {
-            custom_role = Some(role.name.clone());
+            custom_role = Some(role.role.clone());
         }
         UserOrgRole {
             base_role: standard_role,
