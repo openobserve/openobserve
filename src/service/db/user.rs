@@ -17,10 +17,14 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use config::utils::json;
+#[cfg(feature = "enterprise")]
+use infra::table::org_invites::InvitationRecord;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
-    table::{org_invites::InvitationRecord, users},
+    table::users,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::org_invites;
 
 use super::org_users::{self, get_cached_user_org};
 use crate::{
@@ -269,9 +273,10 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, anyhow::Error> {
     let user_id = user_id.to_lowercase();
-    db::org_invites::list_by_user(&user_id).await
+    org_invites::list_by_user(&user_id).await
 }
 
 pub async fn list_users(

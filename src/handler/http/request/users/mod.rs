@@ -157,7 +157,10 @@ pub async fn update(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role = Some(meta::user::UserRole::Admin);
+        user.role = Some(UserRoleRequest {
+            role: meta::user::UserRole::Admin.to_string(),
+            custom: None,
+        });
     }
     let initiator_id = &user_email.user_id;
     let self_update = user_email.user_id.eq(&email_id);

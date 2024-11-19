@@ -20,9 +20,11 @@ use config::{
     get_config, ider, meta::stream::StreamType, utils::rand::generate_random_string, SMTP_CLIENT,
 };
 use lettre::{message::SinglePart, AsyncTransport, Message};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::org_invites;
 
 use super::{
-    db::{org_invites, org_users},
+    db::org_users,
     users::{add_admin_to_org, get_user},
 };
 use crate::{
@@ -288,6 +290,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn generate_invitation(
     org_id: &str,
     user_email: &str,
@@ -355,6 +358,7 @@ pub async fn generate_invitation(
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn accept_invitation(
     org_id: &str,
     user_email: &str,

@@ -34,7 +34,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     short_urls::init().await?;
     users::init().await?;
     organizations::init().await?;
-    org_invites::init().await?;
     org_users::init().await?;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

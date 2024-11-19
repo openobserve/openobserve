@@ -15,6 +15,8 @@
 
 use std::{fmt, str::FromStr};
 
+#[cfg(feature = "enterprise")]
+use infra::table::org_invites::OrgInviteStatus;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
 use utoipa::ToSchema;
@@ -356,6 +358,7 @@ pub struct UserList {
     pub data: Vec<UserResponse>,
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub enum InviteStatus {
     #[serde(rename = "pending")]
@@ -368,17 +371,19 @@ pub enum InviteStatus {
     Expired,
 }
 
-impl From<&infra::table::org_invites::OrgInviteStatus> for InviteStatus {
-    fn from(status: &infra::table::org_invites::OrgInviteStatus) -> Self {
+#[cfg(feature = "enterprise")]
+impl From<&OrgInviteStatus> for InviteStatus {
+    fn from(status: &OrgInviteStatus) -> Self {
         match status {
-            infra::table::org_invites::OrgInviteStatus::Pending => InviteStatus::Pending,
-            infra::table::org_invites::OrgInviteStatus::Accepted => InviteStatus::Accepted,
-            infra::table::org_invites::OrgInviteStatus::Rejected => InviteStatus::Rejected,
-            infra::table::org_invites::OrgInviteStatus::Expired => InviteStatus::Expired,
+            OrgInviteStatus::Pending => InviteStatus::Pending,
+            OrgInviteStatus::Accepted => InviteStatus::Accepted,
+            OrgInviteStatus::Rejected => InviteStatus::Rejected,
+            OrgInviteStatus::Expired => InviteStatus::Expired,
         }
     }
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInvite {
     pub org_id: String,
@@ -388,6 +393,7 @@ pub struct UserInvite {
     pub expires_at: i64,
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInviteList {
     pub data: Vec<UserInvite>,
