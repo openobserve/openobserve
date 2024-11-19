@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
-              :variablesData="variablesData"
+              :variablesData="refreshVariableDataRef"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
@@ -319,6 +319,7 @@ export default defineComponent({
 
     // watch on currentTimeObj to update the variablesData
     watch(
+      () =>
       props.currentTimeObj,
       () => {
         console.log("props.currentTimeObj", props.currentTimeObj);
@@ -600,6 +601,7 @@ export default defineComponent({
       currentQueryTraceIds,
       openEditLayout,
       saveDashboard,
+      refreshVariableDataRef,
     };
   },
   methods: {
