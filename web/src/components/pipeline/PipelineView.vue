@@ -5,7 +5,7 @@
         v-model:nodes="lockedNodes"
         v-model:edges="pipelineObj.currentSelectedPipeline.edges"
         :options="{ readOnly: true }"
-        :default-viewport="{ zoom: 0.5 }"
+        :default-viewport="{ zoom: 0 }"
 
        >
        <DropzoneBackground
@@ -90,6 +90,8 @@ const queryImage = getImageURL("images/pipeline/query.svg");
 
       onMounted(async () => {
 
+        console.log(props,'props')
+
 
 
         
@@ -155,7 +157,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
         setTimeout(() => {
           if(vueFlowRef.value)
           vueFlowRef.value.fitView({ padding: 0.1});
-        }, 0);
+        }, 100);
 
       })
   

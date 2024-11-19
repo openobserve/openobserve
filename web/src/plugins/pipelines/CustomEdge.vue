@@ -1,3 +1,32 @@
+<template>
+  <BaseEdge
+    :id="id"
+    :style="style"
+    :path="path[0]"
+    :marker-end="markerEnd"
+  />
+  <EdgeLabelRenderer v-if="!isInView">
+    <div
+      :style="{
+        position: 'absolute',
+        top: `${midY}px`,
+        left: `${midX}px`,
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'auto', /* Ensure the button receives events */
+        zIndex: 10, /* Bring it to the front */
+      }"
+    >
+      <button
+        @click="handleClick"
+        class="remove-edge-button"
+        aria-label="Remove edge"
+      >
+      <q-icon name="close" />
+      </button>
+    </div>
+  </EdgeLabelRenderer>
+</template>
+
 <script setup>
 import { BaseEdge, getBezierPath,EdgeLabelRenderer,getSmoothStepPath,useVueFlow } from '@vue-flow/core'
 import { computed, onMounted } from 'vue'
@@ -71,36 +100,19 @@ function handleClick(event) {
 export default {
   inheritAttrs: false,
 }
-
-
-
 </script>
 
-<template>
-  <BaseEdge
-    :id="id"
-    :style="style"
-    :path="path[0]"
-    :marker-end="markerEnd"
-  />
-  <EdgeLabelRenderer v-if="!isInView">
-    <div
-      :style="{
-        position: 'absolute',
-        top: `${midY}px`,
-        left: `${midX}px`,
-        transform: 'translate(-50%, -50%)',
-        pointerEvents: 'auto', /* Ensure the button receives events */
-        zIndex: 10, /* Bring it to the front */
-      }"
-    >
-      <button
-        @click="handleClick"
-        style="background: red; color: white; border: none; border-radius: 100%; cursor: pointer; padding: 4px 8px;"
-      >
-      <q-icon name="close" />
-      </button>
-    </div>
-  </EdgeLabelRenderer>
-</template>
+
+<style scoped>
+.remove-edge-button {
+  background: red;
+  color: white;
+  border: none;
+  border-radius: 100%;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+</style>
+
+
 
