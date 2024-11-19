@@ -3089,6 +3089,58 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
+
+  const validateQuery = (query: any, variables: any) => {
+    // Helper to test one replacement (string or number)
+    const testReplacement = (q: any, varName: any, replacement: any) => {
+      const regex = new RegExp(`\\$${varName}(?!\\w)`, "g"); // Match $VAR_NAME only
+      return q.replace(regex, replacement);
+    };
+
+    // Recursive validation function
+    const validateRecursive: any = (currentQuery: any, remainingVars: any) => {
+      if (!remainingVars.length) {
+        try {
+          // Try parsing the current query
+          parser.astify(currentQuery);
+          return currentQuery; // Return valid query
+        } catch (error) {
+          return null; // Invalid query
+        }
+      }
+
+      // Process next variable
+      const [varName, ...restVars] = remainingVars;
+
+      // Try as string
+      const stringQuery = testReplacement(
+        currentQuery,
+        varName,
+        "VARIABLE_PLACEHOLDER",
+      );
+      const resultAsString: any = validateRecursive(stringQuery, restVars);
+      if (resultAsString) return resultAsString; // Found valid query
+
+      // Try as number
+      const numericQuery = testReplacement(currentQuery, varName, "10");
+      const resultAsNumber = validateRecursive(numericQuery, restVars);
+      if (resultAsNumber) return resultAsNumber; // Found valid query
+
+      // If neither works, return null
+      throw new Error("Invalid query");
+    };
+
+    return validateRecursive(query, variables);
+  };
+
+  // Extract variables from the query
+  const extractVariables = (query: any) => {
+    const matches = query.match(/\$(\w+|\{\w+\})/g);
+    return matches
+      ? [...new Set(matches.map((v: any) => v.replace(/^\$|\{|\}/g, "")))]
+      : [];
+  };
+
   // This function parses the custom query and generates the errors and custom fields
   const updateQueryValue = () => {
     // store the query in the dashboard panel data
@@ -3139,19 +3191,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             "1|2"
           );
         }
-        if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
-          const isLimitClause = dashboardPanelData.meta.parsedQuery?.limit?.value?.every(
-            (val: any) => val.value === 0
-          );
-          currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, () => {
-            if (isLimitClause) {
-              return "0"; 
-            } else {
-              return "VARIABLE_PLACEHOLDER"; 
-            }
-          });
-        } 
-        dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);        
+
+        const variables = extractVariables(currentQuery); // Extract all unique variables
+        const validatedQuery = validateQuery(currentQuery, variables);
+
+        if (validatedQuery) {
+          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);
+        } else {
+          dashboardPanelData.meta.parsedQuery = null;
+        }
       } catch (e) {
         // exit as there is an invalid query
         dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
