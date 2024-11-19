@@ -275,7 +275,10 @@ pub async fn process_token(
                 false,
                 &get_config().auth.root_user_email,
                 crate::common::meta::user::UpdateUser {
-                    role: Some(org.role.clone()),
+                    role: Some(crate::common::meta::user::UserRoleRequest {
+                        role: org.role.to_string(),
+                        custom: None,
+                    }),
                     ..Default::default()
                 },
             )

@@ -175,7 +175,7 @@ pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
 ) -> Result<Organization, anyhow::Error> {
-    org.identifier = format!("{}_{}", org.name, ider::generate());
+    org.identifier = format!("{}_{}", org.name.replace(' ', "_"), ider::generate());
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;

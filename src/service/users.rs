@@ -17,6 +17,7 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
+use hashbrown::HashSet;
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -43,7 +44,11 @@ pub async fn post_user(
     usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+    let initiator_user = if is_root_user(initiator_id) {
+        db::user::get(None, initiator_id).await
+    } else {
+        db::user::get(Some(org_id), initiator_id).await
+    };
     let cfg = get_config();
 
     let Ok(initiator_user) = initiator_user else {
@@ -283,8 +288,9 @@ pub async fn update_user(
                     // Admins Role can still be mutable.
                     && !local_user.role.eq(&UserRole::Root)
                 {
+                    let new_org_role = UserOrgRole::from(&user.role.unwrap());
                     old_role = Some(new_user.role);
-                    new_user.role = user.role.unwrap();
+                    new_user.role = new_org_role.base_role;
                     new_role = Some(new_user.role.clone());
                     is_org_updated = true;
                 }
@@ -620,19 +626,22 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 }
 
-pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Error> {
+    let cfg = get_config();
     let mut user_list: Vec<UserResponse> = vec![];
+    let mut user_name = HashSet::new();
     log::debug!("Listing users for org: {}", org_id);
     for user in ORG_USERS.iter() {
         if user.key().starts_with(&format!("{org_id}/")) {
             if let Some(user) = get_user(Some(org_id), user.value().email.as_str()).await {
                 user_list.push(UserResponse {
                     email: user.email.clone(),
-                    role: user.role.clone(),
+                    role: user.role.to_string(),
                     first_name: user.first_name.clone(),
                     last_name: user.last_name.clone(),
                     is_external: user.is_external,
-                })
+                });
+                user_name.insert(user.email.clone());
             }
         }
     }
@@ -644,11 +653,27 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
             let root_user = root.value();
             user_list.push(UserResponse {
                 email: root_user.email.clone(),
-                role: root_user.role.clone(),
+                role: root_user.role.to_string(),
                 first_name: root_user.first_name.clone(),
                 last_name: root_user.last_name.clone(),
                 is_external: root_user.is_external,
-            })
+            });
+            user_name.insert(root_user.email.clone());
+        }
+        if org_id.eq(cfg.common.usage_org.as_str()) && list_all {
+            let usage_users = db::user::list_users(None).await.unwrap();
+            for usage_user in usage_users {
+                if user_name.contains(&usage_user.email) {
+                    continue;
+                }
+                user_list.push(UserResponse {
+                    email: usage_user.email.clone(),
+                    role: "".to_string(),
+                    first_name: usage_user.first_name.clone(),
+                    last_name: usage_user.last_name.clone(),
+                    is_external: usage_user.user_type.into(),
+                });
+            }
         }
     }
 
@@ -885,7 +910,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy").await.is_ok())
+        assert!(list_users("dummy", false).await.is_ok())
     }
 
     #[tokio::test]
@@ -940,7 +965,10 @@ mod tests {
                 last_name: Some("last_name".to_string()),
                 old_password: Some("pass".to_string()),
                 new_password: Some("new_pass".to_string()),
-                role: Some(crate::common::meta::user::UserRole::Member),
+                role: Some(crate::common::meta::user::UserRoleRequest {
+                    role: crate::common::meta::user::UserRole::Admin.to_string(),
+                    custom: None,
+                }),
                 change_password: false,
             },
         )
@@ -959,7 +987,10 @@ mod tests {
                 last_name: Some("last_name".to_string()),
                 old_password: None,
                 new_password: None,
-                role: Some(crate::common::meta::user::UserRole::Admin),
+                role: Some(crate::common::meta::user::UserRoleRequest {
+                    role: crate::common::meta::user::UserRole::Admin.to_string(),
+                    custom: None,
+                }),
                 change_password: false,
             },
         )
