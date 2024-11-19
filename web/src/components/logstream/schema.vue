@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 text-bold" data-test="schema-title-text">
+          <div class="text-body1 tw-font-semibold tw-text-xl" data-test="schema-title-text">
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
@@ -46,57 +46,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           No data available.
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
-          <div class="title" data-test="schema-stream-title-text">
-            {{ indexData.name }}
+         <div class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5">
+          <div data-test="stream-details-container" class="stream_details_container tw-flex tw-justify-between tw-gap-5 tw-flex-wrap" >
+           
+          <div data-test="schema-stream-title-text">
+            {{ t("alerts.stream_name") }} <span class="title q-pl-xs"> {{ indexData.name }}</span>
           </div>
-          <div class="q-table__container q-table--cell-separator">
-            <table class="q-table" data-test="schema-stream-meta-data-table">
-              <thead>
-                <tr>
-                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
-                    {{ t("logStream.docsCount") }}
-                  </th>
-                  <th>{{ t("logStream.storageSize") }}</th>
-                  <th v-if="isCloud !== 'true'">
-                    {{ t("logStream.compressedSize") }}
-                  </th>
-                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
-                    {{ t("logStream.time") }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td v-if="store.state.zoConfig.show_stream_stats_doc_num">
-                    {{
-                      parseInt(indexData.stats.doc_num).toLocaleString("en-US")
-                    }}
-                  </td>
-                  <td>
-                    {{ formatSizeFromMB(indexData.stats.storage_size) }}
-                  </td>
-                  <td v-if="isCloud !== 'true'">
-                    {{ formatSizeFromMB(indexData.stats.compressed_size) }}
-                  </td>
-                  <td
-                    v-if="store.state.zoConfig.show_stream_stats_doc_num"
-                    class="text-center"
-                  >
-                    {{ indexData.stats.doc_time_min }}
-                    <br />
-                    to
-                    <br />
-                    {{ indexData.stats.doc_time_max }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div  v-if="store.state.zoConfig.show_stream_stats_doc_num" data-test="schema-stream-title-text">
+            {{ t("logStream.docsCount") }} <span class="title q-pl-xs"> {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}  </span>
           </div>
-          <q-separator v-if="showDataRetention" class="q-mt-lg q-mb-lg" />
+          <div data-test="schema-stream-title-text">
+            {{ t("logStream.storageSize") }} <span class="title q-pl-xs">  {{ formatSizeFromMB(indexData.stats.storage_size) }}</span>
+          </div>
+          <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
+            {{ t("logStream.compressedSize") }} <span class="title q-pl-xs">   {{ formatSizeFromMB(indexData.stats.compressed_size) }}</span>
+          </div>
+
+          </div>
+          <div class="stream-time-container"  v-if="store.state.zoConfig.show_stream_stats_doc_num" data-test="schema-stream-title-text">
+            {{ t("logStream.time") }} <span class="title q-pl-xs">   {{ indexData.stats.doc_time_min }} </span> <span >to</span> <span class="title" >{{ indexData.stats.doc_time_max }}</span>
+          </div>
+        </div>
+
 
           <template v-if="showDataRetention">
+            <div class="tw-flex ">
             <div class="row flex items-center q-pb-xs q-mt-lg">
-              <label class="q-pr-sm text-bold">Data Retention (in days)</label>
+              <div class="flex tw-flex-col">
+                <label class="q-pr-sm tw-font-medium">Data Retention in days</label>
+                <span class="tw-text-xs tw-font-normal"> (Global retention is {{ store.state.zoConfig.data_retention_days }} days)
+                </span>
+              </div>
               <q-input
                 data-test="stream-details-data-retention-input"
                 v-model="dataRetentionDays"
@@ -105,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 min="0"
                 round
-                class="q-mr-sm data-retention-input"
+                class="q-mr-sm q-ml-sm data-retention-input"
                 :rules="[
                   (val: any) =>
                     (!!val && val > 0) ||
@@ -114,13 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @change="formDirtyFlag = true"
               ></q-input>
               <div>
-                <span class="text-bold">Note:</span> Global data retention
-                period is {{ store.state.zoConfig.data_retention_days }} days
+   
               </div>
             </div>
 
             <div class="row flex items-center q-pb-xs q-mt-lg">
-              <label class="q-pr-sm text-bold"
+              <label class="q-pr-sm tw-font-medium"
                 >Max Query Range (in hours)</label
               >
               <q-input
@@ -144,8 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="approxPartition"
                 :label="t('logStream.approxPartition')"
                 @click="formDirtyFlag = true"
+                left-label
+                dense
               />
             </div>
+          </div>
           </template>
 
           <template
@@ -175,20 +157,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove="removeSchemaField"
             />
           </template>
-          <q-separator class="q-mt-lg q-mb-lg" />
+          <q-separator class="q-mt-md q-mb-md" />
 
           <div
-            class="title flex tw-justify-between items-center"
+            class="title flex tw-justify-between tw-items-center"
             data-test="schema-log-stream-mapping-title-text"
           >
-            <div>
+            <div class="mapping-warning-msg" style="font-weight: 400;">
               {{ t("logStream.mapping") }}
               <label
                 v-show="indexData.defaultFts"
-                class="warning-msg"
-                style="font-weight: normal"
-                >- Using default fts keys, as no fts keys are set for
-                stream.</label
+                style="font-weight:600"
+                >Default FTS keys used (no custom keys set).</label
               >
             </div>
             <q-toggle
@@ -196,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="storeOriginalData"
               :label="t('logStream.storeOriginalData')"
               @click="formDirtyFlag = true"
+              left-label
             />
           </div>
 
@@ -1086,6 +1067,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.q-card__section--vert{
+  padding: 8px 16px;
+}
 .indexDetailsContainer {
   padding: 1.25rem;
   width: 100%;
@@ -1093,6 +1077,13 @@ export default defineComponent({
   .title {
     margin-bottom: 1rem;
     font-weight: 700;
+  }
+
+  .titleContainer{
+    background-color: #00000005;
+    border: 1px solid $input-field-border-color;
+    border-radius: 5px;
+    padding: 1rem;
   }
 
   .q-table {
@@ -1170,13 +1161,23 @@ export default defineComponent({
   }
 
   .data-retention-input {
-    &.q-field {
+     border: 1px solid $input-field-border-color;
+     border-radius: 0.2rem ;
+     width: 128px;
+     height: 39px;
+     &.q-field {
       padding-bottom: 0 !important;
     }
-    .q-field__bottom {
-      padding: 8px 0;
-    }
+
   }
+}
+
+.mapping-warning-msg{
+  background-color: #F5E72380 ;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
 }
 
 // .sticky-buttons {
