@@ -218,7 +218,6 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 
 pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
-    // TODO(taiming): diff env
     if !cfg.common.usage_enabled {
         return;
     }
@@ -252,7 +251,6 @@ pub async fn flush() {
         // wait for flush ingestion job
         res_receiver.await.ok();
 
-        // TODO(taiming): ERROR_QUEUE might not have the same # of threads
         let (error_sender, error_receiver) = oneshot::channel();
         if let Err(e) = queues::ERROR_QUEUE.shutdown(error_sender).await {
             log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");

@@ -64,7 +64,6 @@ fn initialize_usage_queue() -> ReportingQueue {
     ReportingQueue::new(msg_sender)
 }
 
-// TODO(taiming): ERROR_QUEUE should be configured differently
 fn initialize_error_queue() -> ReportingQueue {
     let cfg = get_config();
     let timeout = time::Duration::from_secs(

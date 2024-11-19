@@ -176,7 +176,6 @@ pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
     }
 }
 
-// TODO(taiming): should trigger and error data consider the usage_reporting_mode the same way?
 pub(super) async fn ingest_reporting_data(
     reporting_data_json: Vec<json::Value>,
     stream_params: StreamParams,
