@@ -43,6 +43,7 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
                 || has_having(query)
                 || has_join(query)
                 || has_subquery(statement)
+                || has_union(query)
             {
                 return Ok(true);
             }
@@ -138,6 +139,13 @@ fn has_join(query: &Query) -> bool {
     } else {
         false
     }
+}
+
+fn has_union(query: &Query) -> bool {
+    if let SetExpr::SetOperation { .. } = *query.body {
+        return true;
+    }
+    false
 }
 
 fn has_subquery(stat: &Statement) -> bool {
