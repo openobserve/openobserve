@@ -258,7 +258,7 @@ pub async fn flush() {
 
         let (error_sender, error_receiver) = oneshot::channel();
         if let Err(e) = queues::ERROR_QUEUE.shutdown(error_sender).await {
-            log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");
+            log::error!("[SELF-REPORTING] Error shutting down ERROR_QUEUE: {e}");
         }
         // wait for flush ingestion job
         error_receiver.await.ok();

@@ -199,7 +199,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             // on error in ingesting usage data, push back the data
             for error_json in errors {
                 let error: ErrorData = json::from_value(error_json).unwrap();
-                if let Err(e) = USAGE_QUEUE
+                if let Err(e) = ERROR_QUEUE
                     .enqueue(ReportingData::Error(Box::new(error)))
                     .await
                 {
