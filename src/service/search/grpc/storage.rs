@@ -505,7 +505,7 @@ async fn filter_file_list_by_tantivy_index(
                         .unwrap();
                     let hits_per_file = res.count_ones();
                     total_hits += hits_per_file;
-                    file.with_segment_ids(res.into_vec());
+                    file.with_segment_ids(res);
                     log::debug!(
                         "[trace_id {}] search->storage: hits for index_condition: {:?} found {} in {}",
                         query.trace_id,

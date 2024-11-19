@@ -75,7 +75,6 @@ pub fn get_file_from_empty_puffin_dir_with_ext(file_ext: &str) -> Result<OwnedBy
     Ok(file_data.read_bytes()?)
 }
 
-#[allow(dead_code)]
 pub async fn convert_puffin_file_to_tantivy_dir<T: Into<PathBuf>>(
     puffin_dir: PuffinDirReader,
     dest_path: T,

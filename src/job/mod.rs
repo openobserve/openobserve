@@ -170,7 +170,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
-    tokio::task::spawn(async move { db::file_list::remote::cache_stats().await });
+    tokio::task::spawn(async move { db::file_list::cache_stats().await });
 
     #[cfg(feature = "enterprise")]
     db::ofga::cache().await.expect("ofga model cache failed");
