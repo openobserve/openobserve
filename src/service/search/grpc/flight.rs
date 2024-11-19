@@ -23,6 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        bitvec::BitVec,
         search::ScanStats,
         stream::{FileKey, StreamPartition, StreamType},
     },
@@ -298,7 +299,8 @@ async fn get_file_list_by_ids(
             if let Some(file) = file_list_map.get(&idx_file.key) {
                 let mut new_file = file.clone();
                 if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
-                    new_file.with_segment_ids(segment_ids.clone());
+                    let segment_ids = BitVec::from_slice(segment_ids);
+                    new_file.with_segment_ids(segment_ids);
                 }
                 files.push(new_file);
             }

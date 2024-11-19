@@ -328,7 +328,7 @@ impl RwFile {
 
     #[inline]
     pub async fn read(&self) -> Result<Vec<u8>, std::io::Error> {
-        get_file_contents(&self.full_name()).await
+        get_file_contents(&self.full_name(), None).await
     }
 
     #[inline]

@@ -82,17 +82,17 @@ pub async fn search_parquet(
         .map(|file| async move {
             let cfg = get_config();
             let r = WAL_PARQUET_METADATA.read().await;
+            let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
             if let Some(meta) = r.get(file.key.as_str()) {
                 let mut file = file;
                 file.meta = meta.clone();
                 // reset file meta if it already removed
-                if !is_exists(file.key.as_str()) {
+                if !is_exists(&source_file) {
                     file.meta = Default::default();
                 }
                 return file;
             }
             drop(r);
-            let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();
@@ -366,7 +366,6 @@ pub async fn search_memtable(
         super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
     }
 
-    // construct latest schema map
     // construct latest schema map
     let schema_latest = Arc::new(
         schema

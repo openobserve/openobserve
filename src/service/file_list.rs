@@ -13,25 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Write;
-
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         search::ScanStats,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamType},
     },
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
-    utils::{file::get_file_meta as util_get_file_meta, json},
+    utils::file::get_file_meta as util_get_file_meta,
 };
 use hashbrown::HashSet;
-use infra::{
-    errors::{Error, Result},
-    file_list, storage,
-};
+use infra::{errors::Result, file_list, storage};
 use rayon::slice::ParallelSliceMut;
-
-use crate::service::db;
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -190,62 +183,8 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64> {
 
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<()> {
-    if get_config().common.meta_store_external {
-        delete_parquet_file_db_only(key, file_list_only).await
-    } else {
-        delete_parquet_file_s3(key, file_list_only).await
-    }
-}
-
-async fn delete_parquet_file_db_only(key: &str, file_list_only: bool) -> Result<()> {
     // delete from file list in metastore
     file_list::batch_remove(&[key.to_string()]).await?;
-
-    // delete the parquet whaterever the file is exists or not
-    if !file_list_only {
-        _ = storage::del(&[key]).await;
-    }
-    Ok(())
-}
-
-async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<()> {
-    let columns = key.split('/').collect::<Vec<&str>>();
-    if columns[0] != "files" || columns.len() < 9 {
-        return Ok(());
-    }
-    let new_file_list_key = format!(
-        "file_list/{}/{}/{}/{}/{}.json.zst",
-        columns[4],
-        columns[5],
-        columns[6],
-        columns[7],
-        ider::generate()
-    );
-
-    let meta = FileMeta::default();
-    let deleted = true;
-    let file_data = FileKey {
-        key: key.to_string(),
-        meta: meta.clone(),
-        deleted,
-        segment_ids: None,
-    };
-
-    // generate the new file list
-    let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-    let mut write_buf = json::to_vec(&file_data)?;
-    write_buf.push(b'\n');
-    buf.write_all(&write_buf)?;
-    let compressed_bytes = buf.finish().unwrap();
-    storage::put(&new_file_list_key, compressed_bytes.into())
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    db::file_list::progress(key, Some(&meta), deleted)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    db::file_list::broadcast::send(&[file_data], None)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {

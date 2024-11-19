@@ -49,147 +49,86 @@ impl CacheFS {
 impl ObjectStore for CacheFS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let path = location.to_string();
-        match file_data::memory::get(&path, None).await {
-            Some(data) => {
-                let meta = ObjectMeta {
-                    location: location.clone(),
-                    last_modified: *BASE_TIME,
-                    size: data.len(),
-                    e_tag: None,
-                    version: None,
-                };
-                let range = Range {
-                    start: 0,
-                    end: data.len(),
-                };
-                Ok(GetResult {
-                    payload: GetResultPayload::Stream(
-                        futures::stream::once(async move { Ok(data) }).boxed(),
-                    ),
-                    attributes: Attributes::default(),
-                    meta,
-                    range,
-                })
-            }
-            None => match storage::LOCAL_CACHE.get(location).await {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.get(location).await,
-            },
-        }
-    }
-
-    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        let path = location.to_string();
-        match file_data::memory::get(&path, None).await {
-            Some(data) => {
-                let meta = ObjectMeta {
-                    location: location.clone(),
-                    last_modified: *BASE_TIME,
-                    size: data.len(),
-                    e_tag: None,
-                    version: None,
-                };
-                let (range, data) = match options.range {
-                    Some(range) => {
-                        let r = range
-                            .as_range(data.len())
-                            .map_err(|e| crate::storage::Error::BadRange(e.to_string()))?;
-                        (r.clone(), data.slice(r))
-                    }
-                    None => (0..data.len(), data),
-                };
-                Ok(GetResult {
-                    payload: GetResultPayload::Stream(
-                        futures::stream::once(async move { Ok(data) }).boxed(),
-                    ),
-                    attributes: Attributes::default(),
-                    meta,
-                    range,
-                })
-            }
-            None => match storage::LOCAL_CACHE
-                .get_opts(
-                    location,
-                    GetOptions {
-                        range: options.range.clone(),
-                        if_modified_since: options.if_modified_since,
-                        if_unmodified_since: options.if_unmodified_since,
-                        if_match: options.if_match.clone(),
-                        if_none_match: options.if_none_match.clone(),
-                        version: options.version.clone(),
-                        head: options.head,
-                    },
-                )
-                .await
-            {
-                Ok(ret) => Ok(ret),
-                Err(_) => storage::DEFAULT.get_opts(location, options).await,
-            },
-        }
-    }
-
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        let path = location.to_string();
-        match file_data::memory::get(&path, Some(range.clone())).await {
-            Some(data) => {
-                if range.start > range.end {
-                    return Err(crate::storage::Error::BadRange(location.to_string()).into());
-                }
-                if range.end - range.start != data.len() {
-                    return Err(crate::storage::Error::BadRange(location.to_string()).into());
-                }
-                Ok(data)
-            }
-            None => match storage::LOCAL_CACHE
-                .get_range(location, range.clone())
-                .await
-            {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.get_range(location, range).await,
-            },
-        }
-    }
-
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        if ranges.is_empty() {
-            return Ok(vec![]);
-        }
-        let path = location.to_string();
-        match file_data::memory::get(&path, None).await {
-            Some(data) => ranges
-                .iter()
-                .map(|range| {
-                    if range.start > range.end {
-                        return Err(crate::storage::Error::BadRange(location.to_string()).into());
-                    }
-                    if range.end > data.len() {
-                        return Err(crate::storage::Error::OutOfRange(location.to_string()).into());
-                    }
-                    Ok(data.slice(range.clone()))
-                })
-                .collect(),
-            None => match storage::LOCAL_CACHE.get_ranges(location, ranges).await {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.get_ranges(location, ranges).await,
-            },
-        }
-    }
-
-    async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        let path = location.to_string();
-        match file_data::memory::get(&path, None).await {
-            Some(data) => Ok(ObjectMeta {
+        if let Ok(data) = file_data::get_opts("", &path, None, false).await {
+            let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
                 size: data.len(),
                 e_tag: None,
                 version: None,
-            }),
-            None => match storage::LOCAL_CACHE.head(location).await {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.head(location).await,
-            },
+            };
+            let range = Range {
+                start: 0,
+                end: data.len(),
+            };
+            return Ok(GetResult {
+                payload: GetResultPayload::Stream(
+                    futures::stream::once(async move { Ok(data) }).boxed(),
+                ),
+                attributes: Attributes::default(),
+                meta,
+                range,
+            });
         }
+        // default to storage
+        storage::DEFAULT.get(location).await
+    }
+
+    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        log::warn!("OOPS: please check cache:storage:get_opts: {:?}", location);
+        let path = location.to_string();
+        if let Ok(data) = file_data::get_opts("", &path, None, false).await {
+            let meta = ObjectMeta {
+                location: location.clone(),
+                last_modified: *BASE_TIME,
+                size: data.len(),
+                e_tag: None,
+                version: None,
+            };
+            let (range, data) = match options.range {
+                Some(range) => {
+                    let r = range
+                        .as_range(data.len())
+                        .map_err(|e| crate::storage::Error::BadRange(e.to_string()))?;
+                    (r.clone(), data.slice(r))
+                }
+                None => (0..data.len(), data),
+            };
+            return Ok(GetResult {
+                payload: GetResultPayload::Stream(
+                    futures::stream::once(async move { Ok(data) }).boxed(),
+                ),
+                attributes: Attributes::default(),
+                meta,
+                range,
+            });
+        }
+        // default to storage
+        storage::DEFAULT.get_opts(location, options).await
+    }
+
+    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+        if range.start > range.end {
+            return Err(crate::storage::Error::BadRange(location.to_string()).into());
+        }
+        let path = location.to_string();
+        let data = file_data::get_opts("", &path, Some(range), true).await?;
+        Ok(data)
+    }
+
+    async fn head(&self, location: &Path) -> Result<ObjectMeta> {
+        let path = location.to_string();
+        if let Ok(size) = file_data::get_size_opts("", &path, false).await {
+            return Ok(ObjectMeta {
+                location: location.clone(),
+                last_modified: *BASE_TIME,
+                size,
+                e_tag: None,
+                version: None,
+            });
+        }
+        // default
+        storage::DEFAULT.head(location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
@@ -241,16 +180,13 @@ impl ObjectStore for CacheFS {
     }
 }
 
-pub async fn get(location: &Path) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get(location: &Path) -> object_store::Result<bytes::Bytes> {
     let data = DEFAULT.get(location).await?;
     let data = data.bytes().await?;
     Ok(data)
 }
 
-pub async fn get_range(
-    location: &Path,
-    range: Range<usize>,
-) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get_range(location: &Path, range: Range<usize>) -> object_store::Result<bytes::Bytes> {
     let data = DEFAULT.get_range(location, range).await?;
     Ok(data)
 }
