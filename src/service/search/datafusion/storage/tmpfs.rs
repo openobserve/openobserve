@@ -20,33 +20,11 @@ use bytes::Bytes;
 use chrono::Utc;
 use config::utils::time::BASE_TIME;
 use futures::{stream::BoxStream, StreamExt};
-use infra::cache::tmpfs;
+use infra::{cache::tmpfs, storage::GetRangeExt};
 use object_store::{
     path::Path, Attributes, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
     ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
 };
-use thiserror::Error as ThisError;
-
-use super::GetRangeExt;
-
-/// A specialized `Error` for in-memory object store-related errors
-#[derive(ThisError, Debug)]
-#[allow(missing_docs)]
-enum Error {
-    #[error("Out of range")]
-    OutOfRange(String),
-    #[error("Bad range")]
-    BadRange(String),
-}
-
-impl From<Error> for object_store::Error {
-    fn from(source: Error) -> Self {
-        Self::Generic {
-            store: "tmpfs",
-            source: Box::new(source),
-        }
-    }
-}
 
 /// Tmpfs storage suitable for testing or for opting out of using a cloud
 /// storage provider.
@@ -99,7 +77,7 @@ impl ObjectStore for Tmpfs {
             Some(range) => {
                 let r = range
                     .as_range(data.len())
-                    .map_err(|e| super::Error::BadRange(e.to_string()))?;
+                    .map_err(|e| infra::storage::Error::BadRange(e.to_string()))?;
                 (r.clone(), data.slice(r))
             }
             None => (0..data.len(), data),
@@ -118,29 +96,12 @@ impl ObjectStore for Tmpfs {
         // log::info!("get_range: {}, {:?}", location, range);
         let data = self.get_bytes(location).await?;
         if range.end > data.len() {
-            return Err(Error::OutOfRange(location.to_string()).into());
+            return Err(infra::storage::Error::OutOfRange(location.to_string()).into());
         }
         if range.start > range.end {
-            return Err(Error::BadRange(location.to_string()).into());
+            return Err(infra::storage::Error::BadRange(location.to_string()).into());
         }
         Ok(data.slice(range))
-    }
-
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        // log::info!("get_ranges: {}, {:?}", location, ranges);
-        let data = self.get_bytes(location).await?;
-        ranges
-            .iter()
-            .map(|range| {
-                if range.end > data.len() {
-                    return Err(Error::OutOfRange(location.to_string()).into());
-                }
-                if range.start > range.end {
-                    return Err(Error::BadRange(location.to_string()).into());
-                }
-                Ok(data.slice(range.clone()))
-            })
-            .collect()
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {

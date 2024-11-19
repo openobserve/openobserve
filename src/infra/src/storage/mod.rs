@@ -18,7 +18,7 @@ use std::ops::Range;
 use config::{get_config, is_local_disk_storage, metrics};
 use datafusion::parquet::data_type::AsBytes;
 use futures::{StreamExt, TryStreamExt};
-use object_store::{path::Path, GetRange, ObjectStore, WriteMultipart};
+use object_store::{path::Path, GetRange, ObjectMeta, ObjectStore, WriteMultipart};
 use once_cell::sync::Lazy;
 
 pub mod local;
@@ -64,7 +64,7 @@ fn local_wal() -> Box<dyn ObjectStore> {
     Box::new(local::Local::new(&cfg.common.data_wal_dir, false))
 }
 
-pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+pub async fn list(prefix: &str) -> object_store::Result<Vec<String>> {
     let files = DEFAULT
         .list(Some(&prefix.into()))
         .map_ok(|meta| meta.location.to_string())
@@ -74,18 +74,20 @@ pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
     Ok(files)
 }
 
-pub async fn get(file: &str) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get(file: &str) -> object_store::Result<bytes::Bytes> {
     let data = DEFAULT.get(&file.into()).await?;
-    let data = data.bytes().await?;
-    Ok(data)
+    data.bytes().await
 }
 
-pub async fn get_range(file: &str, range: Range<usize>) -> Result<bytes::Bytes, anyhow::Error> {
-    let data = DEFAULT.get_range(&file.into(), range).await?;
-    Ok(data)
+pub async fn get_range(file: &str, range: Range<usize>) -> object_store::Result<bytes::Bytes> {
+    DEFAULT.get_range(&file.into(), range).await
 }
 
-pub async fn put(file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+pub async fn head(file: &str) -> object_store::Result<ObjectMeta> {
+    DEFAULT.head(&file.into()).await
+}
+
+pub async fn put(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
     if bytes_size_in_mb(&data) >= MULTI_PART_UPLOAD_DATA_SIZE {
         put_multipart(file, data).await?;
     } else {
@@ -94,7 +96,7 @@ pub async fn put(file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn put_multipart(file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+pub async fn put_multipart(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
     let path = Path::from(file);
     let upload = DEFAULT.put_multipart(&path).await?;
     let mut write = WriteMultipart::new(upload);
@@ -103,7 +105,7 @@ pub async fn put_multipart(file: &str, data: bytes::Bytes) -> Result<(), anyhow:
     Ok(())
 }
 
-pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
+pub async fn del(files: &[&str]) -> object_store::Result<()> {
     if files.is_empty() {
         return Ok(());
     }
@@ -161,7 +163,7 @@ fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {
 }
 
 #[derive(Debug)]
-pub(crate) enum Error {
+pub enum Error {
     OutOfRange(String),
     BadRange(String),
 }
@@ -188,7 +190,7 @@ impl From<Error> for object_store::Error {
 }
 
 #[derive(Debug)]
-pub(crate) enum InvalidGetRange {
+pub enum InvalidGetRange {
     StartTooLarge { requested: usize, length: usize },
     Inconsistent { start: usize, end: usize },
 }
@@ -214,7 +216,7 @@ impl std::fmt::Display for InvalidGetRange {
     }
 }
 
-pub(crate) trait GetRangeExt {
+pub trait GetRangeExt {
     fn is_valid(&self) -> Result<(), InvalidGetRange>;
     /// Convert to a [`Range`] if valid.
     fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange>;

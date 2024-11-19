@@ -21,6 +21,7 @@ use proto::cluster_rpc;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
+use super::bitvec::BitVec;
 use crate::{
     get_config,
     meta::usage::Stats,
@@ -166,12 +167,12 @@ pub struct ListStreamParams {
     pub list: Vec<StreamParams>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
-    pub segment_ids: Option<Vec<u8>>,
+    pub segment_ids: Option<BitVec>,
 }
 
 impl FileKey {
@@ -193,7 +194,7 @@ impl FileKey {
         }
     }
 
-    pub fn with_segment_ids(&mut self, segment_ids: Vec<u8>) {
+    pub fn with_segment_ids(&mut self, segment_ids: BitVec) {
         self.segment_ids = Some(segment_ids);
     }
 }
@@ -439,7 +440,7 @@ impl From<&FileKey> for cluster_rpc::FileKey {
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
-            segment_ids: req.segment_ids.clone(),
+            segment_ids: None,
         }
     }
 }
@@ -450,7 +451,7 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
-            segment_ids: req.segment_ids.clone(),
+            segment_ids: None,
         }
     }
 }

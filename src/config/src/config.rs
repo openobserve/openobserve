@@ -62,6 +62,7 @@ pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
+pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -740,6 +741,12 @@ pub struct Common {
     )]
     pub inverted_index_search_format: String,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
+        default = "",
+        help = "Tantivy search mode, puffin or mmap, default is puffin."
+    )]
+    pub inverted_index_tantivy_mode: String,
+    #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "eq",
         help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
@@ -1122,7 +1129,7 @@ pub struct MemoryCache {
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
@@ -1158,7 +1165,7 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
@@ -1709,8 +1716,8 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.memory_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
-        // 80% of max_size
-        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 10 * 8;
+        // 50% of max_size
+        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 2;
     } else {
         cfg.memory_cache.skip_size *= 1024 * 1024;
     }
@@ -1824,8 +1831,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
-        // 80% of max_size
-        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 10 * 8;
+        // 50% of max_size
+        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 2;
     } else {
         cfg.disk_cache.skip_size *= 1024 * 1024;
     }
@@ -1862,6 +1869,17 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
+
+    // check disk cache with tantivy mode
+    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
+    if cfg.common.inverted_index_tantivy_mode.is_empty() {
+        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
+    }
+    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
+        return Err(anyhow::anyhow!(
+            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
+        ));
+    }
 
     Ok(())
 }

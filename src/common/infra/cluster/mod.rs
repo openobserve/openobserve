@@ -32,8 +32,6 @@ use infra::{
 use once_cell::sync::Lazy;
 use tokio::time;
 
-use crate::service::db as db_service;
-
 mod etcd;
 mod nats;
 
@@ -268,7 +266,6 @@ async fn watch_node_list() -> Result<()> {
     log::info!("Start watching node_list");
 
     loop {
-        let cfg = get_config();
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
@@ -280,7 +277,7 @@ async fn watch_node_list() -> Result<()> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
-                let (broadcasted, exist) = match NODES.read().await.get(item_key) {
+                let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
                     Some(v) => (v.broadcasted, item_value.eq(v)),
                     None => (false, false),
                 };
@@ -320,31 +317,6 @@ async fn watch_node_list() -> Result<()> {
                     continue;
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
-                if !cfg.common.meta_store_external && !broadcasted {
-                    // The ingester need broadcast local file list to the new node
-                    if LOCAL_NODE.is_ingester()
-                        && (item_value.status.eq(&NodeStatus::Prepare)
-                            || item_value.status.eq(&NodeStatus::Online))
-                    {
-                        let notice_uuid = if item_key.eq(LOCAL_NODE.uuid.as_str()) {
-                            log::info!("[CLUSTER] broadcast file_list to other nodes");
-                            None
-                        } else {
-                            log::info!(
-                                "[CLUSTER] broadcast file_list to new node: {}",
-                                &item_value.grpc_addr
-                            );
-                            Some(item_key.to_string())
-                        };
-                        tokio::task::spawn(async move {
-                            if let Err(e) =
-                                db_service::file_list::local::broadcast_cache(notice_uuid).await
-                            {
-                                log::error!("[CLUSTER] broadcast file_list error: {}", e);
-                            }
-                        });
-                    }
-                }
                 item_value.broadcasted = true;
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
