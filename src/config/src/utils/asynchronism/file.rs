@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::Metadata, path::Path, time::SystemTime};
+use std::{fs::Metadata, ops::Range, path::Path, time::SystemTime};
 
 use async_walkdir::WalkDir;
 use futures::StreamExt;
 use tokio::{
     fs::{read_dir, remove_dir, File},
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
 #[inline(always)]
@@ -29,11 +29,34 @@ pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::
 }
 
 #[inline(always)]
-pub async fn get_file_contents(path: impl AsRef<Path>) -> Result<Vec<u8>, std::io::Error> {
+pub async fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+    let file = File::open(path).await?;
+    file.metadata().await.map(|m| m.len())
+}
+
+#[inline(always)]
+pub async fn is_exists(file: &str) -> bool {
+    tokio::fs::metadata(file).await.is_ok()
+}
+
+#[inline(always)]
+pub async fn get_file_contents(
+    path: impl AsRef<Path>,
+    range: Option<Range<usize>>,
+) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(path).await?;
-    let mut contents: Vec<u8> = Vec::new();
-    file.read_to_end(&mut contents).await?;
-    Ok(contents)
+    let data = if let Some(range) = range {
+        file.seek(std::io::SeekFrom::Start(range.start as u64))
+            .await?;
+        let mut buf = vec![0; range.end - range.start];
+        file.read_exact(&mut buf).await?;
+        buf
+    } else {
+        let mut buf: Vec<u8> = Vec::new();
+        file.read_to_end(&mut buf).await?;
+        buf
+    };
+    Ok(data)
 }
 
 #[inline(always)]

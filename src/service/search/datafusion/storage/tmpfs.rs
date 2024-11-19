@@ -106,23 +106,6 @@ impl ObjectStore for Tmpfs {
         Ok(data.slice(range))
     }
 
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        // log::info!("get_ranges: {}, {:?}", location, ranges);
-        let data = self.get_bytes(location).await?;
-        ranges
-            .iter()
-            .map(|range| {
-                if range.end > data.len() {
-                    return Err(super::Error::OutOfRange(location.to_string()).into());
-                }
-                if range.start > range.end {
-                    return Err(super::Error::BadRange(location.to_string()).into());
-                }
-                Ok(data.slice(range.clone()))
-            })
-            .collect()
-    }
-
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         // log::info!("head: {}", location);
         let last_modified = Utc::now();

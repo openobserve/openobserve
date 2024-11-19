@@ -246,7 +246,7 @@ impl Metrics for MetricsQuerier {
             }
             // check time range by parquet metadata
             let source_file = wal_dir.to_string() + "/" + file;
-            let Ok(body) = get_file_contents(&source_file) else {
+            let Ok(body) = get_file_contents(&source_file, None) else {
                 continue;
             };
             let body = bytes::Bytes::from(body);

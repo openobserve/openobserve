@@ -117,17 +117,18 @@ impl FileData {
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        let data = match get_file_contents(&file_path).await {
-            Ok(data) => Bytes::from(data),
-            Err(_) => {
-                return None;
-            }
-        };
-        Some(if let Some(range) = range {
-            data.slice(range)
-        } else {
-            data
-        })
+        match get_file_contents(&file_path, range).await {
+            Ok(data) => Some(Bytes::from(data)),
+            Err(_) => None,
+        }
+    }
+
+    async fn get_size(&self, file: &str) -> Option<usize> {
+        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
+        match get_file_len(&file_path).await {
+            Ok(v) => Some(v as usize),
+            Err(_) => None,
+        }
     }
 
     async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
@@ -386,6 +387,20 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         RESULT_FILES[idx].read().await
     };
     files.get(file, range).await
+}
+
+#[inline]
+pub async fn get_size(file: &str) -> Option<usize> {
+    if !get_config().disk_cache.enabled {
+        return None;
+    }
+    let idx = get_bucket_idx(file);
+    let files = if file.starts_with("files") {
+        FILES[idx].read().await
+    } else {
+        RESULT_FILES[idx].read().await
+    };
+    files.get_size(file).await
 }
 
 #[inline]

@@ -15,7 +15,8 @@
 
 use std::{
     fs::{File, Metadata},
-    io::{Read, Write},
+    io::{Read, Seek, Write},
+    ops::Range,
     path::Path,
 };
 
@@ -28,16 +29,33 @@ pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
 }
 
 #[inline(always)]
+pub async fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+    let file = File::open(path)?;
+    file.metadata().map(|m| m.len())
+}
+
+#[inline(always)]
 pub fn is_exists(file: &str) -> bool {
     std::fs::metadata(file).is_ok()
 }
 
 #[inline(always)]
-pub fn get_file_contents(file: &str) -> Result<Vec<u8>, std::io::Error> {
+pub fn get_file_contents(
+    file: &str,
+    range: Option<Range<usize>>,
+) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(file)?;
-    let mut contents: Vec<u8> = Vec::new();
-    file.read_to_end(&mut contents)?;
-    Ok(contents)
+    let data = if let Some(range) = range {
+        file.seek(std::io::SeekFrom::Start(range.start as u64))?;
+        let mut buf = vec![0; range.end - range.start];
+        file.read_exact(&mut buf)?;
+        buf
+    } else {
+        let mut buf: Vec<u8> = Vec::new();
+        file.read_to_end(&mut buf)?;
+        buf
+    };
+    Ok(data)
 }
 
 #[inline(always)]
@@ -152,7 +170,7 @@ mod tests {
         let file_name = "sample.parquet";
 
         put_file_contents(file_name, content).unwrap();
-        assert_eq!(get_file_contents(file_name).unwrap(), content);
+        assert_eq!(get_file_contents(file_name, None).unwrap(), content);
         assert!(get_file_meta(file_name).unwrap().is_file());
         assert!(!scan_files(".", "parquet", None).unwrap().is_empty());
         std::fs::remove_file(file_name).unwrap();

@@ -1370,7 +1370,7 @@ pub(crate) async fn create_tantivy_index(
                 caller,
                 e.to_string()
             );
-            return Err(e);
+            return Err(e.into());
         }
     }
 

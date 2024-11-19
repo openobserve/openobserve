@@ -69,13 +69,6 @@ impl ObjectStore for FS {
             .await
     }
 
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        let location = self.format_location(location);
-        infra::cache::storage::DEFAULT
-            .get_ranges(&location, ranges)
-            .await
-    }
-
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let location = self.format_location(location);
         infra::cache::storage::DEFAULT.head(&location).await

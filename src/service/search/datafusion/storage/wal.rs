@@ -66,14 +66,6 @@ impl ObjectStore for FS {
         storage::LOCAL_WAL.get_range(location, range).await
     }
 
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        if ranges.is_empty() {
-            return Ok(vec![]);
-        }
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_ranges(location, ranges).await
-    }
-
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let location = &self.format_location(location);
         storage::LOCAL_WAL.head(location).await
