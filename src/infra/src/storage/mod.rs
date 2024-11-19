@@ -163,13 +163,15 @@ fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {
 }
 
 #[derive(Debug)]
-pub(crate) enum Error {
+pub enum Error {
+    OutOfRange(String),
     BadRange(String),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::OutOfRange(s) => write!(f, "Out of range: {}", s),
             Self::BadRange(s) => write!(f, "Bad range: {}", s),
         }
     }
@@ -188,7 +190,7 @@ impl From<Error> for object_store::Error {
 }
 
 #[derive(Debug)]
-pub(crate) enum InvalidGetRange {
+pub enum InvalidGetRange {
     StartTooLarge { requested: usize, length: usize },
     Inconsistent { start: usize, end: usize },
 }
@@ -214,7 +216,7 @@ impl std::fmt::Display for InvalidGetRange {
     }
 }
 
-pub(crate) trait GetRangeExt {
+pub trait GetRangeExt {
     fn is_valid(&self) -> Result<(), InvalidGetRange>;
     /// Convert to a [`Range`] if valid.
     fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange>;
