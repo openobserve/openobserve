@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height no-wrap" v-if="indexData.schema">
+  <q-card style="width: 60vw;" class="column full-height no-wrap" v-if="indexData.schema">
     <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
@@ -69,8 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
 
+
           <template v-if="showDataRetention">
-            <div class="tw-flex ">
+            <div class="tw-flex tw-justify-between  ">
             <div class="row flex items-center q-pb-xs q-mt-lg">
               <div class="flex tw-flex-col">
                 <label class="q-pr-sm tw-font-medium">Data Retention in days</label>
@@ -128,36 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
+
           </template>
 
-          <template
-            v-if="
-              indexData.defined_schema_fields.length && isSchemaEvolutionEnabled
-            "
-          >
-            <q-separator
-              id="schema-add-fields-section"
-              class="q-mt-lg q-mb-lg"
-            />
-            <div
-              data-test="schema-add-fields-title"
-              class="q-pr-sm text-bold q-mb-sm"
-            >
-              Add Fields
-            </div>
-            <StreamFieldsInputs
-              :fields="newSchemaFields"
-              :showHeader="false"
-              :visibleInputs="{
-                name: true,
-                type: false,
-                index_type: false,
-              }"
-              @add="addSchemaField"
-              @remove="removeSchemaField"
-            />
-          </template>
-          <q-separator class="q-mt-md q-mb-md" />
+          <q-separator class="q-my-md" />
+
 
           <div
             class="title flex tw-justify-between tw-items-center"
@@ -177,7 +153,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('logStream.storeOriginalData')"
               @click="formDirtyFlag = true"
               left-label
+              dense
             />
+          </div>
+                <div class="flex justify-between items-center full-width q-mb-md">
+                  <div>
+                    <app-tabs
+                      v-if="isSchemaEvolutionEnabled"
+                      class="schema-fields-tabs"
+                      style="
+                        border: 1px solid #8a8a8a;
+                        border-radius: 4px;
+                        overflow: hidden;
+                      "
+                      data-test="schema-fields-tabs"
+                      :tabs="tabs"
+                      :active-tab="activeTab"
+                      @update:active-tab="updateActiveTab"
+                    />
+                  </div>
+
+                    <div class="flex items-center tw-gap-4">
+                    <q-input
+                    data-test="schema-field-search-input"
+                    v-model="filterField"
+                    data-cy="schema-index-field-search-input"
+                     filled
+                    borderless
+                    dense
+                    debounce="1"
+                    :placeholder="t('search.searchField')"
+                  >
+
+                    <template #prepend>
+                      <q-icon name="search" />
+                    </template>
+                  </q-input>
+                  <q-btn
+                  color="primary"
+                  data-test="schema-add-fields-title"
+                  @click="isDialogOpen = true"
+                  class="font-weight-bold"
+                >
+                  Add Field(s)
+                </q-btn>
+                </div>    
+                </div>
+          <div class="q-mb-md" v-if="isDialogOpen">
+            <q-card style="width: 100vw; max-width: 100%; display: flex; flex-direction: column;">
+        
+        <!-- Header Section -->
+        <q-card-section>
+          <div class="text-h6">Add Field(s)</div>
+        </q-card-section>
+        <!-- Main Content (Scrollable if necessary) -->
+        <q-card-section class="q-pa-none" style="flex: 1; overflow-y: auto;">
+          <StreamFieldsInputs
+            :fields="newSchemaFields"
+            :showHeader="false"
+            :visibleInputs="{
+              name: true,
+              type: false,
+              index_type: false,
+            }"
+            @add="addSchemaField"
+            @remove="removeSchemaField"
+          />
+        </q-card-section>
+
+      </q-card>
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -201,40 +245,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hidePagination="indexData.schema.length <= rowsPerPage"
               dense
             >
-              <template #top-right>
-                <div class="flex justify-between items-center full-width">
-                  <div>
-                    <app-tabs
-                      v-if="isSchemaEvolutionEnabled"
-                      class="schema-fields-tabs"
-                      style="
-                        border: 1px solid #8a8a8a;
-                        border-radius: 4px;
-                        overflow: hidden;
-                      "
-                      data-test="schema-fields-tabs"
-                      :tabs="tabs"
-                      :active-tab="activeTab"
-                      @update:active-tab="updateActiveTab"
-                    />
-                  </div>
+            <template v-slot:header="props">
 
-                  <q-input
-                    data-test="schema-field-search-input"
-                    v-model="filterField"
-                    data-cy="schema-index-field-search-input"
-                    filled
-                    borderless
-                    dense
-                    debounce="1"
-                    :placeholder="t('search.searchField')"
-                  >
-                    <template #prepend>
-                      <q-icon name="search" />
-                    </template>
-                  </q-input>
-                </div>
-              </template>
+              <q-tr :props="props">
+                <q-th>
+                    <q-checkbox
+                      v-model="props.selected"
+                      color="primary"
+                    />
+                  </q-th>
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  class=""
+                >
+                <span v-if="col.icon" >
+                  <q-icon color="primary" name="person"></q-icon>
+                  <q-icon color="primary" name="schema"></q-icon>
+
+                </span>
+                <span v-else>
+                  {{ col.label }}
+                </span>
+                
+                </q-th>
+              </q-tr>
+          </template>
+
               <template v-slot:header-selection="scope">
                 <q-td class="text-center">
                   <q-checkbox
@@ -274,6 +312,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:body-cell-type="props">
                 <q-td>{{ props.row.type }}</q-td>
               </template>
+              <template v-slot:body-cell-settings="props">
+                <q-td  v-if="props.row.isUserDefined" >
+                  <q-icon color="primary" name="person"></q-icon>
+                  <q-icon color="primary" name="schema"></q-icon>
+
+                </q-td>
+                <q-td v-else>
+
+                </q-td>
+              </template>
               <template v-slot:body-cell-index_type="props">
                 <q-td data-test="schema-stream-index-select"
                   ><q-select
@@ -309,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </q-td>
               </template>
+
               <template v-slot:bottom-row>
                 <q-tr
                   ><q-td colspan="100%">
@@ -372,6 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
+
   <ConfirmDialog
     title="Delete Action"
     :message="t('logStream.deleteActionMessage')"
@@ -396,6 +446,7 @@ import useStreams from "@/composables/useStreams";
 import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+
 
 const defaultValue: any = () => {
   return {
@@ -437,10 +488,17 @@ export default defineComponent({
     const rowsPerPage = ref(250);
     const filterField = ref("");
     const router = useRouter();
-    const newSchemaFields = ref([]);
+    const newSchemaFields = ref([
+      {
+        name: "",
+        type: "",
+        index_type: [],
+      },
+    ]);
     const activeTab = ref("allFields");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+    const isDialogOpen = ref(false);
 
     const selectedFields = ref([]);
 
@@ -687,6 +745,7 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
+          streamResponse = updateStreamResponse(streamResponse);
           setSchema(streamResponse);
           loadingState.value = false;
           dismiss();
@@ -824,6 +883,9 @@ export default defineComponent({
             true,
             true
           ).then((streamResponse) => {
+            formDirtyFlag.value = false;
+            newSchemaFields.value = [];
+            streamResponse = updateStreamResponse(streamResponse);
             setSchema(streamResponse);
             loadingState.value = false;
             q.notify({
@@ -935,12 +997,27 @@ export default defineComponent({
         label: t("logStream.propertyName"),
         align: "center",
         sortable: true,
+        field: "name",
+      },
+      {
+        name: "settings",
+        align: "left",
+        sortable: true,
+        field: "isUserDefined",
+        icon:"settings",
+        sort: (a, b) => {
+          // Ensure `isUserDefined` is properly handled
+          if (a && !b) return -1; // `a` comes first
+          if (!a && b) return 1;  // `b` comes first
+          return 0; // No change in order
+        },
       },
       {
         name: "type",
         label: t("logStream.propertyType"),
         align: "center",
         sortable: true,
+        field: "type",
       },
       {
         name: "index_type",
@@ -1007,6 +1084,31 @@ export default defineComponent({
 
       selectedFields.value = [];
     };
+    const updateStreamResponse = (streamResponse) => {
+      if (streamResponse.settings.hasOwnProperty('defined_schema_fields')) {
+        const userDefinedSchema = streamResponse.settings.defined_schema_fields;
+
+        // Map through the schema and add `isUserDefined` field
+        const updatedSchema = streamResponse.schema.map((field) => ({
+          ...field,
+          isUserDefined: userDefinedSchema.includes(field.name), // Mark true if in userDefinedSchema
+        }));
+
+        // Find fields in userDefinedSchema that are not in the schema
+        const additionalFields = userDefinedSchema
+          .filter((name) => !streamResponse.schema.some((field) => field.name === name))
+          .map((name) => ({
+            name,
+            isUserDefined: true,
+            // Optionally, add default values for other properties (e.g., type, index_type, etc.)
+          }));
+
+        // Combine the updated schema with additional fields
+        streamResponse.schema = [...updatedSchema, ...additionalFields];
+      }
+
+      return streamResponse;
+    };
 
     return {
       t,
@@ -1050,6 +1152,8 @@ export default defineComponent({
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,
+      updateStreamResponse,
+      isDialogOpen,
     };
   },
   created() {
@@ -1163,7 +1267,7 @@ export default defineComponent({
   .data-retention-input {
      border: 1px solid $input-field-border-color;
      border-radius: 0.2rem ;
-     width: 128px;
+     width: 80px;
      height: 39px;
      &.q-field {
       padding-bottom: 0 !important;
