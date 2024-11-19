@@ -242,6 +242,11 @@ pub async fn flush() {
     #[cfg(feature = "enterprise")]
     flush_audit().await;
 
+    let cfg = get_config();
+    if !cfg.common.usage_enabled {
+        return;
+    }
+
     // shutdown usage_queuer
     for _ in 0..get_config().limit.usage_reporting_thread_num {
         let (res_sender, res_receiver) = oneshot::channel();

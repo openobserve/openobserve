@@ -46,6 +46,7 @@ pub enum ErrorSource {
 pub struct PipelineError {
     pub pipeline_id: String,
     pub pipeline_name: String,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(serialize_with = "serialize_values_only")]
     pub node_errors: HashMap<String, NodeErrors>,
 }
@@ -133,8 +134,10 @@ mod tests {
             }),
         };
 
-        let val = json::to_value(error_data).unwrap();
-        let val_str = json::to_string(&val).unwrap();
-        println!("val: {}", val_str);
+        let val = json::to_value(error_data);
+        assert!(val.is_ok());
+        let val_str = json::to_string(&val.unwrap());
+        assert!(val_str.is_ok());
+        println!("val: {}", val_str.unwrap());
     }
 }
