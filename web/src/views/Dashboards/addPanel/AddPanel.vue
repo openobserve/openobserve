@@ -1163,6 +1163,38 @@ export default defineComponent({
         );
       }
 
+      // add name alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.name?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.name?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.name.alias,
+        );
+      }
+
+      // add value_for_maps alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value_for_maps?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value_for_maps?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.value_for_maps.alias,
+        );
+      }
+
       // remove custom query fields from field list
       dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
         aliasList.push(it.name);

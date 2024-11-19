@@ -66,6 +66,9 @@ const getDefaultDashboardPanelData: any = () => ({
       base_map: {
         type: "osm",
       },
+      map_type: {
+        type: "world",
+      },
       map_view: {
         zoom: 1,
         lat: 0,
@@ -116,6 +119,8 @@ const getDefaultDashboardPanelData: any = () => ({
           latitude: null,
           longitude: null,
           weight: null,
+          name: null,
+          value_for_maps: null,
           source: null,
           target: null,
           value: null,
@@ -230,6 +235,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         latitude: null,
         longitude: null,
         weight: null,
+        name: null,
+        value_for_maps: null,
         source: null,
         target: null,
         value: null,
@@ -671,6 +678,42 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
+  const addMapName = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.name
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.name = {
+        label: generateLabelFromName(row.name),
+        alias: "name",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
+  const addMapValue = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value_for_maps
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value_for_maps = {
+        label: generateLabelFromName(row.name),
+        alias: "value_for_maps",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: "count", // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
   const addSource = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
     if (
@@ -758,6 +801,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -798,6 +843,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -834,6 +881,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -859,6 +908,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+        });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.breakdown = [];
@@ -892,6 +945,28 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
+      case "maps":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+        });
+        break;
       case "sankey":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -918,6 +993,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
         });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1051,6 +1128,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.weight = null;
+  };
+
+  const removeMapName = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.name = null;
+  };
+
+  const removeMapValue = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.value_for_maps = null;
   };
 
   const removeSource = () => {
@@ -1245,6 +1334,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].fields.weight = null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
+      ].fields.name = null;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value_for_maps = null;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
       ].fields.source = null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1297,7 +1392,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.latitude?.alias &&
-        !dashboardPanelData?.data?.queries[
+        dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.latitude?.isDerived
       ) {
@@ -1311,7 +1406,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.longitude?.alias &&
-        !dashboardPanelData?.data?.queries[
+        dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.longitude?.isDerived
       ) {
@@ -1325,7 +1420,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.weight?.alias &&
-        !dashboardPanelData?.data?.queries[
+        dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.weight?.isDerived
       ) {
@@ -1339,7 +1434,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.source?.alias &&
-        !dashboardPanelData?.data?.queries[
+        dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.source?.isDerived
       ) {
@@ -1353,7 +1448,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.target?.alias &&
-        !dashboardPanelData?.data?.queries[
+        dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.target?.isDerived
       ) {
@@ -1367,7 +1462,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.value?.alias &&
-        !dashboardPanelData?.data?.queries[
+        dashboardPanelData?.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.value?.isDerived
       ) {
@@ -1376,6 +1471,34 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.value = null;
       }
 
+      // remove from name
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.name?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.name?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name = null;
+      }
+
+      // remove from value_for_maps
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value_for_maps?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value_for_maps?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps = null;
+      }
+      
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach(
         (it: any, index: number) => {
@@ -1399,6 +1522,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.weight;
+          } else if (name === "name") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.name;
+          } else if (name === "value_for_maps") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.value_for_maps;
           } else if (name === "source") {
             field =
               dashboardPanelData.data.queries[
@@ -1631,6 +1764,34 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.weight;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the name fields
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.name;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the value fields
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.value_for_maps;
 
         if (field && field.alias == oldName) {
           const newName = newArray[changedIndex[0]]?.name;
@@ -2045,6 +2206,98 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return query;
   };
 
+  const mapChart = () => {
+    const { name, value_for_maps } =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields;
+
+    // Validate required fields
+    if (!name?.column) {
+      console.warn("Map name field is required but not provided");
+      return "";
+    }
+    if (!value_for_maps?.column) {
+      console.warn("Map value field is required but not provided");
+      return "";
+    }
+    let query = "";
+
+    if (name && value_for_maps) {
+      query = `SELECT ${name.column} as "${name.alias}", `;
+
+      if (value_for_maps?.aggregationFunction) {
+        switch (value_for_maps.aggregationFunction) {
+          case "p50":
+            query += `approx_percentile_cont(${value_for_maps.column}, 0.5) as ${value_for_maps.alias}`;
+            break;
+          case "p90":
+            query += `approx_percentile_cont(${value_for_maps.column}, 0.9) as ${value_for_maps.alias}`;
+            break;
+          case "p95":
+            query += `approx_percentile_cont(${value_for_maps.column}, 0.95) as ${value_for_maps.alias}`;
+            break;
+          case "p99":
+            query += `approx_percentile_cont(${value_for_maps.column}, 0.99) as ${value_for_maps.alias}`;
+            break;
+          case "count-distinct":
+            query += `count(distinct(${value_for_maps.column})) as "${value_for_maps.alias}"`;
+            break;
+          default:
+            query += `${value_for_maps.aggregationFunction}(${value_for_maps.column}) as "${value_for_maps.alias}"`;
+            break;
+        }
+      } else {
+        query += `${value_for_maps.column} as "${value_for_maps.alias}"`;
+      }
+
+      query += ` FROM "${
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream
+      }"`;
+
+      // Add WHERE clause based on applied filters
+      const filterData =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter.conditions;
+
+      const whereClause = buildWhereClause(filterData);
+      query += whereClause;
+
+      // Group By clause
+      if (name) {
+        query += ` GROUP BY ${name.alias}`;
+      }
+    }
+
+    // array of sorting fields with followed by asc or desc
+    const orderByArr: string[] = [];
+
+    [name, value_for_maps]
+      .filter((it: any) => !it?.isDerived)
+      .forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
+
+    // append with query by joining array with comma
+    query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+    // append limit
+    // if limit is less than or equal to 0 then don't add
+    const queryLimit =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].config.limit ?? 0;
+    query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+    return query;
+  };
+
   const geoMapChart = () => {
     let query = "";
 
@@ -2254,6 +2507,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         query = geoMapChart();
       } else if (dashboardPanelData.data.type == "sankey") {
         query = sankeyChartQuery();
+      } else if (dashboardPanelData.data.type == "maps") {
+        query = mapChart();
       } else {
         query = sqlchart();
       }
@@ -2305,6 +2560,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.value,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.name,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value_for_maps,
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].config.limit,
@@ -2617,6 +2878,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.value == null
+          ) {
+            errors.push("Add one field for the value");
+          }
+          break;
+        }
+        case "maps": {
+          if (
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.name == null
+          ) {
+            errors.push("Add one field for the name");
+          }
+          if (
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.value_for_maps == null
           ) {
             errors.push("Add one field for the value");
           }
@@ -3009,6 +3287,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     addLatitude,
     addLongitude,
     addWeight,
+    addMapName,
+    addMapValue,
     addSource,
     addTarget,
     addValue,
@@ -3020,6 +3300,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     removeLatitude,
     removeLongitude,
     removeWeight,
+    removeMapName,
+    removeMapValue,
     removeSource,
     removeTarget,
     removeValue,
