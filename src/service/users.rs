@@ -23,6 +23,8 @@ use infra::table::org_users::OrgUserRecord;
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use super::db::org_users::get_cached_user_org;
+#[cfg(feature = "enterprise")]
+use crate::common::meta::user::{UserInvite, UserInviteList};
 use crate::{
     common::{
         infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
@@ -30,8 +32,8 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
             user::{
-                DBUser, InviteStatus, UpdateUser, User, UserInvite, UserInviteList, UserList,
-                UserOrg, UserOrgRole, UserRequest, UserResponse, UserRole,
+                DBUser, InviteStatus, UpdateUser, User, UserList, UserOrg, UserOrgRole,
+                UserRequest, UserResponse, UserRole,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
@@ -829,6 +831,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
     let result = db::user::list_user_invites(user_id).await;
     match result {

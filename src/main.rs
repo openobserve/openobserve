@@ -202,6 +202,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("infra init failed: {}", e);
             }
+
+            // init enterprise tables
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = o2_enterprise::enterprise::tables_init().await {
+                job_init_tx.send(false).ok();
+                panic!("enterprise tables init failed: {}", e);
+            }
+
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {}", e);
