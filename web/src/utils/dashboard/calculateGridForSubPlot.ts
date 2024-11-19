@@ -9,15 +9,7 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
   // Calculate the aspect ratio of the available space
   const aspectRatio = width / height;
 
-  // Calculate the number of rows and columns based on the aspect ratio
-  let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
-  let numCols = Math.ceil(numGrids / numRows);
-
-  // Adjust the number of rows and columns if necessary to fit all grids
-  while ((numRows - 1) * numCols >= numGrids) {
-    numRows--;
-    numCols = Math.ceil(numGrids / numRows);
-  }
+  const { numRows, numCols } = calculateOptimalGrid(numGrids, aspectRatio);
 
   // width and height for single gauge
   const cellWidth = 100 / numCols;
@@ -68,20 +60,11 @@ export function getTrellisGrid(
   // Calculate the aspect ratio of the available space
   const aspectRatio = width / height;
 
-  // Calculate the number of rows and columns based on the aspect ratio
-  let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
-  let numCols = Math.ceil(numGrids / numRows);
-
-  // Adjust the number of rows and columns if necessary to fit all grids
-  while ((numRows - 1) * numCols >= numGrids) {
-    numRows--;
-    numCols = Math.ceil(numGrids / numRows);
-  }
-
-  if (numOfColumns > 0) {
-    numCols = numOfColumns;
-    numRows = Math.ceil(numGrids / numCols);
-  }
+  const { numRows, numCols } = calculateOptimalGrid(
+    numGrids,
+    aspectRatio,
+    numOfColumns,
+  );
 
   const spaceBetweenCharts = 4;
   const verticalSpacingBetweenCharts = 30;
@@ -105,7 +88,7 @@ export function getTrellisGrid(
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {
     for (let col = 0; col < numCols; col++) {
-      if (gridArray.length > numGrids) {
+      if (gridArray.length >= numGrids) {
         break;
       }
       const grid = {
@@ -126,4 +109,35 @@ export function getTrellisGrid(
     gridNoOfRow: numRows,
     gridNoOfCol: numCols,
   };
+}
+
+function calculateOptimalGrid(
+  numGrids: number,
+  aspectRatio: number,
+  forcedColumns?: number,
+): { numRows: number; numCols: number } {
+  if (forcedColumns && forcedColumns > 0) {
+    return {
+      numCols: forcedColumns,
+      numRows: Math.ceil(numGrids / forcedColumns),
+    };
+  }
+
+  let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
+
+  // Binary search for optimal row count
+  let low = 1,
+    high = numRows;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const cols = Math.ceil(numGrids / mid);
+    if (mid * cols >= numGrids) {
+      numRows = mid;
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return { numRows, numCols: Math.ceil(numGrids / numRows) };
 }

@@ -638,6 +638,18 @@ export const convertSQLData = async (
       options.legend.show = false;
     } catch (err) {
       console.error("Failed to update trellis configuration:", err);
+      // Fallback to default single grid configuration
+      options.grid = [
+        {
+          containLabel: true,
+          left: "10%",
+          right: "10%",
+          top: "15%",
+          bottom: "15%",
+        },
+      ];
+      options.xAxis = options.xAxis.slice(0, 1);
+      options.yAxis = [options.yAxis];
     }
   };
 
@@ -667,14 +679,21 @@ export const convertSQLData = async (
     yAxisNameGap: number,
     gridData: null | any = null,
   ) => {
+    console.log(
+      Math.max(...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat()),
+    );
     const maxYValue = formatUnitValue(
       getUnitValue(
-        Math.max(...getAxisDataFromKey(yAxisKeys[0])),
+        Math.max(
+          ...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat(),
+        ),
         panelSchema.config?.unit,
         panelSchema.config?.unit_custom,
         panelSchema.config?.decimals,
       ),
     );
+
+    console.log(maxYValue);
 
     // Update yAxis label properties for each chart yAxis based on the grid position
     options.yAxis.forEach((it: any, index: number) => {
