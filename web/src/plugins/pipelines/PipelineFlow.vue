@@ -144,11 +144,6 @@ export default {
     vueFlowInstance.fitView()
   })
 
-
-  const  buttonClass = () => {
-      return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
-    };
-
     const { setViewport } = useVueFlow()
 
 
@@ -195,7 +190,6 @@ function resetTransform() {
       zoomIn,
       zoomOut,
       vueFlowRef,
-      buttonClass,
       resetTransform,
       isCanvasEmpty,
     };
