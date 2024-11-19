@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.latitude.column,
-              'latitude'
+              'latitude',
             )
           "
         >
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.longitude.column,
-              'longitude'
+              'longitude',
             )
           "
         >
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.weight.column,
-              'weight'
+              'weight',
             )
           "
         >
@@ -479,7 +479,7 @@ import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 
 export default defineComponent({
-  name: "DashboardMapQueryBuilder",
+  name: "DashboardGeoMapsQueryBuilder",
   components: {
     SortByBtnGrp,
     CommonAutoComplete,
@@ -498,7 +498,7 @@ export default defineComponent({
     });
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const {
       dashboardPanelData,
@@ -547,7 +547,7 @@ export default defineComponent({
           expansionItems.weight = true;
           expansionItems.filter = true;
         }
-      }
+      },
     );
 
     const onDrop = (e: any, targetAxis: string) => {
@@ -580,11 +580,11 @@ export default defineComponent({
 
         const dragName =
           selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-            (item: any) => item?.name === dragElement
+            (item: any) => item?.name === dragElement,
           );
         const customDragName =
           dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement
+            (item: any) => item?.name === dragElement,
           );
 
         if (dragName || customDragName) {

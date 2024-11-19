@@ -26,7 +26,7 @@ function normalizeValue(value: any, minValue: any, maxValue: any) {
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
-export const convertMapData = (panelSchema: any, mapData: any) => {
+export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   //if no latitude and longitude than return it
   if (
     !panelSchema.queries[0]?.fields?.latitude ||
@@ -102,8 +102,8 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
               formattedValue,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         }
 
@@ -213,13 +213,17 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     };
   });
 
+  if (!options.series.map((item: any) => item.data).every(Array.isArray)) {
+    return;
+  }
   //min max for symbol size
-  const seriesDataaa = options.series.flatMap((series: any) => series.data);
-  const minValue = Math.min(...seriesDataaa.map((item: any) => item[2]));
-  const maxValue = Math.max(...seriesDataaa.map((item: any) => item[2]));
+  const seriesData = options.series.flatMap((series: any) => series.data); 
+  
+  // Calculate min/max values once +
+  const values = seriesData.map((item: any) => item[2]); 
+  const minValue = Math.min(...values); 
+  const maxValue = Math.max(...values);
 
-  //min max for visual map
-  const seriesData = options.series.flatMap((series: any) => series.data);
   if (seriesData.length > 0) {
     const minValue = Math.min(...seriesData.map((item: any) => item[2]));
     const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
