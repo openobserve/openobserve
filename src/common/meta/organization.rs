@@ -32,10 +32,18 @@ pub struct Organization {
     pub org_type: String,
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrganizationInvites {
     #[serde(default)]
     pub invites: Vec<String>, // user emails
+    pub role: UserRole,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgRoleMapping {
+    pub org_id: String,
+    pub org_name: String,
     pub role: UserRole,
 }
 
