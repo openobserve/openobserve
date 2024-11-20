@@ -1068,7 +1068,11 @@ pub struct Limit {
     pub max_enrichment_table_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
-    #[env_config(name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES", default = 100000)]
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
+    )]
     pub inverted_index_cache_max_entries: usize,
 }
 
