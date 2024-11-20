@@ -727,7 +727,7 @@ export const convertSQLData = async (
       it.axisLabel.margin = showAxisLabel ? 5 : 0;
       it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
-      it.axisLabel.show = showAxisLabel ? true : false;
+      it.axisLabel.show = showAxisLabel;
       if (!showAxisLabel) it.name = "";
     });
   };
@@ -758,7 +758,7 @@ export const convertSQLData = async (
       it.axisLabel.margin = showAxisLabel ? 8 : 0;
       it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
-      it.axisLabel.show = showAxisLabel ? true : false;
+      it.axisLabel.show = showAxisLabel;
 
       if (!showAxisLabel) it.name = "";
     });
