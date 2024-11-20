@@ -4204,80 +4204,90 @@ const useLogs = () => {
       console.error("Error in setSelectedStreams:", {
         error,
         query: value,
-        currentStreams: searchObj.data.stream.selectedStream
+        currentStreams: searchObj.data.stream.selectedStream,
       });
       throw error;
     }
   };
 
   const extractValueQuery = () => {
-    const orgQuery: string = searchObj.data.query
-      .split("\n")
-      .filter((line: string) => !line.trim().startsWith("--"))
-      .join("\n");
-    const outputQueries: any = {};
-    const parsedSQL = parser.astify(orgQuery);
+    try {
+      const orgQuery: string = searchObj.data.query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      const outputQueries: any = {};
+      const parsedSQL = parser.astify(orgQuery);
 
-    let query = `select * from INDEX_NAME`;
-    const newParsedSQL = parser.astify(query);
-    if (
-      Object.hasOwn(parsedSQL, "from") &&
-      parsedSQL.from.length <= 1 &&
-      parsedSQL._next == null
-    ) {
-      newParsedSQL.where = parsedSQL.where;
+      let query = `select * from INDEX_NAME`;
+      const newParsedSQL = parser.astify(query);
+      if (
+        Object.hasOwn(parsedSQL, "from") &&
+        parsedSQL.from.length <= 1 &&
+        parsedSQL._next == null
+      ) {
+        newParsedSQL.where = parsedSQL.where;
 
-      query = parser.sqlify(newParsedSQL);
-      outputQueries[parsedSQL.from[0].table] = query.replace(
-        "INDEX_NAME",
-        "[INDEX_NAME]",
-      );
-    } else {
-      // parse join queries & union queries
-      if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
-        parsedSQL.where = cleanBinaryExpression(parsedSQL.where);
-        // parse join queries
-        searchObj.data.stream.selectedStream.forEach((stream: string) => {
-          newParsedSQL.where = null;
+        query = parser.sqlify(newParsedSQL);
+        outputQueries[parsedSQL.from[0].table] = query.replace(
+          "INDEX_NAME",
+          "[INDEX_NAME]",
+        );
+      } else {
+        // parse join queries & union queries
+        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
+          parsedSQL.where = cleanBinaryExpression(parsedSQL.where);
+          // parse join queries
+          searchObj.data.stream.selectedStream.forEach((stream: string) => {
+            newParsedSQL.where = null;
 
-          query = parser.sqlify(newParsedSQL);
-          outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
-        });
-      } else if (parsedSQL._next != null) {
-        //parse union queries
-        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from) {
-          let query = `select * from INDEX_NAME`;
-          const newParsedSQL = parser.astify(query);
-
-          newParsedSQL.where = parsedSQL.where;
-
-          query = parser.sqlify(newParsedSQL);
-          outputQueries[parsedSQL.from[0].table] = query.replace(
-            "INDEX_NAME",
-            "[INDEX_NAME]",
-          );
-        }
-
-        let nextTable = parsedSQL._next;
-        while (nextTable) {
-          // Map through each "from" array in the _next object, as it can contain multiple tables
-          if (nextTable.from) {
+            query = parser.sqlify(newParsedSQL);
+            outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
+          });
+        } else if (parsedSQL._next != null) {
+          //parse union queries
+          if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from) {
             let query = `select * from INDEX_NAME`;
             const newParsedSQL = parser.astify(query);
 
-            newParsedSQL.where = nextTable.where;
+            newParsedSQL.where = parsedSQL.where;
 
             query = parser.sqlify(newParsedSQL);
-            outputQueries[nextTable.from[0].table] = query.replace(
+            outputQueries[parsedSQL.from[0].table] = query.replace(
               "INDEX_NAME",
               "[INDEX_NAME]",
             );
           }
-          nextTable = nextTable._next;
+
+          let nextTable = parsedSQL._next;
+          let depth = 0;
+          const MAX_DEPTH = 100;
+          while (nextTable && depth++ < MAX_DEPTH) {
+            // Map through each "from" array in the _next object, as it can contain multiple tables
+            if (nextTable.from) {
+              let query = `select * from INDEX_NAME`;
+              const newParsedSQL = parser.astify(query);
+
+              newParsedSQL.where = nextTable.where;
+
+              query = parser.sqlify(newParsedSQL);
+              outputQueries[nextTable.from[0].table] = query.replace(
+                "INDEX_NAME",
+                "[INDEX_NAME]",
+              );
+            }
+            nextTable = nextTable._next;
+          }
+          if (depth >= MAX_DEPTH) {
+            throw new Error("Maximum query depth exceeded");
+          }
         }
       }
+      return outputQueries;
+    } catch (error) {
+      console.error("Error in extractValueQuery:", error);
+      throw error;
     }
-    return outputQueries;
   };
 
   const cleanBinaryExpression = (node: any): any => {
