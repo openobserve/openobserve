@@ -47,7 +47,7 @@ const MainLayoutCloudMixin = {
      */
     const getDefaultOrganization = async (store: any) => {
       await organizationService
-        .list(0, 100000, "id", false, "", "default")
+        .list(0, 100000, "id", false, "")
         .then((res: any) => {
           store.dispatch("setOrganizations", res.data.data);
           const localOrg: any = useLocalOrganization();
