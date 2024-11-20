@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trellis-chart-num-of-columns"
           :disable="isBreakdownFieldEmpty"
           :rules="[
-            (val) => val > 0 || 'Number of columns must be positive',
-            (val) => val <= 16 || 'Maximum 16 columns allowed',
+            (val: number) => val > 0 || 'Number of columns must be positive',
+            (val: number) => val <= 16 || 'Maximum 16 columns allowed',
           ]"
           :min="1"
           :max="16"

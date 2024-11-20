@@ -75,7 +75,7 @@ export function getTrellisGrid(
 
   // if no grid then return empty array
   if (numGrids <= 0) {
-    return gridArray;
+    return { gridArray: gridArray };
   }
 
   // Calculate the aspect ratio of the available space
@@ -149,28 +149,43 @@ function calculateOptimalGrid(
   aspectRatio: number,
   forcedColumns?: number,
 ): { numRows: number; numCols: number } {
-  if (forcedColumns && forcedColumns > 0) {
-    return {
-      numCols: forcedColumns,
-      numRows: Math.ceil(numGrids / forcedColumns),
-    };
-  }
-
-  let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
-
-  // Binary search for optimal row count
-  let low = 1,
-    high = numRows;
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-    const cols = Math.ceil(numGrids / mid);
-    if (mid * cols >= numGrids) {
-      numRows = mid;
-      high = mid;
-    } else {
-      low = mid + 1;
+  try {
+    if (numGrids <= 0) {
+      throw new Error("Number of grids must be positive");
     }
-  }
+    if (aspectRatio <= 0) {
+      throw new Error("Aspect ratio must be positive");
+    }
+    if (forcedColumns !== undefined && forcedColumns <= 0) {
+      throw new Error("Forced columns must be positive");
+    }
 
-  return { numRows, numCols: Math.ceil(numGrids / numRows) };
+    if (forcedColumns && forcedColumns > 0) {
+      return {
+        numCols: forcedColumns,
+        numRows: Math.ceil(numGrids / forcedColumns),
+      };
+    }
+
+    let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
+
+    // Binary search for optimal row count
+    let low = 1,
+      high = numRows;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      const cols = Math.ceil(numGrids / mid);
+      if (mid * cols >= numGrids) {
+        numRows = mid;
+        high = mid;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    return { numRows, numCols: Math.ceil(numGrids / numRows) };
+  } catch (err: any) {
+    console.log("Error in calculateOptimalGrid", err?.message);
+    return { numRows: 1, numCols: 1 };
+  }
 }
