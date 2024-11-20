@@ -4166,7 +4166,8 @@ const useLogs = () => {
       const parsedSQL = fnParsedSQL();
 
       if (!parsedSQL) {
-        console.error("Failed to parse SQL query");
+        console.error("Failed to parse SQL query:", value);
+        throw new Error("Invalid SQL syntax");
         return;
       }
 
@@ -4199,7 +4200,12 @@ const useLogs = () => {
         onStreamChange(value);
       }
     } catch (error) {
-      console.error("Error in setSelectedStreams:", error);
+      console.error("Error in setSelectedStreams:", {
+        error,
+        query: value,
+        currentStreams: searchObj.data.stream.selectedStream
+      });
+      throw error;
     }
   };
 

@@ -1426,6 +1426,10 @@ export default defineComponent({
           this.resetHistogramWithError(
             "Histogram is not available for limit queries.",
           );
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+          this.resetHistogramWithError(
+            "Histogram is not available for multi stream search.",
+          );
         } else if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
           // this.handleRunQuery();
