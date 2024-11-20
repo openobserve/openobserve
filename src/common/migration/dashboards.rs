@@ -105,9 +105,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         stream_settings.distinct_value_fields.push(temp);
                     }
 
-                    distinct_values::add(record)
-                        .await
-                        .map_err(|e| anyhow::anyhow!(e))?;
+                    distinct_values::add(record).await?;
                 }
             }
 
