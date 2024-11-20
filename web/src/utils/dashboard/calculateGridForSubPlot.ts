@@ -9,7 +9,16 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
   // Calculate the aspect ratio of the available space
   const aspectRatio = width / height;
 
-  const { numRows, numCols } = calculateOptimalGrid(numGrids, aspectRatio);
+  let numRows = 1;
+  let numCols = 1;
+
+  try {
+    const optionalGrid = calculateOptimalGrid(numGrids, aspectRatio);
+    numRows = optionalGrid.numRows;
+    numCols = optionalGrid.numCols;
+  } catch (err: any) {
+    console.error("Error in calculateGridPositions:", err?.message);
+  }
 
   // width and height for single gauge
   const cellWidth = 100 / numCols;
@@ -81,11 +90,20 @@ export function getTrellisGrid(
   // Calculate the aspect ratio of the available space
   const aspectRatio = width / height;
 
-  const { numRows, numCols } = calculateOptimalGrid(
-    numGrids,
-    aspectRatio,
-    numOfColumns,
-  );
+  let numRows = 1;
+  let numCols = 1;
+
+  try {
+    const optionalGrid = calculateOptimalGrid(
+      numGrids,
+      aspectRatio,
+      numOfColumns,
+    );
+    numRows = optionalGrid.numRows;
+    numCols = optionalGrid.numCols;
+  } catch (err: any) {
+    console.error("Error in calculateGridPositions:", err?.message);
+  }
 
   // Validate total horizontal spacing doesn't exceed width
   const totalHorizontalSpacing =
@@ -149,43 +167,38 @@ function calculateOptimalGrid(
   aspectRatio: number,
   forcedColumns?: number,
 ): { numRows: number; numCols: number } {
-  try {
-    if (numGrids <= 0) {
-      throw new Error("Number of grids must be positive");
-    }
-    if (aspectRatio <= 0) {
-      throw new Error("Aspect ratio must be positive");
-    }
-    if (forcedColumns !== undefined && forcedColumns <= 0) {
-      throw new Error("Forced columns must be positive");
-    }
-
-    if (forcedColumns && forcedColumns > 0) {
-      return {
-        numCols: forcedColumns,
-        numRows: Math.ceil(numGrids / forcedColumns),
-      };
-    }
-
-    let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
-
-    // Binary search for optimal row count
-    let low = 1,
-      high = numRows;
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      const cols = Math.ceil(numGrids / mid);
-      if (mid * cols >= numGrids) {
-        numRows = mid;
-        high = mid;
-      } else {
-        low = mid + 1;
-      }
-    }
-
-    return { numRows, numCols: Math.ceil(numGrids / numRows) };
-  } catch (err: any) {
-    console.log("Error in calculateOptimalGrid", err?.message);
-    return { numRows: 1, numCols: 1 };
+  if (numGrids <= 0) {
+    throw new Error("Number of grids must be positive");
   }
+  if (aspectRatio <= 0) {
+    throw new Error("Aspect ratio must be positive");
+  }
+  if (forcedColumns !== undefined && forcedColumns <= 0) {
+    throw new Error("Forced columns must be positive");
+  }
+
+  if (forcedColumns && forcedColumns > 0) {
+    return {
+      numCols: forcedColumns,
+      numRows: Math.ceil(numGrids / forcedColumns),
+    };
+  }
+
+  let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
+
+  // Binary search for optimal row count
+  let low = 1,
+    high = numRows;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const cols = Math.ceil(numGrids / mid);
+    if (mid * cols >= numGrids) {
+      numRows = mid;
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return { numRows, numCols: Math.ceil(numGrids / numRows) };
 }
