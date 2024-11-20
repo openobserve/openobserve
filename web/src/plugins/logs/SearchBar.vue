@@ -1127,6 +1127,7 @@ export default defineComponent({
       resetStreamData,
       loadStreamLists,
       fnParsedSQL,
+      fnUnparsedSQL,
       onStreamChange,
       moveItemsToTop,
       validateFilterForMultiStream,
@@ -2392,21 +2393,17 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream}"`;
-        if (
-          searchObj.data.stream.interestingFieldList.length > 0 &&
-          searchObj.meta.quickMode
-        ) {
-          searchObj.data.query = searchObj.data.query.replace(
-            "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
-          );
-        } else {
-          searchObj.data.query = searchObj.data.query.replace(
-            "[FIELD_LIST]",
-            "*",
-          );
+        const parsedSQL = fnParsedSQL();
+        if (parsedSQL.where != "") {
+          parsedSQL.where = null;
         }
+
+        if (parsedSQL._next != "") {
+          parsedSQL._next.where = null;
+        }
+
+        searchObj.data.query = fnUnparsedSQL(parsedSQL);
+        searchObj.data.query = searchObj.data.query.replaceAll("`", '"')
       } else {
         searchObj.data.query = "";
       }

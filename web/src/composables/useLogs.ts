@@ -4359,6 +4359,7 @@ const useLogs = () => {
     getHistogramQueryData,
     generateHistogramSkeleton,
     fnParsedSQL,
+    fnUnparsedSQL,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
