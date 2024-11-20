@@ -88,6 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Auto"
           data-test="trellis-chart-num-of-columns"
           :disable="isBreakdownFieldEmpty"
+          :rules="[
+            (val) => val > 0 || 'Number of columns must be positive',
+            (val) => val <= 12 || 'Maximum 12 columns allowed',
+          ]"
+          :min="1"
+          :max="16"
         >
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
