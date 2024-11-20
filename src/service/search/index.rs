@@ -1,6 +1,15 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use config::INDEX_FIELD_NAME_FOR_ALL;
+use datafusion::{
+    logical_expr::Operator,
+    physical_plan::{
+        expressions::{BinaryExpr, Column, LikeExpr, Literal},
+        PhysicalExpr,
+    },
+    scalar::ScalarValue,
+};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
@@ -91,6 +100,19 @@ impl IndexCondition {
                 acc.extend(condition.get_fields());
                 acc
             })
+    }
+
+    pub fn to_physical_expr(
+        &self,
+        schema: &arrow_schema::Schema,
+        fst_fields: &[String],
+    ) -> Arc<dyn PhysicalExpr> {
+        disjunction(
+            self.conditions
+                .iter()
+                .map(|condition| condition.to_physical_expr(schema, fst_fields))
+                .collect_vec(),
+        )
     }
 }
 
@@ -230,6 +252,50 @@ impl Condition {
         }
         fields
     }
+
+    pub fn to_physical_expr(
+        &self,
+        schema: &arrow_schema::Schema,
+        fst_fields: &[String],
+    ) -> Arc<dyn PhysicalExpr> {
+        match self {
+            Condition::Equal(name, value) => {
+                let left = Arc::new(Column::new(name, schema.index_of(name).unwrap()));
+                // TODO: based on the field type, we need to convert the value to the correct type
+                let _field = schema.field_with_name(name).unwrap();
+                let right = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))));
+                Arc::new(BinaryExpr::new(left, Operator::Eq, right))
+            }
+            Condition::MatchAll(value) => {
+                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
+                let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
+                    Vec::with_capacity(fst_fields.len());
+                for field in fst_fields.iter() {
+                    let new_expr = Arc::new(LikeExpr::new(
+                        false,
+                        true, // TODO: handle this case
+                        Arc::new(Column::new(field, schema.index_of(field).unwrap())),
+                        term.clone(),
+                    ));
+                    expr_list.push(new_expr);
+                }
+                if expr_list.is_empty() {
+                    panic!("FullTextSearchFieldNotFound");
+                }
+                disjunction(expr_list)
+            }
+            Condition::Or(left, right) => {
+                let left = left.to_physical_expr(schema, fst_fields);
+                let right = right.to_physical_expr(schema, fst_fields);
+                Arc::new(BinaryExpr::new(left, Operator::Or, right))
+            }
+            Condition::And(left, right) => {
+                let left = left.to_physical_expr(schema, fst_fields);
+                let right = right.to_physical_expr(schema, fst_fields);
+                Arc::new(BinaryExpr::new(left, Operator::And, right))
+            }
+        }
+    }
 }
 
 // check if function is match_all and only have one argument
@@ -298,5 +364,18 @@ fn get_value(expr: &Expr) -> String {
     match expr {
         Expr::Value(value) => trim_quotes(value.to_string().as_str()),
         _ => unreachable!(),
+    }
+}
+
+fn disjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
+    if exprs.len() == 1 {
+        exprs[0].clone()
+    } else {
+        // conjuction all expr in exprs
+        let mut expr = exprs[0].clone();
+        for e in exprs.into_iter().skip(1) {
+            expr = Arc::new(BinaryExpr::new(expr, Operator::Or, e));
+        }
+        expr
     }
 }

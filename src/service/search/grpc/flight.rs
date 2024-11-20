@@ -27,10 +27,15 @@ use config::{
         search::ScanStats,
         stream::{FileKey, StreamPartition, StreamType},
     },
+    utils::json,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::{get_stream_setting_fts_fields, unwrap_stream_settings},
+};
+use itertools::Itertools;
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
@@ -46,6 +51,7 @@ use crate::service::{
             exec::{prepare_datafusion_context, register_udf},
             table_provider::uniontable::NewUnionTable,
         },
+        index::IndexCondition,
         match_file,
     },
 };
@@ -112,11 +118,23 @@ pub async fn search(
     );
 
     // construct latest schema map
-    let schema_latest = empty_exec.schema();
+    let schema_latest = empty_exec.full_schema();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
+
+    let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
+    let fst_fields = get_stream_setting_fts_fields(&stream_settings)
+        .into_iter()
+        .filter_map(|v| {
+            if schema_latest_map.contains_key(&v) {
+                Some(v)
+            } else {
+                None
+            }
+        })
+        .collect_vec();
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -145,6 +163,13 @@ pub async fn search(
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+
+    let index_condition: Option<IndexCondition> = if !req.index_condition.is_empty() {
+        let condition: IndexCondition = json::from_str(&req.index_condition)?;
+        Some(condition)
+    } else {
+        None
+    };
 
     // search in object storage
     if !req.file_id_list.is_empty() {
@@ -232,6 +257,8 @@ pub async fn search(
             schema_latest.clone(),
             &search_partition_keys,
             empty_exec.sorted_by_time(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
