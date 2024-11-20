@@ -608,7 +608,8 @@ const useLogs = () => {
     searchObj.data.filterErrMsg = "";
     searchObj.data.missingStreamMessage = "";
     searchObj.data.stream.missingStreamMultiStreamFilter = [];
-    for (const fieldName of searchObj.data.stream.filteredField) {
+    for (const fieldObj of searchObj.data.stream.filteredField) {
+      const fieldName = fieldObj.expr.value;
       const filteredFields: any =
         searchObj.data.stream.selectedStreamFields.filter(
           (field: any) => field.name === fieldName,

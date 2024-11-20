@@ -2761,6 +2761,7 @@ export default defineComponent({
             currentQuery[1] = filter;
           }
           this.searchObj.data.query = currentQuery.join("| ");
+          this.searchObj.data.editorValue = this.searchObj.data.query;
         } else {
           let unionType: string = "";
           if (
@@ -2880,6 +2881,7 @@ export default defineComponent({
           } else {
             this.searchObj.data.query = queries.join(` ${unionType} `);
           }
+          this.searchObj.data.editorValue = this.searchObj.data.query;
           this.searchObj.data.stream.addToFilter = "";
           if (this.queryEditorRef?.setValue)
             this.queryEditorRef.setValue(this.searchObj.data.query);
