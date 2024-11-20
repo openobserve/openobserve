@@ -199,6 +199,9 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
 }
 
 pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
+    if let Some(org) = ORGANIZATIONS.read().await.get(org_id) {
+        return Ok(org.clone());
+    }
     let org = organizations::get(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("Error getting org: {}", e))?;

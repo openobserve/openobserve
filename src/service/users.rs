@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
-use hashbrown::HashSet;
+use hashbrown::HashMap;
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -30,7 +30,7 @@ use crate::{
         infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
         meta::{
             http::HttpResponse as MetaHttpResponse,
-            organization::DEFAULT_ORG,
+            organization::{OrgRoleMapping, DEFAULT_ORG},
             user::{
                 DBUser, UpdateUser, User, UserList, UserOrg, UserOrgRole, UserRequest,
                 UserResponse, UserRole,
@@ -631,20 +631,54 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Error> {
     let cfg = get_config();
     let mut user_list: Vec<UserResponse> = vec![];
-    let mut user_name = HashSet::new();
+    let is_list_all = list_all & org_id.eq(cfg.common.usage_org.as_str());
+    let mut user_orgs: HashMap<String, Vec<OrgRoleMapping>> = HashMap::new();
     log::debug!("Listing users for org: {}", org_id);
-    for user in ORG_USERS.iter() {
-        if user.key().starts_with(&format!("{org_id}/")) {
-            if let Some(user) = get_user(Some(org_id), user.value().email.as_str()).await {
+
+    for org_user in ORG_USERS.iter() {
+        // If list all user, maintain a list of orgs for each user
+        if is_list_all {
+            let (org, id) = org_user.key().split_once('/').unwrap();
+            if let Some(org_record) = organization::get_org(org).await {
+                let user_org = user_orgs.entry(id.to_string()).or_insert(vec![]);
+                user_org.push(OrgRoleMapping {
+                    org_id: org.to_string(),
+                    role: org_user.value().role.clone().into(),
+                    org_name: org_record.name,
+                });
+            }
+        } else if org_user.key().starts_with(&format!("{org_id}/")) {
+            if let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await {
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
                     first_name: user.first_name.clone(),
                     last_name: user.last_name.clone(),
                     is_external: user.is_external,
+                    orgs: None,
                 });
-                user_name.insert(user.email.clone());
             }
+        }
+    }
+
+    if is_list_all {
+        let users = db::user::list_users(None).await.unwrap();
+        for user in users {
+            if is_root_user(&user.email) {
+                continue;
+            }
+            let role = match ORG_USERS.get(&format!("{org_id}/{}", user.email)) {
+                Some(org_user) => org_user.value().role.to_string(),
+                None => "".to_string(),
+            };
+            user_list.push(UserResponse {
+                email: user.email.clone(),
+                role,
+                first_name: user.first_name.clone(),
+                last_name: user.last_name.clone(),
+                is_external: user.user_type.into(),
+                orgs: user_orgs.get(user.email.as_str()).cloned(),
+            });
         }
     }
 
@@ -659,23 +693,8 @@ pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Er
                 first_name: root_user.first_name.clone(),
                 last_name: root_user.last_name.clone(),
                 is_external: root_user.is_external,
+                orgs: None,
             });
-            user_name.insert(root_user.email.clone());
-        }
-        if org_id.eq(cfg.common.usage_org.as_str()) && list_all {
-            let usage_users = db::user::list_users(None).await.unwrap();
-            for usage_user in usage_users {
-                if user_name.contains(&usage_user.email) {
-                    continue;
-                }
-                user_list.push(UserResponse {
-                    email: usage_user.email.clone(),
-                    role: "".to_string(),
-                    first_name: usage_user.first_name.clone(),
-                    last_name: usage_user.last_name.clone(),
-                    is_external: usage_user.user_type.into(),
-                });
-            }
         }
     }
 

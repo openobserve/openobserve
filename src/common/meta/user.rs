@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
 use utoipa::ToSchema;
 
+use super::organization::{OrgRoleMapping, Organization};
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserRequest {
     pub email: String,
@@ -351,6 +353,8 @@ pub struct UserResponse {
     pub role: String,
     #[serde(default)]
     pub is_external: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orgs: Option<Vec<OrgRoleMapping>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
