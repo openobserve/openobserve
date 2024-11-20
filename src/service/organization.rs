@@ -27,13 +27,15 @@ use super::{
     db::org_users,
     users::{add_admin_to_org, get_user},
 };
+#[cfg(feature = "enterprise")]
+use crate::common::organization::OrganizationInvites;
 use crate::{
     common::{
         // infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
                 IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-                OrganizationInvites, RumIngestionToken, CUSTOM, DEFAULT_ORG,
+                RumIngestionToken, CUSTOM, DEFAULT_ORG,
             },
             user::UserRole,
         },
