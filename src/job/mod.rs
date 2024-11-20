@@ -39,7 +39,7 @@ mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
-pub use mmdb_downloader::{run_download_files, CLIENT_INITIALIZED};
+pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(

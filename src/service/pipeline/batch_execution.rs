@@ -28,12 +28,10 @@ use config::{
     utils::{flatten, json::Value},
 };
 use futures::future::try_join_all;
-use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
-    job,
     service::{
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
@@ -53,10 +51,6 @@ impl PipelineExt for Pipeline {
         let mut vrl_map = HashMap::new();
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
-                let client = Lazy::get(&job::CLIENT_INITIALIZED);
-                if client.is_none() {
-                    job::run_download_files().await;
-                }
                 let transform = get_transforms(&self.org, &func_params.name).await?;
                 let vrl_runtime_config = compile_vrl_function(&transform.function, &self.org)?;
                 let registry = vrl_runtime_config
