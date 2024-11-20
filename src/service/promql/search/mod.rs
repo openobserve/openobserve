@@ -23,8 +23,8 @@ use config::{
     meta::{
         cluster::{get_internal_grpc_token, RoleGroup},
         search::ScanStats,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
-        usage::{RequestStats, UsageType},
     },
 };
 use futures::future::try_join_all;
@@ -45,7 +45,7 @@ use crate::{
         grpc::get_cached_channel,
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
         search::{server_internal_error, MetadataMap},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

@@ -48,13 +48,12 @@ use openobserve::{
                 metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
                 query_cache::QueryCacheServerImpl,
                 traces::TraceServer,
-                usage::UsageServerImpl,
             },
         },
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER, usage},
+    service::{db, metadata, search::SEARCH_SERVER, self_reporting},
 };
 use opentelemetry::{global, trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
@@ -66,7 +65,7 @@ use opentelemetry_proto::tonic::collector::{
 use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
 use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
-    query_cache_server::QueryCacheServer, search_server::SearchServer, usage_server::UsageServer,
+    query_cache_server::QueryCacheServer, search_server::SearchServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -340,7 +339,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("HTTP server stopped");
 
     // flush usage report
-    usage::flush().await;
+    self_reporting::flush().await;
 
     // leave the cluster
     _ = cluster::leave().await;
@@ -404,9 +403,6 @@ async fn init_common_grpc_server(
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let usage_svc = UsageServer::new(UsageServerImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -434,7 +430,6 @@ async fn init_common_grpc_server(
         .add_service(metrics_svc)
         .add_service(metrics_ingest_svc)
         .add_service(trace_svc)
-        .add_service(usage_svc)
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)

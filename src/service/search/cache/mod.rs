@@ -18,9 +18,9 @@ use config::{
     get_config,
     meta::{
         search::{self, ResponseTook},
+        self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
@@ -39,7 +39,7 @@ use crate::{
     },
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
-        usage::{http_report_metrics, report_request_usage_stats},
+        self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
 

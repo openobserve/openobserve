@@ -45,7 +45,7 @@ use {
         jwt::process_token,
         validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
     },
-    crate::service::usage::audit,
+    crate::service::self_reporting::audit,
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
