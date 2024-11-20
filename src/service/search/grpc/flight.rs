@@ -231,6 +231,8 @@ pub async fn search(
             &search_partition_keys,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {

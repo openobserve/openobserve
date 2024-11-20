@@ -16,24 +16,19 @@
 use std::{any::Any, sync::Arc};
 
 use arrow::array::RecordBatch;
-use arrow_schema::{DataType, Schema, SchemaRef, SortOptions};
+use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use datafusion::{
     catalog::Session,
-    common::{project_schema, Constraints, Result},
+    common::{Constraints, Result},
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
     physical_expr::{LexOrdering, PhysicalSortExpr},
-    physical_plan::{
-        expressions::{CastExpr, Column},
-        filter::FilterExec,
-        projection::ProjectionExec,
-        sorts::sort::SortExec,
-        ExecutionPlan, PhysicalExpr,
-    },
+    physical_plan::{expressions::Column, sorts::sort::SortExec, ExecutionPlan},
 };
 use hashbrown::HashMap;
 
+use super::{apply_filter, apply_projection};
 use crate::service::search::index::IndexCondition;
 
 #[derive(Debug)]
@@ -102,14 +97,14 @@ impl TableProvider for NewMemTable {
             .scan(state, mem_projection, filters, limit)
             .await?;
 
-        let projection_exec = apply_projection_if_need(
+        let projection_exec = apply_projection(
             &self.schema(),
             &self.diff_rules,
             mem_projection,
             memory_exec,
         )?;
 
-        let filter_exec = apply_filter_if_needed(
+        let filter_exec = apply_filter(
             self.index_condition.as_ref(),
             &self.schema(),
             &self.fst_fields,
@@ -117,7 +112,7 @@ impl TableProvider for NewMemTable {
             filter_projection,
         )?;
 
-        apply_sort_if_needed(filter_exec, self.sorted_by_time)
+        apply_sort(filter_exec, self.sorted_by_time)
     }
 
     fn get_column_default(&self, column: &str) -> Option<&Expr> {
@@ -144,59 +139,7 @@ fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
     }) as _
 }
 
-fn wrap_filter(
-    index_condition: &IndexCondition,
-    schema: &Schema,
-    fst_fields: &[String],
-    exec: Arc<dyn ExecutionPlan>,
-    projection: Option<&Vec<usize>>,
-) -> Result<Arc<dyn ExecutionPlan>> {
-    let expr = index_condition.to_physical_expr(schema, fst_fields);
-
-    Ok(Arc::new(
-        FilterExec::try_new(expr, exec)?.with_projection(projection.cloned())?,
-    ))
-}
-
-fn apply_projection_if_need(
-    schema: &SchemaRef,
-    diff_rules: &HashMap<String, DataType>,
-    projection: Option<&Vec<usize>>,
-    memory_exec: Arc<dyn ExecutionPlan>,
-) -> Result<Arc<dyn ExecutionPlan>> {
-    if diff_rules.is_empty() {
-        return Ok(memory_exec);
-    }
-    let projected_schema = project_schema(schema, projection)?;
-    let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
-        Vec::with_capacity(projected_schema.fields().len());
-    for (idx, field) in projected_schema.fields().iter().enumerate() {
-        let name = field.name().to_string();
-        let col = Arc::new(Column::new(&name, idx));
-        if let Some(data_type) = diff_rules.get(&name) {
-            exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
-        } else {
-            exprs.push((col, name));
-        }
-    }
-    Ok(Arc::new(ProjectionExec::try_new(exprs, memory_exec)?))
-}
-
-fn apply_filter_if_needed(
-    index_condition: Option<&IndexCondition>,
-    schema: &Schema,
-    fst_fields: &[String],
-    exec_plan: Arc<dyn ExecutionPlan>,
-    filter_projection: Option<&Vec<usize>>,
-) -> Result<Arc<dyn ExecutionPlan>> {
-    if let Some(condition) = index_condition {
-        wrap_filter(condition, schema, fst_fields, exec_plan, filter_projection)
-    } else {
-        Ok(exec_plan)
-    }
-}
-
-fn apply_sort_if_needed(
+fn apply_sort(
     exec_plan: Arc<dyn ExecutionPlan>,
     sorted_by_time: bool,
 ) -> Result<Arc<dyn ExecutionPlan>> {

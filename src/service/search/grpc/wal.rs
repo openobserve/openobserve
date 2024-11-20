@@ -57,6 +57,8 @@ pub async fn search_parquet(
     search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> super::SearchTable {
     // get file list
     let stream_settings =
@@ -273,6 +275,8 @@ pub async fn search_parquet(
             diff_fields,
             sorted_by_time,
             file_stat_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {

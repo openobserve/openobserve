@@ -287,6 +287,8 @@ pub async fn search(
             diff_fields,
             sorted_by_time,
             file_stat_cache.clone(),
+            None,
+            vec![],
         )
         .await?;
         tables.push(table);

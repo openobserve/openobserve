@@ -1,5 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
+use arrow_schema::DataType;
 use config::INDEX_FIELD_NAME_FOR_ALL;
 use datafusion::{
     logical_expr::Operator,
@@ -9,7 +10,6 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
@@ -18,12 +18,12 @@ use tantivy::{
     Term,
 };
 
-use super::utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes};
+use super::utils::{is_field, is_value, split_conjunction, trim_quotes};
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
     expr: &Expr,
-) -> (IndexCondition, Option<Expr>) {
+) -> (Option<IndexCondition>, Option<Expr>) {
     let mut other_expr = Vec::new();
     let expr_list = split_conjunction(expr);
     let mut index_condition = IndexCondition::default();
@@ -37,8 +37,12 @@ pub fn get_index_condition_from_expr(
         index_condition.add_condition(multi_condition);
     }
 
-    let new_expr = conjunction(other_expr);
-    (index_condition, new_expr)
+    let new_expr = super::utils::conjunction(other_expr);
+    if index_condition.conditions.is_empty() {
+        (None, new_expr)
+    } else {
+        (Some(index_condition), new_expr)
+    }
 }
 
 // note the condition in IndexCondition is connection by AND operator
@@ -106,13 +110,13 @@ impl IndexCondition {
         &self,
         schema: &arrow_schema::Schema,
         fst_fields: &[String],
-    ) -> Arc<dyn PhysicalExpr> {
-        disjunction(
+    ) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
+        Ok(conjunction(
             self.conditions
                 .iter()
                 .map(|condition| condition.to_physical_expr(schema, fst_fields))
-                .collect_vec(),
-        )
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
     }
 }
 
@@ -152,12 +156,7 @@ impl Condition {
                 Condition::Equal(field, value)
             }
             Expr::Function(func) => {
-                if !func
-                    .name
-                    .to_string()
-                    .to_lowercase()
-                    .starts_with("match_all")
-                {
+                if func.name.to_string().to_lowercase() != "match_all" {
                     unreachable!()
                 }
                 if let FunctionArguments::List(list) = &func.args {
@@ -257,14 +256,14 @@ impl Condition {
         &self,
         schema: &arrow_schema::Schema,
         fst_fields: &[String],
-    ) -> Arc<dyn PhysicalExpr> {
+    ) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
         match self {
             Condition::Equal(name, value) => {
-                let left = Arc::new(Column::new(name, schema.index_of(name).unwrap()));
-                // TODO: based on the field type, we need to convert the value to the correct type
-                let _field = schema.field_with_name(name).unwrap();
-                let right = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))));
-                Arc::new(BinaryExpr::new(left, Operator::Eq, right))
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let right = get_scalar_value(value, field.data_type())?;
+                Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
             }
             Condition::MatchAll(value) => {
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
@@ -273,26 +272,28 @@ impl Condition {
                 for field in fst_fields.iter() {
                     let new_expr = Arc::new(LikeExpr::new(
                         false,
-                        true, // TODO: handle this case
+                        false,
                         Arc::new(Column::new(field, schema.index_of(field).unwrap())),
                         term.clone(),
                     ));
                     expr_list.push(new_expr);
                 }
                 if expr_list.is_empty() {
-                    panic!("FullTextSearchFieldNotFound");
+                    return Err(anyhow::anyhow!(
+                        "Using match_all() function in a stream that don't have full text search field"
+                    )); // already check this in sql.rs 
                 }
-                disjunction(expr_list)
+                Ok(disjunction(expr_list))
             }
             Condition::Or(left, right) => {
-                let left = left.to_physical_expr(schema, fst_fields);
-                let right = right.to_physical_expr(schema, fst_fields);
-                Arc::new(BinaryExpr::new(left, Operator::Or, right))
+                let left = left.to_physical_expr(schema, fst_fields)?;
+                let right = right.to_physical_expr(schema, fst_fields)?;
+                Ok(Arc::new(BinaryExpr::new(left, Operator::Or, right)))
             }
             Condition::And(left, right) => {
-                let left = left.to_physical_expr(schema, fst_fields);
-                let right = right.to_physical_expr(schema, fst_fields);
-                Arc::new(BinaryExpr::new(left, Operator::And, right))
+                let left = left.to_physical_expr(schema, fst_fields)?;
+                let right = right.to_physical_expr(schema, fst_fields)?;
+                Ok(Arc::new(BinaryExpr::new(left, Operator::And, right)))
             }
         }
     }
@@ -329,12 +330,7 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 && is_expr_valid_for_index(right, index_fields);
         }
         Expr::Function(func) => {
-            if !func
-                .name
-                .to_string()
-                .to_lowercase()
-                .starts_with("match_all")
-            {
+            if func.name.to_string().to_lowercase() != "match_all" {
                 return false;
             }
             if let FunctionArguments::List(list) = &func.args {
@@ -378,4 +374,31 @@ fn disjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
         }
         expr
     }
+}
+
+fn conjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
+    if exprs.len() == 1 {
+        exprs[0].clone()
+    } else {
+        // conjuction all expr in exprs
+        let mut expr = exprs[0].clone();
+        for e in exprs.into_iter().skip(1) {
+            expr = Arc::new(BinaryExpr::new(expr, Operator::And, e));
+        }
+        expr
+    }
+}
+
+fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, anyhow::Error> {
+    Ok(match data_type {
+        DataType::Boolean => Arc::new(Literal::new(ScalarValue::Boolean(Some(value.parse()?)))),
+        DataType::Int64 => Arc::new(Literal::new(ScalarValue::Int64(Some(value.parse()?)))),
+        DataType::UInt64 => Arc::new(Literal::new(ScalarValue::UInt64(Some(value.parse()?)))),
+        DataType::Float64 => Arc::new(Literal::new(ScalarValue::Float64(Some(value.parse()?)))),
+        DataType::Utf8 => Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string())))),
+        DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
+            value.as_bytes().to_vec(),
+        )))),
+        _ => unimplemented!(),
+    })
 }
