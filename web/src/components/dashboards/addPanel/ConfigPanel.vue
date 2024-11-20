@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="isBreakdownFieldEmpty"
           :rules="[
             (val) => val > 0 || 'Number of columns must be positive',
-            (val) => val <= 12 || 'Maximum 12 columns allowed',
+            (val) => val <= 16 || 'Maximum 16 columns allowed',
           ]"
           :min="1"
           :max="16"
