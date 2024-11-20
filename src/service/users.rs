@@ -24,7 +24,7 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 
 use super::db::org_users::get_cached_user_org;
 #[cfg(feature = "enterprise")]
-use crate::common::meta::user::{UserInvite, UserInviteList};
+use crate::common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 use crate::{
     common::{
         infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
@@ -32,8 +32,8 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
             user::{
-                DBUser, InviteStatus, UpdateUser, User, UserList, UserOrg, UserOrgRole,
-                UserRequest, UserResponse, UserRole,
+                DBUser, UpdateUser, User, UserList, UserOrg, UserOrgRole, UserRequest,
+                UserResponse, UserRole,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
