@@ -1,9 +1,9 @@
-import { ref, markRaw } from "vue";
+import { ref, markRaw, Ref } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 
-import { getUserInfo, getImageURL } from "@/utils/zincutils";
+import { getUserInfo, getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
@@ -14,6 +14,7 @@ const MainLayoutCloudMixin = {
     const router = useRouter();
     const store = useStore();
     const orgOptions = ref([{ label: Number, value: String }]);
+    const selectedOrg: Ref<string> = ref("");
 
     /**
      * Add function & organization menu in left navigation
@@ -46,9 +47,40 @@ const MainLayoutCloudMixin = {
      */
     const getDefaultOrganization = async (store: any) => {
       await organizationService
-        .list(0, 100000, "id", false, "")
+        .list(0, 100000, "id", false, "", "default")
         .then((res: any) => {
           store.dispatch("setOrganizations", res.data.data);
+          const localOrg: any = useLocalOrganization();
+          orgOptions.value = res.data.data.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+            }) => {
+              const optiondata: any = {
+                label: data.name,
+                id: data.id,
+                identifier: data.identifier,
+                user_email: store.state.userInfo.email,
+              };
+
+              if (
+                (selectedOrg.value == "" &&
+                  (data.type == "default" || data.id == "1") &&
+                  store.state.userInfo.email == data.UserObj.email) ||
+                res.data.data.length == 1
+              ) {
+                selectedOrg.value = localOrg.value && Object.keys(localOrg.value).length > 0
+                  ? localOrg.value
+                  : optiondata;
+                useLocalOrganization(selectedOrg.value);
+                store.dispatch("setSelectedOrganization", selectedOrg.value);
+              }
+              return optiondata;
+            },
+          );
         })
         .catch((error) => console.log(error));
     };

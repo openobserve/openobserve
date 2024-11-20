@@ -48,7 +48,7 @@ export default defineComponent({
         await configService
           .get_config()
           .then(async (res) => {
-            store.commit("setZoConfig", res.data);
+            store.commit("setConfig", res.data);
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
