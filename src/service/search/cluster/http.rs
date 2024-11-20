@@ -126,7 +126,7 @@ pub async fn search(
             match program {
                 Some(program) => {
                     if apply_over_hits {
-                        let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -155,7 +155,7 @@ pub async fn search(
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
-                                let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
                                     &mut runtime,
                                     &VRLResultResolver {
                                         program: program.program.clone(),

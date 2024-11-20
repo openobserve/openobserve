@@ -17,14 +17,6 @@ mod generated;
 
 pub use generated::{cluster as cluster_rpc, prometheus as prometheus_rpc};
 
-impl From<Vec<serde_json::Value>> for cluster_rpc::UsageData {
-    fn from(usages: Vec<serde_json::Value>) -> Self {
-        Self {
-            data: serde_json::to_vec(&usages).unwrap(),
-        }
-    }
-}
-
 impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
     fn from(usages: Vec<serde_json::Value>) -> Self {
         Self {

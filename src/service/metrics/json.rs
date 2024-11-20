@@ -21,8 +21,8 @@ use config::{
     cluster::LOCAL_NODE,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
-        usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
@@ -44,7 +44,7 @@ use crate::{
         ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 

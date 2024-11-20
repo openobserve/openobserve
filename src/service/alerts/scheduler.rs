@@ -20,8 +20,8 @@ use config::{
     get_config,
     meta::{
         alerts::FrequencyType,
+        self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
         stream::{StreamParams, StreamType},
-        usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
     utils::{
         json,
@@ -44,7 +44,7 @@ use crate::{
         db::{self, scheduler::ScheduledTriggerData},
         ingestion::ingestion_service,
         pipeline::batch_execution::ExecutablePipeline,
-        usage::publish_triggers_usage,
+        self_reporting::publish_triggers_usage,
     },
 };
 
@@ -996,7 +996,7 @@ async fn handle_derived_stream_triggers(
                         data: Some(cluster_rpc::IngestionData::from(records)),
                         ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                     };
-                    match ingestion_service::ingest(&org_id, req).await {
+                    match ingestion_service::ingest(req).await {
                         Ok(resp) if resp.status_code == 200 => {
                             log::info!(
                                 "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",

@@ -23,9 +23,9 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
+        self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, SqlOperator},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query},
@@ -57,7 +57,7 @@ use {
     tracing::info_span,
 };
 
-use super::usage::report_request_usage_stats;
+use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster},
     handler::grpc::request::search::Searcher,
@@ -253,7 +253,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -289,7 +289,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let ret_val = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
