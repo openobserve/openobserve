@@ -399,7 +399,7 @@ impl Report {
                     .singlepart(
                         // Only supports PDF for now, attach the PDF
                         lettre::message::Attachment::new(
-                            self.title.clone(), // Attachment filename
+                            format!("{}.pdf", self.title), // Attachment filename
                         )
                         .body(pdf_data.to_owned(), ContentType::parse("application/pdf")?),
                     ),
