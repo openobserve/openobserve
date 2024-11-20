@@ -600,8 +600,10 @@ async fn search_tantivy_index(
                 .try_into()?;
             let index = Arc::new(index);
             let reader = Arc::new(reader);
-            reader_cache::GLOBAL_CACHE
-                .put(ttv_file_name.to_string(), (index.clone(), reader.clone()));
+            if cfg.common.inverted_index_cache_enabled {
+                reader_cache::GLOBAL_CACHE
+                    .put(ttv_file_name.to_string(), (index.clone(), reader.clone()));
+            }
             (index, reader)
         }
     };
