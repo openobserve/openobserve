@@ -2394,20 +2394,22 @@ export default defineComponent({
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
-        if (parsedSQL.where != "") {
+        if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
           parsedSQL.where = null;
         }
 
-        if (parsedSQL._next != "") {
+        if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
           parsedSQL._next.where = null;
         }
 
         searchObj.data.query = fnUnparsedSQL(parsedSQL);
-        searchObj.data.query = searchObj.data.query.replaceAll("`", '"')
+        searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
+        searchObj.data.editorValue = searchObj.data.query;
       } else {
         searchObj.data.query = "";
+        searchObj.data.editorValue = "";
       }
-      searchObj.data.editorValue = "";
+
       queryEditorRef.value?.setValue(searchObj.data.query);
       if (store.state.zoConfig.query_on_stream_selection == false) {
         handleRunQueryFn();
