@@ -238,7 +238,7 @@ async fn get_remote_batch(
             .iter()
             .map(|f| cluster_rpc::IdxFileName {
                 key: f.key.clone(),
-                segment_ids: f.segment_ids.clone(),
+                segment_ids: f.segment_ids.clone().map(|s| s.into_vec()),
             })
             .collect()
     } else {

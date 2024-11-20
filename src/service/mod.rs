@@ -24,6 +24,7 @@ pub mod enrichment;
 pub mod enrichment_table;
 pub mod exporter;
 pub mod file_list;
+pub mod folders;
 pub mod functions;
 pub mod grpc;
 pub mod ingestion;
@@ -36,12 +37,12 @@ pub mod pipeline;
 pub mod promql;
 pub mod schema;
 pub mod search;
+pub mod self_reporting;
 pub mod session;
 pub mod short_url;
 pub mod stream;
 pub mod syslogs_route;
 pub mod traces;
-pub mod usage;
 pub mod users;
 
 // format stream name

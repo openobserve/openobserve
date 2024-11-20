@@ -30,7 +30,7 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::usage::audit,
+    crate::service::self_reporting::audit,
     o2_enterprise::enterprise::common::{
         auditor::AuditMessage, infra::config::get_config as get_o2_config,
     },

@@ -44,3 +44,17 @@ impl std::fmt::Display for InvertedIndexFormat {
         }
     }
 }
+
+pub enum InvertedIndexTantivyMode {
+    Puffin,
+    Mmap,
+}
+
+impl std::fmt::Display for InvertedIndexTantivyMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InvertedIndexTantivyMode::Puffin => write!(f, "puffin"),
+            InvertedIndexTantivyMode::Mmap => write!(f, "mmap"),
+        }
+    }
+}

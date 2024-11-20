@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.13.1"
+version = "0.13.2"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -87,7 +87,7 @@ dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-aggregate-common.workspace = true
-datafusion-functions-json = "0.42.0"
+datafusion-functions-json = "0.43.0"
 arrow.workspace = true
 arrow-flight.workspace = true
 arrow-schema.workspace = true
@@ -233,16 +233,16 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "6.0", features = ["serde"] }
-datafusion = "42.0.0"
-datafusion-proto = "42.0.0"
-datafusion-functions-aggregate-common = "42.0.0"
-arrow = { version = "53.0.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "53.0.0"
-arrow-json = "53.0.0"
-arrow-schema = { version = "53.0.0", features = ["serde"] }
-parquet = { version = "53.0.0", features = ["arrow", "async", "object_store"] }
+datafusion = "43.0.0"
+datafusion-proto = "43.0.0"
+datafusion-functions-aggregate-common = "43.0.0"
+arrow = { version = "53.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "53.2.0"
+arrow-json = "53.2.0"
+arrow-schema = { version = "53.2.0", features = ["serde"] }
+parquet = { version = "53.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.11.0", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.50.0", features = ["serde", "visitor"] }
+sqlparser = { version = "0.51.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.1"
 dotenvy = "0.15.7"
 env_logger = "0.10"

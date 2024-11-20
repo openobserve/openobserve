@@ -164,15 +164,14 @@ pub fn split_files(
 }
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
-    let index_segment_length = if config::get_config()
+    if config::get_config()
         .common
         .inverted_index_search_format
         .eq("tantivy")
     {
-        1
-    } else {
-        INDEX_SEGMENT_LENGTH
+        return generate_access_plan_row_level(file);
     };
+    let index_segment_length = INDEX_SEGMENT_LENGTH;
     let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
@@ -211,6 +210,63 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
         access_plan.scan(last_group_id);
         access_plan.scan_selection(last_group_id, RowSelection::from(selection));
     }
+    log::debug!(
+        "file path: {:?}, row_group_count: {}, access_plan: {:?}",
+        file.path().as_ref(),
+        row_group_count,
+        access_plan
+    );
+    Some(Arc::new(access_plan))
+}
+
+pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+    let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(num_rows) = stats.num_rows else {
+        return None;
+    };
+    let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
+    let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
+
+    for (row_group_id, chunk) in row_ids.chunks(PARQUET_MAX_ROW_GROUP_SIZE).enumerate() {
+        let mut selection = Vec::new();
+        let mut current_count = 0;
+        let mut current_select = false;
+
+        for val in chunk
+            .iter()
+            .take(num_rows - row_group_id * PARQUET_MAX_ROW_GROUP_SIZE)
+        {
+            if *val == current_select {
+                current_count += 1;
+            } else {
+                if current_count > 0 {
+                    if current_select {
+                        selection.push(RowSelector::select(current_count));
+                    } else {
+                        selection.push(RowSelector::skip(current_count));
+                    }
+                }
+                current_select = *val;
+                current_count = 1;
+            }
+        }
+
+        // handle the last batch
+        if current_count > 0 {
+            if current_select {
+                selection.push(RowSelector::select(current_count));
+            } else {
+                selection.push(RowSelector::skip(current_count));
+            }
+        }
+
+        if selection.iter().any(|s| !s.skip) {
+            access_plan.scan(row_group_id);
+            access_plan.scan_selection(row_group_id, RowSelection::from(selection));
+        }
+    }
+
     log::debug!(
         "file path: {:?}, row_group_count: {}, access_plan: {:?}",
         file.path().as_ref(),

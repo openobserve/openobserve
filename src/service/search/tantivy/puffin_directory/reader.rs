@@ -118,6 +118,10 @@ impl PuffinDirReader {
             blobs_metadata: Arc::new(blobs_metadata),
         })
     }
+
+    pub fn list_files(&self) -> Vec<PathBuf> {
+        self.blobs_metadata.keys().cloned().collect()
+    }
 }
 
 impl Clone for PuffinDirReader {

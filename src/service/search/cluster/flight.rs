@@ -938,14 +938,14 @@ pub async fn get_inverted_index_file_list(
                 ..Default::default()
             });
         match (&entry.segment_ids, &segment_ids) {
-            (Some(_), None) => {}
+            (_, None) => {}
             (Some(bin_data), Some(segment_ids)) => {
-                let mut bv = BitVec::from_slice(bin_data);
+                let mut bv = bin_data.clone();
                 bv |= BitVec::from_slice(segment_ids);
-                entry.segment_ids = Some(bv.into_vec());
+                entry.segment_ids = Some(bv);
             }
-            (None, _) => {
-                entry.segment_ids = segment_ids;
+            (None, Some(segment_ids)) => {
+                entry.segment_ids = Some(BitVec::from_slice(segment_ids));
             }
         }
     }

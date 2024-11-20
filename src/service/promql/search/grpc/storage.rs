@@ -218,13 +218,13 @@ async fn cache_parquet_files(
     let cache_type = if cfg.memory_cache.enabled
         && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
     {
-        // if scan_compressed_size < 80% of total memory cache, use memory cache
+        // if scan_compressed_size < ZO_MEMORY_CACHE_SKIP_SIZE, use memory cache
         file_data::CacheType::Memory
     } else if !is_local_disk_storage()
         && cfg.disk_cache.enabled
         && scan_stats.compressed_size < cfg.disk_cache.skip_size as i64
     {
-        // if scan_compressed_size < 80% of total disk cache, use disk cache
+        // if scan_compressed_size < ZO_DISK_CACHE_SKIP_SIZE, use disk cache
         file_data::CacheType::Disk
     } else {
         // no cache

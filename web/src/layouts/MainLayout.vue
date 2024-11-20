@@ -91,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -185,10 +186,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated
+no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -450,7 +453,7 @@ export default defineComponent({
     const isMonacoEditorLoaded = ref(false);
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
-      "org_identifier"
+      "org_identifier",
     )
       ? router.currentRoute.value.query.org_identifier
       : undefined;
@@ -653,13 +656,13 @@ export default defineComponent({
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
-          ?.filter((val: string) => val?.trim()) || []
+          ?.filter((val: string) => val?.trim()) || [],
       );
 
       store.dispatch("setHiddenMenus", disableMenus);
 
       linksList.value = linksList.value.filter(
-        (link: { name: string }) => !disableMenus.has(link.name)
+        (link: { name: string }) => !disableMenus.has(link.name),
       );
     };
 
@@ -757,7 +760,7 @@ export default defineComponent({
       // } else {
       if (
         store.state.zoConfig.hasOwnProperty(
-          "restricted_routes_on_empty_data"
+          "restricted_routes_on_empty_data",
         ) &&
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
@@ -789,7 +792,7 @@ export default defineComponent({
 
     const setSelectedOrganization = async () => {
       customOrganization = router.currentRoute.value.query.hasOwnProperty(
-        "org_identifier"
+        "org_identifier",
       )
         ? router.currentRoute.value.query.org_identifier
         : "";
@@ -797,6 +800,16 @@ export default defineComponent({
       let localOrgFlag = false;
       if (store.state.organizations?.length > 0) {
         const localOrg: any = useLocalOrganization();
+        const url = new URL(window.location.href);
+        if (
+          Object.keys(localOrg.value).length == 0 &&
+          url.searchParams.get("org_identifier") != null
+        ) {
+          localOrg.value = {
+            identifier: url.searchParams.get("org_identifier"),
+            user_email: store.state.userInfo.email,
+          };
+        }
         orgOptions.value = store.state.organizations.map(
           (data: {
             id: any;
@@ -863,7 +876,7 @@ export default defineComponent({
             }
 
             return optiondata;
-          }
+          },
         );
       }
 
@@ -892,7 +905,7 @@ export default defineComponent({
       try {
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
-          store.state?.selectedOrganization?.identifier
+          store.state?.selectedOrganization?.identifier,
         );
 
         //set settings in store
@@ -958,7 +971,7 @@ export default defineComponent({
                   path: matchedRoutes[matchedRoutes.length - 2].path,
                 });
               }
-            }
+            },
           );
         }
       } else {
@@ -981,7 +994,7 @@ export default defineComponent({
     const prefetch = () => {
       const href = "/web/assets/editor.api.v1.js";
       const existingLink = document.querySelector(
-        `link[rel="prefetch"][href="${href}"]`
+        `link[rel="prefetch"][href="${href}"]`,
       );
 
       if (!existingLink) {

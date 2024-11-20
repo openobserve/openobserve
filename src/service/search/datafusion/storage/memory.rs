@@ -17,15 +17,11 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::utils::time::BASE_TIME;
 use futures::{stream::BoxStream, StreamExt};
-use infra::{cache::file_data, storage};
 use object_store::{
-    path::Path, Attributes, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
-    ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
+    path::Path, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
 };
-
-use super::GetRangeExt;
 
 /// File system with memory cache
 #[derive(Debug, Default)]
@@ -44,13 +40,6 @@ impl FS {
         }
         path.into()
     }
-
-    async fn get_cache(&self, location: &Path, range: Option<Range<usize>>) -> Option<Bytes> {
-        let path = location.to_string();
-        let data = file_data::memory::get(&path, range).await;
-        tokio::task::yield_now().await;
-        data
-    }
 }
 
 impl std::fmt::Display for FS {
@@ -62,148 +51,27 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        let location = &self.format_location(location);
-        match self.get_cache(location, None).await {
-            Some(data) => {
-                let meta = ObjectMeta {
-                    location: location.clone(),
-                    last_modified: *BASE_TIME,
-                    size: data.len(),
-                    e_tag: None,
-                    version: None,
-                };
-                let range = Range {
-                    start: 0,
-                    end: data.len(),
-                };
-                Ok(GetResult {
-                    payload: GetResultPayload::Stream(
-                        futures::stream::once(async move { Ok(data) }).boxed(),
-                    ),
-                    attributes: Attributes::default(),
-                    meta,
-                    range,
-                })
-            }
-            None => match storage::LOCAL_CACHE.get(location).await {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.get(location).await,
-            },
-        }
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT.get(&location).await
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        let location = &self.format_location(location);
-        match self.get_cache(location, None).await {
-            Some(data) => {
-                let meta = ObjectMeta {
-                    location: location.clone(),
-                    last_modified: *BASE_TIME,
-                    size: data.len(),
-                    e_tag: None,
-                    version: None,
-                };
-                let (range, data) = match options.range {
-                    Some(range) => {
-                        let r = range
-                            .as_range(data.len())
-                            .map_err(|e| super::Error::BadRange(e.to_string()))?;
-                        (r.clone(), data.slice(r))
-                    }
-                    None => (0..data.len(), data),
-                };
-                Ok(GetResult {
-                    payload: GetResultPayload::Stream(
-                        futures::stream::once(async move { Ok(data) }).boxed(),
-                    ),
-                    attributes: Attributes::default(),
-                    meta,
-                    range,
-                })
-            }
-            None => match storage::LOCAL_CACHE
-                .get_opts(
-                    location,
-                    GetOptions {
-                        range: options.range.clone(),
-                        if_modified_since: options.if_modified_since,
-                        if_unmodified_since: options.if_unmodified_since,
-                        if_match: options.if_match.clone(),
-                        if_none_match: options.if_none_match.clone(),
-                        version: options.version.clone(),
-                        head: options.head,
-                    },
-                )
-                .await
-            {
-                Ok(ret) => Ok(ret),
-                Err(_) => storage::DEFAULT.get_opts(location, options).await,
-            },
-        }
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT
+            .get_opts(&location, options)
+            .await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        let location = &self.format_location(location);
-        match self.get_cache(location, Some(range.clone())).await {
-            Some(data) => {
-                if range.start > range.end {
-                    return Err(super::Error::BadRange(location.to_string()).into());
-                }
-                if range.end - range.start != data.len() {
-                    return Err(super::Error::BadRange(location.to_string()).into());
-                }
-                Ok(data)
-            }
-            None => match storage::LOCAL_CACHE
-                .get_range(location, range.clone())
-                .await
-            {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.get_range(location, range).await,
-            },
-        }
-    }
-
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        if ranges.is_empty() {
-            return Ok(vec![]);
-        }
-        let location = &self.format_location(location);
-        match self.get_cache(location, None).await {
-            Some(data) => ranges
-                .iter()
-                .map(|range| {
-                    if range.start > range.end {
-                        return Err(super::Error::BadRange(location.to_string()).into());
-                    }
-                    if range.end > data.len() {
-                        return Err(super::Error::OutOfRange(location.to_string()).into());
-                    }
-                    Ok(data.slice(range.clone()))
-                })
-                .collect(),
-            None => match storage::LOCAL_CACHE.get_ranges(location, ranges).await {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.get_ranges(location, ranges).await,
-            },
-        }
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT
+            .get_range(&location, range)
+            .await
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        let location = &self.format_location(location);
-        match self.get_cache(location, None).await {
-            Some(data) => Ok(ObjectMeta {
-                location: location.clone(),
-                last_modified: *BASE_TIME,
-                size: data.len(),
-                e_tag: None,
-                version: None,
-            }),
-            None => match storage::LOCAL_CACHE.head(location).await {
-                Ok(data) => Ok(data),
-                Err(_) => storage::DEFAULT.head(location).await,
-            },
-        }
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT.head(&location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
@@ -232,15 +100,17 @@ impl ObjectStore for FS {
         Err(object_store::Error::NotImplemented {})
     }
 
-    async fn put_multipart(&self, _location: &Path) -> Result<Box<dyn MultipartUpload>> {
+    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
+        log::error!("NotImplemented put_multipart: {}", location);
         Err(object_store::Error::NotImplemented)
     }
 
     async fn put_multipart_opts(
         &self,
-        _location: &Path,
+        location: &Path,
         _opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
+        log::error!("NotImplemented put_multipart_opts: {}", location);
         Err(object_store::Error::NotImplemented)
     }
 

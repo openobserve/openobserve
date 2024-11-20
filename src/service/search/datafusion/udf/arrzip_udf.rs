@@ -37,7 +37,7 @@ pub(crate) static ARR_ZIP_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects three string - field1, field2 and the delim
         vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
         // returns string
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         Arc::new(arr_zip_impl),
     )

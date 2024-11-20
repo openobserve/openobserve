@@ -26,7 +26,6 @@ use crate::{
     service::{db, stream::save_stream_settings},
 };
 
-pub mod folders;
 pub mod reports;
 
 async fn add_distinct_field_entry(

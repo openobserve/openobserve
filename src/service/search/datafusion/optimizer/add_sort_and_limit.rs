@@ -25,10 +25,12 @@ use datafusion::{
     },
     logical_expr::{col, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan},
     optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    prelude::Expr,
+    scalar::ScalarValue,
 };
 
 /// Optimization rule that add sort and limit to table scan
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AddSortAndLimitRule {
     limit: usize,
     offset: usize,
@@ -77,8 +79,9 @@ impl OptimizerRule for AddSortAndLimitRule {
                         (Transformed::no(LogicalPlan::Limit(limit)), None)
                     } else {
                         // the add sort plan should reflect the limit
-                        let fetch = limit.fetch.unwrap() + limit.skip;
-                        let (sort, schema) = generate_sort_plan(limit.input.clone(), fetch);
+                        let fetch = get_int_from_expr(&limit.fetch);
+                        let skip = get_int_from_expr(&limit.skip);
+                        let (sort, schema) = generate_sort_plan(limit.input.clone(), fetch + skip);
                         limit.input = Arc::new(sort);
                         (Transformed::yes(LogicalPlan::Limit(limit)), schema)
                     }
@@ -131,19 +134,23 @@ fn is_complex_query(plan: &LogicalPlan) -> bool {
         plan,
         LogicalPlan::Aggregate(_)
             | LogicalPlan::Join(_)
-            | LogicalPlan::CrossJoin(_)
             | LogicalPlan::Distinct(_)
             | LogicalPlan::RecursiveQuery(_)
             | LogicalPlan::SubqueryAlias(_)
             | LogicalPlan::Subquery(_)
             | LogicalPlan::Window(_)
+            | LogicalPlan::Union(_)
     )
 }
 
 fn generate_limit_plan(input: Arc<LogicalPlan>, limit: usize, skip: usize) -> LogicalPlan {
     LogicalPlan::Limit(Limit {
-        skip,
-        fetch: Some(limit),
+        skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
+            skip as i64,
+        ))))),
+        fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
+            limit as i64,
+        ))))),
         input,
     })
 }
@@ -195,12 +202,26 @@ fn generate_limit_and_sort_plan(
     let (sort, schema) = generate_sort_plan(input, limit + skip);
     (
         LogicalPlan::Limit(Limit {
-            skip,
-            fetch: Some(limit),
+            skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
+                skip as i64,
+            ))))),
+            fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
+                limit as i64,
+            ))))),
             input: Arc::new(sort),
         }),
         schema,
     )
+}
+
+fn get_int_from_expr(expr: &Option<Box<Expr>>) -> usize {
+    match expr {
+        Some(expr) => match expr.as_ref() {
+            Expr::Literal(ScalarValue::Int64(Some(value))) => *value as usize,
+            _ => 0,
+        },
+        _ => 0,
+    }
 }
 
 struct ChangeTableScanSchema {}

@@ -30,6 +30,7 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 
 /// An empty plan that is useful for testing and generating plans
 /// without mapping them to actual data.
+#[derive(Debug)]
 pub struct NewEmptyTable {
     name: String,
     schema: SchemaRef,

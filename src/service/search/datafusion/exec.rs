@@ -215,7 +215,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         }
         super::MemoryPoolType::None => {}
     };
-    RuntimeEnv::new(rn_config)
+    RuntimeEnv::try_new(rn_config)
 }
 
 pub async fn prepare_datafusion_context(

@@ -25,6 +25,7 @@ use datafusion::{
     physical_plan::{empty::EmptyExec, union::UnionExec, ExecutionPlan},
 };
 
+#[derive(Debug)]
 pub(crate) struct NewUnionTable {
     schema: SchemaRef,
     tables: Vec<Arc<dyn TableProvider>>,

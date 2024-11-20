@@ -23,6 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        bitvec::BitVec,
         search::ScanStats,
         stream::{FileKey, StreamPartition, StreamType},
     },
@@ -249,6 +250,7 @@ pub async fn search(
     }
 
     // create a Union Plan to merge all tables
+    let start = std::time::Instant::now();
     let union_table = Arc::new(NewUnionTable::try_new(schema_latest.clone(), tables)?);
 
     let union_exec = union_table
@@ -262,7 +264,10 @@ pub async fn search(
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 
-    log::info!("[trace_id {trace_id}] flight->search: generated physical plan");
+    log::info!(
+        "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
+        start.elapsed().as_millis()
+    );
 
     Ok((ctx, physical_plan, scan_stats))
 }
@@ -294,7 +299,8 @@ async fn get_file_list_by_ids(
             if let Some(file) = file_list_map.get(&idx_file.key) {
                 let mut new_file = file.clone();
                 if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
-                    new_file.segment_ids = Some(segment_ids.clone());
+                    let segment_ids = BitVec::from_slice(segment_ids);
+                    new_file.with_segment_ids(segment_ids);
                 }
                 files.push(new_file);
             }
