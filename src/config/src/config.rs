@@ -717,6 +717,12 @@ pub struct Common {
     )]
     pub inverted_index_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
+        default = false,
+        help = "Toggle inverted index cache."
+    )]
+    pub inverted_index_cache_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = "",
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
@@ -1062,6 +1068,8 @@ pub struct Limit {
     pub max_enrichment_table_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
+    #[env_config(name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES", default = 100000)]
+    pub inverted_index_cache_max_entries: usize,
 }
 
 #[derive(EnvConfig)]
