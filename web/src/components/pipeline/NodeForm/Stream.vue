@@ -285,10 +285,19 @@ watch(stream_type, (newValue:any) => {
 });
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;
-  await pipelineService.getPipelineStreams(org_identifier)
-    .then((res: any) => {
-      usedStreams.value = res.data.list;
-    })
+  try {
+    const res = await pipelineService.getPipelineStreams(org_identifier);
+    usedStreams.value = res.data.list;
+  } catch (error) {
+    console.error('Failed to fetch pipeline streams:', error);
+    usedStreams.value = [];
+    $q.notify({
+      message: "Failed to fetch Streams that are used in pipelines",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+  }
 }
 async function getStreamList() {
   const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty("stream_type")
