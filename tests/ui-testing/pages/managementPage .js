@@ -27,6 +27,7 @@ export
 
     async updateCustomLogoText(text) {
         //  await this.page.waitForSelector("[type='submit']").nth(1);
+        await this.page.waitForTimeout(5000);
         await this.submitButton.click({ force: true });
         await this.customLogoText.fill(text);
         await this.page.waitForSelector('[data-test="settings_ent_logo_custom_text_save_btn"]');
