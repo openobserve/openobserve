@@ -67,7 +67,7 @@ const MainLayoutCloudMixin = {
               };
 
               if (
-                (selectedOrg.value == "" &&
+                (Object.keys(selectedOrg.value).length == 0 &&
                   (data.type == "default" || data.id == "1") &&
                   store.state.userInfo.email == data.UserObj.email) ||
                 res.data.data.length == 1
