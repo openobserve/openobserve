@@ -578,6 +578,16 @@ impl From<&UserRoleRequest> for UserOrgRole {
     }
 }
 
+#[cfg(feature = "enterprise")]
+pub fn is_standard_role(role: &str) -> bool {
+    for user_role in UserRole::iter() {
+        if user_role.to_string().eq_ignore_ascii_case(role) {
+            return true;
+        }
+    }
+    false
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RolesResponse {
     pub label: String,

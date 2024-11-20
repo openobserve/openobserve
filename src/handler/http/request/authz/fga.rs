@@ -26,8 +26,14 @@ pub async fn create_role(
     org_id: web::Path<String>,
     user_req: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
+    use crate::common::meta::user::is_standard_role;
+
     let org_id = org_id.into_inner();
     let user_req = user_req.into_inner();
+
+    if user_req.role.is_empty() || is_standard_role(&user_req.role) {
+        return Ok(HttpResponse::BadRequest().body("Role name cannot be empty or standard role"));
+    }
 
     match o2_enterprise::enterprise::openfga::authorizer::roles::create_role(
         &user_req.role,
