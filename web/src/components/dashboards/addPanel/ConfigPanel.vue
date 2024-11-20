@@ -87,11 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :type="'number'"
           placeholder="Auto"
           data-test="trellis-chart-num-of-columns"
-          :disable="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.breakdown?.length == 0
-          "
+          :disable="isBreakdownFieldEmpty"
         >
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
