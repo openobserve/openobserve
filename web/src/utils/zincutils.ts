@@ -259,7 +259,7 @@ export const useLocalOrganization = (
       }
       return organizationDataLocal;
     } else {
-      throw new Error("Invalid organization data format");
+      return organizationDataLocal;
     }
   } catch (e) {
     console.log(`Error: Error in useLocalOrganization: ${e}`);

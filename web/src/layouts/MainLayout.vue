@@ -952,35 +952,6 @@ export default defineComponent({
       mainLayoutMixin.setup().getDefaultOrganization(store);
     }
 
-    const redirectToParentRoute = (matchedRoutes: any) => {
-      if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
-        router.push({
-          name: "dashboards",
-        });
-      } else if (
-        matchedRoutes?.length > 2 &&
-        !excludeParentRedirect.includes(router.currentRoute.value.name) &&
-        router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&
-        router.currentRoute.value.path.indexOf("/billings/") == -1
-      ) {
-        if (matchedRoutes[matchedRoutes.length - 2]?.children?.length > 0) {
-          matchedRoutes[matchedRoutes.length - 2].children.forEach(
-            (route: any) => {
-              if (route.name == matchedRoutes[matchedRoutes.length - 1].name) {
-                router.push({
-                  path: matchedRoutes[matchedRoutes.length - 2].path,
-                });
-              }
-            },
-          );
-        }
-      } else {
-        router.push({
-          query: { org_identifier: selectedOrg.value.identifier },
-        });
-      }
-    };
-
     const setRumUser = () => {
       if (store.state.zoConfig?.rum?.enabled == true) {
         const userInfo = store.state.userInfo;
@@ -1030,7 +1001,6 @@ export default defineComponent({
       getImageURL,
       updateOrganization,
       setSelectedOrganization,
-      redirectToParentRoute,
       getOrganizationSettings,
       resetStreams,
       triggerRefreshToken,
@@ -1069,11 +1039,7 @@ export default defineComponent({
 
       await this.getOrganizationSettings();
 
-      this.isLoading = true;
-      setTimeout(() => {
-        this.redirectToParentRoute(this.$route.matched);
-        // this.setSelectedOrganization();
-      }, 500);
+      // this.isLoading = true;
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {
