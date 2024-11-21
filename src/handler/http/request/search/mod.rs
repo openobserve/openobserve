@@ -77,18 +77,10 @@ async fn can_use_distinct_stream(
         if DISTINCT_FIELDS.contains(f) {
             return true;
         }
-        let settings_entries: Vec<_> = stream_settings
+        stream_settings
             .distinct_value_fields
             .iter()
-            .filter(|_f| _f.name == *f)
-            .collect();
-        if let Some(entry) = settings_entries.first() {
-            // if the  field has been added before our search start time, we can use the
-            // distinct stream, otherwise not.
-            entry.added_ts < start_time
-        } else {
-            false
-        }
+            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
     });
 
     // all the fields used in the query sent must be in the distinct stream
@@ -106,18 +98,10 @@ async fn can_use_distinct_stream(
         if DISTINCT_FIELDS.contains(f) {
             return true;
         }
-        let settings_entries: Vec<_> = stream_settings
+        stream_settings
             .distinct_value_fields
             .iter()
-            .filter(|_f| _f.name == *f)
-            .collect();
-        if let Some(entry) = settings_entries.first() {
-            // if the  field has been added before our search start time, we can use the
-            // distinct stream, otherwise not.
-            entry.added_ts < start_time
-        } else {
-            false
-        }
+            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
     });
 
     all_fields_distinct && all_query_fields_distinct
@@ -808,6 +792,9 @@ async fn values_v1(
                 default_sql
             } else {
                 let columns = v.splitn(2, '=').collect::<Vec<_>>();
+                if columns.len() < 2 {
+                    return Ok(MetaHttpResponse::bad_request("Invalid filter format"));
+                }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
                 format!("{} WHERE {} IN ('{}')", default_sql, columns[0], vals)
             }

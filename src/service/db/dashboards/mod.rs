@@ -45,7 +45,7 @@ async fn add_distinct_field_entry(
     );
     distinct_values::add(record)
         .await
-        .map_err(|e| anyhow::anyhow!(e))
+        .map_err(|e| anyhow::anyhow!("error in adding distinct value record : {e}"))
 }
 
 async fn remove_distinct_field_entry(
@@ -65,7 +65,7 @@ async fn remove_distinct_field_entry(
     );
     distinct_values::remove(record)
         .await
-        .map_err(|e| anyhow::anyhow!(e))
+        .map_err(|e| anyhow::anyhow!("error in removing distinct value record : {e}"))
 }
 
 /// This big macro helps in covering all 5 versions of dashboards and update the
