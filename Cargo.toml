@@ -232,6 +232,7 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 ], default-features = false, rev = "348967500868c2b5dfcb3930fe483b2ff17b35ff" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
+collapse = "0.1.2"
 dashmap = { version = "6.0", features = ["serde"] }
 datafusion = "43.0.0"
 datafusion-proto = "43.0.0"
@@ -288,6 +289,12 @@ sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
     "macros",
+] }
+sea-orm-migration = { version = "1.1.0", features = [
+    "sqlx-mysql",
+    "sqlx-postgres",
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
 ] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
