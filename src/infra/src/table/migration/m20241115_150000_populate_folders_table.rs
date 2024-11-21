@@ -35,9 +35,9 @@ impl MigrationTrait for Migration {
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
         // txn.execute()
-        let mut meta_pages = meta::Entity::find()
-            .filter(meta::Column::Module.eq("folders"))
-            .order_by_asc(meta::Column::Id)
+        let mut meta_pages = super::meta::Entity::find()
+            .filter(super::meta::Column::Module.eq("folders"))
+            .order_by_asc(super::meta::Column::Id)
             .paginate(&txn, 100);
 
         while let Some(metas) = meta_pages.fetch_and_next().await? {
@@ -91,29 +91,6 @@ struct MetaFolder {
 // this migration only references ORM models in private submodules that should
 // remain unchanged rather than ORM models in the `entity` module that will be
 // updated to reflect the latest changes to table schemas.
-
-/// Representation of the meta table at the time this migration executes.
-mod meta {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "meta")]
-    pub struct Model {
-        #[sea_orm(primary_key)]
-        pub id: i64,
-        pub module: String,
-        pub key1: String,
-        pub key2: String,
-        pub start_dt: i64,
-        #[sea_orm(column_type = "Text")]
-        pub value: String,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
 
 /// Representation of the folder table at the time this migration executes.
 mod folder {

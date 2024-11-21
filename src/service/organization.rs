@@ -28,7 +28,7 @@ use super::{
     users::{add_admin_to_org, get_user},
 };
 #[cfg(feature = "enterprise")]
-use crate::common::organization::OrganizationInvites;
+use crate::common::meta::organization::OrganizationInvites;
 use crate::{
     common::{
         // infra::config::USERS_RUM_TOKEN,
