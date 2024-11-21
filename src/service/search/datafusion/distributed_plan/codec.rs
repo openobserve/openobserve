@@ -206,6 +206,7 @@ mod tests {
         assert_eq!(plan.projection(), plan2.projection());
         assert_eq!(plan.filters(), plan2.filters());
         assert_eq!(plan.limit(), plan2.limit());
+        assert_eq!(plan.full_schema(), plan2.full_schema());
 
         Ok(())
     }

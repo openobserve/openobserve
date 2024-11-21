@@ -125,12 +125,7 @@ pub async fn search(
     }
 
     // construct index condition
-    let index_condition: Option<IndexCondition> = if !req.index_condition.is_empty() {
-        let condition: IndexCondition = json::from_str(&req.index_condition)?;
-        Some(condition)
-    } else {
-        None
-    };
+    let index_condition = generate_index_condition(&req.index_condition)?;
 
     let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
@@ -356,4 +351,21 @@ async fn get_file_list_by_ids(
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok((files, start.elapsed().as_millis() as usize))
+}
+
+fn generate_index_condition(index_condition: &str) -> Result<Option<IndexCondition>, Error> {
+    Ok(if !index_condition.is_empty() {
+        let condition: IndexCondition = match json::from_str(index_condition) {
+            Ok(cond) => cond,
+            Err(e) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(format!(
+                    "Invalid index condition JSON: {}",
+                    e
+                ))));
+            }
+        };
+        Some(condition)
+    } else {
+        None
+    })
 }
