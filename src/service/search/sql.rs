@@ -976,6 +976,7 @@ fn is_complex_query(statement: &mut Statement) -> bool {
 // 3. has group by
 // 4. has aggregate
 // 5. has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
+// 6. has distinct
 struct ComplexQueryVisitor {
     pub is_complex: bool,
 }
@@ -999,6 +1000,9 @@ impl VisitorMut for ComplexQueryVisitor {
                 }
                 // check if has join
                 if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                    self.is_complex = true;
+                }
+                if select.distinct.is_some() {
                     self.is_complex = true;
                 }
                 if self.is_complex {
