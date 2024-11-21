@@ -45,7 +45,7 @@ use {
         jwt::process_token,
         validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
     },
-    crate::service::usage::audit,
+    crate::service::self_reporting::audit,
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
@@ -68,7 +68,10 @@ use crate::{
     },
     service::{
         db,
-        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+        search::{
+            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+            tantivy::puffin_directory::reader_cache,
+        },
     },
 };
 
@@ -343,6 +346,10 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert(
         "DATAFUSION",
         json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
+    );
+    stats.insert(
+        "INVERTED_INDEX",
+        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
     );
 
     let consistent_hashing = cluster::print_consistent_hash().await;

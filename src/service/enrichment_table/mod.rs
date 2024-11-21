@@ -26,8 +26,8 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        self_reporting::usage::UsageType,
         stream::{PartitionTimeLevel, StreamType},
-        usage::UsageType,
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
     SIZE_IN_MB,
@@ -49,7 +49,7 @@ use crate::{
         format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
