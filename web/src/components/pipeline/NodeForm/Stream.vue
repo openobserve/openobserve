@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-input-stream-routing-section"
-    class="full-width full-height"
+    class=" full-height"
+    style="width: 40vw;"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
@@ -115,44 +116,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            data-test="input-node-stream-select"
-            class="o2-input full-width"
+            data-test="input-node-stream-type-select"
+            class="alert-stream-type o2-input q-mr-sm full-width"
             style="padding-top: 0"
           >
-          <span>
-            <label class="q-mb-xs q-mt-none text-bold" style="color: #BABABA;">
-            {{ t('alerts.stream_name') + ' *' }}
-          </label>
-          
-          <q-icon
-            :name="outlinedInfo"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="
-              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-            "
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              :label="'hello'"
-            >
-              <span style="font-size: 14px">To set Stream Name dynamically using the value of a field, please surround the field name with &#123;&#123;  &#125;&#125; <br> Eg: &#123;&#123;kubernetes_namespace_name&#125;&#125;</span>
-            </q-tooltip>
-          </q-icon>
-          </span>
           <q-select
             v-model="stream_name"
             :options="filteredStreams"
              option-label="label"
               option-value="value"
-            label=""
+            :label="t('alerts.stream_name') + ' *'"
             :loading="isFetchingStreams"
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-pb-sm showLabelOnTop no-case full-width"
+            class="q-py-sm showLabelOnTop no-case full-width"
             filled
             stack-label
             dense
@@ -165,13 +143,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
             @input-value="handleDynamicStreamName"
-            style="padding-top: 4px !important;"
            
             />
 
 
 
+
           </div>
+          <div style="font-size: 14px;" class="note-message" >
+          <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces {} to include dynamic values. e.g. static_text_{fieldname}_postfix</span>
+            </div>
         </div>
 
         <div
@@ -309,9 +290,8 @@ watch(selected, (newValue:any) => {
 watch(() => dynamic_stream_name.value,
 ()=>{
   if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== ""){
-    const regex = /\{(?!\{)[^{}]+\}(?!\})/g;
-
-// Check if there is any value between {{ stream_name }}
+    const regex = /^[a-zA-Z0-9_]*\{[a-zA-Z0-9_]+\}[a-zA-Z0-9_]*$/;
+    // Check if there is any value between {{ stream_name }}
       if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
         saveDynamicStream();
       }
@@ -523,6 +503,16 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   text-transform: none !important;
   font-size: 0.875rem; /* Keep the font size and weight as needed */
   font-weight: 600;
+}
+
+.note-message{
+  background-color: #F9F290 ;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
+  width: 100%;
+  margin-bottom: 20px;
 }
 
 
