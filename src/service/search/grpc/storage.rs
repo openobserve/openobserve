@@ -279,7 +279,7 @@ pub async fn search(
         let schema = schema.with_metadata(std::collections::HashMap::new());
 
         let session = config::meta::search::Session {
-            id: format!("{}-{ver}", query.trace_id),
+            id: format!("{}-{}-{ver}", query.trace_id, query.job_id),
             storage_type: StorageType::Memory,
             work_group: query.work_group.clone(),
             target_partitions,
