@@ -39,6 +39,9 @@ export class LogsPage {
     this.endTimeInput = "input[class = 'q-field__native q-placeholder']:nth-child(3)";
     this.timezoneSelector = "//label[contains(@class,'timezone-select')]";
 
+    this.streamDropdown = '[data-test="log-search-index-list-select-stream"]';
+    this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
+    this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
 
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
     this.signOutButton = page.getByText('Sign Out');
@@ -162,6 +165,29 @@ async setTimeZone(zone) {
     return await this.page.locator("//button[(@data-test ='date-time-btn')]/span[contains(@class,'q-btn__content')]/span").textContent();
 }
 
+async selectStream(stream) {
+  await this.page.waitForTimeout(4000);
+  await this.page.locator(this.streamDropdown).click({ force: true });
+  await this.page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
+}
+
+async applyQuery() {
+  const search = this.page.waitForResponse("**/api/default/_search**");
+  await this.page.waitForTimeout(3000);
+  await this.page.locator(this.queryButton).click({ force: true });
+  await expect.poll(async () => (await search).status()).toBe(200);
+}
+
+async clearAndRunQuery() {
+  await this.page.locator(this.queryButton).click();
+  await this.page.getByLabel("SQL Mode").locator("div").nth(2).click();
+  await this.page.locator(this.queryEditor).click();
+  await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await this.page.keyboard.press("Backspace");
+  await this.page.waitForTimeout(3000);
+  await this.page.locator(this.queryButton).click();
+  await this.page.getByText("No column found in selected stream.").click();
+}
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
