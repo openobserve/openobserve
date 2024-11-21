@@ -67,6 +67,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     name: trans.name.clone(),
                     num_args: trans.num_args,
                     after_flatten: !stream_ord.apply_before_flattening,
+                    apply_by_array: false, // does not apply to previous version of functions
                 };
                 let entry = stream_funcs
                     .entry(StreamParams::new(

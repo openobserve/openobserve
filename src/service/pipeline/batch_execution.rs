@@ -541,29 +541,31 @@ async fn process_node(
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_id} starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
+            // let mut func_inputs = vec![];
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
-                if let Some(vrl_runtime) = &vrl_runtime {
-                    if func_params.after_flatten && !flattened {
-                        record = match flatten::flatten_with_level(
-                            record,
-                            cfg.limit.ingest_flatten_level,
-                        ) {
-                            Ok(flattened) => flattened,
-                            Err(e) => {
-                                let err_msg = format!("FunctionNode error with flattening: {}", e);
-                                if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                    break;
-                                }
-                                continue;
+                if func_params.after_flatten && !flattened {
+                    record = match flatten::flatten_with_level(
+                        record,
+                        cfg.limit.ingest_flatten_level,
+                    ) {
+                        Ok(flattened) => flattened,
+                        Err(e) => {
+                            let err_msg = format!("FunctionNode error with flattening: {}", e);
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                );
+                                break;
                             }
-                        };
-                    }
+                            continue;
+                        }
+                    };
+                    flattened = true;
+                }
+                if let Some(vrl_runtime) = &vrl_runtime {
                     record = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,

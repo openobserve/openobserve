@@ -108,6 +108,19 @@ impl Pipeline {
         // ck 3
         match self.nodes.first().unwrap().get_node_data() {
             NodeData::Stream(stream_params) => {
+                // check if any FunctionNode has apply_by_result as true
+                // since it's only applicable for scheduled pipelines
+                if self.nodes.iter().any(|node| {
+                    if let NodeData::Function(func_params) = &node.data {
+                        func_params.apply_by_array
+                    } else {
+                        false
+                    }
+                }) {
+                    return Err(anyhow!(
+                        "Function apply_by_array is only supported to Scheduled Pipelines where source is a DerivedStream Query",
+                    ));
+                }
                 self.source = PipelineSource::Realtime(stream_params);
             }
             NodeData::Query(derived_stream) => {
