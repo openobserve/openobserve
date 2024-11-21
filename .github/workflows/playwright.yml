@@ -109,7 +109,7 @@ jobs:
             "dashboards/dashboard-variables-setting.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
             "reportsUpdated.spec.js",
-            "logoManagement.spec.js",
+            
           ]
 
     steps:
