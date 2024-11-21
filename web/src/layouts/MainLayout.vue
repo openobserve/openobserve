@@ -854,7 +854,7 @@ export default defineComponent({
             }
 
             if (
-              (Object.key(selectedOrg.value).length == 0 &&
+              (Object.keys(selectedOrg.value).length == 0 &&
                 data.type == "default" &&
                 store.state.userInfo.email == data.UserObj.email &&
                 (customOrganization == "" ||
