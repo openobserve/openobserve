@@ -1277,7 +1277,7 @@ export default defineComponent({
 }
 
 .mapping-warning-msg{
-  background-color: #F5E72380 ;
+  background-color: #F9F290 ;
   padding: 8px 16px;
   border-radius: 4px;
   border: 1px solid #F5A623;
