@@ -13,21 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+pub use sea_orm_migration::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Folder {
-    #[serde(default)]
-    pub folder_id: String,
-    pub name: String,
-    pub description: String,
+mod m20241114_000001_create_folders_table;
+mod m20241115_150000_populate_folders_table;
+mod m20241116_000001_delete_metas;
+
+pub struct Migrator;
+
+#[async_trait::async_trait]
+impl MigratorTrait for Migrator {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![
+            Box::new(m20241114_000001_create_folders_table::Migration),
+            Box::new(m20241115_150000_populate_folders_table::Migration),
+            Box::new(m20241116_000001_delete_metas::Migration),
+        ]
+    }
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct FolderList {
-    pub list: Vec<Folder>,
-}
-
-pub const DEFAULT_FOLDER: &str = "default";

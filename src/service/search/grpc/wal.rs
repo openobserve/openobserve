@@ -42,7 +42,9 @@ use crate::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_filter_from_equal_items, generate_search_schema_diff, match_source,
+            generate_filter_from_equal_items, generate_search_schema_diff,
+            index::IndexCondition,
+            match_source,
         },
     },
 };
@@ -55,6 +57,8 @@ pub async fn search_parquet(
     search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> super::SearchTable {
     // get file list
     let stream_settings =
@@ -257,7 +261,7 @@ pub async fn search_parquet(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let session = config::meta::search::Session {
-            id: format!("{}-wal-{ver}", query.trace_id),
+            id: format!("{}-{}-wal-{ver}", query.trace_id, query.job_id),
             storage_type: StorageType::Wal,
             work_group: query.work_group.clone(),
             target_partitions: cfg.limit.cpu_num,
@@ -271,6 +275,8 @@ pub async fn search_parquet(
             diff_fields,
             sorted_by_time,
             file_stat_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
@@ -296,6 +302,8 @@ pub async fn search_memtable(
     schema: Arc<Schema>,
     search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> super::SearchTable {
     let mut scan_stats = ScanStats::new();
 
@@ -395,6 +403,8 @@ pub async fn search_memtable(
             vec![record_batches],
             diff_fields,
             sorted_by_time,
+            index_condition.clone(),
+            fst_fields.clone(),
         )?);
         tables.push(table as _);
     }
