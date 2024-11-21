@@ -154,7 +154,8 @@ pub async fn search(
 
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
-        org_id: org_id.to_string(),
+        org_id: org_id.clone(),
+        job_id: req.job_id.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: Some((req.start_time, req.end_time)),
