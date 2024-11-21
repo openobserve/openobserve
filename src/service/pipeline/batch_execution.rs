@@ -216,7 +216,7 @@ impl ExecutablePipeline {
                         }
                         Err(e) => {
                             log::error!(
-                                "[Pipeline]: dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped"
+                                "[Pipeline]: dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped."
                             );
                             continue;
                         }
