@@ -33,7 +33,7 @@ async fn add_distinct_from_dashboard(
     value: bytes::Bytes,
     settings_cache: &mut SettingsCache,
 ) -> Result<(), anyhow::Error> {
-    let local_key = key.strip_prefix('/').unwrap_or(&key);
+    let local_key = key.strip_prefix('/').unwrap_or(key);
 
     // key format is dashboard/org_id/folder/id
     let parts = local_key.split('/').collect::<Vec<_>>();
