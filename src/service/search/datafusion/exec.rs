@@ -80,8 +80,8 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE) ORDER BY {} DESC",
-            cfg.common.column_timestamp
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
+            cfg.common.column_timestamp, cfg.common.column_timestamp
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
