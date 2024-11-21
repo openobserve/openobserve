@@ -2398,8 +2398,13 @@ export default defineComponent({
           parsedSQL.where = null;
         }
 
+        if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
+          parsedSQL.limit = null;
+        }
+
         if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
           parsedSQL._next.where = null;
+          parsedSQL._next.limit = null;
         }
 
         searchObj.data.query = fnUnparsedSQL(parsedSQL);
