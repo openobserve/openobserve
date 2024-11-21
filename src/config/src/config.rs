@@ -880,7 +880,7 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
-    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 2000)]
+    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 1000)]
     pub udschema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
