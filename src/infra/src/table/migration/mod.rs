@@ -22,6 +22,31 @@ mod m20241116_000002_drop_folders_created_at_column;
 mod m20241119_000001_create_dashboards_table;
 mod m20241119_000002_populate_dashboards_table;
 mod m20241119_000003_delete_metas;
+mod m20241121_000001_create_organizations_table;
+mod m20241122_000001_populate_organizations_table;
+
+/// Representation of the meta table at the time this migration executes.
+pub(super) mod meta {
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "meta")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub module: String,
+        pub key1: String,
+        pub key2: String,
+        pub start_dt: i64,
+        #[sea_orm(column_type = "Text")]
+        pub value: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
 
 pub struct Migrator;
 
