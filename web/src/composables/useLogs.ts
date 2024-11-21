@@ -4166,10 +4166,9 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      if (!parsedSQL) {
+      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
         console.error("Failed to parse SQL query:", value);
         throw new Error("Invalid SQL syntax");
-        return;
       }
 
       let newSelectedStreams: string[] = [];
