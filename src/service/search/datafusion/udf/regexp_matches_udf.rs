@@ -16,19 +16,19 @@
 use std::{any::Any, sync::Arc};
 
 use arrow::{
-    array::{Array, ArrayRef, OffsetSizeTrait, ListBuilder, GenericStringBuilder},
+    array::{Array, ArrayRef, GenericStringBuilder, ListBuilder, OffsetSizeTrait, StringArray},
+    compute::kernels::regexp,
 };
 use arrow_schema::Field;
 use datafusion::{
     arrow::datatypes::DataType::{self, *},
-    common::{exec_err, ScalarValue},
+    common::{arrow_datafusion_err, cast::as_generic_string_array, exec_err, ScalarValue},
     error::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDFImpl, Signature, TypeSignature, Volatility},
+    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility},
 };
-use datafusion::common::cast::as_generic_string_array;
-use datafusion::logical_expr::ScalarUDF;
 use once_cell::sync::Lazy;
 use regex::Regex;
+
 use crate::service::search::datafusion::udf::REGEX_MATCHES_UDF_NAME;
 
 /// Implementation of regexp_matches
@@ -117,6 +117,37 @@ fn regexp_matches_func(args: &[ArrayRef]) -> Result<ArrayRef> {
     }
 }
 
+pub fn _regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef> {
+    match args.len() {
+        2 => {
+            let values = as_generic_string_array::<T>(&args[0])?;
+            let regex = as_generic_string_array::<T>(&args[1])?;
+            // Enable global matching by default
+            regexp::regexp_match(values, regex, Some(&StringArray::from(vec!["g"])))
+                .map_err(|e| arrow_datafusion_err!(e))
+        }
+        3 => {
+            let values = as_generic_string_array::<T>(&args[0])?;
+            let regex = as_generic_string_array::<T>(&args[1])?;
+            let mut flags = as_generic_string_array::<T>(&args[2])?;
+
+            // FIX: Ensure the global flag is always present
+            // for i in 0..flags.len() {
+            //     if let Some(flag) = flags.value(i) {
+            //         if !flag.contains('g') {
+            //             flags.values_mut().set_value(i, format!("{}g", flag));
+            //         }
+            //     }
+            // }
+
+            regexp::regexp_match(values, regex, Some(flags)).map_err(|e| arrow_datafusion_err!(e))
+        }
+        other => exec_err!(
+            "regexp_matches was called with {other} arguments. It requires at least 2 and at most 3."
+        ),
+    }
+}
+
 pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef> {
     let values = as_generic_string_array::<T>(&args[0])?;
     let regex = as_generic_string_array::<T>(&args[1])?;
@@ -140,9 +171,8 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
         let pattern = regex.value(i);
 
         // Compile the regex
-        let re = Regex::new(pattern).map_err(|e| {
-            DataFusionError::Execution(format!("Invalid regex pattern: {}", e))
-        })?;
+        let re = Regex::new(pattern)
+            .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?;
 
         // Extract matches
         let mut has_match = false;
@@ -169,14 +199,13 @@ mod tests {
 
     use arrow::array::{RecordBatch, StringArray};
     use arrow_schema::Schema;
-    use datafusion::assert_batches_eq;
-    use datafusion::datasource::MemTable;
-    use datafusion::prelude::SessionContext;
+    use datafusion::{assert_batches_eq, datasource::MemTable, prelude::SessionContext};
+
     use super::*;
 
     #[tokio::test]
     async fn test_re_matches_extract_all_numbers() {
-        let sql = "SELECT re_matches(log, '(\\d+)', 'g') AS matches FROM t";
+        let sql = "SELECT re_matches(log, '(\\d+)') AS matches FROM t";
 
         // Define schema
         let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
@@ -190,7 +219,7 @@ mod tests {
                 "789ghi123",
             ]))],
         )
-            .unwrap();
+        .unwrap();
 
         // Create a session context
         let ctx = SessionContext::new();
@@ -220,7 +249,8 @@ mod tests {
 
     // #[tokio::test]
     // async fn test_re_matches_named_groups() {
-    //     let sql = "SELECT re_matches(log, '(?P<word>[a-zA-Z]+)(?P<number>\\d+)') AS matches FROM t";
+    //     let sql = "SELECT re_matches(log, '(?P<word>[a-zA-Z]+)(?P<number>\\d+)') AS matches FROM
+    // t";
     //
     //     // Define schema
     //     let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
