@@ -34,7 +34,7 @@ export
         await this.saveButton.click({ force: true });
         await this.page.waitForTimeout(5000);
 
-    }
+    }   
 
     async uploadLogo(filePath) {
         const isVisible = await this.deleteLogoButton.isVisible();

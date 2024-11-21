@@ -25,6 +25,7 @@ export class IngestionPage {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const jsonData = await response.json();
+        console.log(response);
         // Process JSON data here
       } else {
         const textData = await response.text();
