@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
     >
 
-    <template #edge-button="buttonEdgeProps">
+    <!-- <template #edge-button="buttonEdgeProps">
       <EdgeWithButton
         :id="buttonEdgeProps.id"
         :source-x="buttonEdgeProps.sourceX"
@@ -53,6 +53,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :target-position="buttonEdgeProps.targetPosition"
         :marker-end="buttonEdgeProps.markerEnd"
         :style="buttonEdgeProps.style"
+      />
+    </template> -->
+    <template #edge-custom="customEdgeProps">
+      <CustomEdge
+        :id="customEdgeProps.id"
+        :source-x="customEdgeProps.sourceX"
+        :source-y="customEdgeProps.sourceY"
+        :target-x="customEdgeProps.targetX"
+        :target-y="customEdgeProps.targetY"
+        :source-position="customEdgeProps.sourcePosition"
+        :target-position="customEdgeProps.targetPosition"
+        :data="customEdgeProps.data"
+        :marker-end="customEdgeProps.markerEnd"
+        :style="customEdgeProps.style"
+        :is-in-view = false
       />
     </template>
       <DropzoneBackground
@@ -91,6 +106,7 @@ import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
+import CustomEdge from "./CustomEdge.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
 import EdgeWithButton from "./EdgeWithButton.vue";
@@ -101,7 +117,7 @@ import { useStore } from "vuex";
 const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton
+  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton,CustomEdge
    },
   setup() {
     const {
@@ -128,10 +144,6 @@ export default {
     vueFlowInstance.fitView()
   })
 
-
-const  buttonClass = () => {
-      return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
-    };
     const { setViewport } = useVueFlow()
 
 
@@ -147,7 +159,7 @@ watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
 onMounted(async () => {
      setTimeout(() => {
       if (vueFlowRef.value) {
-        vueFlowRef.value.fitView({ padding: 1});
+        vueFlowRef.value.fitView({ padding: 0.1});
       }
      }, 100);
     });
@@ -178,7 +190,6 @@ function resetTransform() {
       zoomIn,
       zoomOut,
       vueFlowRef,
-      buttonClass,
       resetTransform,
       isCanvasEmpty,
     };
