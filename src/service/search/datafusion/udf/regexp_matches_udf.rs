@@ -137,25 +137,46 @@ fn regexp_matches_func(args: &[ArrayRef]) -> Result<ArrayRef> {
     }
 }
 
+/// Extracts all matches of a regular expression from a string column.
+/// The function supports both scalar and array inputs.
 pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef> {
     let values = as_generic_string_array::<T>(&args[0])?;
     let regex = as_generic_string_array::<T>(&args[1])?;
 
+    // Scalar is a single regex pattern
+    // Check if the regex pattern is a scalar
+    let is_scalar_pattern = regex.len() == 1;
+
+    // Precompile the regex if it's scalar
+    let scalar_regex = if is_scalar_pattern {
+        Some(
+            Regex::new(regex.value(0)).map_err(|e| {
+                DataFusionError::Execution(format!("Invalid regex pattern: {}", e))
+            })?,
+        )
+    } else {
+        None
+    };
+
     let mut list_builder = ListBuilder::new(GenericStringBuilder::<T>::new());
 
     for i in 0..values.len() {
-        if values.is_null(i) || regex.is_null(i) {
+        if values.is_null(i) || (!is_scalar_pattern && regex.is_null(i)) {
             // Append NULL for this row
             list_builder.append(false);
             continue;
         }
 
         let value = values.value(i);
-        let pattern = regex.value(i);
 
-        // Compile the regex
-        let re = Regex::new(pattern)
-            .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?;
+        let re = if is_scalar_pattern {
+            scalar_regex.clone().unwrap() // Use precompiled regex
+        } else {
+            Regex::new(regex.value(i)) // Compile regex for this row
+                .map_err(|e| {
+                DataFusionError::Execution(format!("Invalid regex pattern: {}", e))
+            })?
+        };
 
         // Extract matches
         let mut has_match = false;
@@ -187,7 +208,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_re_matches_extract_all_numbers() {
+    async fn test_re_matches_extract_all_numbers_as_scalar() {
         let sql = "SELECT re_matches(log, '(\\d+)') AS matches FROM t";
 
         // Define schema
@@ -224,6 +245,66 @@ mod tests {
             "| [123, 456] |",
             "|            |",
             "| [789, 123] |",
+            "+------------+",
+        ];
+
+        assert_batches_eq!(expected, &results);
+    }
+
+    #[tokio::test]
+    async fn test_re_matches_regex_as_array() {
+        let sql = "SELECT re_matches(log, regex) AS matches FROM t";
+
+        // Define schema
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("log", DataType::Utf8, true),    // Allow NULLs in `log`
+            Field::new("regex", DataType::Utf8, true), // Allow NULLs in `regex`
+        ]));
+
+        // Define data
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec![
+                    Some("abc123def456"), // Normal case: numbers in the string
+                    Some("no match here"), // No match case
+                    Some("789ghi123"), // Multiple matches
+                    None, // NULL log
+                    Some(""), // Empty string
+                ])),
+                Arc::new(StringArray::from(vec![
+                    Some("\\d+"), // Match any digits
+                    Some("no match"), // Match literal "no match"
+                    Some("ghi"), // Match substring "ghi"
+                    Some("\\w+"), // Match any word (NULL log should return NULL)
+                    None, // NULL regex
+                ])),
+            ],
+        )
+            .unwrap();
+
+        // Create a session context
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCHES_UDF.clone());
+
+        // Register the table
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // Execute SQL
+        let df = ctx.sql(sql).await.unwrap();
+        let results = df.collect().await.unwrap();
+
+        // Expected output
+        let expected = vec![
+            "+------------+",
+            "| matches    |",
+            "+------------+",
+            "| [123, 456] |", // Matches "\\d+" for "abc123def456"
+            "| [no match] |", // Matches "no match" for "no match here"
+            "| [ghi]      |", // Matches "ghi" for "789ghi123"
+            "|            |", // NULL log should return NULL
+            "|            |", // Empty string, no match
             "+------------+",
         ];
 
