@@ -138,6 +138,40 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
+        } else if node.name() == "UnionExec" {
+            let mut visitor = TableNameVisitor::new();
+            node.visit(&mut visitor)?;
+            // add each remote scan for each child
+            if visitor.is_remote_scan {
+                let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
+                for child in node.children() {
+                    let mut visitor = TableNameVisitor::new();
+                    child.visit(&mut visitor)?;
+                    let table_name = visitor.table_name.clone().unwrap();
+                    let remote_scan = Arc::new(RemoteScanExec::new(
+                        child.clone(),
+                        self.file_id_lists
+                            .get(&table_name)
+                            .unwrap_or(&empty_files)
+                            .clone(),
+                        self.idx_file_list.clone(),
+                        self.equal_keys
+                            .get(&table_name)
+                            .unwrap_or(&empty_keys)
+                            .clone(),
+                        self.match_all_keys.clone(),
+                        self.index_condition.clone(),
+                        self.is_leader,
+                        self.req.clone(),
+                        self.nodes.clone(),
+                        self.context.clone(),
+                    ));
+                    new_children.push(remote_scan);
+                }
+                let new_node = node.with_new_children(new_children)?;
+                self.is_changed = true;
+                return Ok(Transformed::yes(new_node));
+            }
         }
         Ok(Transformed::no(node))
     }

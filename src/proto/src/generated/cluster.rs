@@ -2473,38 +2473,40 @@ pub struct FlightSearchRequest {
     #[prost(uint32, tag = "2")]
     pub partition: u32,
     #[prost(string, tag = "3")]
-    pub org_id: ::prost::alloc::string::String,
+    pub job_id: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
     pub stream_type: ::prost::alloc::string::String,
     /// used for search
-    #[prost(bytes = "vec", tag = "6")]
+    #[prost(bytes = "vec", tag = "7")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
-    #[prost(int64, repeated, tag = "7")]
+    #[prost(int64, repeated, tag = "8")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "8")]
-    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
     #[prost(message, repeated, tag = "9")]
+    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
+    #[prost(message, repeated, tag = "10")]
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
-    #[prost(string, repeated, tag = "10")]
+    #[prost(string, repeated, tag = "11")]
     pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(int64, tag = "11")]
-    pub start_time: i64,
     #[prost(int64, tag = "12")]
-    pub end_time: i64,
+    pub start_time: i64,
     #[prost(int64, tag = "13")]
+    pub end_time: i64,
+    #[prost(int64, tag = "14")]
     pub timeout: i64,
     /// used for super cluster and enterprise
-    #[prost(bool, tag = "14")]
+    #[prost(bool, tag = "18")]
     pub is_super_cluster: bool,
-    #[prost(bool, tag = "15")]
+    #[prost(bool, tag = "19")]
     pub use_inverted_index: bool,
-    #[prost(string, optional, tag = "16")]
+    #[prost(string, optional, tag = "20")]
     pub work_group: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "18")]
+    #[prost(string, optional, tag = "21")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "19")]
+    #[prost(string, optional, tag = "22")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, tag = "20")]
+    #[prost(string, tag = "23")]
     pub index_condition: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]

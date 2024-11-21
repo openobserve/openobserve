@@ -25,24 +25,25 @@ message FlightSearchRequest {
     // query identifier
     string                       trace_id = 1;
     uint32                      partition = 2;
-    string                         org_id = 3;
-    string                    stream_type = 4;
+    string                         job_id = 3;
+    string                         org_id = 4;
+    string                    stream_type = 5;
     // used for search
-    bytes                            plan = 6;
-    repeated int64           file_id_list = 7;
-    repeated IdxFileName    idx_file_list = 8;
-    repeated KvItem            equal_keys = 9;
-    repeated string       match_all_keys = 10;
-    int64                     start_time = 11;
-    int64                       end_time = 12;
-    int64                        timeout = 13;
+    bytes                            plan = 7;
+    repeated int64           file_id_list = 8;
+    repeated IdxFileName    idx_file_list = 9;
+    repeated KvItem           equal_keys = 10;
+    repeated string       match_all_keys = 11;
+    int64                     start_time = 12;
+    int64                       end_time = 13;
+    int64                        timeout = 14;
     // used for super cluster and enterprise
-    bool                is_super_cluster = 14;
-    bool              use_inverted_index = 15;
-    optional string           work_group = 16;
-    optional string              user_id = 18;
-    optional string    search_event_type = 19;
-    string               index_condition = 20;
+    bool                is_super_cluster = 18;
+    bool              use_inverted_index = 19;
+    optional string           work_group = 20;
+    optional string              user_id = 21;
+    optional string    search_event_type = 22;
+    string               index_condition = 23;
 }
 
 message KvItem {
