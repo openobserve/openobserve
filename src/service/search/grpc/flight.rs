@@ -124,6 +124,14 @@ pub async fn search(
         schema_latest_map.insert(field.name(), field);
     }
 
+    // construct index condition
+    let index_condition: Option<IndexCondition> = if !req.index_condition.is_empty() {
+        let condition: IndexCondition = json::from_str(&req.index_condition)?;
+        Some(condition)
+    } else {
+        None
+    };
+
     let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
@@ -164,13 +172,6 @@ pub async fn search(
     let mut scan_stats = ScanStats::new();
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
-    let index_condition: Option<IndexCondition> = if !req.index_condition.is_empty() {
-        let condition: IndexCondition = json::from_str(&req.index_condition)?;
-        Some(condition)
-    } else {
-        None
-    };
-
     // search in object storage
     if !req.file_id_list.is_empty() {
         let stream_settings = infra::schema::get_settings(&org_id, stream_name, stream_type)
@@ -199,11 +200,10 @@ pub async fn search(
             query_params.clone(),
             schema_latest.clone(),
             &file_list,
-            &req.equal_keys,
-            &req.match_all_keys,
-            &req.index_condition,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
