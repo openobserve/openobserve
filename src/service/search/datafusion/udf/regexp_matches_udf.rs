@@ -15,14 +15,11 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow::{
-    array::{Array, ArrayRef, GenericStringBuilder, ListBuilder, OffsetSizeTrait, StringArray},
-    compute::kernels::regexp,
-};
+use arrow::array::{Array, ArrayRef, GenericStringBuilder, ListBuilder, OffsetSizeTrait};
 use arrow_schema::Field;
 use datafusion::{
     arrow::datatypes::DataType::{self, *},
-    common::{arrow_datafusion_err, cast::as_generic_string_array, exec_err, ScalarValue},
+    common::{cast::as_generic_string_array, exec_err, ScalarValue},
     error::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility},
 };
@@ -35,6 +32,29 @@ use crate::service::search::datafusion::udf::REGEX_MATCHES_UDF_NAME;
 pub(crate) static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(RegexpMatchesFunc::default()));
 
+/// # `re_matches` User-Defined Function (UDF)
+///
+/// This UDF extracts all substrings from a string column that match a given regular expression pattern.
+/// It is designed to work with the DataFusion query engine and supports both scalar and array inputs.
+///
+/// ## Purpose
+///
+/// The `re_matches` UDF allows users to extract all matches of a regular expression from a string column.
+///
+/// ## Function Signature
+///
+/// The UDF supports the following signatures:
+///
+/// - `re_matches(string_column, regex_pattern)`
+///
+/// - `string_column`: The input column containing strings to search.
+/// - `regex_pattern`: The regular expression pattern to match.
+///
+/// ## Return Type
+///
+/// - The function returns a `List` of strings for each input row. If no matches are found, an empty list is returned.
+/// - If the input string or pattern is null, the function returns null for that row.
+///
 #[derive(Debug)]
 pub struct RegexpMatchesFunc {
     signature: Signature,
@@ -117,46 +137,9 @@ fn regexp_matches_func(args: &[ArrayRef]) -> Result<ArrayRef> {
     }
 }
 
-pub fn _regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef> {
-    match args.len() {
-        2 => {
-            let values = as_generic_string_array::<T>(&args[0])?;
-            let regex = as_generic_string_array::<T>(&args[1])?;
-            // Enable global matching by default
-            regexp::regexp_match(values, regex, Some(&StringArray::from(vec!["g"])))
-                .map_err(|e| arrow_datafusion_err!(e))
-        }
-        3 => {
-            let values = as_generic_string_array::<T>(&args[0])?;
-            let regex = as_generic_string_array::<T>(&args[1])?;
-            let mut flags = as_generic_string_array::<T>(&args[2])?;
-
-            // FIX: Ensure the global flag is always present
-            // for i in 0..flags.len() {
-            //     if let Some(flag) = flags.value(i) {
-            //         if !flag.contains('g') {
-            //             flags.values_mut().set_value(i, format!("{}g", flag));
-            //         }
-            //     }
-            // }
-
-            regexp::regexp_match(values, regex, Some(flags)).map_err(|e| arrow_datafusion_err!(e))
-        }
-        other => exec_err!(
-            "regexp_matches was called with {other} arguments. It requires at least 2 and at most 3."
-        ),
-    }
-}
-
 pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef> {
     let values = as_generic_string_array::<T>(&args[0])?;
     let regex = as_generic_string_array::<T>(&args[1])?;
-
-    // let flags = if args.len() == 3 {
-    //     Some(as_generic_string_array::<T>(&args[2])?)
-    // } else {
-    //     None
-    // };
 
     let mut list_builder = ListBuilder::new(GenericStringBuilder::<T>::new());
 
@@ -246,49 +229,4 @@ mod tests {
 
         assert_batches_eq!(expected, &results);
     }
-
-    // #[tokio::test]
-    // async fn test_re_matches_named_groups() {
-    //     let sql = "SELECT re_matches(log, '(?P<word>[a-zA-Z]+)(?P<number>\\d+)') AS matches FROM
-    // t";
-    //
-    //     // Define schema
-    //     let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
-    //
-    //     // Define data
-    //     let batch = RecordBatch::try_new(
-    //         schema.clone(),
-    //         vec![Arc::new(StringArray::from(vec![
-    //             "abc123def456",
-    //             "no match here",
-    //             "xyz789",
-    //         ]))],
-    //     )
-    //         .unwrap();
-    //
-    //     // Create a session context
-    //     let ctx = SessionContext::new();
-    //     ctx.register_udf(REGEX_MATCHES_UDF.clone());
-    //
-    //     // Register the table
-    //     let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
-    //     ctx.register_table("t", Arc::new(provider)).unwrap();
-    //
-    //     // Execute SQL
-    //     let df = ctx.sql(sql).await.unwrap();
-    //     let results = df.collect().await.unwrap();
-    //
-    //     // Expected output
-    //     let expected = vec![
-    //         "+------------------------------------------------------+",
-    //         "| matches                                              |",
-    //         "+------------------------------------------------------+",
-    //         "| [{word: abc, number: 123}, {word: def, number: 456}] |",
-    //         "|                                                      |",
-    //         "| [{word: xyz, number: 789}]                           |",
-    //         "+------------------------------------------------------+",
-    //     ];
-    //
-    //     assert_batches_eq!(expected, &results);
-    // }
 }
