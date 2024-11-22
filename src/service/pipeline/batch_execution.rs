@@ -56,21 +56,19 @@ impl PipelineExt for Pipeline {
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
                 let transform = get_transforms(&self.org, &func_params.name).await?;
-                if let Ok(vrl_runtime_config) = compile_vrl_function(&transform.function, &self.org)
-                {
-                    let registry = vrl_runtime_config
-                        .config
-                        .get_custom::<vector_enrichment::TableRegistry>()
-                        .unwrap();
-                    registry.finish_load();
-                    vrl_map.insert(
-                        node.get_node_id(),
-                        VRLResultResolver {
-                            program: vrl_runtime_config.program,
-                            fields: vrl_runtime_config.fields,
-                        },
-                    );
-                }
+                let vrl_runtime_config = compile_vrl_function(&transform.function, &self.org)?;
+                let registry = vrl_runtime_config
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                vrl_map.insert(
+                    node.get_node_id(),
+                    VRLResultResolver {
+                        program: vrl_runtime_config.program,
+                        fields: vrl_runtime_config.fields,
+                    },
+                );
             }
         }
         Ok(vrl_map)
@@ -134,8 +132,44 @@ impl ExecutablePipeline {
             })
             .collect();
 
-        let vrl_map = pipeline.register_functions().await?;
-        let sorted_nodes = topological_sort(&node_map)?;
+        let vrl_map = match pipeline.register_functions().await {
+            Ok(vrl_map) => vrl_map,
+            Err(e) => {
+                let pipeline_error = PipelineError {
+                    pipeline_id: pipeline.id.to_string(),
+                    pipeline_name: pipeline.name.to_string(),
+                    error: Some(format!("Init error: failed to compile function: {e}")),
+                    node_errors: HashMap::new(),
+                };
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: pipeline.get_source_stream_params(),
+                    error_source: ErrorSource::Pipeline(pipeline_error),
+                })
+                .await;
+                return Err(e);
+            }
+        };
+        let sorted_nodes = match topological_sort(&node_map) {
+            Ok(sorted) => sorted,
+            Err(e) => {
+                let pipeline_error = PipelineError {
+                    pipeline_id: pipeline.id.to_string(),
+                    pipeline_name: pipeline.name.to_string(),
+                    error: Some(
+                        "Init error: failed to sort pipeline nodes for execution".to_string(),
+                    ),
+                    node_errors: HashMap::new(),
+                };
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: pipeline.get_source_stream_params(),
+                    error_source: ErrorSource::Pipeline(pipeline_error),
+                })
+                .await;
+                return Err(e);
+            }
+        };
         let source_node_id = sorted_nodes[0].to_owned();
 
         Ok(Self {

@@ -21,6 +21,7 @@ use config::meta::{
     stream::StreamParams,
 };
 use infra::pipeline::{self as infra_pipeline};
+use once_cell::sync::Lazy;
 
 use crate::{
     common::infra::config::STREAM_EXECUTABLE_PIPELINES,
@@ -176,6 +177,17 @@ pub async fn delete(pipeline_id: &str) -> Result<()> {
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
     let pipelines = list().await?;
+    if pipelines
+        .iter()
+        .any(|pl| pl.enabled && pl.num_of_func() > 0)
+        && !config::get_config().common.mmdb_disable_download
+    {
+        log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
+        Lazy::force(&crate::job::MMDB_INIT_NOTIFIER)
+            .notified()
+            .await;
+        log::info!("[PIPELINE:CACHE] done waiting");
+    }
     let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
