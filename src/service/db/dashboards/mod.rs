@@ -18,7 +18,7 @@ use std::hash::{Hash, Hasher};
 use actix_web::web;
 use config::{
     meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
-    utils::{hash::Sum64, json},
+    utils::json,
 };
 
 use crate::service::db;
