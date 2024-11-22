@@ -43,8 +43,8 @@ use serde::Serialize;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
-        SetExpr, Statement, VisitMut, VisitorMut,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, Select,
+        SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -1105,44 +1105,107 @@ impl VisitorMut for TrackTotalHitsVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let SetExpr::Select(select) = query.body.as_mut() {
-            let (field_expr, duplicate_treatment) = if select.distinct.is_some() {
-                match select.projection.first() {
-                    Some(SelectItem::UnnamedExpr(expr)) => (
-                        FunctionArgExpr::Expr(expr.clone()),
-                        Some(DuplicateTreatment::Distinct),
-                    ),
-                    Some(SelectItem::ExprWithAlias { expr, alias: _ }) => (
-                        FunctionArgExpr::Expr(expr.clone()),
-                        Some(DuplicateTreatment::Distinct),
-                    ),
-                    _ => (FunctionArgExpr::Wildcard, None),
-                }
-            } else {
-                (FunctionArgExpr::Wildcard, None)
-            };
+        match query.body.as_mut() {
+            SetExpr::Select(select) => {
+                let (field_expr, duplicate_treatment) = if select.distinct.is_some() {
+                    match select.projection.first() {
+                        Some(SelectItem::UnnamedExpr(expr)) => (
+                            FunctionArgExpr::Expr(expr.clone()),
+                            Some(DuplicateTreatment::Distinct),
+                        ),
+                        Some(SelectItem::ExprWithAlias { expr, alias: _ }) => (
+                            FunctionArgExpr::Expr(expr.clone()),
+                            Some(DuplicateTreatment::Distinct),
+                        ),
+                        _ => (FunctionArgExpr::Wildcard, None),
+                    }
+                } else {
+                    (FunctionArgExpr::Wildcard, None)
+                };
 
-            select.group_by = GroupByExpr::Expressions(vec![], vec![]);
-            select.having = None;
-            select.sort_by = vec![];
-            select.projection = vec![SelectItem::ExprWithAlias {
-                expr: Expr::Function(Function {
-                    name: ObjectName(vec![Ident::new("count")]),
-                    parameters: FunctionArguments::None,
-                    args: FunctionArguments::List(FunctionArgumentList {
-                        args: vec![FunctionArg::Unnamed(field_expr)],
-                        duplicate_treatment,
-                        clauses: vec![],
+                select.group_by = GroupByExpr::Expressions(vec![], vec![]);
+                select.having = None;
+                select.sort_by = vec![];
+                select.projection = vec![SelectItem::ExprWithAlias {
+                    expr: Expr::Function(Function {
+                        name: ObjectName(vec![Ident::new("count")]),
+                        parameters: FunctionArguments::None,
+                        args: FunctionArguments::List(FunctionArgumentList {
+                            args: vec![FunctionArg::Unnamed(field_expr)],
+                            duplicate_treatment,
+                            clauses: vec![],
+                        }),
+                        filter: None,
+                        null_treatment: None,
+                        over: None,
+                        within_group: vec![],
                     }),
-                    filter: None,
-                    null_treatment: None,
-                    over: None,
-                    within_group: vec![],
-                }),
-                alias: Ident::new("zo_sql_num"),
-            }];
-            select.distinct = None;
-            query.order_by = None;
+                    alias: Ident::new("zo_sql_num"),
+                }];
+                select.distinct = None;
+                query.order_by = None;
+            }
+            SetExpr::SetOperation { .. } => {
+                let select = Box::new(SetExpr::Select(Box::new(Select {
+                    distinct: None,
+                    top: None,
+                    projection: vec![SelectItem::ExprWithAlias {
+                        expr: Expr::Function(Function {
+                            name: ObjectName(vec![Ident::new("count")]),
+                            parameters: FunctionArguments::None,
+                            args: FunctionArguments::List(FunctionArgumentList {
+                                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
+                                duplicate_treatment: None,
+                                clauses: vec![],
+                            }),
+                            filter: None,
+                            null_treatment: None,
+                            over: None,
+                            within_group: vec![],
+                        }),
+                        alias: Ident::new("zo_sql_num"),
+                    }],
+                    into: None,
+                    from: vec![TableWithJoins {
+                        relation: TableFactor::Derived {
+                            lateral: false,
+                            subquery: Box::new(query.clone()),
+                            alias: None,
+                        },
+                        joins: vec![],
+                    }],
+                    lateral_views: vec![],
+                    selection: None,
+                    group_by: GroupByExpr::Expressions(vec![], vec![]),
+                    having: None,
+                    prewhere: None,
+                    sort_by: vec![],
+                    cluster_by: vec![],
+                    distribute_by: vec![],
+                    named_window: vec![],
+                    qualify: None,
+                    window_before_qualify: false,
+                    connect_by: None,
+                    value_table_mode: None,
+                })));
+                *query = Query {
+                    with: None,
+                    body: select,
+                    order_by: None,
+                    limit: None,
+                    offset: None,
+                    fetch: None,
+                    limit_by: vec![],
+                    for_clause: None,
+                    locks: vec![],
+                    settings: None,
+                    format_clause: None,
+                };
+            }
+            SetExpr::Query(_) => {
+                println!("Query");
+            }
+            _ => {}
         }
         ControlFlow::Break(())
     }
@@ -1363,6 +1426,99 @@ mod tests {
             index_visitor.index_condition.clone().unwrap().to_query(),
             expected
         );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits1() {
+        let sql = "SELECT * FROM t WHERE name = 'a'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM t WHERE name = 'a'";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits2() {
+        let sql = "SELECT name, count(*) FROM t WHERE name = 'a' group by name order by name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM t WHERE name = 'a'";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits3() {
+        let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where t1.name = 'openobserve' group by t1.name, t2.name order by t1.name, t2.name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM t1 JOIN t2 ON t1.name = t2.name WHERE t1.name = 'openobserve'";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits4() {
+        let sql = "SELECT name from t1 where name not in (select name from t2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql =
+            "SELECT count(*) AS zo_sql_num FROM t1 WHERE name NOT IN (SELECT name FROM t2)";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits5() {
+        let sql = "SELECT name from t1 union select name from t2";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql =
+            "SELECT count(*) AS zo_sql_num FROM (SELECT name FROM t1 UNION SELECT name FROM t2)";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits6() {
+        let sql = "(SELECT name from t1) union (select name from t2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM ((SELECT name FROM t1) UNION (SELECT name FROM t2))";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits7() {
+        let sql = "SELECT name from t1 union select name from t2 union select name from t3";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT name FROM t1 UNION SELECT name FROM t2 UNION SELECT name FROM t3)";
         assert_eq!(statement.to_string(), expected_sql);
     }
 }
