@@ -72,6 +72,7 @@ bitflags = "2.6.0"
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
+byteorder.workspace = true
 chrono.workspace = true
 clap = { version = "4.1", default-features = false, features = [
     "std",
