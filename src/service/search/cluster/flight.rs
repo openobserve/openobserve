@@ -731,7 +731,11 @@ pub async fn generate_context(
 
 pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
     for (stream_name, schema) in &sql.schemas {
-        let schema = schema.schema().as_ref().clone();
+        let schema = schema
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new());
         let table = Arc::new(
             NewEmptyTable::new(stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())

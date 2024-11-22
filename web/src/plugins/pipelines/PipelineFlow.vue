@@ -137,32 +137,22 @@ export default {
     const vueFlowRef = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
 
-
-
-    onInit((vueFlowInstance) => {
-    // instance is the same as the return of `useVueFlow`
-    vueFlowInstance.fitView()
-  })
-
     const { setViewport } = useVueFlow()
 
 
 
-watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
-      if (vueFlowRef.value) {
-       vueFlowRef.value.fitView({ padding: 1});
-      }
-      if(pipelineObj.dirtyFlag){
-        pipelineObj.dirtyFlag = false;
-      }
-    });
-onMounted(async () => {
-     setTimeout(() => {
-      if (vueFlowRef.value) {
-        vueFlowRef.value.fitView({ padding: 0.1});
-      }
-     }, 100);
-    });
+    watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
+          if(pipelineObj.dirtyFlag){
+            pipelineObj.dirtyFlag = false;
+          }
+        });
+    onMounted(async () => {
+        setTimeout(() => {
+          if (vueFlowRef.value) {
+            vueFlowRef.value.fitView({ padding: 0.1});
+          }
+        }, 100);
+        });
 
     
 function resetTransform() {
