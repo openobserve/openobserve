@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::hash::{Hash, Hasher};
+
 use actix_web::web;
 use config::{
     meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
@@ -31,13 +33,14 @@ pub(crate) async fn get(
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let bytes = db::get(&key).await?;
-    let dash_str = std::str::from_utf8(&bytes)?;
-    let hash = config::utils::hash::gxhash::new()
-        .sum64(dash_str)
-        .to_string();
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
+
+    let mut hasher = std::hash::DefaultHasher::new();
+
     if d_version.version == 1 {
         let dash: v1::Dashboard = json::from_slice(&bytes)?;
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         Ok(Dashboard {
             v1: Some(dash),
             version: 1,
@@ -46,6 +49,8 @@ pub(crate) async fn get(
         })
     } else if d_version.version == 2 {
         let dash: v2::Dashboard = json::from_slice(&bytes)?;
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         Ok(Dashboard {
             v2: Some(dash),
             version: 2,
@@ -54,6 +59,8 @@ pub(crate) async fn get(
         })
     } else if d_version.version == 3 {
         let dash: v3::Dashboard = json::from_slice(&bytes)?;
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         Ok(Dashboard {
             v3: Some(dash),
             version: 3,
@@ -62,6 +69,8 @@ pub(crate) async fn get(
         })
     } else if d_version.version == 4 {
         let dash: v4::Dashboard = json::from_slice(&bytes)?;
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         Ok(Dashboard {
             v4: Some(dash),
             version: 4,
@@ -70,6 +79,8 @@ pub(crate) async fn get(
         })
     } else {
         let dash: v5::Dashboard = json::from_slice(&bytes)?;
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         Ok(Dashboard {
             v5: Some(dash),
             version: 5,
