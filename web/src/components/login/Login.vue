@@ -296,6 +296,7 @@ export default defineComponent({
                 //if email is different, remove organization information from localstorage
                 const localOrg: any = useLocalOrganization();
                 if (
+                  Object.keys(localOrg.value).length > 0 &&
                   localOrg.value != null &&
                   localOrg.value.user_email !== userInfo.email
                 ) {
