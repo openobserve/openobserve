@@ -2435,7 +2435,7 @@ export default defineComponent({
                   .replace("[STREAM_NAME]", stream)
                   .replace(
                     "[FIELD_LIST]",
-                    field_list.length > 0 ? field_list.join(",") : "*",
+                    field_list.length > 0 && searchObj.meta.quickMode ? field_list.join(",") : "*",
                   ),
               );
             });
