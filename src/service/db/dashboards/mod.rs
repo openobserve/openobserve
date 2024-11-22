@@ -34,7 +34,6 @@ pub(crate) async fn get(
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let bytes = db::get(&key).await?;
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
-
     let mut hasher = std::hash::DefaultHasher::new();
 
     if d_version.version == 1 {
@@ -113,7 +112,10 @@ pub(crate) async fn put(
             ));
         }
     };
+
     let d_version: DashboardVersion = json::from_slice(&body)?;
+    let mut hasher = std::hash::DefaultHasher::new();
+
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
         dash.title = dash.title.trim().to_string();
@@ -122,10 +124,8 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         let value: bytes::Bytes = json::to_vec(&dash)?.into();
-        let dash_str = std::str::from_utf8(&value)?;
-        let hash = config::utils::hash::gxhash::new()
-            .sum64(dash_str)
-            .to_string();
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
 
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
@@ -144,10 +144,8 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         let value: bytes::Bytes = json::to_vec(&dash)?.into();
-        let dash_str = std::str::from_utf8(&value)?;
-        let hash = config::utils::hash::gxhash::new()
-            .sum64(dash_str)
-            .to_string();
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v2: Some(dash),
@@ -165,10 +163,8 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         let value: bytes::Bytes = json::to_vec(&dash)?.into();
-        let dash_str = std::str::from_utf8(&value)?;
-        let hash = config::utils::hash::gxhash::new()
-            .sum64(dash_str)
-            .to_string();
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v3: Some(dash),
@@ -186,10 +182,8 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         let value: bytes::Bytes = json::to_vec(&dash)?.into();
-        let dash_str = std::str::from_utf8(&value)?;
-        let hash = config::utils::hash::gxhash::new()
-            .sum64(dash_str)
-            .to_string();
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v4: Some(dash),
@@ -207,10 +201,8 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         let value: bytes::Bytes = json::to_vec(&dash)?.into();
-        let dash_str = std::str::from_utf8(&value)?;
-        let hash = config::utils::hash::gxhash::new()
-            .sum64(dash_str)
-            .to_string();
+        dash.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
         match db::put(&key, value, db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v5: Some(dash),
@@ -230,13 +222,13 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
         .await?
         .into_values()
         .map(|val| {
-            let dash_str = std::str::from_utf8(&val)?;
-            let hash = config::utils::hash::gxhash::new()
-                .sum64(dash_str)
-                .to_string();
             let d_version: DashboardVersion = json::from_slice(&val).unwrap();
+            let mut hasher = std::hash::DefaultHasher::new();
+
             if d_version.version == 1 {
                 let dash: v1::Dashboard = json::from_slice(&val).unwrap();
+                dash.hash(&mut hasher);
+                let hash = hasher.finish().to_string();
                 Ok(Dashboard {
                     v1: Some(dash),
                     version: 1,
@@ -245,6 +237,8 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 })
             } else if d_version.version == 2 {
                 let dash: v2::Dashboard = json::from_slice(&val).unwrap();
+                dash.hash(&mut hasher);
+                let hash = hasher.finish().to_string();
                 Ok(Dashboard {
                     v2: Some(dash),
                     version: 2,
@@ -253,6 +247,8 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 })
             } else if d_version.version == 3 {
                 let dash: v3::Dashboard = json::from_slice(&val).unwrap();
+                dash.hash(&mut hasher);
+                let hash = hasher.finish().to_string();
                 Ok(Dashboard {
                     v3: Some(dash),
                     version: 3,
@@ -261,6 +257,8 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 })
             } else if d_version.version == 4 {
                 let dash: v4::Dashboard = json::from_slice(&val).unwrap();
+                dash.hash(&mut hasher);
+                let hash = hasher.finish().to_string();
                 Ok(Dashboard {
                     v4: Some(dash),
                     version: 4,
@@ -269,6 +267,8 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
                 })
             } else {
                 let dash: v5::Dashboard = json::from_slice(&val).unwrap();
+                dash.hash(&mut hasher);
+                let hash = hasher.finish().to_string();
                 Ok(Dashboard {
                     v5: Some(dash),
                     version: 5,
