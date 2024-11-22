@@ -747,8 +747,6 @@ pub async fn merge_files(
             diff_fields,
             true,
             None,
-            None,
-            vec![],
         )
         .await
         {
