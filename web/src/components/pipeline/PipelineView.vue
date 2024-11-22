@@ -90,10 +90,9 @@ const queryImage = getImageURL("images/pipeline/query.svg");
 
       onMounted(async () => {
 
-        console.log(props,'props')
-
-
-
+      if (vueFlowRef.value) {
+        vueFlowRef.value.fitView({ padding: 0.1});
+      }
         
         pipelineObj.nodeTypes = [
   {
