@@ -1185,9 +1185,6 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     format_clause: None,
                 };
             }
-            SetExpr::Query(_) => {
-                println!("Query");
-            }
             _ => {}
         }
         ControlFlow::Break(())
