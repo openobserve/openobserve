@@ -67,3 +67,10 @@ def test_e2e_join_queries(create_session, base_url, test_name, sql_query):
 
     # Assert that the response status is 200
     assert response.status_code == 200, f"{test_name} failed: Expected status 200, got {response.status_code} - {response.content}"
+
+    # Assert that the response contains the 'hits' field
+    response_json = response.json()
+    assert "hits" in response_json, f"{test_name} failed: 'hits' field not found in the response"
+    
+    # Optionally, assert that 'hits' is not empty
+    assert len(response_json["hits"]) > 0, f"{test_name} failed: 'hits' is empty in the response"
