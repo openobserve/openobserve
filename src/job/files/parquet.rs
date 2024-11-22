@@ -687,17 +687,9 @@ async fn merge_files(
         target_partitions: 0,
     };
     let rules = hashbrown::HashMap::new();
-    let table = exec::create_parquet_table(
-        &session,
-        schema.clone(),
-        &new_file_list,
-        rules,
-        true,
-        None,
-        None,
-        vec![],
-    )
-    .await?;
+    let table =
+        exec::create_parquet_table(&session, schema.clone(), &new_file_list, rules, true, None)
+            .await?;
     let tables = vec![table];
 
     let start = std::time::Instant::now();

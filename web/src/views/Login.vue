@@ -48,7 +48,7 @@ export default defineComponent({
         await configService
           .get_config()
           .then(async (res) => {
-            store.commit("setZoConfig", res.data);
+            store.commit("setConfig", res.data);
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
@@ -91,7 +91,7 @@ export default defineComponent({
             };
 
             if (
-              (selectedOrg.value == "" &&
+              (Object.keys(selectedOrg.value).length == 0 &&
                 (data.type == "default" || data.id == "1") &&
                 store.state.userInfo.email == data.UserObj.email) ||
               res.data.data.length == 1
