@@ -2486,6 +2486,7 @@ dependencies = [
  "datafusion",
  "dotenv_config",
  "dotenvy",
+ "expect-test",
  "faststr",
  "fst",
  "futures",
