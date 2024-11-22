@@ -17,7 +17,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct DashboardVersion {
     #[serde(default = "default_version")]
     pub version: i32,
