@@ -20,6 +20,7 @@ use std::{
     sync::Arc,
 };
 
+use byteorder::ByteOrder;
 use bytes::Bytes;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -76,7 +77,7 @@ impl FooterCache {
         }
         // write metadata
         let offset = buf.len() as u64;
-        let meta_bytes = serde_json::to_vec(&metadata).unwrap();
+        let meta_bytes = serde_json::to_vec(&metadata)?;
         buf.extend_from_slice(&meta_bytes);
         // write footer offset
         buf.extend_from_slice(&offset.to_le_bytes()[..]);
@@ -88,7 +89,7 @@ impl FooterCache {
     pub(crate) fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
         // parse version
         let range = bytes.len() - FOOTER_VERSION_LEN..bytes.len();
-        let footer_version = u32::from_le_bytes(bytes.slice(range).to_vec().try_into().unwrap());
+        let footer_version = byteorder::LittleEndian::read_u32(&bytes.slice(range));
         if footer_version != FOOTER_CACHE_VERSION {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
                 "Invalid footer version: {}",
@@ -98,10 +99,10 @@ impl FooterCache {
         // parse footer offset
         let range =
             bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN..bytes.len() - FOOTER_VERSION_LEN;
-        let footer_offset = u64::from_le_bytes(bytes.slice(range).to_vec().try_into().unwrap());
+        let footer_offset = byteorder::LittleEndian::read_u64(&bytes.slice(range));
         // parse metadata
         let range = footer_offset as usize..(bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN);
-        let metadata: FooterCacheMeta = serde_json::from_slice(&bytes.slice(range)).unwrap();
+        let metadata: FooterCacheMeta = serde_json::from_slice(&bytes.slice(range))?;
         // parse footer data
         let mut data = HashMap::new();
         for (path, items) in metadata.files.iter() {
