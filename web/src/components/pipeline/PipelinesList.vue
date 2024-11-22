@@ -444,7 +444,7 @@ if(tab === "all"){
 };
 
 
-onMounted(async () => {
+  onMounted(async () => {
       await getPipelines(); // Ensure pipelines are fetched before updating
       updateActiveTab();
     });
@@ -466,7 +466,7 @@ const getPipelines = async () => {
                 width: 20,  // Increase arrow width
                 height: 20, // Increase arrow height
               },
-              type: 'button',
+              type: 'custom',
               
               style:{
                 strokeWidth: 2,
@@ -571,7 +571,6 @@ const deletePipeline = async () => {
       org_id
     })
     .then(async () => {
-      await getPipelines();
       updateActiveTab();
       q.notify({
         message: "Pipeline deleted successfully",

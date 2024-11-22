@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon  name="close" size="18px" @click="closeDialog" style="cursor: pointer" />
     </q-card-section>
     <q-card-section>
-  <div class="pipeline-list-container">
+  <div v-if="transformedPipelineList.length > 0" class="pipeline-list-container">
     <q-list class="scrollable-list">
     <q-item
       v-for="(pipeline, index) in transformedPipelineList"
@@ -164,6 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-item-section>
     </q-item>
   </q-list>
+  </div>
+  <div v-else>
+    <div class="text-h6 text-center">No pipelines associated with this function</div>
   </div>
     </q-card-section>
 
