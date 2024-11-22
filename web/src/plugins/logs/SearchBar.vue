@@ -2394,22 +2394,56 @@ export default defineComponent({
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
-        if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
-          parsedSQL.where = null;
-        }
+        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 0) {
+          if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
+            parsedSQL.where = null;
+          }
 
-        if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
-          parsedSQL.limit = null;
-        }
+          if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
+            parsedSQL.limit = null;
+          }
 
-        if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
-          parsedSQL._next.where = null;
-          parsedSQL._next.limit = null;
-        }
+          if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
+            parsedSQL._next.where = null;
+            parsedSQL._next.limit = null;
+          }
 
-        searchObj.data.query = fnUnparsedSQL(parsedSQL);
-        searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
-        searchObj.data.editorValue = searchObj.data.query;
+          searchObj.data.query = fnUnparsedSQL(parsedSQL);
+          searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
+          searchObj.data.editorValue = searchObj.data.query;
+        } else {
+          if (searchObj.data.stream.selectedStream.length > 1) {
+            const query: string = `SELECT [FIELD_LIST] FROM "[STREAM_NAME]"`;
+            const queries = [];
+            let field_list = [];
+
+            searchObj.data.stream.selectedStream.forEach((stream) => {
+              field_list = [];
+              searchObj.data.stream.selectedStreamFields.forEach(
+                (item: any) => {
+                  if (
+                    searchObj.data.stream.interestingFieldList.includes(
+                      item.name,
+                    )
+                  ) {
+                    field_list.push(item.name);
+                  }
+                },
+              );
+              queries.push(
+                query
+                  .replace("[STREAM_NAME]", stream)
+                  .replace(
+                    "[FIELD_LIST]",
+                    field_list.length > 0 ? field_list.join(",") : "*",
+                  ),
+              );
+            });
+
+            searchObj.data.query = queries.join(" UNION ");
+            searchObj.data.editorValue = searchObj.data.query;
+          }
+        }
       } else {
         searchObj.data.query = "";
         searchObj.data.editorValue = "";
