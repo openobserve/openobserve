@@ -98,15 +98,15 @@ pub(crate) async fn put(
     hash: Option<&str>,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{}", dashboard_id);
-    if let Ok(existing_dash_bytes) = db::get(&key).await {
-        let existing_dash_str = std::str::from_utf8(&existing_dash_bytes)?;
-        let existing_dash_hash = config::utils::hash::gxhash::new().sum64(existing_dash_str);
+    if let Ok(existing_dash) = get(org_id, dashboard_id, folder).await {
+        let existing_dash_hash = existing_dash.hash;
+
         let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
             return Err(anyhow::anyhow!(
                 "Request to update existing dashboard with missing or invalid hash value. BUG"
             ));
         };
-        if hash_val != existing_dash_hash {
+        if hash_val.to_string() != existing_dash_hash {
             return Err(anyhow::anyhow!(
                 "Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes."
             ));
