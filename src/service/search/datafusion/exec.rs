@@ -275,6 +275,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::regexp_matches_udf::REGEX_MATCHES_UDF.clone());
     ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
     ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
     ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());

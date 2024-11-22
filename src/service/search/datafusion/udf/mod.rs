@@ -26,6 +26,7 @@ pub(crate) mod date_format_udf;
 pub(crate) mod histogram_udf;
 pub(crate) mod match_all_udf;
 pub(crate) mod match_udf;
+pub(crate) mod regexp_matches_udf;
 pub(crate) mod regexp_udf;
 pub(crate) mod spath_udf;
 pub(crate) mod string_to_array_v2_udf;
@@ -41,8 +42,10 @@ pub(crate) const MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
 pub(crate) const REGEX_MATCH_UDF_NAME: &str = "re_match";
 /// The name of the not_regex_match UDF given to DataFusion.
 pub(crate) const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
+/// The name of the regex_matches UDF given to DataFusion.
+pub(crate) const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
-pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
+pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 8] = [
     ZoFunction {
         name: "match_all_raw",
         text: "match_all_raw('v')",
@@ -70,6 +73,10 @@ pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
     ZoFunction {
         name: REGEX_NOT_MATCH_UDF_NAME,
         text: "re_not_match(field, 'pattern')",
+    },
+    ZoFunction {
+        name: REGEX_MATCHES_UDF_NAME,
+        text: "re_matches(field, 'pattern')",
     },
 ];
 
