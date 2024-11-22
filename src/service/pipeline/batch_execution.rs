@@ -236,6 +236,7 @@ impl ExecutablePipeline {
         let flattened = {
             let source_node = self.node_map.get(&self.source_node_id).unwrap();
             matches!(&source_node.node_data, NodeData::Stream(stream_params) if stream_params.stream_type == StreamType::Metrics)
+                || matches!(&source_node.node_data, NodeData::Query(_)) // Query results are flattened
         };
         let source_sender = node_senders.remove(&self.source_node_id).unwrap();
         for (idx, record) in records.into_iter().enumerate() {
@@ -466,7 +467,6 @@ async fn process_node(
                                     log::error!(
                                         "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
                                     );
-                                    break;
                                 }
                                 continue;
                             }
@@ -480,7 +480,6 @@ async fn process_node(
                         log::error!(
                             "[Pipeline]: LeafNode errors sending result for collection caused by: {send_err}"
                         );
-                        break;
                     }
                     count += 1;
                 }
@@ -514,7 +513,6 @@ async fn process_node(
                                 log::error!(
                                     "[Pipeline]: ConditionNode failed sending errors for collection caused by: {send_err}"
                                 );
-                                break;
                             }
                             continue;
                         }
@@ -541,9 +539,29 @@ async fn process_node(
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_id} starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
-            // let mut func_inputs = vec![];
+            let mut func_inputs = vec![];
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
-                if func_params.after_flatten && !flattened {
+                // ensure vrl_runtime was successfully compiled
+                let Some(vrl_runtime) = &vrl_runtime else {
+                    // vrl_runtime should've been compiled. BUG
+                    let err_msg = format!(
+                        "[Pipeline] FunctionNode {} vrl runtime failed to compile. BUG",
+                        node.id
+                    );
+                    log::error!("{err_msg}");
+                    if let Err(send_err) = error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                        );
+                    }
+                    continue;
+                };
+
+                // both function parameters indicate that the record should be flattened first
+                if !flattened && (func_params.apply_by_array || func_params.after_flatten) {
                     record = match flatten::flatten_with_level(
                         record,
                         cfg.limit.ingest_flatten_level,
@@ -558,14 +576,17 @@ async fn process_node(
                                 log::error!(
                                     "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
                                 );
-                                break;
                             }
                             continue;
                         }
                     };
-                    flattened = true;
                 }
-                if let Some(vrl_runtime) = &vrl_runtime {
+
+                if func_params.apply_by_array {
+                    // buff records to apply function by array
+                    func_inputs.push(record);
+                } else {
+                    // apply function by record
                     record = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
@@ -583,17 +604,58 @@ async fn process_node(
                                 log::error!(
                                     "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
                                 );
-                                break;
                             }
                             res
                         }
                     };
                     flattened = false; // since apply_vrl_fn can produce unflattened data
+                    send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
+                        .await;
+                    count += 1;
                 }
-                send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
-                    .await;
-                count += 1;
             }
+
+            if !func_inputs.is_empty() {
+                let input =
+                    Value::Array(func_inputs.into_iter().filter(|v| !v.is_null()).collect());
+
+                match apply_vrl_fn(
+                    &mut runtime,
+                    vrl_runtime.as_ref().unwrap(),
+                    input,
+                    &org_id,
+                    &["pipeline".to_string()],
+                ) {
+                    (_, Some(err)) => {
+                        let err_msg = format!("FunctionNode error applying by array: {}", err);
+                        if let Err(send_err) = error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                            );
+                        }
+                    }
+                    (res, None) => {
+                        let res_json = res
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .filter_map(|v| {
+                                (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
+                            })
+                            .collect::<Vec<_>>();
+
+                        for record in res_json {
+                            send_to_children(&mut child_senders, (0, record, true), "FunctionNode")
+                                .await;
+                            count += 1;
+                        }
+                    }
+                }
+            }
+
             log::debug!("[Pipeline]: func node {node_id} done processing {count} records");
         }
         NodeData::Query(_) => {
