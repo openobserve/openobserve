@@ -28,6 +28,8 @@ use tantivy::{directory::OwnedBytes, Directory, ReloadPolicy};
 use super::{caching_directory::CachingDirectory, FOOTER_CACHE};
 
 const FOOTER_CACHE_VERSION: u32 = 1;
+const FOOTER_VERSION_LEN: usize = 4;
+const FOOTER_OFFSET_LEN: usize = 8;
 
 pub(crate) struct FooterCache {
     data: RwLock<HashMap<PathBuf, HashMap<Range<usize>, OwnedBytes>>>,
@@ -85,16 +87,22 @@ impl FooterCache {
 
     pub(crate) fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
         let buf = bytes.as_slice();
-        let footer_version = u32::from_le_bytes(buf[buf.len() - 4..].try_into().unwrap());
+        let footer_version =
+            u32::from_le_bytes(buf[buf.len() - FOOTER_VERSION_LEN..].try_into().unwrap());
         if footer_version != FOOTER_CACHE_VERSION {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
                 "Invalid footer version: {}",
                 footer_version
             )));
         }
-        let footer_offset =
-            u64::from_le_bytes(buf[buf.len() - 12..buf.len() - 4].try_into().unwrap());
-        let meta_bytes = &buf[footer_offset as usize..buf.len() - 8];
+        let footer_offset = u64::from_le_bytes(
+            buf[(buf.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN)
+                ..buf.len() - FOOTER_VERSION_LEN]
+                .try_into()
+                .unwrap(),
+        );
+        let meta_bytes =
+            &buf[footer_offset as usize..(buf.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN)];
         let metadata: FooterCacheMeta = serde_json::from_slice(meta_bytes).unwrap();
         let mut data = HashMap::new();
         for (path, items) in metadata.files.iter() {
