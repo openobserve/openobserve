@@ -53,7 +53,7 @@ impl FooterCache {
         self.data
             .write()
             .entry(path)
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(byte_range, bytes);
     }
 
@@ -70,7 +70,7 @@ impl FooterCache {
         for (path, slice_data) in r.iter() {
             for (range, bytes) in slice_data.iter() {
                 let offset = buf.len();
-                buf.extend_from_slice(&bytes);
+                buf.extend_from_slice(bytes);
                 metadata.push(path, offset, range);
             }
         }
@@ -86,33 +86,30 @@ impl FooterCache {
     }
 
     pub(crate) fn from_bytes(bytes: OwnedBytes) -> tantivy::Result<Self> {
-        let buf = bytes.as_slice();
-        let footer_version =
-            u32::from_le_bytes(buf[buf.len() - FOOTER_VERSION_LEN..].try_into().unwrap());
+        // parse version
+        let range = bytes.len() - FOOTER_VERSION_LEN..bytes.len();
+        let footer_version = u32::from_le_bytes(bytes.slice(range).to_vec().try_into().unwrap());
         if footer_version != FOOTER_CACHE_VERSION {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
                 "Invalid footer version: {}",
                 footer_version
             )));
         }
-        let footer_offset = u64::from_le_bytes(
-            buf[(buf.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN)
-                ..buf.len() - FOOTER_VERSION_LEN]
-                .try_into()
-                .unwrap(),
-        );
-        let meta_bytes =
-            &buf[footer_offset as usize..(buf.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN)];
-        let metadata: FooterCacheMeta = serde_json::from_slice(meta_bytes).unwrap();
+        // parse footer offset
+        let range =
+            bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN..bytes.len() - FOOTER_VERSION_LEN;
+        let footer_offset = u64::from_le_bytes(bytes.slice(range).to_vec().try_into().unwrap());
+        // parse metadata
+        let range = footer_offset as usize..(bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN);
+        let metadata: FooterCacheMeta = serde_json::from_slice(&bytes.slice(range)).unwrap();
+        // parse footer data
         let mut data = HashMap::new();
         for (path, items) in metadata.files.iter() {
             let mut slice_data = HashMap::new();
             for item in items.iter() {
                 let range = item.start as usize..(item.start + item.len) as usize;
-                let bytes = OwnedBytes::new(
-                    buf[item.offset as usize..(item.offset + item.len) as usize].to_vec(),
-                );
-                slice_data.insert(range, bytes);
+                let data = bytes.slice(item.offset as usize..(item.offset + item.len) as usize);
+                slice_data.insert(range, data);
             }
             data.insert(PathBuf::from(path), slice_data);
         }
@@ -141,10 +138,10 @@ impl FooterCacheMeta {
         }
     }
 
-    fn push(&mut self, path: &PathBuf, offset: usize, range: &Range<usize>) {
+    fn push(&mut self, path: &Path, offset: usize, range: &Range<usize>) {
         self.files
             .entry(path.to_string_lossy().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(FooterCacheMetaItem {
                 offset: offset as u64,
                 start: range.start as u64,

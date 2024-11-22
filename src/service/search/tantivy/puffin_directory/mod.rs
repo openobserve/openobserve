@@ -92,6 +92,9 @@ pub async fn convert_puffin_file_to_tantivy_dir<T: Into<PathBuf>>(
     let mut total = 0;
     let mut filename = "".to_string();
     for file in puffin_dir.list_files() {
+        if file.extension().is_none() {
+            continue;
+        }
         let file_data = puffin_dir.open_read(&file.clone())?;
         let mut file_handle = std::fs::OpenOptions::new()
             .write(true)
