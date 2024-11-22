@@ -24,6 +24,8 @@ use tantivy::{
 };
 use writer::PuffinDirWriter;
 
+pub mod caching_directory;
+pub mod footer_cache;
 pub mod reader;
 pub mod reader_cache;
 pub mod writer;
@@ -34,6 +36,7 @@ pub mod writer;
 const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos"];
 const EMPTY_FILE_EXT: &[&str] = &["fast", "fieldnorm", "store"];
 const META_JSON: &str = "meta.json";
+const FOOTER_CACHE: &str = "footer_cache";
 
 // Lazy loaded global instance of RAM directory which will contain
 // all the files of an empty tantivy index. This instance will be used to fill the missing files
