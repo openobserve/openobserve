@@ -34,6 +34,11 @@
     {
       "test_name": "Error count query: Users without orders",
       "sql_query": "SELECT COUNT(*) AS error_count FROM u1 usr LEFT JOIN orders o ON usr.user_id = o.user_id WHERE o.order_id IS NULL"
+    },
+
+    {
+        "test_name": "Total Orders Query",
+        "sql_query": "WITH total AS (SELECT COUNT(*) AS total_count FROM orders) SELECT u1.name, u1.status, o.amount, total.total_count AS total_orders FROM u1 JOIN orders o ON u1.user_id = o.user_id CROSS JOIN total"
     }
   ]
   
