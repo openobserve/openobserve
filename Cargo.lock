@@ -6112,6 +6112,7 @@ dependencies = [
  "bitflags 2.6.0",
  "bitvec",
  "blake3",
+ "byteorder",
  "bytes",
  "chromiumoxide",
  "chrono",
