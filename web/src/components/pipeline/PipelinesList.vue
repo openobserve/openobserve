@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        dense
       >
       <template v-slot:body="props">
         <q-tr
@@ -379,7 +380,7 @@ const toggleAlertState = (row : any) =>{
 }
 
 const triggerExpand = (props : any) =>{
-  if (expandedRow.value === props.row.pipeline_id) {
+  if (expandedRow.value === props.row.pipeline_id || props.row.source.source_type === 'realtime') {
       expandedRow.value = null;
     } else {
       // Otherwise, expand the clicked row and collapse any other row
@@ -443,7 +444,7 @@ if(tab === "all"){
 };
 
 
-onMounted(async () => {
+  onMounted(async () => {
       await getPipelines(); // Ensure pipelines are fetched before updating
       updateActiveTab();
     });
@@ -465,7 +466,7 @@ const getPipelines = async () => {
                 width: 20,  // Increase arrow width
                 height: 20, // Increase arrow height
               },
-              type: 'button',
+              type: 'custom',
               
               style:{
                 strokeWidth: 2,
@@ -570,7 +571,6 @@ const deletePipeline = async () => {
       org_id
     })
     .then(async () => {
-      await getPipelines();
       updateActiveTab();
       q.notify({
         message: "Pipeline deleted successfully",

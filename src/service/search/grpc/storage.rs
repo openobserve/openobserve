@@ -50,7 +50,9 @@ use crate::service::{
         generate_search_schema_diff,
         index::IndexCondition,
         tantivy::puffin_directory::{
+            caching_directory::CachingDirectory,
             convert_puffin_file_to_tantivy_dir,
+            footer_cache::FooterCache,
             reader::{warm_up_terms, PuffinDirReader},
             reader_cache,
         },
@@ -279,7 +281,7 @@ pub async fn search(
         let schema = schema.with_metadata(std::collections::HashMap::new());
 
         let session = config::meta::search::Session {
-            id: format!("{}-{ver}", query.trace_id),
+            id: format!("{}-{}-{ver}", query.trace_id, query.job_id),
             storage_type: StorageType::Memory,
             work_group: query.work_group.clone(),
             target_partitions,
@@ -584,7 +586,7 @@ async fn search_tantivy_index(
         Some((indexer, reader)) => (indexer, reader),
         None => {
             log::debug!("init cache for puffin file: {}", ttv_file_name);
-            let puffin_dir: Box<dyn Directory> = if cfg.common.inverted_index_tantivy_mode
+            let reader_directory: Box<dyn Directory> = if cfg.common.inverted_index_tantivy_mode
                 == InvertedIndexTantivyMode::Mmap.to_string()
             {
                 let puffin_dir_path = format!(
@@ -599,10 +601,15 @@ async fn search_tantivy_index(
                 }
                 Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
             } else {
-                Box::new(get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?)
+                let puffin_dir =
+                    Arc::new(get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?);
+                let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+                let cache_dir =
+                    CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+                Box::new(cache_dir)
             };
 
-            let index = tantivy::Index::open(puffin_dir)?;
+            let index = tantivy::Index::open(reader_directory)?;
             let reader = index
                 .reader_builder()
                 .reload_policy(tantivy::ReloadPolicy::Manual)

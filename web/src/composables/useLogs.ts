@@ -35,6 +35,7 @@ import {
   getFunctionErrorMessage,
   getUUID,
   generateTraceContext,
+  arraysMatch,
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -280,6 +281,7 @@ const useLogs = () => {
       searchObj.meta.quickMode = true;
     }
     await importSqlParser();
+    extractValueQuery();
   });
 
   const importSqlParser = async () => {
@@ -531,9 +533,7 @@ const useLogs = () => {
 
     if (searchObj.data.query) {
       query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(
-        searchObj.data.query.trim(),
-      );
+      query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
     }
 
     if (
@@ -597,7 +597,7 @@ const useLogs = () => {
   }
 
   const validateFilterForMultiStream = () => {
-    const filterCondition = searchObj.data.editorValue;
+    const filterCondition = searchObj.data.query;
     const parsedSQL: any = parser.astify(
       "select * from stream where " + filterCondition,
     );
@@ -608,7 +608,8 @@ const useLogs = () => {
     searchObj.data.filterErrMsg = "";
     searchObj.data.missingStreamMessage = "";
     searchObj.data.stream.missingStreamMultiStreamFilter = [];
-    for (const fieldName of searchObj.data.stream.filteredField) {
+    for (const fieldObj of searchObj.data.stream.filteredField) {
+      const fieldName = fieldObj.expr.value;
       const filteredFields: any =
         searchObj.data.stream.selectedStreamFields.filter(
           (field: any) => field.name === fieldName,
@@ -647,7 +648,7 @@ const useLogs = () => {
 
   function buildSearch() {
     try {
-      let query = searchObj.data.editorValue.trim();
+      let query = searchObj.data.query.trim();
       searchObj.data.filterErrMsg = "";
       searchObj.data.missingStreamMessage = "";
       searchObj.data.stream.missingStreamMultiStreamFilter = [];
@@ -3851,12 +3852,21 @@ const useLogs = () => {
       };
       searchObj.data.stream.selectedStreamFields = [];
 
+      let unionquery = "";
+      const streams = searchObj.data.stream.selectedStream;
+
+      streams.forEach((stream: string, index: number) => {
+        // Add UNION for all but the first SELECT statement
+        if (index > 0) {
+          unionquery += " UNION ";
+        }
+        unionquery += `SELECT [FIELD_LIST] FROM "${stream}"`;
+      });
+
       let query = searchObj.meta.sqlMode
         ? queryStr != ""
           ? queryStr
-          : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-              ",",
-            )}"`
+          : unionquery
         : "";
 
       searchObj.data.stream.selectedStreamFields = [];
@@ -3868,7 +3878,7 @@ const useLogs = () => {
         );
 
         if (streamData.schema != undefined) {
-          searchObj.data.stream.selectedStreamFields.push(streamData.schema);
+          searchObj.data.stream.selectedStreamFields.push(...streamData.schema);
         }
       }
 
@@ -3881,10 +3891,10 @@ const useLogs = () => {
         return;
       }
       const streamFieldNames: any = [];
-      searchObj.data.stream.selectedStreamFields.forEach((subArray: any) => {
-        subArray.forEach((item: any) => {
-          streamFieldNames.push(item.name);
-        });
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        // subArray.forEach((item: any) => {
+        streamFieldNames.push(item.name);
+        // });
       });
 
       for (
@@ -3898,19 +3908,19 @@ const useLogs = () => {
         }
       }
 
-      if (queryStr == "") {
-        if (
-          searchObj.data.stream.interestingFieldList.length > 0 &&
-          searchObj.meta.quickMode
-        ) {
-          query = query.replace(
-            "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
-          );
-        } else {
-          query = query.replace("[FIELD_LIST]", "*");
-        }
+      // if (queryStr == "") {
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
+        query = query.replace(
+          /\[FIELD_LIST\]/g,
+          searchObj.data.stream.interestingFieldList.join(","),
+        );
+      } else {
+        query = query.replace(/\[FIELD_LIST\]/g, "*");
       }
+      // }
 
       searchObj.data.editorValue = query;
       searchObj.data.query = query;
@@ -4066,6 +4076,29 @@ const useLogs = () => {
     return selectedFields;
   };
 
+  function getFieldsWithStreamNames() {
+    const fieldMap: any = {};
+
+    searchObj.data.streamResults.list
+      .filter((stream: any) =>
+        searchObj.data.stream.selectedStream.includes(stream.name),
+      )
+      .forEach((stream: any) => {
+        stream.schema.forEach((field: any) => {
+          const fieldKey = field.name;
+          const fieldValue = `${stream.name}`;
+
+          // Add the fieldValue to the corresponding fieldKey in the map
+          if (!fieldMap[fieldKey]) {
+            fieldMap[fieldKey] = [];
+          }
+          fieldMap[fieldKey].push(fieldValue);
+        });
+      });
+
+    return fieldMap;
+  }
+
   const getFilterExpressionByFieldType = (
     field: string | number,
     field_value: string | number | boolean,
@@ -4129,6 +4162,186 @@ const useLogs = () => {
     }
   };
 
+  const setSelectedStreams = (value: string) => {
+    try {
+      const parsedSQL = fnParsedSQL();
+
+      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
+        console.error("Failed to parse SQL query:", value);
+        throw new Error("Invalid SQL syntax");
+      }
+
+      let newSelectedStreams: string[] = [];
+
+      //for simple query get the table name from the parsedSQL object
+      // this will handle joins as well
+      if (parsedSQL?.from) {
+        newSelectedStreams = parsedSQL.from.map((stream: any) => stream.table);
+      }
+
+      // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
+      if (parsedSQL?._next) {
+        let nextTable = parsedSQL._next;
+        while (nextTable) {
+          // Map through each "from" array in the _next object, as it can contain multiple tables
+          if (nextTable.from) {
+            nextTable.from.forEach((stream: { table: string }) =>
+              newSelectedStreams.push(stream.table),
+            );
+          }
+          nextTable = nextTable._next;
+        }
+      }
+
+      if (
+        !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams)
+      ) {
+        searchObj.data.stream.selectedStream = newSelectedStreams;
+        onStreamChange(value);
+      }
+    } catch (error) {
+      console.error("Error in setSelectedStreams:", {
+        error,
+        query: value,
+        currentStreams: searchObj.data.stream.selectedStream,
+      });
+      throw error;
+    }
+  };
+
+  const extractValueQuery = () => {
+    try {
+      const orgQuery: string = searchObj.data.query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      const outputQueries: any = {};
+      const parsedSQL = parser.astify(orgQuery);
+
+      let query = `select * from INDEX_NAME`;
+      const newParsedSQL = parser.astify(query);
+      if (
+        Object.hasOwn(parsedSQL, "from") &&
+        parsedSQL.from.length <= 1 &&
+        parsedSQL._next == null
+      ) {
+        newParsedSQL.where = parsedSQL.where;
+
+        query = parser.sqlify(newParsedSQL);
+        outputQueries[parsedSQL.from[0].table] = query.replace(
+          "INDEX_NAME",
+          "[INDEX_NAME]",
+        );
+      } else {
+        // parse join queries & union queries
+        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
+          parsedSQL.where = cleanBinaryExpression(parsedSQL.where);
+          // parse join queries
+          searchObj.data.stream.selectedStream.forEach((stream: string) => {
+            newParsedSQL.where = null;
+
+            query = parser.sqlify(newParsedSQL);
+            outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
+          });
+        } else if (parsedSQL._next != null) {
+          //parse union queries
+          if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from) {
+            let query = `select * from INDEX_NAME`;
+            const newParsedSQL = parser.astify(query);
+
+            newParsedSQL.where = parsedSQL.where;
+
+            query = parser.sqlify(newParsedSQL);
+            outputQueries[parsedSQL.from[0].table] = query.replace(
+              "INDEX_NAME",
+              "[INDEX_NAME]",
+            );
+          }
+
+          let nextTable = parsedSQL._next;
+          let depth = 0;
+          const MAX_DEPTH = 100;
+          while (nextTable && depth++ < MAX_DEPTH) {
+            // Map through each "from" array in the _next object, as it can contain multiple tables
+            if (nextTable.from) {
+              let query = `select * from INDEX_NAME`;
+              const newParsedSQL = parser.astify(query);
+
+              newParsedSQL.where = nextTable.where;
+
+              query = parser.sqlify(newParsedSQL);
+              outputQueries[nextTable.from[0].table] = query.replace(
+                "INDEX_NAME",
+                "[INDEX_NAME]",
+              );
+            }
+            nextTable = nextTable._next;
+          }
+          if (depth >= MAX_DEPTH) {
+            throw new Error("Maximum query depth exceeded");
+          }
+        }
+      }
+      return outputQueries;
+    } catch (error) {
+      console.error("Error in extractValueQuery:", error);
+      throw error;
+    }
+  };
+
+  const cleanBinaryExpression = (node: any): any => {
+    if (!node) return null;
+
+    switch (node.type) {
+      case "binary_expr": {
+        const left: any = cleanBinaryExpression(node.left);
+        const right: any = cleanBinaryExpression(node.right);
+
+        // Remove the operator and keep only the non-null side if the other side is a field-only reference
+        if (left && isFieldOnly(left) && isFieldOnly(right)) {
+          return null; // Ignore this condition entirely if both sides are fields
+        } else if (!left) {
+          return right; // Only the right side remains, so return it
+        } else if (!right) {
+          return left; // Only the left side remains, so return it
+        }
+
+        // Return the expression if both sides are valid
+        return {
+          type: "binary_expr",
+          operator: node.operator,
+          left: left,
+          right: right,
+        };
+      }
+
+      case "column_ref":
+        return {
+          type: "column_ref",
+          table: node.table || null,
+          column:
+            node.column && node.column.expr
+              ? node.column.expr.value
+              : node.column,
+        };
+
+      case "single_quote_string":
+      case "number":
+        return {
+          type: node.type,
+          value: node.value,
+        };
+
+      default:
+        return node;
+    }
+  };
+
+  // Helper function to check if a node is a field-only reference (column_ref without literal)
+  function isFieldOnly(node: any): boolean {
+    return node && node.type === "column_ref";
+  }
+
   return {
     searchObj,
     searchAggData,
@@ -4162,6 +4375,7 @@ const useLogs = () => {
     getHistogramQueryData,
     generateHistogramSkeleton,
     fnParsedSQL,
+    fnUnparsedSQL,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
@@ -4170,6 +4384,8 @@ const useLogs = () => {
     isNonAggregatedQuery,
     extractTimestamps,
     getFilterExpressionByFieldType,
+    setSelectedStreams,
+    extractValueQuery,
   };
 };
 

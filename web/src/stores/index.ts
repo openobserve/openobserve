@@ -200,6 +200,9 @@ export default createStore({
     endpoint(context, payload) {
       context.commit("endpoint", payload);
     },
+    setUserInfo(context, payload) {
+      context.commit("setUserInfo", payload);
+    },
     // setIndexData(context, payload) {
     //   context.commit("setIndexData", payload);
     // },

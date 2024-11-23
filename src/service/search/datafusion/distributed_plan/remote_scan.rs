@@ -250,9 +250,11 @@ async fn get_remote_batch(
         None => "".to_string(),
     };
 
+    let job_id = config::ider::uuid();
     let request = FlightSearchRequest {
         trace_id: req.trace_id.clone(),
         partition: partition as u32,
+        job_id,
         org_id: req.org_id.clone(),
         stream_type: req.stream_type.to_string(),
         plan: physical_plan_bytes.to_vec(),

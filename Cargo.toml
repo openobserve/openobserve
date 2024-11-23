@@ -72,6 +72,7 @@ bitflags = "2.6.0"
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
+byteorder.workspace = true
 chrono.workspace = true
 clap = { version = "4.1", default-features = false, features = [
     "std",
@@ -184,7 +185,7 @@ tantivy.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
-expect-test = "1.4"
+expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
 
@@ -229,7 +230,7 @@ byteorder = "1.4.3"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "tokio-runtime",
     "_fetcher-rusttls-tokio",
-], default-features = false, rev = "348967500868c2b5dfcb3930fe483b2ff17b35ff" }
+], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
@@ -237,6 +238,7 @@ dashmap = { version = "6.0", features = ["serde"] }
 datafusion = "43.0.0"
 datafusion-proto = "43.0.0"
 datafusion-functions-aggregate-common = "43.0.0"
+expect-test = "1.4"
 arrow = { version = "53.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "53.2.0"
 arrow-json = "53.2.0"
