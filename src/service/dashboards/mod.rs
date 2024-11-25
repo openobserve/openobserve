@@ -46,6 +46,7 @@ pub async fn create_dashboard(
     // If folder is default folder & doesn't exist then create it
 
     if db::folders::exists(org_id, folder_id).await? {
+        println!("======FOLDER EXISTS========");
         let dashboard_id = ider::generate();
         match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
             Ok(res) => {
@@ -195,6 +196,7 @@ async fn save_dashboard(
     body: web::Bytes,
     hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
+    println!("====SAVING WITH ID {dashboard_id}====");
     match db::dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");

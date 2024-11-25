@@ -52,6 +52,32 @@ impl Dashboard {
         }
     }
 
+    pub fn set_dashboard_id(&mut self, dashboard_id: String) {
+        match self.version {
+            1 => self
+                .v1
+                .as_mut()
+                .map(|inner| inner.dashboard_id = dashboard_id),
+            2 => self
+                .v2
+                .as_mut()
+                .map(|inner| inner.dashboard_id = dashboard_id),
+            3 => self
+                .v3
+                .as_mut()
+                .map(|inner| inner.dashboard_id = dashboard_id),
+            4 => self
+                .v4
+                .as_mut()
+                .map(|inner| inner.dashboard_id = dashboard_id),
+            5 => self
+                .v5
+                .as_mut()
+                .map(|inner| inner.dashboard_id = dashboard_id),
+            _ => None,
+        };
+    }
+
     pub fn owner(&self) -> Option<&str> {
         match self.version {
             1 => self.v1.as_ref().map(|inner| inner.owner.as_str()),

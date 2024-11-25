@@ -65,6 +65,7 @@ pub(crate) async fn put(
         .ok_or_else(|| anyhow::anyhow!("Dashboard should have title"))?;
     dash.set_title(title);
 
+    dash.set_dashboard_id(dashboard_id.to_owned());
     let dash = dashboards::put(org_id, folder_id, dash).await?;
     Ok(dash)
 }

@@ -19,7 +19,7 @@ use config::meta::dashboards::{
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, QueryTrait, Set, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
@@ -251,14 +251,22 @@ async fn get_model(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<(folders::Model, Option<dashboards::Model>)>, sea_orm::DbErr> {
-    folders::Entity::find()
+    let select_folders = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
         .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()))
-        .filter(folders::Column::FolderId.eq(folder_id))
-        .find_also_related(dashboards::Entity)
+        .filter(folders::Column::FolderId.eq(folder_id));
+
+    let Some(folder) = select_folders.one(db).await? else {
+        return Ok(None);
+    };
+
+    let maybe_dashboard = folder
+        .find_related(dashboards::Entity)
         .filter(dashboards::Column::DashboardId.eq(dashboard_id))
         .one(db)
-        .await
+        .await?;
+
+    Ok(Some((folder, maybe_dashboard)))
 }
 
 /// Lists all dashboard ORM models that belong to the given org and folder.
