@@ -126,6 +126,13 @@ export default defineComponent({
             selectedOrg.value = tempDefaultOrg;
             useLocalOrganization(tempDefaultOrg);
             store.dispatch("setSelectedOrganization", tempDefaultOrg);
+          } else if (Object.hasOwn(selectedOrg.value, "identifier")) {
+            selectedOrg.value = orgOptions.value;
+            useLocalOrganization(orgOptions.value);
+            store.dispatch(
+              "setSelectedOrganization",
+              orgOptions.value,
+            );
           }
 
           const redirectURI = window.sessionStorage.getItem("redirectURI");

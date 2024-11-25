@@ -370,6 +370,13 @@ export default defineComponent({
                           "setSelectedOrganization",
                           tempDefaultOrg,
                         );
+                      } else if (Object.hasOwn(selectedOrg.value, "identifier")) {
+                        selectedOrg.value = orgOptions.value;
+                        useLocalOrganization(orgOptions.value);
+                        store.dispatch(
+                          "setSelectedOrganization",
+                          orgOptions.value,
+                        );
                       }
                     });
                 }
