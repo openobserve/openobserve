@@ -643,7 +643,7 @@ export default defineComponent({
           store.dispatch("setSelectedOrganization", localOrg.value);
         }
       } catch (error) {
-        console.error('Error in onBeforeMount:', error);
+        console.error("Error in onBeforeMount:", error);
       }
     });
 
