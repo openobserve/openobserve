@@ -370,18 +370,11 @@ export default defineComponent({
                           "setSelectedOrganization",
                           tempDefaultOrg,
                         );
-                      } else if (!Object.hasOwn(selectedOrg.value, "identifier") && orgOptions.value.length > 0) {
-                        selectedOrg.value = orgOptions.value[0];
-                        useLocalOrganization(orgOptions.value[0]);
-                        store.dispatch(
-                          "setSelectedOrganization",
-                          orgOptions.value[0],
-                        );
                       }
                     });
                 }
 
-                redirectUser(redirectURI, store.state.organizations);
+                redirectUser(redirectURI);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;

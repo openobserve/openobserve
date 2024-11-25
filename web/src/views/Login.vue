@@ -116,13 +116,6 @@ export default defineComponent({
           selectedOrg.value = tempDefaultOrg;
           useLocalOrganization(tempDefaultOrg);
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
-        } else if (!Object.hasOwn(selectedOrg.value, "identifier") && orgOptions.value.length > 0) {
-          selectedOrg.value = orgOptions.value[0];
-          useLocalOrganization(orgOptions.value[0]);
-          store.dispatch(
-            "setSelectedOrganization",
-            orgOptions.value[0],
-          );
         }
         redirectUser();
       });
@@ -142,14 +135,7 @@ export default defineComponent({
           router.push({ path: redirectURI });
         }
       } else {
-        const organizations = store.state.organizations;
-        let organization: string = organizations.length > 0 ? organizations[0]?.identifier : "";
-        organizations.forEach((item: any) => {
-          if (item.type == "default") {
-            organization = item?.identifier;
-          }
-        });
-        router.push({ path: "?org_identifier=" + organization });
+        router.push({ path: "/" });
       }
     };
 
