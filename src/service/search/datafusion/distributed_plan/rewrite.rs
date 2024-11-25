@@ -49,7 +49,7 @@ impl RemoteScanRewriter {
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
         Self {
-            remote_scan_nodes: RemoteScanNodes {
+            remote_scan_nodes: RemoteScanNodes::new(
                 req,
                 nodes,
                 file_id_lists,
@@ -59,7 +59,7 @@ impl RemoteScanRewriter {
                 index_condition,
                 is_leader,
                 opentelemetry_context,
-            },
+            ),
             is_changed: false,
         }
     }

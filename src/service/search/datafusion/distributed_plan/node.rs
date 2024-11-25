@@ -142,10 +142,12 @@ impl RemoteScanNode {
     // need to set to true when from super cluster leader to super cluster follower
     // otherwise set to false
     // used in super cluster follower.rs
+    #[cfg(feature = "enterprise")]
     pub fn set_is_super_cluster(&mut self, is_leader: bool) {
         self.super_cluster_info.is_super_cluster = is_leader;
     }
 
+    #[cfg(feature = "enterprise")]
     pub fn from_flight_search_request(
         request: &FlightSearchRequest,
         search_infos: SearchInfos,
