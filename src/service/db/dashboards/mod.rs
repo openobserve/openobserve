@@ -35,6 +35,7 @@ pub(crate) async fn get(
     let bytes = db::get(&key).await?;
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
     let mut hasher = std::hash::DefaultHasher::new();
+    hasher.write_i32(d_version.version);
 
     if d_version.version == 1 {
         let dash: v1::Dashboard = json::from_slice(&bytes)?;
@@ -115,6 +116,7 @@ pub(crate) async fn put(
 
     let d_version: DashboardVersion = json::from_slice(&body)?;
     let mut hasher = std::hash::DefaultHasher::new();
+    hasher.write_i32(d_version.version);
 
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
@@ -224,6 +226,7 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
         .map(|val| {
             let d_version: DashboardVersion = json::from_slice(&val).unwrap();
             let mut hasher = std::hash::DefaultHasher::new();
+            hasher.write_i32(d_version.version);
 
             if d_version.version == 1 {
                 let dash: v1::Dashboard = json::from_slice(&val).unwrap();
