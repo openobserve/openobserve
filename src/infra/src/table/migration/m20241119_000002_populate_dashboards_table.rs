@@ -69,7 +69,7 @@ impl MetaDashboard {
                 r#"
                     SELECT 
                         f.id AS folder_id,
-                        SUBSTRING_INDEX(m.key2,' ', 2) AS dashboard_id,
+                        SUBSTRING_INDEX(m.key2,'/', 2) AS dashboard_id,
                         m.value AS value
                     FROM meta AS m
                     JOIN folders f ON
@@ -129,9 +129,9 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
 
         let mut value: JsonValue = serde_json::from_str(&m.value)
             .map_err(|_| "Dashboard in meta table has \"value\" field that is not valid JSON")?;
-        let obj = value.as_object_mut().ok_or_else(
-            || "Dashboard in meta table has \"value\" field that is not a JSON object",
-        )?;
+        let obj = value.as_object_mut().ok_or_else(|| {
+            "Dashboard in meta table has \"value\" field that is not a JSON object"
+        })?;
 
         // Remove each of the following fields from the inner JSON since they
         // will now be stored in table columns and we don't want to keep

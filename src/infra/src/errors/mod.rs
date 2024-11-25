@@ -110,6 +110,8 @@ pub enum PutDashboardError {
     MissingTitle,
     #[error("error putting dashboard with missing owner")]
     MissingOwner,
+    #[error("error converting created timestamp with timezone to Unix timestamp ")]
+    ConvertingCreatedTimestamp,
 }
 
 #[derive(ThisError, Debug)]

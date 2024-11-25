@@ -36,11 +36,11 @@ pub(crate) async fn get(
 pub(crate) async fn put(
     org_id: &str,
     dashboard_id: &str,
-    folder: &str,
+    folder_id: &str,
     body: web::Bytes,
     hash: Option<&str>,
 ) -> Result<Dashboard, anyhow::Error> {
-    if let Some(existing_dash) = get(org_id, dashboard_id, folder).await? {
+    if let Some(existing_dash) = get(org_id, dashboard_id, folder_id).await? {
         let existing_dash_hash = existing_dash.hash;
 
         let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
@@ -65,13 +65,13 @@ pub(crate) async fn put(
         .ok_or_else(|| anyhow::anyhow!("Dashboard should have title"))?;
     dash.set_title(title);
 
-    let dash = dashboards::put(org_id, folder, dash).await?;
+    let dash = dashboards::put(org_id, folder_id, dash).await?;
     Ok(dash)
 }
 
 #[tracing::instrument]
-pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
-    let ds = dashboards::list(org_id, folder).await?;
+pub(crate) async fn list(org_id: &str, folder_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
+    let ds = dashboards::list(org_id, folder_id).await?;
     Ok(ds)
 }
 
@@ -79,9 +79,9 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
 pub(crate) async fn delete(
     org_id: &str,
     dashboard_id: &str,
-    folder: &str,
+    folder_id: &str,
 ) -> Result<(), anyhow::Error> {
-    dashboards::delete(org_id, folder, dashboard_id).await?;
+    dashboards::delete(org_id, folder_id, dashboard_id).await?;
     Ok(())
 }
 

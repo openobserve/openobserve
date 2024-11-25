@@ -29,7 +29,7 @@ use super::{
 };
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors::{self, GetDashboardError},
+    errors::{self, GetDashboardError, PutDashboardError},
 };
 
 impl TryFrom<dashboards::Model> for Dashboard {
@@ -148,7 +148,7 @@ pub async fn put(
 
     // Remove fields that will be saved in DB columns from the JSON blob so that
     // we are not storing the same value in two different places and risking
-    // desynchonization.
+    // desynchronization.
     let mut data: JsonValue = serde_json::to_value(dashboard)?;
     if let Some(obj) = data.as_object_mut() {
         obj.remove("dashboard_id");
@@ -174,13 +174,15 @@ pub async fn put(
         Some((folder_m, None)) => {
             // Destination folder exists but dashboard does not exist, so create
             // a new dashboard active model that will be inserted.
-            let created_at_unix = if let Some(created_at_tz) = created_at_depricated {
+            let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
                 created_at_tz.timestamp()
             } else {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs() as i64
+                    .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
+                    .as_secs()
+                    .try_into()
+                    .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
             };
 
             let dash_am = dashboards::ActiveModel {
