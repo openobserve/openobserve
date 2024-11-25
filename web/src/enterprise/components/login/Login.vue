@@ -146,7 +146,7 @@ export default defineComponent({
      * @param redirectURI
      */
     const redirectUser = (redirectURI) => {
-      const path = getPath();
+      let path = getPath();
       if (redirectURI != null && redirectURI != "") {
         if (redirectURI.includes("http")) {
           window.location = redirectURI;
@@ -155,6 +155,17 @@ export default defineComponent({
         }
       } else {
         // router.push({ path: "/" });
+        const organizations = store.state.organizations;
+        let organization: string = organizations.length > 0 ? organizations[0]?.identifier : "";
+        organizations.forEach((item: any) => {
+          if (item.type == "default") {
+            organization = item?.identifier;
+          }
+        });
+
+        if (path.indexOf("org_identifier=") == -1) {
+          path = path + "/?org_identifier=" + organization;
+        }
         window.location.replace(path);
       }
     };

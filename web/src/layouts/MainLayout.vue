@@ -640,28 +640,6 @@ export default defineComponent({
         selectedOrg.value = localOrg.value;
         useLocalOrganization(localOrg.value);
         store.dispatch("setSelectedOrganization", localOrg.value);
-      } else {
-        const organizations = store.state.organizations;
-
-        organizations.forEach((item: any) => {
-          if (item.type == "default") {
-            localOrg.value = {
-              identifier: item?.identifier,
-              user_email: store.state.userInfo.email,
-            };
-          }
-        });
-
-        if (!Object.hasOwn(localOrg.value, "identifier")) {
-          localOrg.value = {
-            identifier: organizations[0]?.identifier,
-            user_email: store.state.userInfo.email,
-          };
-        }
-
-        selectedOrg.value = localOrg.value;
-        useLocalOrganization(localOrg.value);
-        store.dispatch("setSelectedOrganization", localOrg.value);
       }
     });
 

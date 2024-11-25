@@ -16,9 +16,11 @@
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
 import { useLocalOrganization, getPath } from "./zincutils";
+import { useStore } from "vuex";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
+const store = useStore();
 
 export const getDefaultOrganization = async (
   userInfo: any,
@@ -76,7 +78,7 @@ export const getDefaultOrganization = async (
 };
 
 export const redirectUser = (redirectURI: string | null) => {
-  const path = getPath();
+  let path = getPath();
   if (redirectURI != null && redirectURI != "") {
     if (redirectURI.includes("http")) {
       window.location.href = redirectURI;
@@ -85,6 +87,17 @@ export const redirectUser = (redirectURI: string | null) => {
     }
   } else {
     // $router.push({ path: "/" });
+    const organizations = store.state.organizations;
+    let organization: string = organizations.length > 0 ? organizations[0]?.identifier : "";
+    organizations.forEach((item: any) => {
+      if (item.type == "default") {
+        organization = item?.identifier;
+      }
+    });
+
+    if (path.indexOf("org_identifier=") == -1) {
+      path = path + "/?org_identifier=" + organization;
+    }
     window.location.replace(path);
   }
 };

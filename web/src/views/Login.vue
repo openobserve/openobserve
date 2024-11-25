@@ -142,7 +142,14 @@ export default defineComponent({
           router.push({ path: redirectURI });
         }
       } else {
-        router.push({ path: "/" });
+        const organizations = store.state.organizations;
+        let organization: string = organizations.length > 0 ? organizations[0]?.identifier : "";
+        organizations.forEach((item: any) => {
+          if (item.type == "default") {
+            organization = item?.identifier;
+          }
+        });
+        router.push({ path: "/?org_identifier=" + organization });
       }
     };
 
