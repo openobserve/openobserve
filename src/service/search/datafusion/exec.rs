@@ -80,8 +80,8 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE) ORDER BY {} DESC",
-            cfg.common.column_timestamp
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
+            cfg.common.column_timestamp, cfg.common.column_timestamp
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -283,6 +283,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::regexp_matches_udf::REGEX_MATCHES_UDF.clone());
     ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
     ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
     ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());

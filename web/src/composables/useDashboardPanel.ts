@@ -18,6 +18,7 @@ import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+import { extractFields } from "@/utils/query/sqlUtils";
 
 const colors = [
   "#5960b2",
@@ -3220,26 +3221,27 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
         );
         dashboardPanelData.meta.stream.customQueryFields = [];
-        dashboardPanelData.meta.parsedQuery.columns.forEach((item: any) => {
-          let val: any;
-          // if there is a label, use that
-          // else use the column or value
-          if (item["as"] === undefined || item["as"] === null) {
-            val = item["expr"]["column"] ?? item["expr"]["value"];
-          } else {
-            val = item["as"];
-          }
-          if (
-            !dashboardPanelData.meta.stream.customQueryFields.find(
-              (it: any) => it.name == val
-            )
-          ) {
-            dashboardPanelData.meta.stream.customQueryFields.push({
-              name: val,
-              type: "",
-            });
-          }
-        });
+
+        const fields = extractFields(
+          dashboardPanelData.meta.parsedQuery,
+          store.state.zoConfig.timestamp_column ?? "_timestamp",
+        );
+
+        if (Array.isArray(fields)) {
+          fields.forEach((field: any) => {
+            const fieldAlias = field.alias ?? field.column;
+            if (
+              !dashboardPanelData.meta.stream.customQueryFields.find(
+                (it: any) => it.name == fieldAlias,
+              )
+            ) {
+              dashboardPanelData.meta.stream.customQueryFields.push({
+                name: fieldAlias,
+                type: "",
+              });
+            }
+          });
+        }
 
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);

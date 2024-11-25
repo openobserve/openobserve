@@ -259,7 +259,7 @@ export const useLocalOrganization = (
       }
       return organizationDataLocal;
     } else {
-      throw new Error("Invalid organization data format");
+      return organizationDataLocal;
     }
   } catch (e) {
     console.log(`Error: Error in useLocalOrganization: ${e}`);
@@ -946,4 +946,20 @@ export const convertTimeFromNsToMs = (time: number) => {
   const milliseconds = Math.floor(nanoseconds / 1000000);
   const date = new Date(milliseconds);
   return date.getTime();
+};
+
+export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
+  // Check if arrays have the same length
+  if (arr1.length !== arr2.length) return false;
+
+  // Sort both arrays
+  arr1 = arr1.slice().sort();
+  arr2 = arr2.slice().sort();
+
+  // Compare each element in the sorted arrays
+  for (let i = 0; i < arr1.length; i++) {
+    if (arr1[i] !== arr2[i]) return false;
+  }
+
+  return true;
 };

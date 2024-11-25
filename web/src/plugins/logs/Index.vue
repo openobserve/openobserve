@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory"
+id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -101,7 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
+                    <q-icon name="warning"
+color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -137,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div data-test="logs-search-error-message" v-else>
                       Error occurred while retrieving search events.
                       <q-btn
-                        v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
+                        v-if="
+                          searchObj.data.errorMsg != '' ||
+                          searchObj?.data?.functionError != ''
+                        "
                         @click="toggleErrorDetails"
                         size="sm"
                         data-test="logs-page-result-error-details-btn"
@@ -178,7 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -197,10 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
-                      v-if="searchObj.data.errorMsg != '' || searchObj?.data?.functionError != ''"
+                      v-if="
+                        searchObj.data.errorMsg != '' ||
+                        searchObj?.data?.functionError != ''
+                      "
                       @click="toggleErrorDetails"
                       size="sm"
                       data-test="logs-page-result-error-details-btn-norecord"
@@ -221,7 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -273,49 +284,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div   v-show="showSearchHistory">
+    <div v-show="showSearchHistory">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
-      <div v-else style="height: 200px;" >
-        <div style="height: 80vh"
-      class=" text-center q-pa-md flex flex-center"
-     >
-    <div>
-      <div>
-        <q-icon
-          name="history"
-          size="100px"
-          color="gray"
-          class="q-mb-md"
-          style="opacity: 0.1;"
-  
-        />
-      </div>
-      <div class="text-h4" style="opacity: 0.8">Search history is not enabled. </div>
-      <div  style="opacity: 0.8" class="q-mt-sm flex items-center justify-center">
-        <q-icon name="info" class="q-mr-xs " size="20px" style="opacity: 0.5;" />
-        <span class="text-h6 text-center ">
-          Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.</span>
-      </div>
+      <div v-else style="height: 200px">
+        <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
+          <div>
+            <div>
+              <q-icon
+                name="history"
+                size="100px"
+                color="gray"
+                class="q-mb-md"
+                style="opacity: 0.1"
+              />
+            </div>
+            <div class="text-h4" style="opacity: 0.8">
+              Search history is not enabled.
+            </div>
+            <div
+              style="opacity: 0.8"
+              class="q-mt-sm flex items-center justify-center"
+            >
+              <q-icon
+                name="info"
+                class="q-mr-xs"
+                size="20px"
+                style="opacity: 0.5"
+              />
+              <span class="text-h6 text-center">
+                Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
+                reporting.</span
+              >
+            </div>
 
-      <q-btn
-        class="q-mt-xl"
-        color="secondary"
-      
-        unelevated
-        :label="t('search.redirect_to_logs_page')"
-        no-caps
-        @click="redirectBackToLogs"
-      />
-    </div>
-  </div>
+            <q-btn
+              class="q-mt-xl"
+              color="secondary"
+              unelevated
+              :label="t('search.redirect_to_logs_page')"
+              no-caps
+              @click="redirectBackToLogs"
+            />
+          </div>
+        </div>
       </div>
     </div>
-
   </q-page>
 </template>
 
@@ -340,7 +358,10 @@ import { useI18n } from "vue-i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { verifyOrganizationStatus } from "@/utils/zincutils";
+import {
+  verifyOrganizationStatus,
+  useLocalInterestingFields,
+} from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
@@ -641,7 +662,7 @@ export default defineComponent({
 
         searchObj.organizationIdentifier =
           store.state.selectedOrganization.identifier;
-          restoreUrlQueryParams();
+        restoreUrlQueryParams();
         if (searchObj.loading == false) {
           resetSearchObj();
           resetStreamData();
@@ -793,7 +814,6 @@ export default defineComponent({
           // const hasSelect =
           //   currentQuery.toLowerCase() === "select" ||
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
-
           if (!hasSelect) {
             if (currentQuery != "") {
               currentQuery = currentQuery.split("|");
@@ -809,11 +829,16 @@ export default defineComponent({
               }
             }
 
-            searchObj.data.query =
-              `SELECT [FIELD_LIST]${selectFields} FROM "` +
-              searchObj.data.stream.selectedStream.join(",") +
-              `" ` +
-              whereClause;
+            searchObj.data.query = "";
+            const streams = searchObj.data.stream.selectedStream;
+
+            streams.forEach((stream: string, index: number) => {
+              // Add UNION for all but the first SELECT statement
+              if (index > 0) {
+                searchObj.data.query += " UNION ";
+              }
+              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
+            });
 
             if (searchObj.data.stream.selectedStreamFields.length == 0) {
               const streamData: any = getStream(
@@ -845,12 +870,12 @@ export default defineComponent({
               searchObj.meta.quickMode
             ) {
               searchObj.data.query = searchObj.data.query.replace(
-                "[FIELD_LIST]",
+                /\[FIELD_LIST\]/g,
                 searchObj.data.stream.interestingFieldList.join(","),
               );
             } else {
               searchObj.data.query = searchObj.data.query.replace(
-                "[FIELD_LIST]",
+                /\[FIELD_LIST\]/g,
                 "*",
               );
             }
@@ -901,7 +926,7 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
-        router.push({
+      router.push({
         name: "logs",
         query: {
           action: "history",
@@ -910,28 +935,27 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
-
     };
 
-    const redirectBackToLogs = () =>{
+    const redirectBackToLogs = () => {
       router.push({
         name: "logs",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-    }
+    };
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
         if (item.expr) {
           if (
-          (item.expr.type === "column_ref" &&
-            (item.expr?.column?.expr?.value === fieldName || item.expr.column === fieldName)
-          ) ||
-          (item.expr.type === "aggr_func" &&
-            item.expr?.args?.expr?.column?.value === fieldName)
-        ) {
+            (item.expr.type === "column_ref" &&
+              (item.expr?.column?.expr?.value === fieldName ||
+                item.expr.column === fieldName)) ||
+            (item.expr.type === "aggr_func" &&
+              item.expr?.args?.expr?.column?.value === fieldName)
+          ) {
             return false;
           }
         }
@@ -945,11 +969,43 @@ export default defineComponent({
     ) => {
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
-      const parsedSQL = fnParsedSQL();
+      let parsedSQL = fnParsedSQL();
+      parsedSQL = processInterestingFiledInSQLQuery(
+        parsedSQL,
+        field,
+        isFieldExistInSQL,
+      );
+      
+      // Modify the query based on stream name
+      const streamName = searchObj.data.stream.selectedStream[0].replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+      const newQuery = parser
+        .sqlify(parsedSQL)
+        .replace(/`/g, "")
+        .replace(
+          new RegExp(`\\b${streamName}\\b`, "g"),
+          `"${searchObj.data.stream.selectedStream[0]}"`,
+        );
+
+        console.log(JSON.stringify(searchObj.data.stream.interestingFieldList));
+      searchObj.data.query = newQuery;
+      searchObj.data.editorValue = newQuery;
+      searchBarRef.value.updateQuery();
+      searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
+    };
+
+    const processInterestingFiledInSQLQuery = (
+      parsedSQL,
+      field,
+      isFieldExistInSQL,
+    ) => {
+      let fieldPrefix = "";
       if (parsedSQL) {
         if (isFieldExistInSQL) {
-          //remove the field from the query
-          if (parsedSQL.columns.length > 0) {
+          // Remove the field from the query
+          if (parsedSQL.columns && parsedSQL.columns.length > 0) {
             let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
@@ -957,50 +1013,65 @@ export default defineComponent({
             );
             if (index > -1) {
               searchObj.data.stream.interestingFieldList.splice(index, 1);
-              field.isInterestingField = false;
             }
             parsedSQL.columns = filteredData;
           }
         } else {
-          //add the field in the query
-          if (parsedSQL.columns.length > 0) {
-            // iterate and remove the * from the query
+          if (searchObj.data.stream.selectedStream.length > 1) {
+            if (parsedSQL && parsedSQL.from.length > 1) {
+              fieldPrefix = parsedSQL.from[0].as
+                ? `${parsedSQL.from[0].as}.`
+                : `${parsedSQL.from[0].table}.`;
+            }
+          }
+          // Add the field in the query
+          if (parsedSQL.columns && parsedSQL.columns.length > 0) {
+            // Iterate and remove the * from the query
             parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
           }
 
+          // check is required for union query where both streams interesting fields goes into single array
+          // but it should be added if field exist in the strem schema
+          searchObj.data.streamResults.list.forEach((stream) => {
+            if (stream.name === parsedSQL.from[0].table) {
+              console.log(stream.schema);
+              stream.schema.forEach((stream_field) => {
+                if (field.name === stream_field.name) {
+                  parsedSQL.columns.push({
+                    expr: {
+                      type: "column_ref",
+                      column: fieldPrefix + field.name,
+                    },
+                    type: "expr",
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // Add '*' if no columns are left
+        if (parsedSQL.columns && parsedSQL.columns.length === 0) {
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
-              column: field.name,
+              column: fieldPrefix + "*",
             },
             type: "expr",
           });
         }
-
-        if (parsedSQL.columns.length == 0) {
-          parsedSQL.columns.push({
-            expr: {
-              type: "column_ref",
-              column: "*",
-            },
-            type: "expr",
-          });
-        }
-        const streamName = searchObj.data.stream.selectedStream[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const newQuery = parser
-          .sqlify(parsedSQL)
-          .replace(/`/g, "")
-          .replace(
-            new RegExp(`\\b${streamName}\\b`, 'g'), // Wrap only standalone stream name
-            `"${searchObj.data.stream.selectedStream[0]}"`
-          );
-        searchObj.data.query = newQuery;
-        searchObj.data.editorValue = newQuery;
-
-        searchBarRef.value.updateQuery();
-
-        searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
       }
+
+      // Recursively process _next if it exists
+      if (parsedSQL._next) {
+        parsedSQL._next = processInterestingFiledInSQLQuery(
+          parsedSQL._next,
+          field,
+          isFieldExistInSQL,
+        );
+      }
+
+      return parsedSQL;
     };
 
     const handleQuickModeChange = () => {
@@ -1011,7 +1082,7 @@ export default defineComponent({
         }
         if (searchObj.meta.sqlMode == true) {
           searchObj.data.query = searchObj.data.query.replace(
-            /SELECT\s+(.*?)\s+FROM/i,
+            /SELECT\s+(.*?)\s+FROM/gi,
             (match, fields) => {
               return `SELECT ${field_list} FROM`;
             },
@@ -1366,6 +1437,10 @@ export default defineComponent({
         ) {
           this.resetHistogramWithError(
             "Histogram is not available for limit queries.",
+          );
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+          this.resetHistogramWithError(
+            "Histogram is not available for multi stream search.",
           );
         } else if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
