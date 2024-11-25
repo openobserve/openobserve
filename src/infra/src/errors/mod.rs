@@ -90,7 +90,7 @@ pub enum DbError {
     SeaORMError(String),
     #[error("error getting dashboard")]
     GetDashboardError(#[from] GetDashboardError),
-    #[error("error creating or updating dashboard")]
+    #[error("PutDashbord# {0}")]
     PutDashboard(#[from] PutDashboardError),
 }
 
