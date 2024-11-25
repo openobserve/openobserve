@@ -1121,10 +1121,9 @@ mod tests {
             ("select a, avg(b) FROM tbl where c=1", vec!["a", "b", "c"]),
             ("select a, a + b FROM tbl where c=1", vec!["a", "b", "c"]),
             ("select a, b + 1 FROM tbl where c=1", vec!["a", "b", "c"]),
-            (
-                "select a, (a + b) as d FROM tbl where c=1",
-                vec!["a", "b", "c"],
-            ),
+            ("select a, (a + b) as d FROM tbl where c=1", vec![
+                "a", "b", "c",
+            ]),
             ("select a, COALESCE(b, c) FROM tbl", vec!["a", "b", "c"]),
             ("select a, COALESCE(b, 'c') FROM tbl", vec!["a", "b"]),
             ("select a, COALESCE(b, \"c\") FROM tbl", vec!["a", "b", "c"]),
@@ -1146,15 +1145,13 @@ mod tests {
             ("SELECT a FROM tbl WHERE b IS UNKNOWN", vec!["a", "b"]),
             ("SELECT a FROM tbl WHERE b IS NOT UNKNOWN", vec!["a", "b"]),
             ("SELECT a FROM tbl WHERE b IN (1, 2, 3)", vec!["a", "b"]),
-            (
-                "SELECT a FROM tbl WHERE b BETWEEN 10 AND 20",
-                vec!["a", "b"],
-            ),
+            ("SELECT a FROM tbl WHERE b BETWEEN 10 AND 20", vec![
+                "a", "b",
+            ]),
             ("SELECT a FROM tbl WHERE b LIKE '%pattern%'", vec!["a", "b"]),
-            (
-                "SELECT a FROM tbl WHERE b ILIKE '%pattern%'",
-                vec!["a", "b"],
-            ),
+            ("SELECT a FROM tbl WHERE b ILIKE '%pattern%'", vec![
+                "a", "b",
+            ]),
             ("SELECT CAST(a AS INTEGER) FROM tbl", vec!["a"]),
             ("SELECT TRY_CAST(a AS INTEGER) FROM tbl", vec!["a"]),
             ("SELECT a AT TIME ZONE 'UTC' FROM tbl", vec!["a"]),
