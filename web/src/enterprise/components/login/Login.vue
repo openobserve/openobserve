@@ -164,7 +164,7 @@ export default defineComponent({
         });
 
         if (path.indexOf("org_identifier=") == -1) {
-          path = path + "/?org_identifier=" + organization;
+          path = path + "?org_identifier=" + organization;
         }
         window.location.replace(path);
       }

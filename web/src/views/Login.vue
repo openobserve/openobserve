@@ -149,7 +149,7 @@ export default defineComponent({
             organization = item?.identifier;
           }
         });
-        router.push({ path: "/?org_identifier=" + organization });
+        router.push({ path: "?org_identifier=" + organization });
       }
     };
 

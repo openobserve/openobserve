@@ -381,7 +381,7 @@ export default defineComponent({
                     });
                 }
 
-                redirectUser(redirectURI);
+                redirectUser(redirectURI, store.state.organizations);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;

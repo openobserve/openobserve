@@ -77,7 +77,7 @@ export const getDefaultOrganization = async (
     });
 };
 
-export const redirectUser = (redirectURI: string | null) => {
+export const redirectUser = (redirectURI: string | null, organizations: any) => {
   let path = getPath();
   if (redirectURI != null && redirectURI != "") {
     if (redirectURI.includes("http")) {
@@ -87,7 +87,6 @@ export const redirectUser = (redirectURI: string | null) => {
     }
   } else {
     // $router.push({ path: "/" });
-    const organizations = store.state.organizations;
     let organization: string = organizations.length > 0 ? organizations[0]?.identifier : "";
     organizations.forEach((item: any) => {
       if (item.type == "default") {
@@ -96,7 +95,7 @@ export const redirectUser = (redirectURI: string | null) => {
     });
 
     if (path.indexOf("org_identifier=") == -1) {
-      path = path + "/?org_identifier=" + organization;
+      path = path + "?org_identifier=" + organization;
     }
     window.location.replace(path);
   }
