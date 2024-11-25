@@ -40,6 +40,85 @@ pub struct Dashboard {
     pub hash: String,
 }
 
+impl Dashboard {
+    pub fn dashboard_id(&self) -> Option<String> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.dashboard_id.clone()),
+            2 => self.v2.as_ref().map(|inner| inner.dashboard_id.clone()),
+            3 => self.v3.as_ref().map(|inner| inner.dashboard_id.clone()),
+            4 => self.v4.as_ref().map(|inner| inner.dashboard_id.clone()),
+            5 => self.v5.as_ref().map(|inner| inner.dashboard_id.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn owner(&self) -> Option<String> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.owner.clone()),
+            2 => self.v2.as_ref().map(|inner| inner.owner.clone()),
+            3 => self.v3.as_ref().map(|inner| inner.owner.clone()),
+            4 => self.v4.as_ref().map(|inner| inner.owner.clone()),
+            5 => self.v5.as_ref().map(|inner| inner.owner.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn title(&self) -> Option<String> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.title.clone()),
+            2 => self.v2.as_ref().map(|inner| inner.title.clone()),
+            3 => self.v3.as_ref().map(|inner| inner.title.clone()),
+            4 => self.v4.as_ref().map(|inner| inner.title.clone()),
+            5 => self.v5.as_ref().map(|inner| inner.title.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn set_title(&mut self, title: String) {
+        match self.version {
+            1 => self.v1.as_mut().map(|inner| inner.title = title),
+            2 => self.v2.as_mut().map(|inner| inner.title = title),
+            3 => self.v3.as_mut().map(|inner| inner.title = title),
+            4 => self.v4.as_mut().map(|inner| inner.title = title),
+            5 => self.v5.as_mut().map(|inner| inner.title = title),
+            _ => None,
+        };
+    }
+
+    pub fn description(&self) -> Option<String> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.description.clone()),
+            2 => self.v2.as_ref().map(|inner| inner.description.clone()),
+            3 => self.v3.as_ref().map(|inner| inner.description.clone()),
+            4 => self.v4.as_ref().map(|inner| inner.description.clone()),
+            5 => self.v5.as_ref().map(|inner| inner.description.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn role(&self) -> Option<String> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.role.clone()),
+            2 => self.v2.as_ref().map(|inner| inner.role.clone()),
+            3 => self.v3.as_ref().map(|inner| inner.role.clone()),
+            4 => self.v4.as_ref().map(|inner| inner.role.clone()),
+            5 => self.v5.as_ref().map(|inner| inner.role.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn created_at_deprecated(&self) -> Option<DateTime<FixedOffset>> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.created.clone()),
+            2 => self.v2.as_ref().map(|inner| inner.created.clone()),
+            3 => self.v3.as_ref().map(|inner| inner.created.clone()),
+            4 => self.v4.as_ref().map(|inner| inner.created.clone()),
+            5 => self.v5.as_ref().map(|inner| inner.created.clone()),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,

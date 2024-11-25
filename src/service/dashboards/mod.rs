@@ -130,10 +130,13 @@ pub async fn get_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    let resp = if let Ok(dashboard) = db::dashboards::get(org_id, dashboard_id, folder_id).await {
-        HttpResponse::Ok().json(dashboard)
-    } else {
-        return Ok(Response::NotFound("Dashboard".to_string()).into());
+    let resp = match db::dashboards::get(org_id, dashboard_id, folder_id).await {
+        Ok(Some(dash)) => HttpResponse::Ok().json(dash),
+        Ok(None) => Response::NotFound("Dashboard".to_string()).into(),
+        Err(error) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            error.to_string(),
+        )),
     };
     Ok(resp)
 }
@@ -153,6 +156,7 @@ pub async fn delete_dashboard(
             "Dashboard not found".to_string(),
         )));
     }
+
     match db::dashboards::delete(org_id, dashboard_id, folder_id).await {
         Ok(_) => {
             remove_ownership(
@@ -209,11 +213,12 @@ pub async fn move_dashboard(
     from_folder: &str,
     to_folder: &str,
 ) -> Result<HttpResponse, anyhow::Error> {
-    if let Ok(dashboard) = db::dashboards::get(org_id, dashboard_id, from_folder).await {
+    if let Ok(Some(dashboard)) = db::dashboards::get(org_id, dashboard_id, from_folder).await {
         // make sure the destination folder exists
         if !db::folders::exists(org_id, to_folder).await? {
             return Ok(Response::NotFound("Destination Folder".to_string()).into());
         }
+
         let dash = if dashboard.version == 1 {
             json::to_vec(&dashboard.v1.unwrap()).unwrap()
         } else if dashboard.version == 2 {

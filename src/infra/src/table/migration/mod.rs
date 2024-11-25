@@ -19,6 +19,9 @@ mod m20241114_000001_create_folders_table;
 mod m20241115_150000_populate_folders_table;
 mod m20241116_000001_delete_metas;
 mod m20241116_000002_drop_folders_created_at_column;
+mod m20241119_000001_create_dashboards_table;
+mod m20241119_000002_populate_dashboards_table;
+mod m20241119_000003_delete_metas;
 
 pub struct Migrator;
 
@@ -30,6 +33,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20241115_150000_populate_folders_table::Migration),
             Box::new(m20241116_000001_delete_metas::Migration),
             Box::new(m20241116_000002_drop_folders_created_at_column::Migration),
+            Box::new(m20241119_000001_create_dashboards_table::Migration),
+            Box::new(m20241119_000002_populate_dashboards_table::Migration),
+            Box::new(m20241119_000003_delete_metas::Migration),
         ]
     }
 }
