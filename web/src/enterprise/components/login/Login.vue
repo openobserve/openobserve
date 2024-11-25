@@ -76,6 +76,12 @@ export default defineComponent({
           }
 
           store.dispatch("setOrganizations", res.data.data);
+          if (res.data.data.length > 0) {
+            selectedOrg.value = res.data.data[0];
+            useLocalOrganization(selectedOrg.value);
+            store.dispatch("setSelectedOrganization", selectedOrg.value);
+          }
+
           orgOptions.value = res.data.data.map(
             (data: {
               id: any;
