@@ -181,10 +181,7 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
             .get("created")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
             .ok_or("Dashboard JSON does not have string \"created\" field".to_string())
-            .and_then(|s| {
-                println!("CREATED FIELD: {:?}", s);
-                DateTime::parse_from_rfc3339(&s).map_err(|e| e.to_string())
-            })?;
+            .and_then(|s| DateTime::parse_from_rfc3339(&s).map_err(|e| e.to_string()))?;
         let created_at_unix = created_at_tz.timestamp();
 
         Ok(dashboards::ActiveModel {

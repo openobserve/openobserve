@@ -46,7 +46,6 @@ pub async fn create_dashboard(
     // If folder is default folder & doesn't exist then create it
 
     if db::folders::exists(org_id, folder_id).await? {
-        println!("======FOLDER EXISTS========");
         let dashboard_id = ider::generate();
         match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
             Ok(res) => {
@@ -153,15 +152,23 @@ pub async fn delete_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    if db::dashboards::get(org_id, dashboard_id, folder_id)
-        .await
-        .is_err()
-    {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Dashboard not found".to_string(),
-        )));
-    }
+    match db::dashboards::get(org_id, dashboard_id, folder_id).await {
+        Ok(Some(_)) => {} // Dashboard exists. Continue with deleting.
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Dashboard not found".to_string(),
+            )));
+        }
+        Err(error) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            )
+        }
+    };
 
     match db::dashboards::delete(org_id, dashboard_id, folder_id).await {
         Ok(_) => {
@@ -196,7 +203,6 @@ async fn save_dashboard(
     body: web::Bytes,
     hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
-    println!("====SAVING WITH ID {dashboard_id}====");
     match db::dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
