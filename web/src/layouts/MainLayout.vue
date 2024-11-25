@@ -738,7 +738,7 @@ export default defineComponent({
       });
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
-      setSelectedOrganization();
+      // setSelectedOrganization();
       // if (
       //   config.isCloud &&
       //   selectedOrg.value.subscription_type == config.freePlan
@@ -767,7 +767,6 @@ export default defineComponent({
       ) {
         await verifyStreamExist(selectedOrg.value);
       }
-      // }
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
@@ -1039,7 +1038,7 @@ export default defineComponent({
 
       await this.getOrganizationSettings();
 
-      // this.isLoading = true;
+      this.isLoading = true;
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {
