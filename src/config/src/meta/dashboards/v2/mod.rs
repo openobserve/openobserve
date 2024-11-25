@@ -17,9 +17,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use super::OrdF64;
 use crate::meta::stream::StreamType;
-
-type OrdF64 = ordered_float::OrderedFloat<f64>;
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
