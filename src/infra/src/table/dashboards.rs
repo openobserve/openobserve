@@ -44,9 +44,12 @@ impl TryFrom<dashboards::Model> for Dashboard {
             obj.insert("dashboard_id".to_owned(), value.dashboard_id.into());
             obj.insert("version".to_owned(), value.version.into());
             obj.insert("owner".to_owned(), value.owner.into());
-            obj.insert("role".to_owned(), value.role.into());
+            obj.insert("role".to_owned(), value.role.unwrap_or_default().into());
             obj.insert("title".to_owned(), value.title.into());
-            obj.insert("description".to_owned(), value.description.into());
+            obj.insert(
+                "description".to_owned(),
+                value.description.unwrap_or_default().into(),
+            );
         }
 
         match value.version {

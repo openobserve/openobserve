@@ -119,9 +119,14 @@ pub async fn update_dashboard(
 
 #[tracing::instrument]
 pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
-    Ok(HttpResponse::Ok().json(Dashboards {
-        dashboards: db::dashboards::list(org_id, folder_id).await.unwrap(),
-    }))
+    let resp = match db::dashboards::list(org_id, folder_id).await {
+        Ok(dashboards) => HttpResponse::Ok().json(Dashboards { dashboards }),
+        Err(error) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            error.to_string(),
+        )),
+    };
+    Ok(resp)
 }
 
 #[tracing::instrument]
