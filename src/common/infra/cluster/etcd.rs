@@ -37,7 +37,16 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 
     // keep alive
     tokio::task::spawn(async move {
+        // check if the node is already online
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            if is_online() {
+                break;
+            }
+        }
+        // after the node is online, keepalive
         let mut need_online_again = false;
+        let ttl = get_config().limit.node_heartbeat_ttl;
         loop {
             if is_offline() {
                 break;
@@ -51,12 +60,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
             }
 
             let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
-            let ret = etcd::keepalive_lease_id(
-                lease_id,
-                get_config().limit.node_heartbeat_ttl,
-                is_offline,
-            )
-            .await;
+            let ret = etcd::keepalive_lease_id(lease_id, ttl, is_offline).await;
             if ret.is_ok() {
                 break;
             }

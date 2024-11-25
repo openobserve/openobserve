@@ -36,7 +36,6 @@ use infra::{
     errors::Result,
 };
 use once_cell::sync::Lazy;
-use tokio::time;
 
 mod etcd;
 mod nats;
@@ -186,7 +185,7 @@ pub async fn register_and_keepalive() -> Result<()> {
         let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
         let client = reqwest::Client::new();
         loop {
-            time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {}", e);
             }

@@ -27,7 +27,7 @@ use infra::{
     dist_lock,
     errors::{Error, Result},
 };
-use tokio::{task, time};
+use tokio::task;
 
 /// Register and keepalive the node to cluster
 pub(crate) async fn register_and_keepalive() -> Result<()> {
@@ -40,16 +40,15 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
     task::spawn(async move {
         // check if the node is already online
         loop {
-            time::sleep(time::Duration::from_secs(1)).await;
-            let status = NodeStatus::from(LOCAL_NODE_STATUS.load(Ordering::Relaxed));
-            if status == NodeStatus::Online {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            if is_online() {
                 break;
             }
         }
         // after the node is online, keepalive
         let ttl_keep_alive = min(10, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
-            time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
                 if is_offline() {
                     break;
@@ -60,7 +59,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
                     }
                     Err(e) => {
                         log::error!("[CLUSTER] keepalive failed: {}", e);
-                        time::sleep(time::Duration::from_secs(1)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
                 }

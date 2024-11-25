@@ -93,6 +93,11 @@ pub fn get_local_node_ip() -> String {
 }
 
 #[inline(always)]
+pub fn is_online() -> bool {
+    NodeStatus::from(LOCAL_NODE_STATUS.load(Ordering::Relaxed)) == NodeStatus::Online
+}
+
+#[inline(always)]
 pub fn is_offline() -> bool {
     NodeStatus::from(LOCAL_NODE_STATUS.load(Ordering::Relaxed)) == NodeStatus::Offline
 }
