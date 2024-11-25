@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use core::cmp::min;
+use std::sync::atomic::Ordering;
 
 use config::{
     cluster::*,
@@ -40,7 +41,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
         // check if the node is already online
         loop {
             time::sleep(time::Duration::from_secs(1)).await;
-            let status = unsafe { LOCAL_NODE_STATUS.clone() };
+            let status = NodeStatus::from(LOCAL_NODE_STATUS.load(Ordering::Relaxed));
             if status == NodeStatus::Online {
                 break;
             }
@@ -215,9 +216,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     };
     let val = json::to_string(&node).unwrap();
 
-    unsafe {
-        LOCAL_NODE_STATUS = status;
-    }
+    LOCAL_NODE_STATUS.store(status as _, Ordering::Release);
 
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;

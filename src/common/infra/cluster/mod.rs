@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, collections::HashMap, ops::Bound, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    collections::HashMap,
+    ops::Bound,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 use config::{
     cluster::*,
@@ -227,9 +233,8 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
 }
 
 pub async fn leave() -> Result<()> {
-    unsafe {
-        LOCAL_NODE_STATUS = NodeStatus::Offline;
-    }
+    LOCAL_NODE_STATUS.store(NodeStatus::Offline as _, Ordering::Release);
+
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());

@@ -167,8 +167,7 @@ pub async fn handle_grpc_request(
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
                     for item in &res.attributes {
-                        rec[format_label_name(item.key.as_str())] =
-                            get_val(&item.value.as_ref());
+                        rec[format_label_name(item.key.as_str())] = get_val(&item.value.as_ref());
                     }
                 }
                 if let Some(lib) = &scope_metric.scope {
@@ -813,8 +812,7 @@ fn process_exp_hist_data_point(
         let offset = buckets.offset;
         for (i, val) in buckets.bucket_counts.iter().enumerate() {
             let mut bucket_rec = rec.clone();
-            bucket_rec[NAME_LABEL] =
-                format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
             bucket_rec[VALUE_LABEL] = (*val as f64).into();
             bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
             bucket_recs.push(bucket_rec);
@@ -825,8 +823,7 @@ fn process_exp_hist_data_point(
         let offset = buckets.offset;
         for (i, val) in buckets.bucket_counts.iter().enumerate() {
             let mut bucket_rec = rec.clone();
-            bucket_rec[NAME_LABEL] =
-                format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
             bucket_rec[VALUE_LABEL] = (*val as f64).into();
             bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
             bucket_recs.push(bucket_rec);

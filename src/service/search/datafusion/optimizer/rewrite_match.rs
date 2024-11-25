@@ -68,9 +68,7 @@ impl OptimizerRule for RewriteMatch {
                     .map(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
                     .any(|x| x)
                 {
-                    let mut expr_rewriter = MatchToFullTextMatch {
-                        fields: self.fields.clone(),
-                    };
+                    let mut expr_rewriter = MatchToFullTextMatch::new(self.fields.clone());
                     let name_preserver = NamePreserver::new(&plan);
                     plan.map_expressions(|expr| {
                         let original_name = name_preserver.save(&expr);

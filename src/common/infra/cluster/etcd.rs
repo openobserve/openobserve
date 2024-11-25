@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::atomic::Ordering;
+
 use config::{
     cluster::*,
     get_config,
@@ -236,9 +238,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
     };
     let val = json::to_string(&node).unwrap();
 
-    unsafe {
-        LOCAL_NODE_STATUS = status;
-    }
+    LOCAL_NODE_STATUS.store(status as _, Ordering::Release);
 
     if new_lease_id {
         // get new lease id

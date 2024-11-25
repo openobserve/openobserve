@@ -214,7 +214,7 @@ impl std::fmt::Display for SqlValue {
     }
 }
 
-impl<'a> From<Offset<'a>> for i64 {
+impl From<Offset<'_>> for i64 {
     fn from(offset: Offset) -> Self {
         match offset.0 {
             SqlOffset {
@@ -271,7 +271,7 @@ impl<'a> TryFrom<Source<'a>> for String {
     }
 }
 
-impl<'a> TryFrom<Order<'a>> for (String, OrderBy) {
+impl TryFrom<Order<'_>> for (String, OrderBy) {
     type Error = anyhow::Error;
 
     fn try_from(order: Order) -> Result<Self, Self::Error> {
@@ -291,7 +291,7 @@ impl<'a> TryFrom<Order<'a>> for (String, OrderBy) {
     }
 }
 
-impl<'a> TryFrom<Group<'a>> for String {
+impl TryFrom<Group<'_>> for String {
     type Error = anyhow::Error;
 
     fn try_from(g: Group) -> Result<Self, Self::Error> {
@@ -345,14 +345,13 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
 
     fn try_from(selection: Timerange<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
-        match selection.0 {
-            Some(expr) => parse_expr_for_field(
+        if let Some(expr) = selection.0 {
+            parse_expr_for_field(
                 expr,
                 &SqlOperator::And,
                 &get_config().common.column_timestamp,
                 &mut fields,
-            )?,
-            None => {}
+            )?
         }
 
         let mut time_min = Vec::new();
@@ -408,9 +407,8 @@ impl<'a> TryFrom<Quicktext<'a>> for Vec<(String, String, SqlOperator)> {
 
     fn try_from(selection: Quicktext<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
-        match selection.0 {
-            Some(expr) => parse_expr_for_field(expr, &SqlOperator::And, "*", &mut fields)?,
-            None => {}
+        if let Some(expr) = selection.0 {
+            parse_expr_for_field(expr, &SqlOperator::And, "*", &mut fields)?
         }
         let fields = fields
             .iter()
@@ -436,9 +434,8 @@ impl<'a> TryFrom<Where<'a>> for Vec<String> {
 
     fn try_from(selection: Where<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
-        match selection.0 {
-            Some(expr) => fields.extend(get_field_name_from_expr(expr)?.unwrap_or_default()),
-            None => {}
+        if let Some(expr) = selection.0 {
+            fields.extend(get_field_name_from_expr(expr)?.unwrap_or_default())
         }
         Ok(fields)
     }

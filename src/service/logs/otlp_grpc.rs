@@ -117,8 +117,7 @@ pub async fn handle_grpc_request(
 
                 if let Some(res) = &resource_log.resource {
                     for item in &res.attributes {
-                        rec[item.key.as_str()] =
-                            get_val_with_type_retained(&item.value.as_ref());
+                        rec[item.key.as_str()] = get_val_with_type_retained(&item.value.as_ref());
                     }
                 }
                 if let Some(lib) = &instrumentation_logs.scope {
