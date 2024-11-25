@@ -81,7 +81,7 @@ fn create_organizations_identifier_idx_stmnt() -> IndexCreateStatement {
 
 /// Identifiers used in queries on the folders table.
 #[derive(DeriveIden)]
-enum Organizations {
+pub(super) enum Organizations {
     Table,
     Identifier,
     OrgName,
