@@ -332,6 +332,7 @@ import {
   watch,
   markRaw,
   nextTick,
+  onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -623,6 +624,24 @@ export default defineComponent({
         icon: "img:" + getImageURL("images/language_flags/pt.svg"),
       },
     ];
+
+    onBeforeMount(() => {
+      const url = new URL(window.location.href);
+      const localOrg: any = useLocalOrganization();
+      if (
+        Object.keys(localOrg.value).length == 0 &&
+        url.searchParams.get("org_identifier") != null
+      ) {
+        localOrg.value = {
+          identifier: url.searchParams.get("org_identifier"),
+          user_email: store.state.userInfo.email,
+        };
+
+        selectedOrg.value = localOrg.value;
+        useLocalOrganization(localOrg.value);
+        store.dispatch("setSelectedOrganization", localOrg.value);
+      }
+    });
 
     onMounted(async () => {
       miniMode.value = true;
