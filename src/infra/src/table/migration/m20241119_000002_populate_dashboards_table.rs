@@ -15,8 +15,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let db = manager.get_connection();
-        let txn = db.begin().await?;
+        let txn = manager.get_connection().begin().await?;
 
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.

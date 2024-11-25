@@ -7,9 +7,14 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let db = manager.get_connection();
-        let txn = db.begin().await?;
+        let txn = manager.get_connection().begin().await?;
         dashboards::Entity::delete_many().exec(&txn).await?;
+
+        meta::Entity::delete_many()
+            .filter(meta::Column::Module.eq("dashboard"))
+            .exec(txn)
+            .await?;
+
         txn.commit().await?;
         Ok(())
     }
@@ -25,28 +30,23 @@ impl MigrationTrait for Migration {
 // remain unchanged rather than ORM models in the `entity` module that will be
 // updated to reflect the latest changes to table schemas.
 
-/// Representation of the dashboards table at the time this migration executes.
-mod dashboards {
+/// Representation of the meta table at the time this migration executes.
+mod meta {
     use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "dashboards")]
+    #[sea_orm(table_name = "meta")]
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i64,
-        pub dashboard_id: String,
-        pub folder_id: i64,
-        pub owner: String,
-        pub role: Option<String>,
-        pub title: String,
-        #[sea_orm(column_type = "Text", nullable)]
-        pub description: Option<String>,
-        pub data: Json,
-        pub version: i32,
-        pub created_at: i64,
+        pub module: String,
+        pub key1: String,
+        pub key2: String,
+        pub start_dt: i64,
+        #[sea_orm(column_type = "Text")]
+        pub value: String,
     }
 
-    // There are relations but they are not important to this migration.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
