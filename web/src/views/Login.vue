@@ -116,7 +116,7 @@ export default defineComponent({
           selectedOrg.value = tempDefaultOrg;
           useLocalOrganization(tempDefaultOrg);
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
-        } else if (Object.hasOwn(selectedOrg.value, "identifier") && orgOptions.value.length > 0) {
+        } else if (!Object.hasOwn(selectedOrg.value, "identifier") && orgOptions.value.length > 0) {
           selectedOrg.value = orgOptions.value[0];
           useLocalOrganization(orgOptions.value[0]);
           store.dispatch(
