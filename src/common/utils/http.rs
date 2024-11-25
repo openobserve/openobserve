@@ -186,7 +186,7 @@ impl<'a> RequestHeaderExtractor<'a> {
     }
 }
 
-impl<'a> Extractor for RequestHeaderExtractor<'a> {
+impl Extractor for RequestHeaderExtractor<'_> {
     fn get(&self, key: &str) -> Option<&str> {
         // Convert the key to a HeaderName, ignoring case
         HeaderName::try_from(key)

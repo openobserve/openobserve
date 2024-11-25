@@ -1298,7 +1298,7 @@ async fn prepare_index_record_batches(
                 .iter()
                 .map(|i| i / INDEX_SEGMENT_LENGTH)
                 .collect::<HashSet<_>>();
-            let segment_num = (total_num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+            let segment_num = total_num_rows.div_ceil(INDEX_SEGMENT_LENGTH);
             let mut bv = BitVec::with_capacity(segment_num);
             for i in 0..segment_num {
                 bv.push(segment_ids.contains(&i));
