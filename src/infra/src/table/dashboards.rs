@@ -19,7 +19,7 @@ use config::meta::dashboards::{
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, QueryTrait, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
@@ -41,7 +41,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
             // some or all these fields to be present in the JSON even though we
             // store them in DB columns. Therefore we add these values back into
             // the JSON object so that deserializing the JSON can succeed.
-            obj.insert("dashboard_id".to_owned(), value.dashboard_id.into());
+            obj.insert("dashboardId".to_owned(), value.dashboard_id.into());
             obj.insert("version".to_owned(), value.version.into());
             obj.insert("owner".to_owned(), value.owner.into());
             obj.insert("role".to_owned(), value.role.unwrap_or_default().into());
