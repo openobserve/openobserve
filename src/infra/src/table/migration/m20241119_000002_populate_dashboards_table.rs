@@ -120,7 +120,7 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
     fn try_from(m: MetaDashboard) -> Result<Self, Self::Error> {
         let folder_id = m
             .folder_id
-            .ok_or_else(|| "Dashboard in meta table references folder that does not exist")?;
+            .ok_or("Dashboard in meta table references folder that does not exist")?;
         let dashboard_id = if m.dashboard_id.is_empty() {
             Err("Dasboard in meta table is missing a dasbhoard ID")
         } else {
@@ -129,9 +129,9 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
 
         let mut value: JsonValue = serde_json::from_str(&m.value)
             .map_err(|_| "Dashboard in meta table has \"value\" field that is not valid JSON")?;
-        let obj = value.as_object_mut().ok_or_else(|| {
-            "Dashboard in meta table has \"value\" field that is not a JSON object"
-        })?;
+        let obj = value
+            .as_object_mut()
+            .ok_or("Dashboard in meta table has \"value\" field that is not a JSON object")?;
 
         // Remove each of the following fields from the inner JSON since they
         // will now be stored in table columns and we don't want to keep
@@ -141,15 +141,15 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
             .remove("version")
             .and_then(|v| v.as_i64())
             .and_then(|v: i64| v.try_into().ok())
-            .ok_or_else(|| "Dashboard JSON does not have i32 \"version\" field")?;
+            .ok_or("Dashboard JSON does not have i32 \"version\" field")?;
         let owner = obj
             .remove("owner")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .ok_or_else(|| "Dashboard JSON does not have string \"owner\" field")?;
+            .ok_or("Dashboard JSON does not have string \"owner\" field")?;
         let title = obj
             .remove("title")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .ok_or_else(|| "Dashboard JSON does not have string \"title\" field")?;
+            .ok_or("Dashboard JSON does not have string \"title\" field")?;
         let role = obj
             .remove("role")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
@@ -166,7 +166,7 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
         let created_at_tz: DateTime<FixedOffset> = obj
             .get("created")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .ok_or_else(|| "Dashboard JSON does not have string \"created\" field".to_string())
+            .ok_or("Dashboard JSON does not have string \"created\" field".to_string())
             .and_then(|s| {
                 println!("CREATED FIELD: {:?}", s);
                 DateTime::parse_from_rfc3339(&s).map_err(|e| e.to_string())

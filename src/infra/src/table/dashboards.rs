@@ -36,7 +36,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
     type Error = errors::Error;
 
     fn try_from(mut value: dashboards::Model) -> Result<Self, Self::Error> {
-        value.data.as_object_mut().map(|obj| {
+        if let Some(obj) = value.data.as_object_mut() {
             // The domain model JSON deserialization logic for v1-v5 expects
             // some or all these fields to be present in the JSON even though we
             // store them in DB columns. Therefore we add these values back into
@@ -47,7 +47,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
             obj.insert("role".to_owned(), value.role.into());
             obj.insert("title".to_owned(), value.title.into());
             obj.insert("description".to_owned(), value.description.into());
-        });
+        }
 
         match value.version {
             1 => {
@@ -123,17 +123,17 @@ pub async fn put(
     let dashboard_id = dashboard
         .dashboard_id()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
-        .ok_or_else(|| errors::PutDashboardError::MissingDashboardId)?
+        .ok_or(errors::PutDashboardError::MissingDashboardId)?
         .to_owned();
     let owner = dashboard
         .owner()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
-        .ok_or_else(|| errors::PutDashboardError::MissingOwner)?
+        .ok_or(errors::PutDashboardError::MissingOwner)?
         .to_owned();
     let title = dashboard
         .title()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
-        .ok_or_else(|| errors::PutDashboardError::MissingTitle)?
+        .ok_or(errors::PutDashboardError::MissingTitle)?
         .to_owned();
     let role = dashboard
         .role()
