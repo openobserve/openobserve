@@ -47,10 +47,10 @@ pub struct Dashboard {
 
 impl From<Dashboard> for super::Dashboard {
     fn from(value: Dashboard) -> Self {
-        let version: i16 = 5;
+        let version: i32 = 5;
 
         let mut hasher = std::hash::DefaultHasher::new();
-        hasher.write_i16(version);
+        hasher.write_i32(version);
         value.hash(&mut hasher);
         let hash = hasher.finish().to_string();
 
