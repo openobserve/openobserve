@@ -41,35 +41,35 @@ pub struct Dashboard {
 }
 
 impl Dashboard {
-    pub fn dashboard_id(&self) -> Option<String> {
+    pub fn dashboard_id(&self) -> Option<&str> {
         match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.dashboard_id.clone()),
-            2 => self.v2.as_ref().map(|inner| inner.dashboard_id.clone()),
-            3 => self.v3.as_ref().map(|inner| inner.dashboard_id.clone()),
-            4 => self.v4.as_ref().map(|inner| inner.dashboard_id.clone()),
-            5 => self.v5.as_ref().map(|inner| inner.dashboard_id.clone()),
+            1 => self.v1.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.dashboard_id.as_str()),
             _ => None,
         }
     }
 
-    pub fn owner(&self) -> Option<String> {
+    pub fn owner(&self) -> Option<&str> {
         match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.owner.clone()),
-            2 => self.v2.as_ref().map(|inner| inner.owner.clone()),
-            3 => self.v3.as_ref().map(|inner| inner.owner.clone()),
-            4 => self.v4.as_ref().map(|inner| inner.owner.clone()),
-            5 => self.v5.as_ref().map(|inner| inner.owner.clone()),
+            1 => self.v1.as_ref().map(|inner| inner.owner.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.owner.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.owner.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.owner.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.owner.as_str()),
             _ => None,
         }
     }
 
-    pub fn title(&self) -> Option<String> {
+    pub fn title(&self) -> Option<&str> {
         match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.title.clone()),
-            2 => self.v2.as_ref().map(|inner| inner.title.clone()),
-            3 => self.v3.as_ref().map(|inner| inner.title.clone()),
-            4 => self.v4.as_ref().map(|inner| inner.title.clone()),
-            5 => self.v5.as_ref().map(|inner| inner.title.clone()),
+            1 => self.v1.as_ref().map(|inner| inner.title.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.title.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.title.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.title.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.title.as_str()),
             _ => None,
         }
     }
@@ -85,35 +85,41 @@ impl Dashboard {
         };
     }
 
-    pub fn description(&self) -> Option<String> {
+    pub fn description(&self) -> Option<&str> {
         match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.description.clone()),
-            2 => self.v2.as_ref().map(|inner| inner.description.clone()),
-            3 => self.v3.as_ref().map(|inner| inner.description.clone()),
-            4 => self.v4.as_ref().map(|inner| inner.description.clone()),
-            5 => self.v5.as_ref().map(|inner| inner.description.clone()),
+            1 => self.v1.as_ref().map(|inner| inner.description.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.description.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.description.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.description.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.description.as_str()),
             _ => None,
         }
     }
 
-    pub fn role(&self) -> Option<String> {
+    pub fn role(&self) -> Option<&str> {
         match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.role.clone()),
-            2 => self.v2.as_ref().map(|inner| inner.role.clone()),
-            3 => self.v3.as_ref().map(|inner| inner.role.clone()),
-            4 => self.v4.as_ref().map(|inner| inner.role.clone()),
-            5 => self.v5.as_ref().map(|inner| inner.role.clone()),
+            1 => self.v1.as_ref().map(|inner| inner.role.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.role.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.role.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.role.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.role.as_str()),
             _ => None,
         }
     }
 
+    /// Returns the timestamp with timezone of the time at which the dashboard
+    /// was created.
+    ///
+    /// This value is stored in JSON for versions 1-5 of the dashboard. However
+    /// future versions of the dashboard should utilize the `created_at` Unix
+    /// timestamp field in the database to represent the creation timestamp.
     pub fn created_at_deprecated(&self) -> Option<DateTime<FixedOffset>> {
         match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.created.clone()),
-            2 => self.v2.as_ref().map(|inner| inner.created.clone()),
-            3 => self.v3.as_ref().map(|inner| inner.created.clone()),
-            4 => self.v4.as_ref().map(|inner| inner.created.clone()),
-            5 => self.v5.as_ref().map(|inner| inner.created.clone()),
+            1 => self.v1.as_ref().map(|inner| inner.created),
+            2 => self.v2.as_ref().map(|inner| inner.created),
+            3 => self.v3.as_ref().map(|inner| inner.created),
+            4 => self.v4.as_ref().map(|inner| inner.created),
+            5 => self.v5.as_ref().map(|inner| inner.created),
             _ => None,
         }
     }

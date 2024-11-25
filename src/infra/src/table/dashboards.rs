@@ -123,21 +123,26 @@ pub async fn put(
     let dashboard_id = dashboard
         .dashboard_id()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
-        .ok_or_else(|| errors::PutDashboardError::MissingDashboardId)?;
+        .ok_or_else(|| errors::PutDashboardError::MissingDashboardId)?
+        .to_owned();
     let owner = dashboard
         .owner()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
-        .ok_or_else(|| errors::PutDashboardError::MissingOwner)?;
+        .ok_or_else(|| errors::PutDashboardError::MissingOwner)?
+        .to_owned();
     let title = dashboard
         .title()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
-        .ok_or_else(|| errors::PutDashboardError::MissingTitle)?;
+        .ok_or_else(|| errors::PutDashboardError::MissingTitle)?
+        .to_owned();
     let role = dashboard
         .role()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) });
+        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .map(|r| r.to_owned());
     let description = dashboard
         .description()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) });
+        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
 
@@ -180,7 +185,7 @@ pub async fn put(
 
             let dash_am = dashboards::ActiveModel {
                 id: NotSet, // Set by DB.
-                dashboard_id: Set(dashboard_id),
+                dashboard_id: Set(dashboard_id.to_owned()),
                 folder_id: NotSet,   // Can be updated, so it is set below.
                 owner: NotSet,       // Can be updated, so it is set below.
                 role: NotSet,        // Can be updated, so it is set below.
