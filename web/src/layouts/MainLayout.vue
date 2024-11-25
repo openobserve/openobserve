@@ -626,20 +626,24 @@ export default defineComponent({
     ];
 
     onBeforeMount(() => {
-      const url = new URL(window.location.href);
-      const localOrg: any = useLocalOrganization();
-      if (
-        Object.keys(localOrg.value).length == 0 &&
-        url.searchParams.get("org_identifier") != null
-      ) {
-        localOrg.value = {
-          identifier: url.searchParams.get("org_identifier"),
-          user_email: store.state.userInfo.email,
-        };
+      try {
+        const url = new URL(window.location.href);
+        const localOrg: any = useLocalOrganization();
+        if (
+          Object.keys(localOrg.value).length == 0 &&
+          url.searchParams.get("org_identifier") != null
+        ) {
+          localOrg.value = {
+            identifier: url.searchParams.get("org_identifier"),
+            user_email: store.state.userInfo.email,
+          };
 
-        selectedOrg.value = localOrg.value;
-        useLocalOrganization(localOrg.value);
-        store.dispatch("setSelectedOrganization", localOrg.value);
+          selectedOrg.value = localOrg.value;
+          useLocalOrganization(localOrg.value);
+          store.dispatch("setSelectedOrganization", localOrg.value);
+        }
+      } catch (error) {
+        console.error('Error in onBeforeMount:', error);
       }
     });
 
