@@ -303,6 +303,8 @@ export default defineComponent({
                 //and set first organization as selected organization
                 if (localOrg.value) {
                   selectedOrg.value = localOrg.value;
+                  useLocalOrganization(selectedOrg.value);
+                  store.dispatch("setSelectedOrganization", selectedOrg.value);
                 } else {
                   await organizationsService
                     .os_list(0, 100000, "id", false, "", "default")
