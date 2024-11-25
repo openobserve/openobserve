@@ -849,7 +849,7 @@ export default defineComponent({
               useLocalOrganization(optiondata);
             }
 
-            if (localOrg.value.identifier == data.identifier) {
+            if (localOrg.value.identifier == data.identifier || url.searchParams.get("org_identifier") == data.identifier) {
               localOrgFlag = true;
             }
 
