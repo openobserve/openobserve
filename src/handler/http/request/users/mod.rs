@@ -23,11 +23,11 @@ use actix_web::{
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     get_config,
+    meta::user::UserRole,
     utils::{base64, json},
     Config,
 };
 use serde::Serialize;
-use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::self_reporting::audit,
@@ -41,8 +41,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRole, UserRoleRequest,
+                get_roles, AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser,
+                UpdateUser, UserOrgRole, UserRequest, UserRoleRequest,
             },
         },
         utils::auth::{generate_presigned_url, UserEmail},
@@ -103,7 +103,7 @@ pub async fn save(
     let mut user = UserRequest::from(&user.into_inner());
     user.email = user.email.trim().to_lowercase();
 
-    if user.role.base_role.eq(&meta::user::UserRole::Root) {
+    if user.role.base_role.eq(&config::meta::user::UserRole::Root) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -632,15 +632,16 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 )]
 #[get("/{org_id}/users/roles")]
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let roles = UserRole::iter()
-        .filter_map(|role| check_role_available(&role))
+    let roles = get_roles()
+        .iter()
+        .filter_map(|role| check_role_available(role))
         .collect::<Vec<RolesResponse>>();
 
     Ok(HttpResponse::Ok().json(roles))
 }
 
 fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
-    if role.eq(&UserRole::Root) || role.eq(&UserRole::Member) {
+    if role.eq(&UserRole::Root) {
         None
     } else {
         #[cfg(feature = "enterprise")]

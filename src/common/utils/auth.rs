@@ -16,7 +16,7 @@
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 use base64::Engine;
-use config::utils::json;
+use config::{meta::user::UserRole, utils::json};
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -32,7 +32,7 @@ use crate::common::{
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
-        user::{AuthTokens, UserOrgRole, UserRole},
+        user::{AuthTokens, UserOrgRole},
     },
 };
 
@@ -92,7 +92,7 @@ pub fn generate_invite_token() -> String {
 
 pub(crate) fn is_root_user(user_id: &str) -> bool {
     match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
-        Some(user) => user.role.eq(&infra::table::org_users::UserRole::Root),
+        Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
 }
@@ -690,7 +690,7 @@ mod tests {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
                 role: UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Root,
+                    base_role: config::meta::user::UserRole::Root,
                     custom_role: None,
                 },
                 first_name: "root".to_owned(),

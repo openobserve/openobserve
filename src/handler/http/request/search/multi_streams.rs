@@ -238,7 +238,8 @@ pub async fn search_multi(
             };
 
             if !is_root_user(user_id) {
-                let user: meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+                let user: config::meta::user::User =
+                    get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.to_string();
 
                 if user.is_external

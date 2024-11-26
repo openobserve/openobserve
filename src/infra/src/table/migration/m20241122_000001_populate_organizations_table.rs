@@ -29,7 +29,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
         let txn = db.begin().await?;
-        let org_set = HashSet::new();
+        let mut org_set = HashSet::new();
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
         // txn.execute()
@@ -45,7 +45,11 @@ impl MigrationTrait for Migration {
                     continue;
                 }
                 let org_id = schema.key1;
-                let org_type = if DEFAULT_ORG.eq(&org_id) { 0 } else { 1 };
+                let org_type = if PartialEq::eq(DEFAULT_ORG, &org_id) {
+                    0
+                } else {
+                    1
+                };
                 let now = chrono::Utc::now().timestamp_micros() as u64;
                 orgs.push(organizations::ActiveModel {
                     identifier: Set(org_id.clone()),

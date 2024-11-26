@@ -15,6 +15,7 @@
 
 use std::cmp::Ordering;
 
+use config::meta::user::UserRole;
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
@@ -32,7 +33,7 @@ use o2_enterprise::enterprise::{
 use crate::{
     common::{
         infra::config::{ORG_USERS, USERS},
-        meta::{organization::DEFAULT_ORG, user::UserRole},
+        meta::organization::DEFAULT_ORG,
     },
     service::db,
 };
@@ -182,7 +183,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 for user_key_val in ORG_USERS.iter() {
                     let org_user = user_key_val.value();
                     let user = USERS.get(org_user.email.as_str()).unwrap();
-                    if user.user_type.eq(&infra::table::users::UserType::External) {
+                    if user.user_type.is_external() {
                         continue;
                     } else {
                         let role = if user.is_root {

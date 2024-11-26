@@ -158,7 +158,7 @@ pub async fn get_latest_traces(
         };
         let user_id = in_req.headers().get("user_id").unwrap();
         if !is_root_user(user_id.to_str().unwrap()) {
-            let user: meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
+            let user: config::meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
                 .await
                 .unwrap();
             let stream_type_str = StreamType::Traces.to_string();

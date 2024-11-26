@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::common::Column;
-use sea_orm::Schema;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -65,7 +63,7 @@ fn create_users_table_statement() -> TableCreateStatement {
         // - 1 is a external user
         .col(ColumnDef::new(Users::UserType).small_integer().not_null())
         .col(
-            ColumnDef::new(Uses::CreatedAt)
+            ColumnDef::new(Users::CreatedAt)
             .big_unsigned()
                 .not_null(),
         )

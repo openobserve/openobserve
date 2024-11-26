@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{fmt, str::FromStr};
+
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -32,14 +35,13 @@ pub struct DBUser {
     pub password_ext: Option<String>,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserOrg {
     pub name: String,
     #[serde(default)]
     pub token: String,
     #[serde(default)]
     pub rum_token: Option<String>,
-    #[serde(default)]
     pub role: UserRole,
 }
 
@@ -49,13 +51,10 @@ impl PartialEq for UserOrg {
     }
 }
 
-#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
 pub enum UserRole {
     #[serde(rename = "admin")]
-    #[default]
     Admin,
-    #[serde(rename = "member")] // admin in OpenSource
-    Member,
     #[serde(rename = "root")]
     Root,
     #[serde(rename = "viewer")] // read only user
@@ -66,6 +65,76 @@ pub enum UserRole {
     Editor,
     #[serde(rename = "service_account")]
     ServiceAccount,
+}
+
+impl From<UserRole> for i16 {
+    fn from(role: UserRole) -> i16 {
+        match role {
+            UserRole::Admin => 0,
+            UserRole::Root => 1,
+            UserRole::Viewer => 2,
+            UserRole::User => 3,
+            UserRole::Editor => 4,
+            UserRole::ServiceAccount => 5,
+        }
+    }
+}
+
+impl From<i16> for UserRole {
+    fn from(role: i16) -> Self {
+        match role {
+            0 => UserRole::Admin,
+            1 => UserRole::Root,
+            2 => UserRole::Viewer,
+            3 => UserRole::User,
+            4 => UserRole::Editor,
+            5 => UserRole::ServiceAccount,
+            _ => UserRole::Admin,
+        }
+    }
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UserRole::Admin => write!(f, "admin"),
+            UserRole::Root => write!(f, "root"),
+            UserRole::Viewer => write!(f, "viewer"),
+            UserRole::Editor => write!(f, "editor"),
+            UserRole::User => write!(f, "user"),
+            UserRole::ServiceAccount => write!(f, "service_account"),
+        }
+    }
+}
+
+impl UserRole {
+    pub fn get_label(&self) -> String {
+        match self {
+            UserRole::Admin => "Admin".to_string(),
+            UserRole::Root => "Root".to_string(),
+            UserRole::Viewer => "Viewer".to_string(),
+            UserRole::Editor => "Editor".to_string(),
+            UserRole::User => "User".to_string(),
+            UserRole::ServiceAccount => "Service Account".to_string(),
+        }
+    }
+}
+
+// Implementing FromStr for UserRole
+impl FromStr for UserRole {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<UserRole, Self::Err> {
+        match input {
+            "admin" => Ok(UserRole::Admin),
+            "root" => Ok(UserRole::Root),
+            "viewer" => Ok(UserRole::Viewer),
+            "editor" => Ok(UserRole::Editor),
+            "user" => Ok(UserRole::User),
+            "service_account" => Ok(UserRole::ServiceAccount),
+            _ => Ok(UserRole::Admin),
+        }
+    }
 }
 
 impl DBUser {
@@ -120,6 +189,7 @@ impl DBUser {
         }
     }
 }
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct User {
     pub email: String,
@@ -139,4 +209,39 @@ pub struct User {
     /// Is the user authenticated and created via LDAP
     pub is_external: bool,
     pub password_ext: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserType {
+    Internal,
+    /// Is the user authenticated and created via LDAP
+    External,
+}
+
+impl From<i16> for UserType {
+    fn from(user_type: i16) -> UserType {
+        match user_type {
+            0 => UserType::Internal,
+            1 => UserType::External,
+            _ => UserType::Internal,
+        }
+    }
+}
+
+impl From<UserType> for i16 {
+    fn from(user_type: UserType) -> i16 {
+        match user_type {
+            UserType::Internal => 0,
+            UserType::External => 1,
+        }
+    }
+}
+
+impl UserType {
+    pub fn is_external(&self) -> bool {
+        match self {
+            UserType::Internal => false,
+            UserType::External => true,
+        }
+    }
 }

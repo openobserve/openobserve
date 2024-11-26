@@ -16,7 +16,11 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::{get_config, ider, utils::rand::generate_random_string};
+use config::{
+    get_config, ider,
+    meta::user::{DBUser, User, UserOrg, UserRole},
+    utils::rand::generate_random_string,
+};
 use hashbrown::HashMap;
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
@@ -32,8 +36,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::{OrgRoleMapping, DEFAULT_ORG},
             user::{
-                DBUser, UpdateUser, User, UserList, UserOrg, UserOrgRole, UserRequest,
-                UserResponse, UserRole,
+                get_default_user_org, UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
@@ -118,9 +121,8 @@ pub async fn post_user(
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{get_user_crole_tuple, get_user_role_tuple, update_tuples},
-                    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                    get_user_crole_tuple, get_user_role_tuple, update_tuples,
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
@@ -608,7 +610,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
             org_id: user_from_db.org.clone(),
             token: user_from_db.token.clone(),
             rum_token: user_from_db.rum_token.clone(),
-            created_ts: 0,
+            created_at: 0,
         };
         if is_root_user(&user_from_db.email) {
             USERS_RUM_TOKEN
@@ -676,7 +678,7 @@ pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Er
                 role,
                 first_name: user.first_name.clone(),
                 last_name: user.last_name.clone(),
-                is_external: user.user_type.into(),
+                is_external: user.user_type.is_external(),
                 orgs: user_orgs.get(user.email.as_str()).cloned(),
             });
         }
@@ -838,12 +840,12 @@ pub async fn root_user_exists() -> bool {
 
 pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     if orgs.is_empty() {
-        (false, UserOrg::default())
+        (false, get_default_user_org())
     } else {
         let mut local_orgs = orgs;
         local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
         if local_orgs.is_empty() {
-            (false, UserOrg::default())
+            (false, get_default_user_org())
         } else {
             (true, local_orgs.first().unwrap().clone())
         }
@@ -896,6 +898,7 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
 
 #[cfg(test)]
 mod tests {
+    use config::meta::user::{UserRole, UserType};
     use infra::db as infra_db;
 
     use super::*;
@@ -911,20 +914,21 @@ mod tests {
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 password_ext: Some("pass#123".to_string()),
-                user_type: infra::table::users::UserType::Internal,
+                user_type: UserType::Internal,
                 is_root: false,
-                created_ts: 0,
+                created_at: 0,
+                updated_at: 0,
             },
         );
         ORG_USERS.insert(
             "dummy/admin@zo.dev".to_string(),
             OrgUserRecord {
-                role: infra::table::org_users::UserRole::Admin,
+                role: UserRole::Admin,
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org_id: "dummy".to_string(),
                 email: "admin@zo.dev".to_string(),
-                created_ts: 0,
+                created_at: 0,
             },
         );
     }
@@ -958,7 +962,7 @@ mod tests {
                 email: "user@zo.dev".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::common::meta::user::UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Admin,
+                    base_role: UserRole::Admin,
                     custom_role: None,
                 },
                 first_name: "user".to_owned(),
@@ -988,7 +992,7 @@ mod tests {
                 old_password: Some("pass".to_string()),
                 new_password: Some("new_pass".to_string()),
                 role: Some(crate::common::meta::user::UserRoleRequest {
-                    role: crate::common::meta::user::UserRole::Admin.to_string(),
+                    role: UserRole::Admin.to_string(),
                     custom: None,
                 }),
                 change_password: false,
@@ -1010,7 +1014,7 @@ mod tests {
                 old_password: None,
                 new_password: None,
                 role: Some(crate::common::meta::user::UserRoleRequest {
-                    role: crate::common::meta::user::UserRole::Admin.to_string(),
+                    role: UserRole::Admin.to_string(),
                     custom: None,
                 }),
                 change_password: false,
@@ -1023,7 +1027,10 @@ mod tests {
         let resp = add_user_to_org(
             "dummy",
             "user2@example.com",
-            UserRole::Member,
+            UserOrgRole {
+                base_role: UserRole::Admin,
+                custom_role: None,
+            },
             "admin@zo.dev",
         )
         .await;

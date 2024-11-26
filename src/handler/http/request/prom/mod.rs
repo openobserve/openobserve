@@ -164,7 +164,8 @@ async fn query(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
-                let user: meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
+                let user: config::meta::user::User =
+                    get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
                         user_email,
@@ -331,7 +332,8 @@ async fn query_range(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
-                let user: meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
+                let user: config::meta::user::User =
+                    get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
                         user_email,
@@ -583,7 +585,7 @@ async fn series(
         let user_email = user_id.to_str().unwrap();
 
         if !is_root_user(user_email) {
-            let user: meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
+            let user: config::meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
             let stream_type_str = StreamType::Metrics.to_string();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(

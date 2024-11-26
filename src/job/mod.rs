@@ -68,7 +68,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 email: cfg.auth.root_user_email.clone(),
                 password: cfg.auth.root_user_password.clone(),
                 role: UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Root,
+                    base_role: config::meta::user::UserRole::Root,
                     custom_role: None,
                 },
                 first_name: "root".to_owned(),

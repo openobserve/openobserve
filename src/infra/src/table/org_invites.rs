@@ -60,7 +60,7 @@ pub struct Model {
     pub role: String,
     pub status: OrgInviteStatus,
     pub expires_at: i64,
-    pub created_ts: i64,
+    pub created_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -81,7 +81,7 @@ pub struct InvitationRecord {
     pub role: String,
     pub status: OrgInviteStatus,
     pub expires_at: i64,
-    pub created_ts: i64,
+    pub created_at: i64,
 }
 
 impl InvitationRecord {
@@ -98,7 +98,7 @@ impl InvitationRecord {
             role: role.to_string(),
             status,
             expires_at,
-            created_ts: chrono::Utc::now().timestamp_micros(),
+            created_at: chrono::Utc::now().timestamp_micros(),
         }
     }
 }
@@ -141,10 +141,10 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["token", "invitee_id"],
     );
     let index2 = IndexStatement::new(
-        "org_invites_created_ts_idx",
+        "org_invites_created_at_idx",
         "org_invites",
         false,
-        &["created_ts"],
+        &["created_at"],
     );
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -181,7 +181,7 @@ pub async fn add(
         expires_at: Set(expires_at),
         role: Set(role.to_string()),
         status: Set(OrgInviteStatus::Pending),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        created_at: Set(chrono::Utc::now().timestamp_micros()),
         ..Default::default()
     };
 
@@ -217,7 +217,7 @@ pub async fn add_many(
             role: Set(role.to_string()),
             status: Set(OrgInviteStatus::Pending),
             expires_at: Set(expires_at),
-            created_ts: Set(now),
+            created_at: Set(now),
             ..Default::default()
         });
     }
@@ -258,7 +258,7 @@ pub async fn get(token: &str) -> Result<Vec<InvitationRecord>, errors::Error> {
         .column(Column::Role)
         .column(Column::Status)
         .column(Column::ExpiresAt)
-        .column(Column::CreatedTs)
+        .column(Column::CreatedAt)
         .filter(Column::Token.eq(token))
         .into_model::<InvitationRecord>()
         .all(client)
@@ -277,7 +277,7 @@ pub async fn get_by_token_user(token: &str, user: &str) -> Result<InvitationReco
         .column(Column::Role)
         .column(Column::Status)
         .column(Column::ExpiresAt)
-        .column(Column::CreatedTs)
+        .column(Column::CreatedAt)
         .filter(Column::Token.eq(token))
         .filter(Column::InviteeId.eq(user))
         .into_model::<InvitationRecord>()
@@ -302,7 +302,7 @@ pub async fn list_by_invitee(user: &str) -> Result<Vec<InvitationRecord>, errors
         .column(Column::Role)
         .column(Column::Status)
         .column(Column::ExpiresAt)
-        .column(Column::CreatedTs)
+        .column(Column::CreatedAt)
         .filter(Column::InviteeId.eq(user))
         .into_model::<InvitationRecord>()
         .all(client)
@@ -321,8 +321,8 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<InvitationRecord>, errors::E
         .column(Column::Role)
         .column(Column::Status)
         .column(Column::ExpiresAt)
-        .column(Column::CreatedTs)
-        .order_by(Column::CreatedTs, Order::Desc);
+        .column(Column::CreatedAt)
+        .order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
@@ -373,7 +373,7 @@ pub async fn get_expired(
     let mut res = Entity::find()
         .select_only()
         .column(Column::Token)
-        .filter(Column::CreatedTs.lt(expired_before));
+        .filter(Column::CreatedAt.lt(expired_before));
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }

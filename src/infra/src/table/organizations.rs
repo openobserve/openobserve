@@ -13,72 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::organization::OrganizationType;
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
-    FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 
-use super::get_lock;
+use super::{
+    entity::organizations::{ActiveModel, Column, Entity, Model},
+    get_lock,
+};
 use crate::{
-    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{connect_to_orm, ORM_CLIENT},
     errors::{self, DbError, Error},
 };
 
-// define the organizations type
-#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
-pub enum OrganizationType {
-    Default = 0,
-    Custom = 1,
-}
-
-impl Into<String> for OrganizationType {
-    fn into(self) -> String {
-        match self {
-            OrganizationType::Default => "default".to_string(),
-            OrganizationType::Custom => "custom".to_string(),
-        }
-    }
-}
-
-impl From<&str> for OrganizationType {
-    fn from(s: &str) -> Self {
-        match s {
-            "default" => OrganizationType::Default,
-            "custom" => OrganizationType::Custom,
-            _ => OrganizationType::Default,
-        }
-    }
-}
-
-// define the organizations table
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "organizations")]
-pub struct Model {
-    #[sea_orm(
-        primary_key,
-        auto_increment = false,
-        column_type = "String(StringLen::N(255))"
-    )]
-    pub identifier: String,
-    #[sea_orm(column_type = "String(StringLen::N(255))")]
-    pub org_name: String,
-    pub org_type: OrganizationType,
-    pub created_ts: i64,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
-
-impl RelationTrait for Relation {
-    fn def(&self) -> RelationDef {
-        panic!("No relations defined")
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-#[derive(FromQueryResult, Debug)]
+#[derive(Debug)]
 pub struct OrganizationRecord {
     pub identifier: String,
     pub org_name: String,
@@ -95,65 +45,19 @@ impl OrganizationRecord {
     }
 }
 
+impl From<Model> for OrganizationRecord {
+    fn from(model: Model) -> Self {
+        Self {
+            identifier: model.identifier,
+            org_name: model.org_name,
+            org_type: model.org_type.into(),
+        }
+    }
+}
+
 #[derive(FromQueryResult, Debug)]
 pub struct OrgId {
     pub identifier: String,
-}
-
-pub async fn init() -> Result<(), errors::Error> {
-    create_table().await?;
-    create_table_index().await?;
-    Ok(())
-}
-
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let builder = client.get_database_backend();
-
-    let schema = Schema::new(builder);
-    let create_table_stmt = schema
-        .create_table_from_entity(Entity)
-        .if_not_exists()
-        .take();
-
-    client
-        .execute(builder.build(&create_table_stmt))
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(())
-}
-
-pub async fn create_table_index() -> Result<(), errors::Error> {
-    let index1 = IndexStatement::new(
-        "organizations_id_idx",
-        "organizations",
-        true,
-        &["identifier"],
-    );
-    let index2 = IndexStatement::new(
-        "organizations_created_ts_idx",
-        "organizations",
-        false,
-        &["created_ts"],
-    );
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match client.get_database_backend() {
-        DatabaseBackend::MySql => {
-            mysql::create_index(index1).await?;
-            mysql::create_index(index2).await?;
-        }
-        DatabaseBackend::Postgres => {
-            postgres::create_index(index1).await?;
-            postgres::create_index(index2).await?;
-        }
-        _ => {
-            sqlite::create_index(index1).await?;
-            sqlite::create_index(index2).await?;
-        }
-    }
-    Ok(())
 }
 
 pub async fn add(
@@ -161,11 +65,13 @@ pub async fn add(
     org_name: &str,
     org_type: OrganizationType,
 ) -> Result<(), errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
     let record = ActiveModel {
         identifier: Set(org_id.to_string()),
         org_name: Set(org_name.to_string()),
-        org_type: Set(org_type),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        org_type: Set(org_type.into()),
+        created_at: Set(now),
+        updated_at: Set(now),
         ..Default::default()
     };
 
@@ -198,12 +104,7 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
 pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
-        .select_only()
-        .column(Column::Identifier)
-        .column(Column::OrgName)
-        .column(Column::OrgType)
         .filter(Column::Identifier.eq(org_id))
-        .into_model::<OrganizationRecord>()
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
@@ -211,25 +112,22 @@ pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
             Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
         })?;
 
-    Ok(record)
+    Ok(OrganizationRecord::from(record))
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<OrganizationRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let mut res = Entity::find()
-        .select_only()
-        .column(Column::Identifier)
-        .column(Column::OrgName)
-        .column(Column::OrgType)
-        .order_by(Column::CreatedTs, Order::Desc);
+    let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
     let records = res
-        .into_model::<OrganizationRecord>()
         .all(client)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(|record| OrganizationRecord::from(record))
+        .collect();
 
     Ok(records)
 }
@@ -238,10 +136,12 @@ pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, erro
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let records = Entity::find()
         .filter(Column::OrgName.eq(org_name))
-        .into_model::<OrganizationRecord>()
         .all(client)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(|record| OrganizationRecord::from(record))
+        .collect();
 
     Ok(records)
 }

@@ -22,11 +22,11 @@ mod m20241116_000002_drop_folders_created_at_column;
 mod m20241119_000001_create_dashboards_table;
 mod m20241119_000002_populate_dashboards_table;
 mod m20241119_000003_delete_metas;
-// mod m20241121_000001_create_organizations_table;
-// mod m20241122_000001_populate_organizations_table;
-// mod m20241122_130000_create_users_table;
-// mod m20241122_150000_create_org_users_table;
-// mod m20241122_163000_populate_users_table;
+mod m20241121_000001_create_organizations_table;
+mod m20241122_000001_populate_organizations_table;
+mod m20241122_130000_create_users_table;
+mod m20241122_150000_create_org_users_table;
+mod m20241122_163000_populate_users_table;
 
 /// Representation of the meta table at the time this migration executes.
 pub(super) mod meta {
@@ -64,11 +64,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20241119_000001_create_dashboards_table::Migration),
             Box::new(m20241119_000002_populate_dashboards_table::Migration),
             Box::new(m20241119_000003_delete_metas::Migration),
-            // Box::new(m20241121_000001_create_organizations_table::Migration),
-            // Box::new(m20241122_000001_populate_organizations_table::Migration),
-            // Box::new(m20241122_130000_create_users_table::Migration),
-            // Box::new(m20241122_150000_create_org_users_table::Migration),
-            // Box::new(m20241122_163000_populate_users_table::Migration),
+            Box::new(m20241121_000001_create_organizations_table::Migration),
+            Box::new(m20241122_000001_populate_organizations_table::Migration),
+            Box::new(m20241122_130000_create_users_table::Migration),
+            Box::new(m20241122_150000_create_org_users_table::Migration),
+            Box::new(m20241122_163000_populate_users_table::Migration),
         ]
     }
 }

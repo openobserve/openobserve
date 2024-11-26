@@ -20,18 +20,14 @@ use config::get_config;
 #[cfg(feature = "enterprise")]
 use jsonwebtoken::TokenData;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::{
-    authorizer::{
-        authz::{
-            get_user_creation_tuples, get_user_org_tuple, get_user_role_creation_tuple,
-            get_user_role_deletion_tuple, update_tuples,
-        },
-        roles::{
-            check_and_get_crole_tuple_for_new_user, get_roles_for_user,
-            get_user_crole_removal_tuples,
-        },
+use o2_enterprise::enterprise::openfga::authorizer::{
+    authz::{
+        get_user_creation_tuples, get_user_org_tuple, get_user_role_creation_tuple,
+        get_user_role_deletion_tuple, update_tuples,
     },
-    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+    roles::{
+        check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
+    },
 };
 #[cfg(feature = "enterprise")]
 use once_cell::sync::Lazy;
@@ -40,9 +36,10 @@ use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
+        common::meta::user::{RoleOrg, TokenValidationResponse},
         service::{db, organization, users},
     },
+    config::meta::user::{DBUser, UserOrg, UserRole},
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 #[cfg(feature = "enterprise")]
@@ -58,7 +55,7 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
-    use crate::{common::meta::user::UserOrgRole, service::users};
+    use crate::common::meta::user::UserOrgRole;
 
     let o2cfg = get_o2_config();
     let dec_token = res.1.unwrap();
@@ -88,7 +85,8 @@ pub async fn process_token(
         source_orgs.push(UserOrg {
             role: UserRole::from_str(&o2cfg.dex.default_role).unwrap(),
             name: o2cfg.dex.default_org.clone(),
-            ..UserOrg::default()
+            token: Default::default(),
+            rum_token: Default::default(),
         });
     } else {
         for group in groups {
@@ -102,7 +100,8 @@ pub async fn process_token(
                 source_orgs.push(UserOrg {
                     role: role_org.role,
                     name: role_org.org,
-                    ..UserOrg::default()
+                    token: Default::default(),
+                    rum_token: Default::default(),
                 });
             }
         }
@@ -371,8 +370,6 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
 
 #[cfg(feature = "enterprise")]
 async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Vec<String>) {
-    use crate::service::users;
-
     let o2cfg = get_o2_config();
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
@@ -408,7 +405,8 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             organizations: vec![UserOrg {
                 role: UserRole::from_str(&o2cfg.dex.default_role).unwrap(),
                 name: o2cfg.dex.default_org.clone(),
-                ..UserOrg::default()
+                token: Default::default(),
+                rum_token: Default::default(),
             }],
             is_external: true,
             password_ext: Some("".to_owned()),

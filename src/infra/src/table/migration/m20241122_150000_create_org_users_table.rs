@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::common::Column;
-use sea_orm::Schema;
 use sea_orm_migration::prelude::*;
 
 use super::{
@@ -26,6 +24,7 @@ use super::{
 pub struct Migration;
 
 const ORG_USER_ID_IDX: &str = "org_users_id_email_idx";
+const ORG_USER_RUM_TOKEN_IDX: &str = "org_users_rum_token_idx";
 const ORG_USER_ORGANIZATION_FOREIGN_KEY: &str = "org_users_org_id_fk";
 const ORG_USER_USER_FOREIGN_KEY: &str = "org_users_user_email_fk";
 
@@ -36,34 +35,20 @@ impl MigrationTrait for Migration {
             .create_table(create_org_users_table_statement())
             .await?;
         manager
-            .create_foreign_key(create_org_users_org_id_foreign_key_stmnt())
-            .await?;
-        manager
-            .create_foreign_key(create_org_users_user_email_foreign_key_stmnt())
-            .await?;
-        manager
             .create_index(create_org_users_id_email_idx_stmnt())
+            .await?;
+        manager
+            .create_index(create_org_users_rum_token_idx_stmnt())
             .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .drop_index(Index::drop().name(ORG_USER_RUM_TOKEN_IDX).to_owned())
+            .await?;
+        manager
             .drop_index(Index::drop().name(ORG_USER_ID_IDX).to_owned())
-            .await?;
-        manager
-            .drop_foreign_key(
-                ForeignKey::drop()
-                    .name(ORG_USER_USER_FOREIGN_KEY)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .drop_foreign_key(
-                ForeignKey::drop()
-                    .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
-                    .to_owned(),
-            )
             .await?;
         manager
             .drop_table(Table::drop().table(OrgUsers::Table).to_owned())
@@ -98,26 +83,18 @@ fn create_org_users_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(OrgUsers::RumToken).string_len(256))
         .col(ColumnDef::new(OrgUsers::CreatedAt).big_unsigned().not_null())
         .col(ColumnDef::new(OrgUsers::UpdatedAt).big_unsigned().not_null())
-        .to_owned()
-}
-
-fn create_org_users_org_id_foreign_key_stmnt() -> ForeignKeyCreateStatement {
-    sea_query::ForeignKeyCreateStatement::create()
-        .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
-        .from(OrgUsers::Table, OrgUsers::OrgId)
-        .to(Organizations::Table, Organizations::Identifier)
-        .on_delete(ForeignKeyAction::Cascade)
-        .on_update(ForeignKeyAction::Cascade)
-        .to_owned()
-}
-
-fn create_org_users_user_email_foreign_key_stmnt() -> ForeignKeyCreateStatement {
-    sea_query::ForeignKeyCreateStatement::create()
-        .name(ORG_USER_USER_FOREIGN_KEY)
-        .from(OrgUsers::Table, OrgUsers::Email)
-        .to(Users::Table, Users::Email)
-        .on_delete(ForeignKeyAction::Cascade)
-        .on_update(ForeignKeyAction::Cascade)
+        .foreign_key(ForeignKey::create()
+            .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
+            .from(OrgUsers::Table, OrgUsers::OrgId)
+            .to(Organizations::Table, Organizations::Identifier)
+            .on_delete(ForeignKeyAction::Cascade)
+        )
+        .foreign_key(ForeignKey::create()
+            .name(ORG_USER_USER_FOREIGN_KEY)
+            .from(OrgUsers::Table, OrgUsers::Email)
+            .to(Users::Table, Users::Email)
+            .on_delete(ForeignKeyAction::Cascade)
+        )
         .to_owned()
 }
 
@@ -130,6 +107,16 @@ fn create_org_users_id_email_idx_stmnt() -> IndexCreateStatement {
         .unique()
         .col(OrgUsers::Email)
         .col(OrgUsers::OrgId)
+        .to_owned()
+}
+
+/// Statement to create index on org.
+fn create_org_users_rum_token_idx_stmnt() -> IndexCreateStatement {
+    sea_query::Index::create()
+        .if_not_exists()
+        .name(ORG_USER_RUM_TOKEN_IDX)
+        .table(OrgUsers::Table)
+        .col(OrgUsers::RumToken)
         .to_owned()
 }
 
