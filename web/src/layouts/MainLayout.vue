@@ -843,6 +843,7 @@ export default defineComponent({
             user_email: store.state.userInfo.email,
           };
         }
+        let index = 0;
         orgOptions.value = store.state.organizations.map(
           (data: {
             id: any;
@@ -908,7 +909,11 @@ export default defineComponent({
 
             if (data.type == "default") {
               tempDefaultOrg = optiondata;
+            } else if (index == 0 && Object.keys(tempDefaultOrg).length == 0) {
+              tempDefaultOrg = optiondata;
             }
+
+            index++;
 
             return optiondata;
           },
