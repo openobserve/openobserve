@@ -73,9 +73,15 @@
           @click="refreshData"
           data-test="dashboard-viewpanel-refresh-data-btn"
           :disable="disable"
-          :color="isVariablesChanged ? '' : 'yellow'"
+          :color="isVariablesChanged ? 'yellow' : ''"
         >
-          <q-tooltip> Variables value changed refresh data </q-tooltip>
+          <q-tooltip>
+            {{
+              isVariablesChanged
+                ? "Variable values changed, refresh needed!"
+                : "Refresh data"
+            }}
+          </q-tooltip>
         </q-btn>
         <q-btn
           no-caps
@@ -161,7 +167,11 @@ import {
 } from "vue";
 
 import { useI18n } from "vue-i18n";
-import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
+import {
+  getDashboard,
+  getPanel,
+  checkIfVariablesAreLoaded,
+} from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -463,7 +473,24 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
     });
+    watch(
+      () => variablesData, 
+      (newVal) => {
+        console.log("newVal", newVal);
+        console.log(
+          "refreshVariableDataRef.value newVal",
+          refreshVariableDataRef,
+        );
+        console.log(
+          "JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef.value) newVal",
+          JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef),
+        );
 
+        isVariablesChanged.value =
+          JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef);
+      },
+      { deep: true }, 
+    );
     const refreshData = () => {
       if (!disable.value) {
         dateTimePickerRef.value.refresh();
