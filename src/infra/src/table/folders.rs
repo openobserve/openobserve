@@ -94,7 +94,6 @@ pub async fn put(org_id: &str, folder: Folder) -> Result<Folder, errors::Error> 
             // creating different types of folders then we can allow the caller
             // to pass the folder type as a field on the Folder struct.
             r#type: Set::<i16>(FolderType::Dashboards.into()),
-            created_at: Set(chrono::offset::Utc::now().timestamp()),
         },
     };
 
