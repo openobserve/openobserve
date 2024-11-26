@@ -475,7 +475,7 @@ async fn filter_file_list_by_tantivy_index(
 
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
-    let (index_parquet_files, limit) =
+    let (mut index_parquet_files, limit) =
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimze_rule {
             (
                 group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num),
@@ -488,17 +488,42 @@ async fn filter_file_list_by_tantivy_index(
     let mut no_more_files = false;
     let mut total_hits = 0;
     let mut is_add_filter_back = false;
-    for files in index_parquet_files {
+    let group_num = index_parquet_files.len();
+    let max_group_len = index_parquet_files
+        .iter()
+        .map(|g| g.len())
+        .max()
+        .unwrap_or(0);
+    for _ in 0..max_group_len {
         if no_more_files {
             // delete the rest of the files
-            for file in files {
+            for i in 0..group_num {
+                let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
+                    if g.is_empty() {
+                        None
+                    } else {
+                        Some(g.remove(g.len() - 1))
+                    }
+                }) else {
+                    continue;
+                };
                 file_list_map.remove(&file.key);
             }
             continue;
         }
 
+        // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
-        for file in files {
+        for i in 0..group_num {
+            let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
+                if g.is_empty() {
+                    None
+                } else {
+                    Some(g.remove(g.len() - 1))
+                }
+            }) else {
+                continue;
+            };
             let trace_id = query.trace_id.to_string();
             // Spawn a task for each file, wherein full text search and
             // secondary index search queries are executed
@@ -754,8 +779,8 @@ async fn search_tantivy_index(
 // use the min_ts & max_ts of the file.meta to group files and each group can't contains crossing
 // time range files
 fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> Vec<Vec<FileKey>> {
-    // sort files by max_ts in descending order
-    files.sort_unstable_by(|a, b| b.meta.max_ts.cmp(&a.meta.max_ts));
+    // sort files by max_ts in ascending order
+    files.sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
     // group by time range
     let mut file_groups_indices: Vec<Vec<FileKey>> = vec![];
     for file in files {
