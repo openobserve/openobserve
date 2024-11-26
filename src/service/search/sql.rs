@@ -243,7 +243,7 @@ impl Sql {
             && can_optimize
         {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
-                limit as usize,
+                (offset + limit) as usize,
                 order_by[0].1 == OrderBy::Asc,
             ));
         }

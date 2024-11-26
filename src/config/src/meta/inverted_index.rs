@@ -78,13 +78,13 @@ impl std::fmt::Display for InvertedIndexOptimizeMode {
     }
 }
 
-impl From<cluster_rpc::InvertedIndexOptimizeMode> for InvertedIndexOptimizeMode {
-    fn from(cluster_rpc_mode: cluster_rpc::InvertedIndexOptimizeMode) -> Self {
+impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
+    fn from(cluster_rpc_mode: cluster_rpc::IdxOptimizeMode) -> Self {
         match cluster_rpc_mode.mode {
-            Some(cluster_rpc::inverted_index_optimize_mode::Mode::SimpleSelect(select)) => {
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleSelect(select)) => {
                 InvertedIndexOptimizeMode::SimpleSelect(select.index as usize, select.asc)
             }
-            Some(cluster_rpc::inverted_index_optimize_mode::Mode::SimpleCount(_)) => {
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(_)) => {
                 InvertedIndexOptimizeMode::SimpleCount
             }
             None => panic!("Invalid InvertedIndexOptimizeMode"),
@@ -92,27 +92,21 @@ impl From<cluster_rpc::InvertedIndexOptimizeMode> for InvertedIndexOptimizeMode 
     }
 }
 
-impl From<InvertedIndexOptimizeMode> for cluster_rpc::InvertedIndexOptimizeMode {
+impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
     fn from(mode: InvertedIndexOptimizeMode) -> Self {
         match mode {
-            InvertedIndexOptimizeMode::SimpleSelect(index, asc) => {
-                cluster_rpc::InvertedIndexOptimizeMode {
-                    mode: Some(
-                        cluster_rpc::inverted_index_optimize_mode::Mode::SimpleSelect(
-                            cluster_rpc::SimpleSelect {
-                                index: index as u32,
-                                asc,
-                            },
-                        ),
-                    ),
-                }
-            }
-            InvertedIndexOptimizeMode::SimpleCount => cluster_rpc::InvertedIndexOptimizeMode {
-                mode: Some(
-                    cluster_rpc::inverted_index_optimize_mode::Mode::SimpleCount(
-                        cluster_rpc::SimpleCount { placeholder: true },
-                    ),
-                ),
+            InvertedIndexOptimizeMode::SimpleSelect(index, asc) => cluster_rpc::IdxOptimizeMode {
+                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleSelect(
+                    cluster_rpc::SimpleSelect {
+                        index: index as u32,
+                        asc,
+                    },
+                )),
+            },
+            InvertedIndexOptimizeMode::SimpleCount => cluster_rpc::IdxOptimizeMode {
+                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(
+                    cluster_rpc::SimpleCount {},
+                )),
             },
         }
     }
