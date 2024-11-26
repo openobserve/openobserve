@@ -375,7 +375,7 @@ export default defineComponent({
                       }
                     });
                 }
-                console.log("test redirec url", selectedOrg.value);
+
                 redirectUser(redirectURI);
               } else {
                 //if user is not authorized, show error message and reset form.
