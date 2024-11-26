@@ -53,28 +53,33 @@ impl Dashboard {
     }
 
     pub fn set_dashboard_id(&mut self, dashboard_id: String) {
-        match self.version {
-            1 => self
-                .v1
-                .as_mut()
-                .map(|inner| inner.dashboard_id = dashboard_id),
-            2 => self
-                .v2
-                .as_mut()
-                .map(|inner| inner.dashboard_id = dashboard_id),
-            3 => self
-                .v3
-                .as_mut()
-                .map(|inner| inner.dashboard_id = dashboard_id),
-            4 => self
-                .v4
-                .as_mut()
-                .map(|inner| inner.dashboard_id = dashboard_id),
-            5 => self
-                .v5
-                .as_mut()
-                .map(|inner| inner.dashboard_id = dashboard_id),
-            _ => None,
+        match self {
+            Self {
+                version: 1,
+                v1: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 2,
+                v2: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 3,
+                v3: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 4,
+                v4: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 5,
+                v5: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            _ => {}
         };
     }
 
@@ -101,13 +106,33 @@ impl Dashboard {
     }
 
     pub fn set_title(&mut self, title: String) {
-        match self.version {
-            1 => self.v1.as_mut().map(|inner| inner.title = title),
-            2 => self.v2.as_mut().map(|inner| inner.title = title),
-            3 => self.v3.as_mut().map(|inner| inner.title = title),
-            4 => self.v4.as_mut().map(|inner| inner.title = title),
-            5 => self.v5.as_mut().map(|inner| inner.title = title),
-            _ => None,
+        match self {
+            Self {
+                version: 1,
+                v1: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 2,
+                v2: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 3,
+                v3: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 4,
+                v4: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 5,
+                v5: Some(inner),
+                ..
+            } => inner.title = title,
+            _ => {}
         };
     }
 
