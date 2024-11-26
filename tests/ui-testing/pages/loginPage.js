@@ -20,9 +20,10 @@ export class LoginPage {
     await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
     await this.waitForLogin;
     await this.loginButton.click();
-    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/?org_identifier=default", {
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "networkidle",
     });
+  
     // await this.page
     //   .locator('[data-test="navbar-organizations-select"]')
     //   .getByText("arrow_drop_down")

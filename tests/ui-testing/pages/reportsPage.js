@@ -29,6 +29,7 @@ export class ReportsPage {
   async navigateToReports() {
     await this.homeMenu.hover();
     await this.reportsMenu.click();
+    await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
     await this.scheduledTab.click();
   }
   async createReport(dashboardName) {
