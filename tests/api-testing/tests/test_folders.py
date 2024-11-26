@@ -104,7 +104,7 @@ def test_e2e_createdeletedashboard(create_session, base_url):
     org_id = "default"
     payload = {
         "description": "pydashboards", 
-        "title": "pytestdashboard"
+        "title": "pytestdashboard",
         "owner": "user1@alpha1.com",
     }
 
