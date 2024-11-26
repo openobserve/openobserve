@@ -424,6 +424,7 @@ fn repartition_sorted_groups(
         let max_group = groups.remove(max_index);
 
         // if the max group has less than 3 files, we don't split it further
+        // less than 3 will cause repartitionExec issue
         if max_group.len() <= 3 {
             groups.push(max_group);
             break;
