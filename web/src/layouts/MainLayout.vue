@@ -843,7 +843,7 @@ export default defineComponent({
             user_email: store.state.userInfo.email,
           };
         }
-        let index = 0;
+
         orgOptions.value = store.state.organizations.map(
           (data: {
             id: any;
@@ -909,11 +909,7 @@ export default defineComponent({
 
             if (data.type == "default") {
               tempDefaultOrg = optiondata;
-            } else if (index == 0 && Object.keys(tempDefaultOrg).length == 0) {
-              tempDefaultOrg = optiondata;
             }
-
-            index++;
 
             return optiondata;
           },
@@ -925,6 +921,28 @@ export default defineComponent({
         selectedOrg.value = tempDefaultOrg;
         useLocalOrganization(tempDefaultOrg);
         store.dispatch("setSelectedOrganization", tempDefaultOrg);
+      }
+
+      if (Object.keys(selectedOrg.value).length == 0) {
+        let data = store.state.organizations[0];
+        let optiondata = {
+          label: data.name,
+          id: data.id,
+          identifier: data.identifier,
+          user_email: store.state.userInfo.email,
+          ingest_threshold: data.ingest_threshold,
+          search_threshold: data.search_threshold,
+          subscription_type: data.hasOwnProperty("CustomerBillingObj")
+            ? data.CustomerBillingObj.subscription_type
+            : "",
+          status: data.status,
+          note: data.hasOwnProperty("CustomerBillingObj")
+            ? data.CustomerBillingObj.note
+            : "",
+        };
+        selectedOrg.value = optiondata;
+        useLocalOrganization(optiondata);
+        store.dispatch("setSelectedOrganization", optiondata);
       }
 
       if (router.currentRoute.value.query.action == "subscribe") {
