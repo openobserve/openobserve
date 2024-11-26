@@ -150,7 +150,7 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
         // Remove each of the following fields from the inner JSON since they
         // will now be stored in table columns and we don't want to keep
         // duplicate sources of the data that we would need to synchronize.
-        obj.remove("dashboard_id");
+        obj.remove("dashboardId");
         let version: i32 = obj
             .remove("version")
             .and_then(|v| v.as_i64())

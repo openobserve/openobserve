@@ -280,7 +280,7 @@ async fn list_models(
         .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()))
         .filter(folders::Column::FolderId.eq(folder_id))
         .find_with_related(dashboards::Entity)
-        .order_by_asc(dashboards::Column::Id)
+        .order_by_asc(dashboards::Column::Title)
         .all(db)
         .await?;
     let dashboards = rslt.into_iter().flat_map(|(_, ds)| ds).collect();
