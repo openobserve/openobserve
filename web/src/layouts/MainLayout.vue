@@ -698,6 +698,11 @@ export default defineComponent({
       );
     };
 
+    watch(store.state.selectedOrganization, () => {
+      console.log("org change", store.state.selectedOrganization);
+      selectedOrg.value = store.state.selectedOrganization;
+    });
+
     // additional links based on environment and conditions
     if (config.isCloud == "true") {
       linksList.value = mainLayoutMixin
