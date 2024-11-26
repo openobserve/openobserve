@@ -630,6 +630,7 @@ export default defineComponent({
       try {
         const url = new URL(window.location.href);
         const localOrg: any = useLocalOrganization();
+        console.log("on before mount", localOrg.value, selectedOrg.value);
         if (
           Object.keys(localOrg.value).length == 0 &&
           url.searchParams.get("org_identifier") != null
@@ -651,6 +652,7 @@ export default defineComponent({
     onMounted(async () => {
       miniMode.value = true;
       filterMenus();
+      console.log("on mounted", selectedOrg.value);
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
       if (
@@ -691,7 +693,7 @@ export default defineComponent({
     };
 
     watch(store.state.selectedOrganization, () => {
-      console.log("org change", store.state.selectedOrganization);
+      console.log("org change", store.state.selectedOrganization, selectedOrg.value);
       selectedOrg.value = store.state.selectedOrganization;
     });
 
@@ -820,6 +822,7 @@ export default defineComponent({
     };
 
     const setSelectedOrganization = async () => {
+      console.log("inside set selected org", selectedOrg.value);
       customOrganization = router.currentRoute.value.query.hasOwnProperty(
         "org_identifier",
       )
@@ -828,6 +831,7 @@ export default defineComponent({
       let tempDefaultOrg = {};
       let localOrgFlag = false;
       const url = new URL(window.location.href);
+      console.log(store.state.organizations?.length);
       if (store.state.organizations?.length > 0) {
         const localOrg: any = useLocalOrganization();
         if (
@@ -894,10 +898,12 @@ export default defineComponent({
               selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
               useLocalOrganization(optiondata);
               store.dispatch("setSelectedOrganization", optiondata);
+              console.log("inside selected org if", selectedOrg.value);
             } else if (data.identifier == customOrganization) {
               selectedOrg.value = optiondata;
               useLocalOrganization(optiondata);
               store.dispatch("setSelectedOrganization", optiondata);
+              console.log("inside selected org else", selectedOrg.value);
             }
 
             if (data.type == "default") {
@@ -910,6 +916,7 @@ export default defineComponent({
       }
 
       if (localOrgFlag == false) {
+        console.log("inside selected org localorgdlag", tempDefaultOrg);
         selectedOrg.value = tempDefaultOrg;
         useLocalOrganization(tempDefaultOrg);
         store.dispatch("setSelectedOrganization", tempDefaultOrg);
@@ -932,6 +939,7 @@ export default defineComponent({
     // get organizations settings on first load and identifier change
     const getOrganizationSettings = async () => {
       try {
+        console.log("inside get org settings");
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
           store.state?.selectedOrganization?.identifier,
@@ -1057,6 +1065,7 @@ export default defineComponent({
     },
     changeOrganization: {
       handler() {
+        console.log("inside change organia watch")
         // setTimeout(() => {
         this.setSelectedOrganization();
         // }, 500);
