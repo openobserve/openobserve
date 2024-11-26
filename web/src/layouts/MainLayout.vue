@@ -1088,6 +1088,7 @@ export default defineComponent({
     },
     changeOrganization: {
       handler() {
+        console.log("inside change organia watch")
         // setTimeout(() => {
         this.setSelectedOrganization();
         // }, 500);
