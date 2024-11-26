@@ -24,6 +24,7 @@ use config::{
     get_config,
     meta::{
         bitvec::BitVec,
+        inverted_index::InvertedIndexOptimizeMode,
         search::ScanStats,
         stream::{FileKey, StreamPartition, StreamType},
     },
@@ -163,6 +164,9 @@ pub async fn search(
         use_inverted_index: req.use_inverted_index,
     });
 
+    // TODO: get from leader
+    let idx_optimze_rule: Option<InvertedIndexOptimizeMode> = None;
+
     // get all tables
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
@@ -200,6 +204,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            idx_optimze_rule,
         )
         .await
         {

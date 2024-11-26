@@ -58,3 +58,20 @@ impl std::fmt::Display for InvertedIndexTantivyMode {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InvertedIndexOptimizeMode {
+    SimpleSelect(usize, bool),
+    SimpleCount,
+}
+
+impl std::fmt::Display for InvertedIndexOptimizeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InvertedIndexOptimizeMode::SimpleSelect(limit, ascend) => {
+                write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
+            }
+            InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
+        }
+    }
+}
