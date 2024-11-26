@@ -854,3 +854,16 @@ export const moveDashboardToAnotherFolder = async (
     throw error;
   }
 };
+
+export const checkIfVariablesAreLoaded = (variablesData: any): boolean => {
+  if (
+    variablesData?.values?.length > 0 &&
+    variablesData?.values?.every(
+      (it: any) => !it.isLoading && !it.isVariableLoadingPending,
+    ) &&
+    !variablesData?.isVariablesLoading
+  ) {
+    return true;
+  }
+  return false;
+};

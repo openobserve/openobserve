@@ -182,7 +182,7 @@ import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
-import { updateDashboard } from "../../utils/commons";
+import { checkIfVariablesAreLoaded, updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
@@ -262,8 +262,6 @@ export default defineComponent({
         : [];
     });
 
-    const refreshVariableDataRef: any = reactive({});
-
     const {
       showPositiveNotification,
       showErrorNotification,
@@ -279,6 +277,7 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+    const refreshVariableDataRef: any = reactive({});
 
     // ======= [START] dashboard PrintMode =======
 
@@ -319,17 +318,16 @@ export default defineComponent({
 
     // watch on currentTimeObj to update the variablesData
     watch(
-      () =>
-      props.currentTimeObj,
+      () => props.currentTimeObj,
       () => {
         console.log("props.currentTimeObj", props.currentTimeObj);
-        
-        Object.assign(
-        refreshVariableDataRef,
-        JSON.parse(JSON.stringify(variablesData))
-      );
+
+        // Object.assign(
+        //   refreshVariableDataRef,
+        //   JSON.parse(JSON.stringify(variablesData)),
+        // );
       },
-    )
+    );
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
         variablesAndPanelsDataLoadingState.searchRequestTraceIds,
@@ -370,44 +368,41 @@ export default defineComponent({
       }
     });
 
+    let needsVariablesAutoUpdate = true;
+
     const variablesDataUpdated = (data: any) => {
       try {
+        console.log("variablesDataUpdated: entry", data);
         // update the variables data
         Object.assign(variablesData, data);
 
-        // Check if any value has changed before assigning to `refreshVariableDataRef`
-      const isValueChanged = refreshVariableDataRef?.values?.length > 0 &&
-        data.values.every((variable: any, index: number) => {
-          const prevValue = refreshVariableDataRef.values[index]?.value;
-          const newValue = variable.value;
-          // Compare current and previous values; handle both string and array cases
-          return Array.isArray(newValue)
-            ? JSON.stringify(prevValue) === JSON.stringify(newValue)
-            : prevValue === newValue;
-        });
-      // when this is called 1st time, we need to set the data for the updated variables data as well
-      // from the second time, it will only be updated after the apply button is clicked
-      if (
-        (!refreshVariableDataRef?.values?.length || isValueChanged) && // Previous value of variables is empty
-        variablesData?.values?.length > 0 // new values of variables is NOT empty
-      ) {
-        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
-        Object.assign(refreshVariableDataRef, variablesData);
-      }
-        // emit the variables data
-        emit("variablesData", refreshVariableDataRef);
+        console.log(
+          "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
+          needsVariablesAutoUpdate,
+        );
+        if (needsVariablesAutoUpdate) {
+          console.log(
+            "variablesDataUpdated: needs auto update, checking variables legth",
+            variablesData?.values?.length,
+          );
 
-        // update the loading state
-        if (variablesAndPanelsDataLoadingState) {
-          variablesAndPanelsDataLoadingState.variablesData =
-            variablesData?.values?.reduce(
-              (obj: any, item: any) => ({
-                ...obj,
-                [item.name]: item.isLoading,
-              }),
-              {},
+          // check if the length is > 0
+          if (checkIfVariablesAreLoaded(variablesData)) {
+            console.log(
+              "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
             );
+            needsVariablesAutoUpdate = false;
+          }
+
+          console.log(
+            "variablesDataUpdated: setting refreshVariableDataRef",
+            JSON.stringify(variablesData, null, 2),
+          );
+          Object.assign(refreshVariableDataRef, variablesData);
+          emit("variablesData", refreshVariableDataRef);
         }
+
+        return;
       } catch (error) {
         console.log(error);
       }

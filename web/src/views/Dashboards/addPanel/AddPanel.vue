@@ -353,6 +353,7 @@ import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import {
   addPanel,
+  checkIfVariablesAreLoaded,
   getDashboard,
   getPanel,
   updatePanel,
@@ -476,6 +477,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
+    let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
@@ -507,25 +509,19 @@ export default defineComponent({
         },
       });
 
-      // Check if any value has changed before assigning to `updatedVariablesData`
-      const valuesUnchanged =
-        updatedVariablesData?.values?.length > 0 &&
-        data.values.every((variable: any, index: number) => {
-          const prevValue = updatedVariablesData.values[index]?.value;
-          const newValue = variable.value;
-          // Compare current and previous values; handle both string and array cases
-          return Array.isArray(newValue)
-            ? JSON.stringify(prevValue) === JSON.stringify(newValue)
-            : prevValue === newValue;
-        });
+      if (needsVariablesAutoUpdate) {
+        console.log(
+          "variablesDataUpdated: needs auto update, checking variables legth",
+          variablesData?.values?.length,
+        );
 
-      // when this is called 1st time, we need to set the data for the updated variables data as well
-      // from the second time, it will only be updated after the apply button is clicked
-      if (
-        (!updatedVariablesData?.values?.length || valuesUnchanged) && // Previous value of variables is empty
-        variablesData?.values?.length > 0 // new values of variables is NOT empty
-      ) {
-        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+        // check if the length is > 0
+        if (checkIfVariablesAreLoaded(variablesData)) {
+            console.log(
+              "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
+            );
+            needsVariablesAutoUpdate = false;
+          }
         Object.assign(updatedVariablesData, variablesData);
       }
     };

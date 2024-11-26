@@ -75,9 +75,7 @@
           :disable="disable"
           :color="isVariablesChanged ? '' : 'yellow'"
         >
-          <q-tooltip>
-            Variables value changed refresh data 
-          </q-tooltip>
+          <q-tooltip> Variables value changed refresh data </q-tooltip>
         </q-btn>
         <q-btn
           no-caps
@@ -163,7 +161,7 @@ import {
 } from "vue";
 
 import { useI18n } from "vue-i18n";
-import { getDashboard, getPanel } from "../../../utils/commons";
+import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -244,35 +242,42 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const initialVariableValues = ref<any>({}); // Store the initial variable values
     const isVariablesChanged = ref(false); // Flag to track if variables have changed
+    let needsVariablesAutoUpdate = true;
+
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
+      try {
+        console.log("variablesDataUpdated: entry", data);
+        // update the variables data
+        Object.assign(variablesData, data);
 
-      // Check if any value has changed before assigning to `refreshVariableDataRef`
-      const isValueChanged =
-        refreshVariableDataRef?.values?.length > 0 &&
-        data.values.every((variable: any, index: number) => {
-          const prevValue = refreshVariableDataRef.values[index]?.value;
-          const newValue = variable.value;
-          // Compare current and previous values; handle both string and array cases
-          return Array.isArray(newValue)
-            ? JSON.stringify(prevValue) === JSON.stringify(newValue)
-            : prevValue === newValue;
-        });
-      // Set the `isChanged` flag if values are different
-      isVariablesChanged.value = isValueChanged;
+        console.log(
+          "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
+          needsVariablesAutoUpdate,
+        );
+        if (needsVariablesAutoUpdate) {
+          console.log(
+            "variablesDataUpdated: needs auto update, checking variables legth",
+            variablesData?.values?.length,
+          );
 
-      // When this is called for the first time, set the initial values
-      if (!initialVariableValues.value) {
-        initialVariableValues.value = { ...data.values };
-      }
-      // when this is called 1st time, we need to set the data for the updated variables data as well
-      // from the second time, it will only be updated after the apply button is clicked
-      if (
-        (!refreshVariableDataRef?.values?.length || isValueChanged) && // Previous value of variables is empty
-        variablesData?.values?.length > 0 // new values of variables is NOT empty
-      ) {
-        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
-        Object.assign(refreshVariableDataRef, variablesData);
+          // check if the length is > 0
+          if (checkIfVariablesAreLoaded(variablesData)) {
+            console.log(
+              "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
+            );
+            needsVariablesAutoUpdate = false;
+          }
+
+          console.log(
+            "variablesDataUpdated: setting refreshVariableDataRef",
+            JSON.stringify(variablesData, null, 2),
+          );
+          Object.assign(refreshVariableDataRef, variablesData);
+        }
+
+        return;
+      } catch (error) {
+        console.log(error);
       }
 
       // resize the chart when variables data is updated
