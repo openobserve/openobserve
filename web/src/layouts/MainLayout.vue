@@ -1063,10 +1063,14 @@ export default defineComponent({
     forceFetchOrganization() {
       mainLayoutMixin.setup().getDefaultOrganization(this.store);
     },
-    changeOrganization() {
-      setTimeout(() => {
+    changeOrganization: {
+      handler() {
+        // setTimeout(() => {
         this.setSelectedOrganization();
-      }, 500);
+        // }, 500);
+      },
+      deep: true,
+      immediate: true,
     },
     async changeOrganizationIdentifier() {
       this.isLoading = false;
