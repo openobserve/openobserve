@@ -167,8 +167,8 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
-    // TODO: get from leader
-    let idx_optimze_rule: Option<InvertedIndexOptimizeMode> = None;
+    let idx_optimze_rule: Option<InvertedIndexOptimizeMode> =
+        req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
     let mut tables = Vec::new();

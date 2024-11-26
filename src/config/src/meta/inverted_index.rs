@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use proto::cluster_rpc;
+
 /// Supported inverted index formats:
 ///  - Parquet (v2): Index is stored in parquet format
 ///  - Tantivy (v3): Index is stored in custom puffin format files
@@ -72,6 +74,46 @@ impl std::fmt::Display for InvertedIndexOptimizeMode {
                 write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
             }
             InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
+        }
+    }
+}
+
+impl From<cluster_rpc::InvertedIndexOptimizeMode> for InvertedIndexOptimizeMode {
+    fn from(cluster_rpc_mode: cluster_rpc::InvertedIndexOptimizeMode) -> Self {
+        match cluster_rpc_mode.mode {
+            Some(cluster_rpc::inverted_index_optimize_mode::Mode::SimpleSelect(select)) => {
+                InvertedIndexOptimizeMode::SimpleSelect(select.index as usize, select.asc)
+            }
+            Some(cluster_rpc::inverted_index_optimize_mode::Mode::SimpleCount(_)) => {
+                InvertedIndexOptimizeMode::SimpleCount
+            }
+            None => panic!("Invalid InvertedIndexOptimizeMode"),
+        }
+    }
+}
+
+impl From<InvertedIndexOptimizeMode> for cluster_rpc::InvertedIndexOptimizeMode {
+    fn from(mode: InvertedIndexOptimizeMode) -> Self {
+        match mode {
+            InvertedIndexOptimizeMode::SimpleSelect(index, asc) => {
+                cluster_rpc::InvertedIndexOptimizeMode {
+                    mode: Some(
+                        cluster_rpc::inverted_index_optimize_mode::Mode::SimpleSelect(
+                            cluster_rpc::SimpleSelect {
+                                index: index as u32,
+                                asc,
+                            },
+                        ),
+                    ),
+                }
+            }
+            InvertedIndexOptimizeMode::SimpleCount => cluster_rpc::InvertedIndexOptimizeMode {
+                mode: Some(
+                    cluster_rpc::inverted_index_optimize_mode::Mode::SimpleCount(
+                        cluster_rpc::SimpleCount { placeholder: true },
+                    ),
+                ),
+            },
         }
     }
 }
