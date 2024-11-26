@@ -73,7 +73,12 @@
           @click="refreshData"
           data-test="dashboard-viewpanel-refresh-data-btn"
           :disable="disable"
-        />
+          :color="isVariablesChanged ? '' : 'yellow'"
+        >
+          <q-tooltip>
+            Variables value changed refresh data 
+          </q-tooltip>
+        </q-btn>
         <q-btn
           no-caps
           @click="goBack"
@@ -237,11 +242,14 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+    const initialVariableValues = ref<any>({}); // Store the initial variable values
+    const isVariablesChanged = ref(false); // Flag to track if variables have changed
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
 
       // Check if any value has changed before assigning to `refreshVariableDataRef`
-      const isValueChanged = refreshVariableDataRef?.values?.length > 0 &&
+      const isValueChanged =
+        refreshVariableDataRef?.values?.length > 0 &&
         data.values.every((variable: any, index: number) => {
           const prevValue = refreshVariableDataRef.values[index]?.value;
           const newValue = variable.value;
@@ -250,6 +258,13 @@ export default defineComponent({
             ? JSON.stringify(prevValue) === JSON.stringify(newValue)
             : prevValue === newValue;
         });
+      // Set the `isChanged` flag if values are different
+      isVariablesChanged.value = isValueChanged;
+
+      // When this is called for the first time, set the initial values
+      if (!initialVariableValues.value) {
+        initialVariableValues.value = { ...data.values };
+      }
       // when this is called 1st time, we need to set the data for the updated variables data as well
       // from the second time, it will only be updated after the apply button is clicked
       if (
@@ -448,9 +463,10 @@ export default defineComponent({
       if (!disable.value) {
         dateTimePickerRef.value.refresh();
         Object.assign(
-        refreshVariableDataRef,
-        JSON.parse(JSON.stringify(variablesData))
-      );
+          refreshVariableDataRef,
+          JSON.parse(JSON.stringify(variablesData)),
+        );
+        isVariablesChanged.value = false;
       }
     };
 
@@ -596,6 +612,7 @@ export default defineComponent({
       disable,
       config,
       refreshVariableDataRef,
+      isVariablesChanged,
     };
   },
 });
