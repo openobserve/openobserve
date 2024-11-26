@@ -149,18 +149,7 @@ pub async fn put(
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
 
-    // Remove fields that will be saved in DB columns from the JSON blob so that
-    // we are not storing the same value in two different places and risking
-    // desynchronization.
-    let mut data: JsonValue = serde_json::to_value(dashboard)?;
-    if let Some(obj) = data.as_object_mut() {
-        obj.remove("dashboard_id");
-        obj.remove("version");
-        obj.remove("owner");
-        obj.remove("role");
-        obj.remove("title");
-        obj.remove("description");
-    }
+    let data = inner_data_as_json(dashboard)?;
 
     let (folder_m, mut dash_am) = match get_model(client, org_id, folder_id, &dashboard_id).await? {
         None => {
@@ -285,4 +274,55 @@ async fn list_models(
         .await?;
     let dashboards = rslt.into_iter().flat_map(|(_, ds)| ds).collect();
     Ok(dashboards)
+}
+
+/// Converts the [Dashboard] into the JSON represention of the inner data that
+/// will be stored in the data column of the database.
+///
+/// The returned JSON object should exclude any field that will be stored in
+/// database columns. The schema of the JSON object will vary depending on the
+/// dashboard version.
+fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> {
+    let mut data: JsonValue = match dashboard {
+        Dashboard {
+            version: 1,
+            v1: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 2,
+            v2: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 3,
+            v3: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 4,
+            v4: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 5,
+            v5: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard { version: v, .. } => Err(errors::PutDashboardError::MissingInnerData(v).into()),
+    }?;
+
+    // Remove fields that will be saved in DB columns from the JSON blob so that
+    // we are not storing the same value in two different places and risking
+    // desynchronization.
+    if let Some(obj) = data.as_object_mut() {
+        obj.remove("dashboard_id");
+        obj.remove("version");
+        obj.remove("owner");
+        obj.remove("role");
+        obj.remove("title");
+        obj.remove("description");
+    }
+
+    Ok(data)
 }
