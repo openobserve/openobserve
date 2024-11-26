@@ -275,7 +275,6 @@ pub async fn search(
     }
 }
 
-
 /// Returns Error if the first query is failed, otherwise returns the partial results.
 /// In case one query fails, the remaining queries are not executed.
 #[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
@@ -533,7 +532,6 @@ pub async fn search_multi(
     }
     Ok(multi_res)
 }
-
 
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
