@@ -908,11 +908,7 @@ export default defineComponent({
 
             if (data.type == "default") {
               tempDefaultOrg = optiondata;
-            } else if (index == 0 && Object.keys(tempDefaultOrg).length == 0) {
-              tempDefaultOrg = optiondata;
             }
-
-            index++;
 
             return optiondata;
           },
