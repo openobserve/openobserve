@@ -177,20 +177,12 @@ size="xs" class="warning" />{{
           class="q-mx-sm current-organization"
         >
           <q-select
-            v-if="Object.keys(selectedOrg).length > 0"
             v-model="selectedOrg"
             borderless
             :options="orgOptions"
             option-label="identifier"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
-          />
-          <q-select
-            v-else
-            borderless
-            option-label="identifier"
-            option-value="identifier"
-            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
           />
         </div>
 
