@@ -989,7 +989,6 @@ export default defineComponent({
           `"${searchObj.data.stream.selectedStream[0]}"`,
         );
 
-        console.log(JSON.stringify(searchObj.data.stream.interestingFieldList));
       searchObj.data.query = newQuery;
       searchObj.data.editorValue = newQuery;
       searchBarRef.value.updateQuery();
@@ -1034,7 +1033,6 @@ export default defineComponent({
           // but it should be added if field exist in the strem schema
           searchObj.data.streamResults.list.forEach((stream) => {
             if (stream.name === parsedSQL.from[0].table) {
-              console.log(stream.schema);
               stream.schema.forEach((stream_field) => {
                 if (field.name === stream_field.name) {
                   parsedSQL.columns.push({
