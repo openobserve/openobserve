@@ -696,7 +696,7 @@ async fn search_tantivy_index(
     let condition: IndexCondition = index_condition.ok_or(anyhow::anyhow!(
         "[trace_id {trace_id}] search->storage: IndexCondition not found"
     ))?;
-    let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field);
+    let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
 
     // warm up the terms in the query
     if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
