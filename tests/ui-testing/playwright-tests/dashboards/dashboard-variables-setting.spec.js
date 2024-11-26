@@ -438,7 +438,7 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-custom-variable-0-checkbox"]').click();
     await page.locator('[data-test="dashboard-custom-variable-1-checkbox"]').click();
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+    await page.locator('[data-test="dashboard-variable-custom-value-selector"]').click();
   })
 
   test("should verify that hide on custom variable dashboard is working", async ({ page, }) => {
