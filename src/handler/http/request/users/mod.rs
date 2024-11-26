@@ -113,7 +113,7 @@ pub async fn save(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role.base_role = meta::user::UserRole::Admin;
+        user.role.base_role = config::meta::user::UserRole::Admin;
     }
     users::post_user(&org_id, user, &initiator_id).await
 }
@@ -158,7 +158,7 @@ pub async fn update(
     #[cfg(not(feature = "enterprise"))]
     {
         user.role = Some(UserRoleRequest {
-            role: meta::user::UserRole::Admin.to_string(),
+            role: config::meta::user::UserRole::Admin.to_string(),
             custom: None,
         });
     }

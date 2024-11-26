@@ -17,6 +17,7 @@ use config::meta::user::{DBUser, User, UserOrg, UserRole};
 #[cfg(feature = "enterprise")]
 use infra::table::org_invites::OrgInviteStatus;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "enterprise")]
 use strum::IntoEnumIterator;
 use utoipa::ToSchema;
 
@@ -130,16 +131,19 @@ pub fn get_default_user_org() -> UserOrg {
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub fn get_default_user_role() -> UserRole {
     let mut role = UserRole::Admin;
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-        if get_o2_config().openfga.enabled {
-            role = get_o2_config().dex.default_role.parse().unwrap();
-        }
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    if get_o2_config().openfga.enabled {
+        role = get_o2_config().dex.default_role.parse().unwrap();
     }
     role
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn get_default_user_role() -> UserRole {
+    UserRole::Admin
 }
 
 #[cfg(feature = "enterprise")]

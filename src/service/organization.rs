@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
+#[cfg(feature = "enterprise")]
 use chrono::{Duration, Utc};
+#[cfg(feature = "enterprise")]
+use config::{get_config, SMTP_CLIENT};
 use config::{
-    get_config, ider,
+    ider,
     meta::{stream::StreamType, user::UserRole},
     utils::rand::generate_random_string,
-    SMTP_CLIENT,
 };
+#[cfg(feature = "enterprise")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::org_invites;
