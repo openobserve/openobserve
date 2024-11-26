@@ -725,6 +725,7 @@ export default defineComponent({
         mainLayoutMixin.setup().customOrganization !=
           store.state.selectedOrganization?.identifier
       ) {
+        console.log("inside null check and blank value", selectedOrg.value);
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
       }
