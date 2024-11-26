@@ -475,14 +475,12 @@ async fn filter_file_list_by_tantivy_index(
 
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
-    let (mut index_parquet_files, limit) =
+    let mut index_parquet_files = group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num);
+    let query_limit =
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimze_rule {
-            (
-                group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num),
-                limit,
-            )
+            limit
         } else {
-            (vec![index_parquet_files], 0)
+            0
         };
 
     let mut no_more_files = false;
@@ -589,7 +587,7 @@ async fn filter_file_list_by_tantivy_index(
             }
         }
         // if limit is set and total hits exceed the limit, we stop searching
-        if limit > 0 && total_hits > limit {
+        if query_limit > 0 && total_hits > query_limit {
             no_more_files = true;
         }
     }
