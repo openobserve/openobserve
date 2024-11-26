@@ -88,10 +88,9 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use config::{cache_instance_id, get_config};
+    use config::{cache_instance_id, get_config, meta::user::User};
 
     use super::*;
-    use crate::common::meta::user::User;
 
     #[tokio::test]
     async fn test_check_no_auth() {
@@ -101,7 +100,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -134,7 +133,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -165,7 +164,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),

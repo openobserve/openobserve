@@ -13,15 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt, str::FromStr};
-
+use config::meta::user::{DBUser, User, UserOrg, UserRole};
 #[cfg(feature = "enterprise")]
 use infra::table::org_invites::OrgInviteStatus;
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, IntoEnumIterator};
+use strum::IntoEnumIterator;
 use utoipa::ToSchema;
 
-use super::organization::{OrgRoleMapping, Organization};
+use super::organization::OrgRoleMapping;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserRequest {
@@ -97,112 +96,6 @@ impl From<&PostUserRequest> for UserRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct DBUser {
-    pub email: String,
-    #[serde(default)]
-    pub first_name: String,
-    #[serde(default)]
-    pub last_name: String,
-    pub password: String,
-    #[serde(default)]
-    pub salt: String,
-    pub organizations: Vec<UserOrg>,
-    #[serde(default)]
-    pub is_external: bool,
-    pub password_ext: Option<String>,
-}
-
-impl DBUser {
-    pub fn get_user(&self, org_id: String) -> Option<User> {
-        if self.organizations.is_empty() {
-            return None;
-        }
-
-        let mut local = self.clone();
-        local.organizations.retain(|org| org.name.eq(&org_id));
-        if local.organizations.is_empty() {
-            return None;
-        }
-
-        let org = local.organizations.first().unwrap();
-        Some(User {
-            email: local.email,
-            first_name: local.first_name,
-            last_name: local.last_name,
-            password: local.password,
-            role: org.role.clone(),
-            org: org.name.clone(),
-            token: org.token.clone(),
-            rum_token: org.rum_token.clone(),
-            salt: local.salt,
-            is_external: self.is_external,
-            password_ext: self.password_ext.clone(),
-        })
-    }
-
-    pub fn get_all_users(&self) -> Vec<User> {
-        let mut ret_val = vec![];
-        if self.organizations.is_empty() {
-            ret_val
-        } else {
-            for org in self.organizations.clone() {
-                ret_val.push(User {
-                    email: self.email.clone(),
-                    first_name: self.first_name.clone(),
-                    last_name: self.last_name.clone(),
-                    password: self.password.clone(),
-                    role: org.role,
-                    org: org.name,
-                    token: org.token,
-                    rum_token: org.rum_token,
-                    salt: self.salt.clone(),
-                    is_external: self.is_external,
-                    password_ext: self.password_ext.clone(),
-                })
-            }
-            ret_val
-        }
-    }
-}
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct User {
-    pub email: String,
-    #[serde(default)]
-    pub first_name: String,
-    #[serde(default)]
-    pub last_name: String,
-    pub password: String,
-    #[serde(default)]
-    pub salt: String,
-    #[serde(default)]
-    pub token: String,
-    #[serde(default)]
-    pub rum_token: Option<String>,
-    pub role: UserRole,
-    pub org: String,
-    /// Is the user authenticated and created via LDAP
-    pub is_external: bool,
-    pub password_ext: Option<String>,
-}
-
-#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
-pub struct UserOrg {
-    pub name: String,
-    #[serde(default)]
-    pub token: String,
-    #[serde(default)]
-    pub rum_token: Option<String>,
-    #[serde(default)]
-    pub role: UserRole,
-}
-
-impl PartialEq for UserOrg {
-    fn eq(&self, other: &Self) -> bool {
-        !self.name.eq(&other.name)
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserOrgRole {
     #[serde(rename = "role")]
     pub base_role: UserRole,
@@ -228,119 +121,39 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
-pub enum UserRole {
-    #[serde(rename = "admin")]
-    Admin,
-    #[serde(rename = "member")] // admin in OpenSource
-    Member,
-    #[serde(rename = "root")]
-    Root,
+pub fn get_default_user_org() -> UserOrg {
+    UserOrg {
+        name: "".to_string(),
+        token: "".to_string(),
+        rum_token: None,
+        role: get_default_user_role(),
+    }
+}
+
+pub fn get_default_user_role() -> UserRole {
+    let mut role = UserRole::Admin;
     #[cfg(feature = "enterprise")]
-    #[serde(rename = "viewer")] // read only user
-    Viewer,
-    #[cfg(feature = "enterprise")]
-    #[serde(rename = "user")] // No access only login user
-    User,
-    #[cfg(feature = "enterprise")]
-    #[serde(rename = "editor")]
-    Editor,
-    #[cfg(feature = "enterprise")]
-    #[serde(rename = "service_account")]
-    ServiceAccount,
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        let mut role = UserRole::Admin;
-        #[cfg(feature = "enterprise")]
-        {
-            use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-            if get_o2_config().openfga.enabled {
-                role = get_o2_config().dex.default_role.parse().unwrap();
-            }
-        }
-        role
-    }
-}
-
-impl fmt::Display for UserRole {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            UserRole::Admin => write!(f, "admin"),
-            UserRole::Member => write!(f, "member"),
-            UserRole::Root => write!(f, "root"),
-            #[cfg(feature = "enterprise")]
-            UserRole::Viewer => write!(f, "viewer"),
-            #[cfg(feature = "enterprise")]
-            UserRole::Editor => write!(f, "editor"),
-            #[cfg(feature = "enterprise")]
-            UserRole::User => write!(f, "user"),
-            #[cfg(feature = "enterprise")]
-            UserRole::ServiceAccount => write!(f, "service_account"),
+    {
+        use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+        if get_o2_config().openfga.enabled {
+            role = get_o2_config().dex.default_role.parse().unwrap();
         }
     }
+    role
 }
 
-impl UserRole {
-    pub fn get_label(&self) -> String {
-        match self {
-            UserRole::Admin => "Admin".to_string(),
-            UserRole::Member => "Member".to_string(),
-            UserRole::Root => "Root".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::Viewer => "Viewer".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::Editor => "Editor".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::User => "User".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::ServiceAccount => "Service Account".to_string(),
-        }
+#[cfg(feature = "enterprise")]
+pub fn get_roles() -> Vec<UserRole> {
+    let mut roles = vec![];
+    for role in UserRole::iter() {
+        roles.push(role);
     }
+    roles
 }
 
-// Implementing FromStr for UserRole
-impl FromStr for UserRole {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<UserRole, Self::Err> {
-        match input {
-            "admin" => Ok(UserRole::Admin),
-            "member" => Ok(UserRole::Member),
-            "root" => Ok(UserRole::Root),
-            #[cfg(feature = "enterprise")]
-            "viewer" => Ok(UserRole::Viewer),
-            #[cfg(feature = "enterprise")]
-            "editor" => Ok(UserRole::Editor),
-            #[cfg(feature = "enterprise")]
-            "user" => Ok(UserRole::User),
-            #[cfg(feature = "enterprise")]
-            "service_account" => Ok(UserRole::ServiceAccount),
-            #[cfg(feature = "enterprise")]
-            _ => Ok(UserRole::User),
-            #[cfg(not(feature = "enterprise"))]
-            _ => Ok(UserRole::Admin),
-        }
-    }
-}
-
-impl Into<infra::table::org_users::UserRole> for UserRole {
-    fn into(self) -> infra::table::org_users::UserRole {
-        match self {
-            UserRole::Admin => infra::table::org_users::UserRole::Admin,
-            UserRole::Member => infra::table::org_users::UserRole::Admin,
-            UserRole::Root => infra::table::org_users::UserRole::Root,
-            #[cfg(feature = "enterprise")]
-            UserRole::Viewer => infra::table::org_users::UserRole::Viewer,
-            #[cfg(feature = "enterprise")]
-            UserRole::Editor => infra::table::org_users::UserRole::Editor,
-            #[cfg(feature = "enterprise")]
-            UserRole::User => infra::table::org_users::UserRole::User,
-            #[cfg(feature = "enterprise")]
-            UserRole::ServiceAccount => infra::table::org_users::UserRole::ServiceAccount,
-        }
-    }
+#[cfg(not(feature = "enterprise"))]
+pub fn get_roles() -> Vec<UserRole> {
+    vec![UserRole::Admin, UserRole::Root]
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -527,10 +340,11 @@ impl TokenValidationResponseBuilder {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RoleOrg {
     pub role: UserRole,
     pub org: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_role: Option<String>,
 }
 
@@ -562,10 +376,10 @@ pub struct UserRoleRequest {
 
 impl From<&UserRoleRequest> for UserOrgRole {
     fn from(role: &UserRoleRequest) -> Self {
-        let mut standard_role = UserRole::default();
+        let mut standard_role = get_default_user_role();
         let mut custom_role = role.custom.clone();
         let mut is_role_name_standard = false;
-        for user_role in UserRole::iter() {
+        for user_role in get_roles() {
             if user_role.to_string().eq(&role.role) {
                 standard_role = user_role;
                 is_role_name_standard = true;

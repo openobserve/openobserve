@@ -158,7 +158,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             old_password: None,
                             new_password: Some(cfg.auth.root_user_password.clone()),
                             role: Some(crate::common::meta::user::UserRoleRequest {
-                                role: crate::common::meta::user::UserRole::Root.to_string(),
+                                role: config::meta::user::UserRole::Root.to_string(),
                                 custom: None,
                             }),
                             first_name: Some("root".to_owned()),

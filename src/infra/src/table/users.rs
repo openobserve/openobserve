@@ -13,70 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::user::{DBUser, UserRole, UserType};
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
-    FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*, ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
+use super::{
+    entity::users::{ActiveModel, Column, Entity, Model},
+    get_lock,
+};
 use crate::{
-    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{connect_to_orm, ORM_CLIENT},
     errors::{self, DbError, Error},
 };
 
-// define the organizations type
-#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
-#[serde(rename_all = "snake_case")]
-pub enum UserType {
-    Internal = 0,
-    /// Is the user authenticated and created via LDAP
-    External = 1,
-}
-
-impl From<UserType> for bool {
-    fn from(user_type: UserType) -> bool {
-        match user_type {
-            UserType::Internal => false,
-            UserType::External => true,
+impl From<Model> for UserRecord {
+    fn from(model: Model) -> Self {
+        Self {
+            email: model.email,
+            first_name: model.first_name,
+            last_name: model.last_name,
+            password: model.password,
+            salt: model.salt,
+            is_root: model.is_root,
+            password_ext: model.password_ext,
+            user_type: model.user_type.into(),
+            created_at: model.created_at,
+            updated_at: model.updated_at,
         }
     }
 }
 
-// define the organizations table
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "users")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = true)]
-    pub id: i64,
-    #[sea_orm(column_type = "String(StringLen::N(255))")]
-    pub email: String,
-    #[sea_orm(column_type = "String(StringLen::N(50))")]
-    pub first_name: String,
-    #[sea_orm(column_type = "String(StringLen::N(50))")]
-    pub last_name: String,
-    #[sea_orm(column_type = "Text")]
-    pub password: String,
-    pub salt: String,
-    pub is_root: bool,
-    pub password_ext: Option<String>,
-    pub user_type: UserType,
-    pub created_ts: i64,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
-
-impl RelationTrait for Relation {
-    fn def(&self) -> RelationDef {
-        panic!("No relations defined")
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-#[derive(FromQueryResult, Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserRecord {
     pub email: String,
     pub first_name: String,
@@ -87,7 +57,8 @@ pub struct UserRecord {
     #[serde(default)]
     pub password_ext: Option<String>,
     pub user_type: UserType,
-    pub created_ts: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 impl UserRecord {
@@ -101,6 +72,7 @@ impl UserRecord {
         password_ext: Option<String>,
         user_type: UserType,
     ) -> Self {
+        let now = chrono::Utc::now().timestamp_micros();
         Self {
             email: email.to_string(),
             first_name: first_name.to_string(),
@@ -110,59 +82,53 @@ impl UserRecord {
             is_root,
             password_ext,
             user_type,
-            created_ts: chrono::Utc::now().timestamp_micros(),
+            created_at: now,
+            updated_at: now,
         }
     }
 }
 
-#[derive(FromQueryResult, Debug)]
-pub struct OrgId {
-    pub identifier: String,
+impl From<&DBUser> for UserRecord {
+    fn from(user: &DBUser) -> Self {
+        let is_root = user
+            .organizations
+            .iter()
+            .any(|org| org.role.eq(&UserRole::Root));
+        let email = user.email.to_lowercase();
+        UserRecord::new(
+            &email,
+            &user.first_name,
+            &user.last_name,
+            &user.password,
+            &user.salt,
+            is_root,
+            user.password_ext.clone(),
+            if user.is_external {
+                UserType::External
+            } else {
+                UserType::Internal
+            },
+        )
+    }
 }
 
-pub async fn init() -> Result<(), errors::Error> {
-    create_table().await?;
-    create_table_index().await?;
-    Ok(())
-}
-
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let builder = client.get_database_backend();
-
-    let schema = Schema::new(builder);
-    let create_table_stmt = schema
-        .create_table_from_entity(Entity)
-        .if_not_exists()
-        .take();
-
-    client
-        .execute(builder.build(&create_table_stmt))
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(())
-}
-
-pub async fn create_table_index() -> Result<(), errors::Error> {
-    let index1 = IndexStatement::new("users_email_idx", "users", true, &["email"]);
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match client.get_database_backend() {
-        DatabaseBackend::MySql => {
-            mysql::create_index(index1).await?;
-        }
-        DatabaseBackend::Postgres => {
-            postgres::create_index(index1).await?;
-        }
-        _ => {
-            sqlite::create_index(index1).await?;
+impl From<&UserRecord> for DBUser {
+    fn from(user: &UserRecord) -> Self {
+        DBUser {
+            email: user.email.clone(),
+            password: user.password.clone(),
+            salt: user.salt.clone(),
+            first_name: user.first_name.clone(),
+            last_name: user.last_name.clone(),
+            is_external: user.user_type.is_external(),
+            organizations: vec![],
+            password_ext: user.password_ext.clone(),
         }
     }
-    Ok(())
 }
 
 pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
     let record = ActiveModel {
         email: Set(user.email),
         first_name: Set(user.first_name.to_string()),
@@ -171,8 +137,9 @@ pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
         salt: Set(user.salt.to_string()),
         is_root: Set(user.is_root),
         password_ext: Set(user.password_ext),
-        user_type: Set(user.user_type),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        user_type: Set(user.user_type.into()),
+        created_at: Set(now),
+        updated_at: Set(now),
         ..Default::default()
     };
 
@@ -202,6 +169,10 @@ pub async fn update(
         .col_expr(Column::LastName, Expr::value(last_name))
         .col_expr(Column::Password, Expr::value(password))
         .col_expr(Column::PasswordExt, Expr::value(password_ext))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
         .filter(Column::Email.eq(email))
         .exec(client)
         .await
@@ -227,71 +198,40 @@ pub async fn remove(email: &str) -> Result<(), errors::Error> {
 pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
-        .select_only()
-        .column(Column::Email)
-        .column(Column::FirstName)
-        .column(Column::LastName)
-        .column(Column::Password)
-        .column(Column::Salt)
-        .column(Column::IsRoot)
-        .column(Column::PasswordExt)
-        .column(Column::UserType)
-        .column(Column::CreatedTs)
         .filter(Column::Email.eq(email))
-        .into_model::<UserRecord>()
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("User not found".to_string())))?;
 
-    Ok(record)
+    Ok(UserRecord::from(record))
 }
 
 pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
-        .select_only()
-        .column(Column::Email)
-        .column(Column::FirstName)
-        .column(Column::LastName)
-        .column(Column::Password)
-        .column(Column::Salt)
-        .column(Column::IsRoot)
-        .column(Column::PasswordExt)
-        .column(Column::UserType)
-        .column(Column::CreatedTs)
         .filter(Column::IsRoot.eq(true))
-        .into_model::<UserRecord>()
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Root user not found".to_string())))?;
 
-    Ok(record)
+    Ok(UserRecord::from(record))
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<UserRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let mut res = Entity::find()
-        .select_only()
-        .column(Column::Email)
-        .column(Column::FirstName)
-        .column(Column::LastName)
-        .column(Column::Password)
-        .column(Column::Salt)
-        .column(Column::IsRoot)
-        .column(Column::PasswordExt)
-        .column(Column::UserType)
-        .column(Column::CreatedTs)
-        .order_by(Column::CreatedTs, Order::Desc);
+    let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
     let records = res
-        .into_model::<UserRecord>()
         .all(client)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(|record| UserRecord::from(record))
+        .collect();
 
     Ok(records)
 }

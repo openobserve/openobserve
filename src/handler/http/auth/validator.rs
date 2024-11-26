@@ -20,7 +20,11 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use config::{get_config, utils::base64};
+use config::{
+    get_config,
+    meta::user::{DBUser, UserRole},
+    utils::base64,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
@@ -29,10 +33,7 @@ use crate::{
         meta::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
-            user::{
-                AuthTokensExt, DBUser, TokenValidationResponse, TokenValidationResponseBuilder,
-                UserRole,
-            },
+            user::{AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder},
         },
         utils::{
             auth::{get_hash, is_root_user, AuthExtractor},
@@ -122,7 +123,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
-    method: &Method,
+    _method: &Method,
 ) -> Result<TokenValidationResponse, Error> {
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
@@ -978,7 +979,7 @@ mod tests {
                 email: init_user.to_string(),
                 password: pwd.to_string(),
                 role: crate::common::meta::user::UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Root,
+                    base_role: config::meta::user::UserRole::Root,
                     custom_role: None,
                 },
                 first_name: "root".to_owned(),
@@ -994,7 +995,7 @@ mod tests {
                 email: user_id.to_string(),
                 password: pwd.to_string(),
                 role: crate::common::meta::user::UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Member,
+                    base_role: config::meta::user::UserRole::Member,
                     custom_role: None,
                 },
                 first_name: "root".to_owned(),

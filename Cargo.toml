@@ -152,7 +152,7 @@ sha256.workspace = true
 snafu.workspace = true
 snap.workspace = true
 sqlparser.workspace = true
-strum = { version = "0.25", features = ["derive"] }
+strum.workspace = true
 sysinfo.workspace = true
 syslog_loose = "0.18.0"
 thiserror.workspace = true
@@ -312,6 +312,7 @@ sqlx = { version = "0.8.1", features = [
     "sqlite",
     "chrono",
 ] }
+strum = { version = "0.25", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tantivy = { version = "0.22.0", features = ["quickwit"] }

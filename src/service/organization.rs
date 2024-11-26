@@ -17,7 +17,10 @@ use std::str::FromStr;
 
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider, meta::stream::StreamType, utils::rand::generate_random_string, SMTP_CLIENT,
+    get_config, ider,
+    meta::{stream::StreamType, user::UserRole},
+    utils::rand::generate_random_string,
+    SMTP_CLIENT,
 };
 use lettre::{message::SinglePart, AsyncTransport, Message};
 #[cfg(feature = "enterprise")]
@@ -32,12 +35,9 @@ use crate::common::meta::organization::OrganizationInvites;
 use crate::{
     common::{
         // infra::config::USERS_RUM_TOKEN,
-        meta::{
-            organization::{
-                IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-                RumIngestionToken, CUSTOM, DEFAULT_ORG,
-            },
-            user::UserRole,
+        meta::organization::{
+            IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
+            RumIngestionToken, CUSTOM, DEFAULT_ORG,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
@@ -169,7 +169,7 @@ pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, an
         .map(|record| Organization {
             identifier: record.org_id.clone(),
             name: record.org_name.clone(),
-            org_type: record.org_type.into(),
+            org_type: record.org_type.to_string(),
         })
         .collect())
 }
@@ -298,6 +298,10 @@ pub async fn generate_invitation(
     user_email: &str,
     invites: OrganizationInvites,
 ) -> Result<String, anyhow::Error> {
+    use o2_enterprise::enterprise::common::org_invites::{
+        get_invite_email_body, get_invite_email_subject,
+    };
+
     let cfg = get_config();
     if !is_root_user(user_email) {
         match get_user(Some(org_id), user_email).await {
@@ -330,7 +334,7 @@ pub async fn generate_invitation(
             // TODO: Use an env to decide whether to send email or not
             let mut email = Message::builder()
                 .from(cfg.smtp.smtp_from_email.parse()?)
-                .subject(format!("Invitation to join organization"));
+                .subject(get_invite_email_subject(org_id));
             for invite in invites.invites.iter() {
                 email = email.to(invite.parse()?);
             }
@@ -338,10 +342,7 @@ pub async fn generate_invitation(
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
             // TODO: Decide the endpoint to be used
-            let msg = format!(
-                "You have been invited to join the organization. Click on the link to accept the invitation: <a href=\"{}/{}/accept-invitation?invite_token={}\">Click Here<a>",
-                cfg.common.base_uri, org_id, invite_token
-            );
+            let msg = get_invite_email_body(org_id, &invite_token);
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
@@ -422,7 +423,7 @@ mod tests {
                 email: init_user.to_string(),
                 password: pwd.to_string(),
                 role: crate::common::meta::user::UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Root,
+                    base_role: config::meta::user::UserRole::Root,
                     custom_role: None,
                 },
                 first_name: "root".to_owned(),
@@ -439,7 +440,7 @@ mod tests {
                 email: user_id.to_string(),
                 password: "pass".to_string(),
                 role: crate::common::meta::user::UserOrgRole {
-                    base_role: crate::common::meta::user::UserRole::Admin,
+                    base_role: config::meta::user::UserRole::Admin,
                     custom_role: None,
                 },
                 first_name: "admin".to_owned(),

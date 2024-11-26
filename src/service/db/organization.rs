@@ -185,7 +185,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     if let Err(e) = organizations::add(
         &entry.identifier,
         &entry.name,
-        entry.org_type.as_str().into(),
+        entry.org_type.as_str().parse().unwrap(),
     )
     .await
     {
@@ -208,7 +208,7 @@ pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
     Ok(Organization {
         identifier: org.identifier,
         name: org.org_name,
-        org_type: org.org_type.into(),
+        org_type: org.org_type.to_string(),
     })
 }
 
@@ -229,7 +229,7 @@ pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow
         .map(|org| Organization {
             identifier: org.identifier,
             name: org.org_name,
-            org_type: org.org_type.into(),
+            org_type: org.org_type.to_string(),
         })
         .collect())
 }

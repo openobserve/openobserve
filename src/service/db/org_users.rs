@@ -16,17 +16,13 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use config::meta::user::{User, UserRole};
 use infra::{
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
-    table::org_users::{
-        self, OrgUserExpandedRecord, OrgUserRecord, UserOrgExpandedRecord, UserRole,
-    },
+    table::org_users::{self, OrgUserExpandedRecord, OrgUserRecord, UserOrgExpandedRecord},
 };
 
-use crate::common::{
-    infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN},
-    meta::user::User,
-};
+use crate::common::infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN};
 
 pub async fn add(
     org_id: &str,
@@ -98,10 +94,7 @@ pub fn get_cached_user_org(org_id: &str, user_email: &str) -> Option<User> {
                 token: org_user.token.clone(),
                 rum_token: org_user.rum_token.clone(),
                 org: org_user.org_id.clone(),
-                is_external: match user.user_type {
-                    infra::table::users::UserType::External => true,
-                    infra::table::users::UserType::Internal => false,
-                },
+                is_external: user.user_type.is_external(),
             }),
             None => None,
         },
@@ -247,7 +240,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 role: item.role.clone(),
                                 token: item.token.clone(),
                                 rum_token: item.rum_token.clone(),
-                                created_ts: item.created_ts.clone(),
+                                created_at: item.created_at.clone(),
                             },
                         );
                         if let Some(rum_token) = &item.rum_token {
@@ -259,7 +252,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     role: item.role,
                                     token: item.token,
                                     rum_token: item.rum_token,
-                                    created_ts: item.created_ts,
+                                    created_at: item.created_at,
                                 },
                             );
                         }
@@ -337,10 +330,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                     token: user.token,
                     rum_token: user.rum_token,
                     org: user.org_id,
-                    is_external: match root.user_type {
-                        infra::table::users::UserType::External => true,
-                        infra::table::users::UserType::Internal => false,
-                    },
+                    is_external: root.user_type.is_external(),
                 },
             );
         }

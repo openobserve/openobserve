@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use config::utils::json;
+use config::meta::user::{DBUser, User, UserOrg, UserRole};
 #[cfg(feature = "enterprise")]
 use infra::table::org_invites::InvitationRecord;
 use infra::{
@@ -28,76 +28,9 @@ use o2_enterprise::enterprise::common::org_invites;
 
 use super::org_users::{self, get_cached_user_org};
 use crate::{
-    common::{
-        infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
-        meta::user::{DBUser, User, UserOrg, UserRole},
-    },
+    common::infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
     service::db,
 };
-
-impl From<&DBUser> for users::UserRecord {
-    fn from(user: &DBUser) -> Self {
-        let is_root = user
-            .organizations
-            .iter()
-            .any(|org| org.role.eq(&UserRole::Root));
-        let email = user.email.to_lowercase();
-        users::UserRecord::new(
-            &email,
-            &user.first_name,
-            &user.last_name,
-            &user.password,
-            &user.salt,
-            is_root,
-            user.password_ext.clone(),
-            if user.is_external {
-                users::UserType::External
-            } else {
-                users::UserType::Internal
-            },
-        )
-    }
-}
-
-impl From<&users::UserRecord> for DBUser {
-    fn from(user: &users::UserRecord) -> Self {
-        DBUser {
-            email: user.email.clone(),
-            password: user.password.clone(),
-            salt: user.salt.clone(),
-            first_name: user.first_name.clone(),
-            last_name: user.last_name.clone(),
-            is_external: match user.user_type {
-                users::UserType::External => true,
-                users::UserType::Internal => false,
-            },
-            organizations: vec![],
-            password_ext: user.password_ext.clone(),
-        }
-    }
-}
-
-impl Into<UserRole> for infra::table::org_users::UserRole {
-    #[cfg(not(feature = "enterprise"))]
-    fn into(self) -> UserRole {
-        match self {
-            infra::table::org_users::UserRole::Root => UserRole::Root,
-            _ => UserRole::Admin,
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn into(self) -> UserRole {
-        match self {
-            infra::table::org_users::UserRole::Admin => UserRole::Admin,
-            infra::table::org_users::UserRole::User => UserRole::User,
-            infra::table::org_users::UserRole::Root => UserRole::Root,
-            infra::table::org_users::UserRole::Viewer => UserRole::Viewer,
-            infra::table::org_users::UserRole::Editor => UserRole::Editor,
-            infra::table::org_users::UserRole::ServiceAccount => UserRole::ServiceAccount,
-        }
-    }
-}
 
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {
     let email = email.to_lowercase();
@@ -128,15 +61,12 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
         first_name: user.first_name,
         last_name: user.last_name,
         password: user.password,
-        role: user.role.into(),
+        role: user.role,
         org: user.org_id,
         token: user.token,
         rum_token: user.rum_token,
         salt: user.salt,
-        is_external: match user.user_type {
-            users::UserType::External => true,
-            users::UserType::Internal => false,
-        },
+        is_external: user.user_type.is_external(),
         password_ext: user.password_ext,
     }))
 }
@@ -169,15 +99,12 @@ pub async fn get_by_token(
         first_name: user.first_name,
         last_name: user.last_name,
         password: user.password,
-        role: user.role.into(),
+        role: user.role,
         org: user.org_id,
         token: user.token,
         rum_token: user.rum_token,
         salt: user.salt,
-        is_external: match user.user_type {
-            users::UserType::External => true,
-            users::UserType::Internal => false,
-        },
+        is_external: user.user_type.is_external(),
         password_ext: user.password_ext,
     }))
 }
@@ -201,14 +128,11 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
         salt: user.salt,
         first_name: user.first_name,
         last_name: user.last_name,
-        is_external: match user.user_type {
-            users::UserType::External => true,
-            users::UserType::Internal => false,
-        },
+        is_external: user.user_type.is_external(),
         organizations: orgs
             .into_iter()
             .map(|org| UserOrg {
-                role: org.role.into(),
+                role: org.role,
                 name: org.org_id,
                 token: org.token,
                 rum_token: org.rum_token,
@@ -231,7 +155,7 @@ pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
         org_users::add(
             &org.name,
             &user.email,
-            org.role.clone().into(),
+            org.role.clone(),
             &org.token,
             org.rum_token.clone(),
         )
@@ -379,14 +303,11 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
                 salt: user.salt,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                is_external: match user.user_type {
-                    users::UserType::External => true,
-                    users::UserType::Internal => false,
-                },
+                is_external: user.user_type.is_external(),
                 organizations: orgs
                     .into_iter()
                     .map(|org| UserOrg {
-                        role: org.role.into(),
+                        role: org.role,
                         name: org.org_id,
                         token: org.token,
                         rum_token: org.rum_token,
@@ -422,7 +343,7 @@ mod tests {
             last_name: "".to_owned(),
             is_external: false,
             organizations: vec![UserOrg {
-                role: crate::common::meta::user::UserRole::Admin,
+                role: UserRole::Admin,
                 name: org_id.clone(),
                 token: "Abcd".to_string(),
                 rum_token: Some("rumAbcd".to_string()),

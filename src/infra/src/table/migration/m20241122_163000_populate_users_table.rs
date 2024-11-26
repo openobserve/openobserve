@@ -17,24 +17,19 @@ use config::{
     meta::user::{DBUser, UserRole},
     utils::json,
 };
-use hashbrown::HashSet;
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
-use serde::{self, Deserialize};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
-
-const DEFAULT_ORG: &str = "default";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
         let txn = db.begin().await?;
-        let org_set = HashSet::new();
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
         // txn.execute()
@@ -74,8 +69,8 @@ impl MigrationTrait for Migration {
                 for org_user in all_org_users {
                     org_users.push(org_users::ActiveModel {
                         org_id: Set(org_user.org),
-                        email: Set(json_user.email),
-                        role: Set(org_user.role),
+                        email: Set(org_user.email),
+                        role: Set(org_user.role.into()),
                         token: Set(org_user.token),
                         rum_token: Set(org_user.rum_token),
                         created_at: Set(now),
@@ -142,18 +137,6 @@ mod users {
 mod org_users {
     use sea_orm::entity::prelude::*;
 
-    // define the organizations type
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-    #[sea_orm(rs_type = "i32", db_type = "Integer")]
-    pub enum UserRole {
-        Admin = 0,
-        Root = 1,
-        Viewer = 2,
-        User = 3,
-        Editor = 4,
-        ServiceAccount = 5,
-    }
-
     // define the organizations table
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
     #[sea_orm(table_name = "org_users")]
@@ -164,14 +147,14 @@ mod org_users {
         pub org_id: String,
         #[sea_orm(column_type = "String(StringLen::N(100))")]
         pub email: String,
-        pub role: UserRole,
+        pub role: i16,
         pub token: String,
         pub rum_token: Option<String>,
         pub created_at: u64,
         pub updated_at: u64,
     }
 
-    #[derive(Copy, Clone, Debug, EnumIter)]
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
