@@ -19,7 +19,7 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 const DASHBOARDS_FOLDERS_FK: &str = "dashboards_folders_fk";
-const DASHBOARDS_DASHBOARD_ID_IDX: &str = "dashboards_dashboard_id_idx";
+const DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX: &str = "dashboards_folder_id_dashboard_id_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -35,7 +35,11 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(DASHBOARDS_DASHBOARD_ID_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_table(Table::drop().table(Dashboards::Table).to_owned())
@@ -86,8 +90,9 @@ fn create_dashboards_table_statement() -> TableCreateStatement {
 fn create_dashboards_dashboard_id_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(DASHBOARDS_DASHBOARD_ID_IDX)
+        .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
         .table(Dashboards::Table)
+        .col(Dashboards::FolderId)
         .col(Dashboards::DashboardId)
         .unique()
         .to_owned()
@@ -142,8 +147,8 @@ mod tests {
             )"#
         );
         assert_eq!(
-            &create_dashboards_dashboard_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_dashboard_id_idx" ON "dasdhboards" ("dashboard_id")"#
+            &create_dashboards_folder_id_dashboard_id_idx_stmnt().to_string(PostgresQueryBuilder),
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_folder_id_dashboard_id_idx" ON "dasdhboards" ("folder_id", "dashboard_id")"#
         );
     }
 
@@ -166,8 +171,8 @@ mod tests {
             )"#
         );
         assert_eq!(
-            &create_dashboards_dashboard_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `dashboards_dashboard_id_idx` ON `dashboards` (`dashboard_id`)"#
+            &create_dashboards_folder_id_dashboard_id_idx_stmnt().to_string(MysqlQueryBuilder),
+            r#"CREATE UNIQUE INDEX `dashboards_folder_id_dashboard_id_idx` ON `dashboards` (`folder_id`, `dashboard_id`)"#
         );
     }
 
@@ -191,7 +196,7 @@ mod tests {
         );
         assert_eq!(
             &create_dashboards_dashboard_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_dashboard_id_idx" ON "dashboards" ("dashboard_id")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_dashboard_id_idx" ON "dashboards" ("folder_id", "dashboard_id")"#
         );
     }
 }
