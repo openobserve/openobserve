@@ -311,7 +311,9 @@ impl TableProvider for NewListingTable {
                     )
                 }
             },
-            None => {} // no ordering required
+            None => {
+                log::debug!("don't not set split_file_groups_by_statistics");
+            } // no ordering required
         };
 
         // extract types of partition columns
