@@ -60,10 +60,10 @@ async fn populate_created_at_tmp(manager: &SchemaManager<'_>) -> Result<(), DbEr
 
     // Migrate pages of 100 records at a time to avoid loading too many
     // records into memory.
-    let mut folder_pages = folders::Entity::find().paginate(&txn, 100);
+    let mut folder_pages = folders_mysql::Entity::find().paginate(&txn, 100);
     while let Some(folders) = folder_pages.fetch_and_next().await? {
         for f in folders {
-            let mut am: folders::ActiveModel = f.into();
+            let mut am: folders_mysql::ActiveModel = f.into();
             let unix_timestamp = if let Some(value) = am.created_at.take() {
                 value.timestamp()
             } else {
@@ -130,10 +130,10 @@ enum Folders {
 // remain unchanged rather than ORM models in the `entity` module that will be
 // updated to reflect the latest changes to table schemas.
 
-/// Representation of the folder table during the time this migration executes,
-/// after the created_at_tmp column is created and before the old created_at
-/// column is deleted.
-mod folders {
+/// Representation of the folder table for MySQL during the time this migration
+/// executes, after the created_at_tmp column is created and before the old
+/// created_at column is deleted.
+mod folders_mysql {
     use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
@@ -148,6 +148,33 @@ mod folders {
         pub description: Option<String>,
         pub r#type: i16,
         pub created_at: DateTimeUtc,
+        pub created_at_tmp: Option<i64>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// Representation of the folder table for PostgreSQL during the time this
+/// migration executes, after the created_at_tmp column is created and before
+/// the old created_at column is deleted.
+mod folders_psql {
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "folders")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub org: String,
+        pub folder_id: String,
+        pub name: String,
+        #[sea_orm(column_type = "Text", nullable)]
+        pub description: Option<String>,
+        pub r#type: i16,
+        pub created_at: DateTime,
         pub created_at_tmp: Option<i64>,
     }
 
