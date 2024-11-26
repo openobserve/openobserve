@@ -13,7 +13,7 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
-    query::{BooleanQuery, Occur, Query, RegexQuery, TermQuery},
+    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
     schema::{Field, IndexRecordOption, Schema},
     Term,
 };
@@ -211,32 +211,48 @@ impl Condition {
                         default_fields,
                     )?),
                     "prefix" => {
-                        let term = tantivy::Term::from_field_text(default_fields, value);
-                        Box::new(tantivy::query::PhrasePrefixQuery::new_with_offset(vec![(
-                            0, term,
-                        )]))
+                        let term = Term::from_field_text(default_fields, value);
+                        Box::new(PhrasePrefixQuery::new_with_offset(vec![(0, term)]))
                     }
                     // default is eq
                     _ => {
-                        let term = Term::from_field_text(default_fields, value);
-                        Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+                        if value.is_empty() {
+                            return Err(anyhow::anyhow!(
+                                "The value of match_all() function can't be empty"
+                            ));
+                        }
+                        let mut terms: Vec<(Occur, Box<dyn Query>)> = value
+                            .split_whitespace()
+                            .map(|value| {
+                                let term = Term::from_field_text(default_fields, value);
+                                (
+                                    Occur::Must,
+                                    Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
+                                )
+                            })
+                            .collect();
+                        if terms.len() > 1 {
+                            Box::new(BooleanQuery::new(terms))
+                        } else {
+                            terms.remove(0).1
+                        }
                     }
                 }
             }
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_fields)?;
                 let right_query = right.to_tantivy_query(schema, default_fields)?;
-                Box::new(tantivy::query::BooleanQuery::new(vec![
-                    (tantivy::query::Occur::Should, left_query),
-                    (tantivy::query::Occur::Should, right_query),
+                Box::new(BooleanQuery::new(vec![
+                    (Occur::Should, left_query),
+                    (Occur::Should, right_query),
                 ]))
             }
             Condition::And(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_fields)?;
                 let right_query = right.to_tantivy_query(schema, default_fields)?;
-                Box::new(tantivy::query::BooleanQuery::new(vec![
-                    (tantivy::query::Occur::Must, left_query),
-                    (tantivy::query::Occur::Must, right_query),
+                Box::new(BooleanQuery::new(vec![
+                    (Occur::Must, left_query),
+                    (Occur::Must, right_query),
                 ]))
             }
         })
