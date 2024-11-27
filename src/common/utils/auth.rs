@@ -648,7 +648,7 @@ pub fn generate_presigned_url(
 
 #[cfg(test)]
 mod tests {
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
     use crate::{common::meta::user::UserRequest, service::users};
@@ -684,6 +684,7 @@ mod tests {
     #[tokio::test]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
         let _ = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
