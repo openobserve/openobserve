@@ -63,7 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             currentTimeObj['__global'] ||
             {}
           "
-          :variablesData="refreshVariableDataRef"
+          :variablesData="
+            refreshVariableDataRef[panels[0].id] ||
+            refreshVariableDataRef['__global']
+          "
           :forceLoad="forceLoad"
           :searchType="searchType"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
@@ -118,7 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
-              :variablesData="refreshVariableDataRef"
+              :variablesData="
+                refreshVariableDataRef[item.id] ||
+                refreshVariableDataRef['__global']
+              "
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
@@ -182,7 +188,10 @@ import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
-import { checkIfVariablesAreLoaded, updateDashboard } from "../../utils/commons";
+import {
+  checkIfVariablesAreLoaded,
+  updateDashboard,
+} from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
@@ -276,8 +285,8 @@ export default defineComponent({
     };
 
     // variables data
-    const variablesData = reactive({});
-    const refreshVariableDataRef: any = reactive({});
+    const variablesData = ref({});
+    const refreshVariableDataRef: any = ref({ __global: {} });
 
     // ======= [START] dashboard PrintMode =======
 
@@ -318,7 +327,7 @@ export default defineComponent({
 
     // watch on currentTimeObj to update the variablesData
     watch(
-      () => props.currentTimeObj,
+      () => props?.currentTimeObj?.__global,
       () => {
         console.log("props.currentTimeObj", props.currentTimeObj);
 
@@ -326,6 +335,9 @@ export default defineComponent({
         //   refreshVariableDataRef,
         //   JSON.parse(JSON.stringify(variablesData)),
         // );
+        refreshVariableDataRef.value = {
+          __global: JSON.parse(JSON.stringify(variablesData.value)),
+        };
       },
     );
     const currentQueryTraceIds = computed(() => {
@@ -374,7 +386,8 @@ export default defineComponent({
       try {
         console.log("variablesDataUpdated: entry", data);
         // update the variables data
-        Object.assign(variablesData, data);
+        // Object.assign(variablesData, data);
+        variablesData.value = data;
 
         console.log(
           "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
@@ -383,11 +396,11 @@ export default defineComponent({
         if (needsVariablesAutoUpdate) {
           console.log(
             "variablesDataUpdated: needs auto update, checking variables legth",
-            variablesData?.values?.length,
+            variablesData.value?.values?.length,
           );
 
           // check if the length is > 0
-          if (checkIfVariablesAreLoaded(variablesData)) {
+          if (checkIfVariablesAreLoaded(variablesData.value)) {
             console.log(
               "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
             );
@@ -396,10 +409,14 @@ export default defineComponent({
 
           console.log(
             "variablesDataUpdated: setting refreshVariableDataRef",
-            JSON.stringify(variablesData, null, 2),
+            JSON.stringify(variablesData.value, null, 2),
           );
-          Object.assign(refreshVariableDataRef, variablesData);
-          emit("variablesData", refreshVariableDataRef);
+          // Object.assign(
+          //   refreshVariableDataRef.value.__global,
+          //   variablesData.value,
+          // );
+          refreshVariableDataRef.value = { __global: variablesData.value };
+          emit("variablesData", refreshVariableDataRef.value.__global);
         }
 
         return;
@@ -563,6 +580,8 @@ export default defineComponent({
 
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
+
+      refreshVariableDataRef.value[panelId] = variablesData.value;
     };
 
     const openEditLayout = (id: string) => {
