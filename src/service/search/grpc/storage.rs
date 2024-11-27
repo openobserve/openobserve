@@ -725,7 +725,7 @@ async fn search_tantivy_index(
         });
         // if no terms are found in the query, warm up all fields
         if warm_terms.is_empty() {
-            for field in condition.get_fields() {
+            for field in condition.get_tantivy_fields() {
                 let field = tantivy_schema.get_field(&field).unwrap();
                 warm_terms.insert(field, HashMap::new());
             }

@@ -1,8 +1,8 @@
 use std::{collections::HashSet, sync::Arc};
 
-use arrow_schema::DataType;
 use config::INDEX_FIELD_NAME_FOR_ALL;
 use datafusion::{
+    arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
     physical_plan::{
         expressions::{BinaryExpr, Column, LikeExpr, Literal},
@@ -100,13 +100,33 @@ impl IndexCondition {
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
-    pub fn get_fields(&self) -> HashSet<String> {
+    pub fn get_tantivy_fields(&self) -> HashSet<String> {
         self.conditions
             .iter()
             .fold(HashSet::new(), |mut acc, condition| {
-                acc.extend(condition.get_fields());
+                acc.extend(condition.get_tantivy_fields());
                 acc
             })
+    }
+
+    pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
+        self.conditions
+            .iter()
+            .fold(HashSet::new(), |mut acc, condition| {
+                acc.extend(condition.get_schema_fields(fst_fields));
+                acc
+            })
+    }
+
+    pub fn get_schema_projection(&self, schema: SchemaRef, fst_fields: &[String]) -> Vec<usize> {
+        let fields = self.get_schema_fields(fst_fields);
+        let mut projection = Vec::with_capacity(fields.len());
+        for field in fields.iter() {
+            if let Ok(index) = schema.index_of(field) {
+                projection.push(index);
+            }
+        }
+        projection
     }
 
     pub fn to_physical_expr(
@@ -258,7 +278,7 @@ impl Condition {
         })
     }
 
-    pub fn get_fields(&self) -> HashSet<String> {
+    pub fn get_tantivy_fields(&self) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
@@ -268,8 +288,25 @@ impl Condition {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
             Condition::Or(left, right) | Condition::And(left, right) => {
-                fields.extend(left.get_fields());
-                fields.extend(right.get_fields());
+                fields.extend(left.get_tantivy_fields());
+                fields.extend(right.get_tantivy_fields());
+            }
+        }
+        fields
+    }
+
+    pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
+        let mut fields = HashSet::new();
+        match self {
+            Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::MatchAll(_) => {
+                fields.extend(fst_fields.iter().cloned());
+            }
+            Condition::Or(left, right) | Condition::And(left, right) => {
+                fields.extend(left.get_schema_fields(fst_fields));
+                fields.extend(right.get_schema_fields(fst_fields));
             }
         }
         fields

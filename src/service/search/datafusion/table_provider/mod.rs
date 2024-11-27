@@ -340,10 +340,23 @@ impl TableProvider for NewListingTable {
             return Ok(Arc::new(EmptyExec::new(Arc::new(Schema::empty()))));
         };
 
-        let (parquet_projection, filter_projection) = if self.index_condition.is_some() {
-            (None, projection)
+        let filter_projection = if let Some(index_condition) = self.index_condition.as_ref() {
+            let mut parquet_projection =
+                index_condition.get_schema_projection(self.schema(), &self.fst_fields);
+            if let Some(v) = projection.as_ref() {
+                parquet_projection.extend(v.iter().map(|x| *x));
+            }
+            parquet_projection.sort();
+            parquet_projection.dedup();
+            parquet_projection
         } else {
+            vec![]
+        };
+
+        let (parquet_projection, filter_projection) = if filter_projection.is_empty() {
             (projection, None)
+        } else {
+            (Some(filter_projection.as_ref()), projection)
         };
 
         // create the execution plan
