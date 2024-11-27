@@ -13,34 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
-pub mod distributed_plan;
-pub mod exec;
-pub mod file_type;
-pub mod optimizer;
-pub mod storage;
-pub mod table_provider;
-pub mod udaf;
-pub mod udf;
-pub mod plan;
-
-#[derive(PartialEq, Debug)]
-pub enum MemoryPoolType {
-    Greedy,
-    Fair,
-    None,
-}
-
-impl FromStr for MemoryPoolType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "greedy" => Ok(MemoryPoolType::Greedy),
-            "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
-            "none" | "off" => Ok(MemoryPoolType::None),
-            _ => Err(format!("Invalid memory pool type '{}'", s)),
-        }
-    }
-}
+pub mod tantivy_exec;

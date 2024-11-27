@@ -311,7 +311,7 @@ pub async fn search(
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
-async fn cache_files(
+pub async fn cache_files(
     trace_id: &str,
     files: &[&str],
     scan_stats: &mut ScanStats,
@@ -744,7 +744,7 @@ async fn search_tantivy_index(
                     .map(|ret| ret.into_iter().map(|(_, doc)| doc).collect::<HashSet<_>>())
             }
             (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => {
-                todo!("SimpleCount not implemented yet")
+                tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
             }
         })
         .await??;
