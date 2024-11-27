@@ -83,7 +83,7 @@ impl MetaDashboard {
                 r#"
                     SELECT 
                         f.id AS folder_id,
-                        SUBSTRING_INDEX(m.key2,'/', 2) AS dashboard_id,
+                        SUBSTRING_INDEX(m.key2,'/', -1) AS dashboard_id,
                         m.value AS value
                     FROM meta AS m
                     JOIN folders f ON
