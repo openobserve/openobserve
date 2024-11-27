@@ -462,7 +462,7 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       const variableObj = {};
-      data.values.forEach((variable) => {
+      data.values?.forEach((variable) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value,
@@ -792,6 +792,7 @@ export default defineComponent({
     watch([refreshInterval, selectedDate, selectedTabId], () => {
       router.replace({
         query: {
+          ...route.query, // used to keep current variables data as is
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,

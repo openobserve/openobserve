@@ -340,6 +340,13 @@ export default defineComponent({
         };
       },
     );
+
+    watch(() => refreshVariableDataRef.value, () => {
+      if(refreshVariableDataRef.value?.__global) {
+        emit("variablesData", refreshVariableDataRef.value?.__global);
+      }
+    })
+
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
         variablesAndPanelsDataLoadingState.searchRequestTraceIds,
@@ -416,7 +423,6 @@ export default defineComponent({
           //   variablesData.value,
           // );
           refreshVariableDataRef.value = { __global: variablesData.value };
-          emit("variablesData", refreshVariableDataRef.value.__global);
         }
 
         return;
@@ -581,7 +587,10 @@ export default defineComponent({
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
 
-      refreshVariableDataRef.value[panelId] = variablesData.value;
+      refreshVariableDataRef.value = {
+        ...refreshVariableDataRef.value,
+        [panelId]: variablesData.value
+      }
     };
 
     const openEditLayout = (id: string) => {
