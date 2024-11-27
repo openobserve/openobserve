@@ -87,13 +87,11 @@ fn create_org_users_table_statement() -> TableCreateStatement {
             .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
             .from(OrgUsers::Table, OrgUsers::OrgId)
             .to(Organizations::Table, Organizations::Identifier)
-            .on_delete(ForeignKeyAction::Cascade)
         )
         .foreign_key(ForeignKey::create()
             .name(ORG_USER_USER_FOREIGN_KEY)
             .from(OrgUsers::Table, OrgUsers::Email)
             .to(Users::Table, Users::Email)
-            .on_delete(ForeignKeyAction::Cascade)
         )
         .to_owned()
 }
@@ -143,75 +141,84 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(PostgresQueryBuilder),
+            &create_org_users_table_statement().to_string(PostgresQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "folders" (
+                CREATE TABLE IF NOT EXISTS "org_users" (
                 "id" bigserial NOT NULL PRIMARY KEY,
-                "org" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL,
-                "name" varchar(256) NOT NULL,
-                "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "email" varchar(100) NOT NULL,
+                "org_id" varchar(256) NOT NULL,
+                "role" smallint NOT NULL,
+                "token" varchar(256) NOT NULL,
+                "rum_token" varchar(256),
+                "created_at" bigint NOT NULL,
+                "updated_at" bigint NOT NULL,
+                CONSTRAINT "org_users_org_id_fk" FOREIGN KEY ("org_id") REFERENCES "organizations" ("identifier"),
+                CONSTRAINT "org_users_user_email_fk" FOREIGN KEY ("email") REFERENCES "users" ("email")
             )"#
         );
         assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
+            &create_org_users_id_email_idx_stmnt().to_string(PostgresQueryBuilder),
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "org_users_id_email_idx" ON "org_users" ("email", "org_id")"#
         );
         assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
+            &create_org_users_rum_token_idx_stmnt().to_string(PostgresQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "org_users_rum_token_idx" ON "org_users" ("rum_token")"#
         );
     }
 
     #[test]
     fn mysql() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(MysqlQueryBuilder),
+            &create_org_users_table_statement().to_string(MysqlQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS `folders` (
-                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `org` varchar(100) NOT NULL,
-                `folder_id` varchar(256) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `description` text,
-                `type` smallint NOT NULL,
-                `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                CREATE TABLE IF NOT EXISTS `org_users` (
+                `id` bigint AUTO_INCREMENT NOT NULL PRIMARY KEY,
+                `email` varchar(100) NOT NULL,
+                `org_id` varchar(256) NOT NULL,
+                `role` smallint NOT NULL,
+                `token` varchar(256) NOT NULL,
+                `rum_token` varchar(256),
+                `created_at` bigint UNSIGNED NOT NULL,
+                `updated_at` bigint UNSIGNED NOT NULL,
+                CONSTRAINT `org_users_org_id_fk` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`identifier`),
+                CONSTRAINT `org_users_user_email_fk` FOREIGN KEY (`email`) REFERENCES `users` (`email`)
             )"#
         );
         assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `folders_org_idx` ON `folders` (`org`)"#
+            &create_org_users_id_email_idx_stmnt().to_string(MysqlQueryBuilder),
+            r#"CREATE UNIQUE INDEX `org_users_id_email_idx` ON `org_users` (`email`, `org_id`)"#
         );
         assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_org_folder_id_idx` ON `folders` (`org`, `folder_id`)"#
+            &create_org_users_rum_token_idx_stmnt().to_string(MysqlQueryBuilder),
+            r#"CREATE INDEX `org_users_rum_token_idx` ON `org_users` (`rum_token`)"#
         );
     }
 
     #[test]
     fn sqlite() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(SqliteQueryBuilder),
+            &create_org_users_table_statement().to_string(SqliteQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "folders" (
+                CREATE TABLE IF NOT EXISTS "org_users" (
                 "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "org" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL,
-                "name" varchar(256) NOT NULL,
-                "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp_text DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "email" varchar(100) NOT NULL,
+                "org_id" varchar(256) NOT NULL,
+                "role" smallint NOT NULL,
+                "token" varchar(256) NOT NULL,
+                "rum_token" varchar(256),
+                "created_at" bigint NOT NULL,
+                "updated_at" bigint NOT NULL,
+                FOREIGN KEY ("org_id") REFERENCES "organizations" ("identifier"),
+                FOREIGN KEY ("email") REFERENCES "users" ("email")
             )"#
         );
         assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
+            &create_org_users_id_email_idx_stmnt().to_string(SqliteQueryBuilder),
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "org_users_id_email_idx" ON "org_users" ("email", "org_id")"#
         );
         assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
+            &create_org_users_rum_token_idx_stmnt().to_string(SqliteQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "org_users_rum_token_idx" ON "org_users" ("rum_token")"#
         );
     }
 }

@@ -18,24 +18,16 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const ORG_ID_IDX: &str = "organizations_identifier_idx";
-
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .create_table(create_organizations_table_statement())
             .await?;
-        manager
-            .create_index(create_organizations_identifier_idx_stmnt())
-            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(Index::drop().name(ORG_ID_IDX).to_owned())
-            .await?;
         manager
             .drop_table(Table::drop().table(Organizations::Table).to_owned())
             .await?;
@@ -68,16 +60,6 @@ fn create_organizations_table_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// Statement to create index on org.
-fn create_organizations_identifier_idx_stmnt() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .if_not_exists()
-        .name(ORG_ID_IDX)
-        .table(Organizations::Table)
-        .col(Organizations::Identifier)
-        .to_owned()
-}
-
 /// Identifiers used in queries on the folders table.
 #[derive(DeriveIden)]
 pub(super) enum Organizations {
@@ -98,75 +80,45 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(PostgresQueryBuilder),
+            &create_organizations_table_statement().to_string(PostgresQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "folders" (
-                "id" bigserial NOT NULL PRIMARY KEY,
-                "org" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL,
-                "name" varchar(256) NOT NULL,
-                "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                CREATE TABLE IF NOT EXISTS "organizations" (
+                "identifier" varchar(256) NOT NULL PRIMARY KEY,
+                "org_name" varchar(100) NOT NULL,
+                "org_type" smallint NOT NULL,
+                "created_at" bigint NOT NULL,
+                "updated_at" bigint NOT NULL
             )"#
-        );
-        assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
         );
     }
 
     #[test]
     fn mysql() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(MysqlQueryBuilder),
+            &create_organizations_table_statement().to_string(MysqlQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS `folders` (
-                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `org` varchar(100) NOT NULL,
-                `folder_id` varchar(256) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `description` text,
-                `type` smallint NOT NULL,
-                `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                CREATE TABLE IF NOT EXISTS `organizations` (
+                `identifier` varchar(256) NOT NULL PRIMARY KEY,
+                `org_name` varchar(100) NOT NULL,
+                `org_type` smallint NOT NULL,
+                `created_at` bigint UNSIGNED NOT NULL,
+                `updated_at` bigint UNSIGNED NOT NULL
             )"#
-        );
-        assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `folders_org_idx` ON `folders` (`org`)"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_org_folder_id_idx` ON `folders` (`org`, `folder_id`)"#
         );
     }
 
     #[test]
     fn sqlite() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(SqliteQueryBuilder),
+            &create_organizations_table_statement().to_string(SqliteQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "folders" (
-                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "org" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL,
-                "name" varchar(256) NOT NULL,
-                "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp_text DEFAULT CURRENT_TIMESTAMP NOT NULL
+                CREATE TABLE IF NOT EXISTS "organizations" (
+                "identifier" varchar(256) NOT NULL PRIMARY KEY,
+                "org_name" varchar(100) NOT NULL,
+                "org_type" smallint NOT NULL,
+                "created_at" bigint NOT NULL,
+                "updated_at" bigint NOT NULL
             )"#
-        );
-        assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
         );
     }
 }

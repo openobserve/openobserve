@@ -11,7 +11,7 @@ pub struct Model {
     pub email: String,
     pub first_name: String,
     pub last_name: String,
-    #[sea_orm(column_type = "custom(\"\")")]
+    #[sea_orm(column_type = "Text")]
     pub password: String,
     pub salt: String,
     pub is_root: bool,

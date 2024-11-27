@@ -18,19 +18,19 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const USER_ID_IDX: &str = "users_id_idx";
+const USER_EMAIL_IDX: &str = "users_email_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.create_table(create_users_table_statement()).await?;
-        manager.create_index(create_users_id_idx_stmnt()).await?;
+        manager.create_index(create_users_email_idx_stmnt()).await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(USER_ID_IDX).to_owned())
+            .drop_index(Index::drop().name(USER_EMAIL_IDX).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(Users::Table).to_owned())
@@ -54,7 +54,7 @@ fn create_users_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Users::Email).string_len(100).not_null())
         .col(ColumnDef::new(Users::FirstName).string_len(80).not_null())
         .col(ColumnDef::new(Users::LastName).string_len(80).not_null())
-        .col(ColumnDef::new(Users::Password).not_null())
+        .col(ColumnDef::new(Users::Password).text().not_null())
         .col(ColumnDef::new(Users::Salt).string_len(256).not_null())
         .col(ColumnDef::new(Users::IsRoot).boolean().not_null())
         .col(ColumnDef::new(Users::PasswordExt).string_len(256))
@@ -72,10 +72,10 @@ fn create_users_table_statement() -> TableCreateStatement {
 }
 
 /// Statement to create index on org.
-fn create_users_id_idx_stmnt() -> IndexCreateStatement {
+fn create_users_email_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(USER_ID_IDX)
+        .name(USER_EMAIL_IDX)
         .table(Users::Table)
         .unique()
         .col(Users::Email)
@@ -108,75 +108,75 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(PostgresQueryBuilder),
+            &create_users_table_statement().to_string(PostgresQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "folders" (
+                CREATE TABLE IF NOT EXISTS "users" (
                 "id" bigserial NOT NULL PRIMARY KEY,
-                "org" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL,
-                "name" varchar(256) NOT NULL,
-                "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "email" varchar(100) NOT NULL,
+                "first_name" varchar(80) NOT NULL,
+                "last_name" varchar(80) NOT NULL,
+                "password" text NOT NULL,
+                "salt" varchar(256) NOT NULL,
+                "is_root" bool NOT NULL,
+                "password_ext" varchar(256),
+                "user_type" smallint NOT NULL,
+                "created_at" bigint NOT NULL,
+                "updated_at" bigint NOT NULL
             )"#
         );
         assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
+            &create_users_email_idx_stmnt().to_string(PostgresQueryBuilder),
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "users_email_idx" ON "users" ("email")"#
         );
     }
 
     #[test]
     fn mysql() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(MysqlQueryBuilder),
+            &create_users_table_statement().to_string(MysqlQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS `folders` (
-                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `org` varchar(100) NOT NULL,
-                `folder_id` varchar(256) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `description` text,
-                `type` smallint NOT NULL,
-                `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                CREATE TABLE IF NOT EXISTS `users` (
+                `id` bigint AUTO_INCREMENT NOT NULL PRIMARY KEY,
+                `email` varchar(100) NOT NULL,
+                `first_name` varchar(80) NOT NULL,
+                `last_name` varchar(80) NOT NULL,
+                `password` text NOT NULL,
+                `salt` varchar(256) NOT NULL,
+                `is_root` bool NOT NULL,
+                `password_ext` varchar(256),
+                `user_type` smallint NOT NULL,
+                `created_at` bigint UNSIGNED NOT NULL,
+                `updated_at` bigint UNSIGNED NOT NULL
             )"#
         );
         assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `folders_org_idx` ON `folders` (`org`)"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_org_folder_id_idx` ON `folders` (`org`, `folder_id`)"#
+            &create_users_email_idx_stmnt().to_string(MysqlQueryBuilder),
+            r#"CREATE UNIQUE INDEX `users_email_idx` ON `users` (`email`)"#
         );
     }
 
     #[test]
     fn sqlite() {
         collapsed_eq!(
-            &create_folders_table_statement().to_string(SqliteQueryBuilder),
+            &create_users_table_statement().to_string(SqliteQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "folders" (
+                CREATE TABLE IF NOT EXISTS "users" (
                 "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "org" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL,
-                "name" varchar(256) NOT NULL,
-                "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp_text DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "email" varchar(100) NOT NULL,
+                "first_name" varchar(80) NOT NULL,
+                "last_name" varchar(80) NOT NULL,
+                "password" text NOT NULL,
+                "salt" varchar(256) NOT NULL,
+                "is_root" boolean NOT NULL,
+                "password_ext" varchar(256),
+                "user_type" smallint NOT NULL,
+                "created_at" bigint NOT NULL,
+                "updated_at" bigint NOT NULL
             )"#
         );
         assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
+            &create_users_email_idx_stmnt().to_string(SqliteQueryBuilder),
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "users_email_idx" ON "users" ("email")"#
         );
     }
 }
