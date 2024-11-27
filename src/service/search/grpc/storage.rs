@@ -461,7 +461,7 @@ async fn filter_file_list_by_tantivy_index(
     .await?;
 
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -564,27 +564,33 @@ async fn filter_file_list_by_tantivy_index(
             // Each result corresponds to a file in the file list
             match result {
                 Ok((file_name, bitvec)) => {
+                    if file_name.is_empty() && bitvec.is_none() {
+                        // no need inverted index for this file, need add filter back
+                        is_add_filter_back = true;
+                        continue;
+                    }
                     if let Some(res) = bitvec {
-                        // Replace the segment IDs in the existing `FileKey` with the new found
-                        // segments
-                        let file = file_list_map
-                        .get_mut(&file_name)
-                        // we expect each file name has atleast 1 file
-                        .unwrap();
-                        let hits_per_file = res.count_ones();
-                        total_hits += hits_per_file;
-                        file.with_segment_ids(res);
+                        let hits_in_file = res.count_ones();
+                        total_hits += hits_in_file;
                         log::debug!(
-                        "[trace_id {}] search->storage: hits for index_condition: {:?} found {} in {}",
-                        query.trace_id,
-                        index_condition,
-                        hits_per_file,
-                        file_name
-                    );
+                            "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
+                            query.trace_id,
+                            index_condition,
+                            hits_in_file,
+                            file_name
+                        );
+                        if hits_in_file == 0 {
+                            // if the bitmap is empty then we remove the file from the list
+                            file_list_map.remove(&file_name);
+                        } else {
+                            // Replace the segment IDs in the existing `FileKey` with the found
+                            let file = file_list_map.get_mut(&file_name).unwrap();
+                            file.with_segment_ids(res);
+                        }
                     } else {
                         // if the bitmap is empty then we remove the file from the list
                         log::debug!(
-                            "[trace_id {}] search->storage: no match found in index for file {}",
+                            "[trace_id {}] search->tantivy: no match found in index for file {}",
                             query.trace_id,
                             file_name
                         );
@@ -592,11 +598,11 @@ async fn filter_file_list_by_tantivy_index(
                     }
                 }
                 Err(e) => {
-                    log::warn!(
-                    "[trace_id {}] search->storage: error filtering file via FST index. Keep file to search, {}",
-                    query.trace_id,
-                    e.to_string()
-                );
+                    log::error!(
+                        "[trace_id {}] search->tantivy: error filtering via index. Keep file to search, error: {}",
+                        query.trace_id,
+                        e
+                    );
                     is_add_filter_back = true;
                     continue;
                 }
@@ -609,7 +615,7 @@ async fn filter_file_list_by_tantivy_index(
     }
 
     log::info!(
-        "[trace_id {}] search->storage: total hits for index_condition: {:?} found {}",
+        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}",
         query.trace_id,
         index_condition,
         total_hits
@@ -774,11 +780,12 @@ async fn search_tantivy_index(
         && matched_docs.len()
             > (parquet_file.meta.records as usize / 100 * cfg.limit.inverted_index_skip_threshold)
     {
-        return Err(anyhow::anyhow!(
+        log::debug!(
             "matched docs over [{}/100] in tantivy index, skip this file: {}",
             cfg.limit.inverted_index_skip_threshold,
             parquet_file.key
-        ));
+        );
+        return Ok(("".to_string(), None));
     }
 
     // Prepare a vec of segment offsets
@@ -786,18 +793,16 @@ async fn search_tantivy_index(
     let seg_metas = tantivy_index
         .searchable_segment_metas()
         .context("Count segments")?;
-    let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
-    // Return early if there is only one segment
-    if seg_metas.len() == 1 {
-        for doc in matched_docs {
-            res.set(doc.doc_id as usize, true);
-        }
-        Ok((parquet_file.key.to_string(), Some(res)))
-    } else {
-        Err(anyhow::anyhow!(
+    if seg_metas.len() > 1 {
+        return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
-        ))
+        ));
     }
+    let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+    for doc in matched_docs {
+        res.set(doc.doc_id as usize, true);
+    }
+    Ok((parquet_file.key.to_string(), Some(res)))
 }
 
 // Group files by time range

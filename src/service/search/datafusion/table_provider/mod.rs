@@ -389,7 +389,7 @@ impl TableProvider for NewListingTable {
 
         apply_filter(
             self.index_condition.as_ref(),
-            &self.schema(),
+            &projection_exec.schema(),
             &self.fst_fields,
             projection_exec,
             filter_projection,
