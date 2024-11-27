@@ -163,7 +163,10 @@ impl ListQuery {
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let query = web::Query::<ListQuery>::from_query(req.query_string()).unwrap(); // FIXME
+    let Ok(query) = web::Query::<ListQuery>::from_query(req.query_string()) else {
+        return Ok(HttpResponse::BadRequest().into());
+    };
+
     let params = query.into_inner().into(&org_id.into_inner());
     dashboards::list_dashboards(params).await
 }
