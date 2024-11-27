@@ -636,6 +636,11 @@ export default defineComponent({
 
       // console.time("AddPanel:loadDashboard:after");
       currentDashboardData.data = data;
+
+      if (!Object.keys(currentDashboardData?.data)?.length) {
+        goBack();
+        return;
+      }
       // if variables data is null, set it to empty list
       if (
         !(
@@ -814,7 +819,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
     };
