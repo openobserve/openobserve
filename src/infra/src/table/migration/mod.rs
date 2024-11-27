@@ -27,29 +27,7 @@ mod m20241122_000001_populate_organizations_table;
 mod m20241122_130000_create_users_table;
 mod m20241122_150000_create_org_users_table;
 mod m20241122_163000_populate_users_table;
-
-/// Representation of the meta table at the time this migration executes.
-pub(super) mod meta {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "meta")]
-    pub struct Model {
-        #[sea_orm(primary_key)]
-        pub id: i64,
-        pub module: String,
-        pub key1: String,
-        pub key2: String,
-        pub start_dt: i64,
-        #[sea_orm(column_type = "Text")]
-        pub value: String,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
+mod m20241123_163000_delete_meta_users_table;
 
 pub struct Migrator;
 
@@ -69,6 +47,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241122_130000_create_users_table::Migration),
             Box::new(m20241122_150000_create_org_users_table::Migration),
             Box::new(m20241122_163000_populate_users_table::Migration),
+            Box::new(m20241123_163000_delete_meta_users_table::Migration),
         ]
     }
 }
