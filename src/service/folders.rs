@@ -146,7 +146,10 @@ pub async fn get_folder(org_id: &str, folder_id: &str) -> HttpResponse {
 #[tracing::instrument()]
 pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse, Error> {
     let filter = db::dashboards::ListParams::new(org_id).with_folder_id(folder_id);
-    let dashboards = db::dashboards::list(filter).await.unwrap();
+    let Ok(dashboards) = db::dashboards::list(filter).await else {
+        return Ok(HttpResponse::InternalServerError().into());
+    };
+
     if !dashboards.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
