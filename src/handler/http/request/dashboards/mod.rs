@@ -17,10 +17,52 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
 use config::meta::dashboards::MoveDashboard;
+use serde::Deserialize;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards};
 
 pub mod reports;
+
+/// HTTP query parameters for listing dashboards.
+#[derive(Debug, Deserialize)]
+pub struct ListParams {
+    /// The optional folder ID surrogate key with which to filter dashboards.
+    folder: Option<String>,
+
+    /// The optional case-insensitive title substring with which to filter
+    /// dashboards.
+    title_pat: Option<String>,
+}
+
+impl ListParams {
+    pub fn into(self, org_id: &str) -> dashboards::ListParams {
+        match self {
+            Self {
+                folder: Some(f),
+                title_pat: Some(t),
+            } => dashboards::ListParams::new(org_id)
+                .with_folder_id(&f)
+                .where_title_contains(&t),
+            Self {
+                folder: None,
+                title_pat: Some(t),
+            } => dashboards::ListParams::new(org_id).where_title_contains(&t),
+            Self {
+                folder: Some(f),
+                title_pat: None,
+            } => dashboards::ListParams::new(org_id).with_folder_id(&f),
+            Self {
+                folder: None,
+                title_pat: None,
+            } => {
+                // To preserve backwards-compatability when no filter parameters
+                // are given we will list the contents of the default folder.
+                dashboards::ListParams::new(org_id)
+                    .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
+            }
+        }
+    }
+}
 
 /// CreateDashboard
 #[utoipa::path(
@@ -106,6 +148,8 @@ async fn update_dashboard(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID"),
+        ("title" = Option<String>, Query, description = "Case-insensitive substring to search for in dashboard titles"),
     ),
     responses(
         (status = StatusCode::OK, body = Dashboards),
@@ -113,8 +157,9 @@ async fn update_dashboard(
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let folder = get_folder(req);
-    dashboards::list_dashboards(&org_id.into_inner(), &folder).await
+    let query = web::Query::<ListParams>::from_query(req.query_string()).unwrap(); // FIXME
+    let params = query.into_inner().into(&org_id.into_inner());
+    dashboards::list_dashboards(params).await
 }
 
 /// GetDashboard

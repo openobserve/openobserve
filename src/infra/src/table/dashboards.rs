@@ -18,8 +18,12 @@ use config::meta::dashboards::{
     v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
 };
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    prelude::Expr,
+    sea_query::{extension::postgres::PgExpr, Func},
+    ActiveModelTrait,
+    ActiveValue::NotSet,
+    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set,
+    TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
@@ -31,6 +35,20 @@ use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors::{self, GetDashboardError, PutDashboardError},
 };
+
+/// Parameters for listing dashboards.
+#[derive(Debug, Clone)]
+pub struct ListParams {
+    /// The org ID surrogate key with which to filter dashboards.
+    pub org_id: String,
+
+    /// The optional folder ID surrogate key with which to filter dashboards.
+    pub folder_id: Option<String>,
+
+    /// The optional case-insensitive title substring with which to filter
+    /// dashboards.
+    pub title_pat: Option<String>,
+}
 
 impl TryFrom<dashboards::Model> for Dashboard {
     type Error = errors::Error;
@@ -103,9 +121,9 @@ pub async fn get(
 }
 
 /// Lists all dashboards belonging to the given org and folder.
-pub async fn list(org_id: &str, folder_id: &str) -> Result<Vec<Dashboard>, errors::Error> {
+pub async fn list(filter: ListParams) -> Result<Vec<Dashboard>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let dashboards = list_models(client, org_id, folder_id)
+    let dashboards = list_models(client, filter)
         .await?
         .into_iter()
         .map(Dashboard::try_from)
@@ -261,18 +279,41 @@ async fn get_model(
 /// Lists all dashboard ORM models that belong to the given org and folder.
 async fn list_models(
     db: &DatabaseConnection,
-    org_id: &str,
-    folder_id: &str,
+    filter: ListParams,
 ) -> Result<Vec<dashboards::Model>, sea_orm::DbErr> {
-    let rslt = folders::Entity::find()
-        .filter(folders::Column::Org.eq(org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()))
-        .filter(folders::Column::FolderId.eq(folder_id))
-        .find_with_related(dashboards::Entity)
-        .order_by_asc(dashboards::Column::Title)
+    let query = folders::Entity::find()
+        .filter(folders::Column::Org.eq(filter.org_id))
+        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
+
+    // Apply the optional folder_id filter.
+    let query = if let Some(folder_id) = &filter.folder_id {
+        query.filter(folders::Column::FolderId.eq(folder_id))
+    } else {
+        query
+    };
+
+    // Left join on dashboards table.
+    let query = query.find_with_related(dashboards::Entity);
+
+    // Apply the optional title substring filter.
+    let query = if let Some(title_pat) = filter.title_pat {
+        query.filter(
+            Expr::expr(Func::lower(Expr::col(dashboards::Column::Title)))
+                .contains(title_pat.trim().to_lowercase()),
+        )
+    } else {
+        query
+    };
+
+    // Apply ordering.
+    let query = query.order_by_asc(dashboards::Column::Title);
+
+    let dashboards = query
         .all(db)
-        .await?;
-    let dashboards = rslt.into_iter().flat_map(|(_, ds)| ds).collect();
+        .await?
+        .into_iter()
+        .flat_map(|(_, ds)| ds)
+        .collect();
     Ok(dashboards)
 }
 
