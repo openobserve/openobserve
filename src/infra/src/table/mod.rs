@@ -39,6 +39,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn create_user_tables() -> Result<(), anyhow::Error> {
+    organizations::create_table().await?;
+    users::create_table().await?;
+    org_users::create_table().await?;
+
+    Ok(())
+}
+
 /// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
 ///
 /// # Returns

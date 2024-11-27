@@ -335,7 +335,7 @@ mod tests {
     async fn test_user() {
         let org_id = "dummy".to_string();
         let email = "user3@example.com";
-        let resp = set(&DBUser {
+        let resp = add(&DBUser {
             email: email.to_string(),
             password: "pass".to_string(),
             salt: String::from("sdfjshdkfshdfkshdfkshdfkjh"),

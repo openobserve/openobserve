@@ -315,7 +315,7 @@ pub async fn validate_credentials_ext(
 /// - The org does not exist in the meta table
 /// - The user is a root user
 /// - This is a ingestion POST endpoint
-async fn check_and_create_org(
+async fn _check_and_create_org(
     user_id: &str,
     org_id: &str,
     method: &Method,
@@ -907,7 +907,7 @@ fn extract_full_url(req: &ServiceRequest) -> String {
 
 #[cfg(test)]
 mod tests {
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
     use crate::common::meta::user::UserRequest;
@@ -973,6 +973,7 @@ mod tests {
         let pwd = "Complexpass#123";
 
         infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
         users::create_root_user(
             org_id,
             UserRequest {
@@ -995,7 +996,7 @@ mod tests {
                 email: user_id.to_string(),
                 password: pwd.to_string(),
                 role: crate::common::meta::user::UserOrgRole {
-                    base_role: config::meta::user::UserRole::Member,
+                    base_role: config::meta::user::UserRole::Admin,
                     custom_role: None,
                 },
                 first_name: "root".to_owned(),

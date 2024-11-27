@@ -303,6 +303,13 @@ pub async fn update_user(
                     is_org_updated = true;
                 }
 
+                if !message.is_empty() {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        message.to_string(),
+                    )));
+                }
+
                 if is_updated
                     && db::user::update(
                         email,
@@ -899,7 +906,7 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
 #[cfg(test)]
 mod tests {
     use config::meta::user::{UserRole, UserType};
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
     use crate::common::infra::config::USERS;
@@ -954,6 +961,7 @@ mod tests {
     #[tokio::test]
     async fn test_post_user() {
         infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
         set_up().await;
 
         let resp = post_user(
@@ -978,6 +986,7 @@ mod tests {
     #[tokio::test]
     async fn test_user() {
         infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
         set_up().await;
 
         let resp = update_user(

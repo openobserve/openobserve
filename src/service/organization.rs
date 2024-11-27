@@ -368,6 +368,8 @@ pub async fn accept_invitation(
     user_email: &str,
     invite_token: &str,
 ) -> Result<(), anyhow::Error> {
+    use std::str::FromStr;
+
     if get_org(org_id).await.is_some() {
         let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
 
@@ -405,7 +407,7 @@ pub async fn get_org(org: &str) -> Option<Organization> {
 
 #[cfg(test)]
 mod tests {
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
     use crate::{common::meta::user::UserRequest, service::users};
@@ -418,6 +420,7 @@ mod tests {
         let pwd = "Complexpass#123";
 
         infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
         users::create_root_user(
             org_id,
             UserRequest {

@@ -15,8 +15,8 @@
 
 use config::meta::organization::OrganizationType;
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Schema, Set,
 };
 
 use super::{
@@ -58,6 +58,24 @@ impl From<Model> for OrganizationRecord {
 #[derive(FromQueryResult, Debug)]
 pub struct OrgId {
     pub identifier: String,
+}
+
+pub async fn create_table() -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let builder = client.get_database_backend();
+
+    let schema = Schema::new(builder);
+    let create_table_stmt = schema
+        .create_table_from_entity(Entity)
+        .if_not_exists()
+        .take();
+
+    client
+        .execute(builder.build(&create_table_stmt))
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
 }
 
 pub async fn add(
