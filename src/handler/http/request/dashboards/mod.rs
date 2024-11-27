@@ -31,7 +31,7 @@ pub struct ListParams {
 
     /// The optional case-insensitive title substring with which to filter
     /// dashboards.
-    title_pat: Option<String>,
+    title: Option<String>,
 }
 
 impl ListParams {
@@ -39,21 +39,21 @@ impl ListParams {
         match self {
             Self {
                 folder: Some(f),
-                title_pat: Some(t),
+                title: Some(t),
             } => dashboards::ListParams::new(org_id)
                 .with_folder_id(&f)
                 .where_title_contains(&t),
             Self {
                 folder: None,
-                title_pat: Some(t),
+                title: Some(t),
             } => dashboards::ListParams::new(org_id).where_title_contains(&t),
             Self {
                 folder: Some(f),
-                title_pat: None,
+                title: None,
             } => dashboards::ListParams::new(org_id).with_folder_id(&f),
             Self {
                 folder: None,
-                title_pat: None,
+                title: None,
             } => {
                 // To preserve backwards-compatability when no filter parameters
                 // are given we will list the contents of the default folder.

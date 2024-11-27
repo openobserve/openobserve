@@ -26,14 +26,14 @@ pub mod reports;
 #[derive(Debug, Clone)]
 pub struct ListParams {
     /// The org ID surrogate key with which to filter dashboards.
-    pub org_id: String,
+    org_id: String,
 
     /// The optional folder ID surrogate key with which to filter dashboards.
-    pub folder_id: Option<String>,
+    folder_id: Option<String>,
 
     /// The optional case-insensitive title substring with which to filter
     /// dashboards.
-    pub title: Option<String>,
+    title: Option<String>,
 }
 
 impl ListParams {

@@ -18,12 +18,8 @@ use config::meta::dashboards::{
     v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
 };
 use sea_orm::{
-    prelude::Expr,
-    sea_query::{extension::postgres::PgExpr, Func},
-    ActiveModelTrait,
-    ActiveValue::NotSet,
-    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set,
-    TryIntoModel,
+    prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
+    DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
@@ -279,34 +275,38 @@ async fn get_model(
 /// Lists all dashboard ORM models that belong to the given org and folder.
 async fn list_models(
     db: &DatabaseConnection,
-    filter: ListParams,
+    params: ListParams,
 ) -> Result<Vec<dashboards::Model>, sea_orm::DbErr> {
     let query = folders::Entity::find()
-        .filter(folders::Column::Org.eq(filter.org_id))
+        .filter(folders::Column::Org.eq(params.org_id))
         .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
 
     // Apply the optional folder_id filter.
-    let query = if let Some(folder_id) = &filter.folder_id {
+    let query = if let Some(folder_id) = &params.folder_id {
         query.filter(folders::Column::FolderId.eq(folder_id))
     } else {
         query
     };
 
+    // Apply ordering. Confusingly, it is necessary to apply the ordering BEFORE
+    // adding a join to the query builder. If we don't do this then Sea ORM will
+    // always sort on the join key (folder.id) before any other sorting
+    // conditions.
+    let query = query.order_by(dashboards::Column::Title, sea_orm::Order::Asc);
+
     // Left join on dashboards table.
     let query = query.find_with_related(dashboards::Entity);
 
     // Apply the optional title substring filter.
-    let query = if let Some(title_pat) = filter.title_pat {
-        query.filter(
-            Expr::expr(Func::lower(Expr::col(dashboards::Column::Title)))
-                .contains(title_pat.trim().to_lowercase()),
-        )
+    let title_pat = params
+        .title_pat
+        .and_then(|p| if p.is_empty() { None } else { Some(p) });
+    let query = if let Some(title_pat) = title_pat {
+        let pattern = format!("%{}%", title_pat.to_lowercase());
+        query.filter(Expr::expr(Func::lower(Expr::col(dashboards::Column::Title))).like(pattern))
     } else {
         query
     };
-
-    // Apply ordering.
-    let query = query.order_by_asc(dashboards::Column::Title);
 
     let dashboards = query
         .all(db)
@@ -366,4 +366,92 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
     }
 
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{entity::prelude::*, DatabaseBackend, MockDatabase, Transaction};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn list_models_psql() -> Result<(), DbErr> {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([Vec::<dashboards::Model>::new()])
+            .into_connection();
+        let params = ListParams {
+            org_id: "orgId".to_owned(),
+            folder_id: Some("folderId".to_owned()),
+            title_pat: Some("tItLePat".to_owned()),
+        };
+        list_models(&db, params).await?;
+        assert_eq!(
+            db.into_transaction_log(),
+            vec![Transaction::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"SELECT "folders"."id" AS "A_id", "folders"."org" AS "A_org", "folders"."folder_id" AS "A_folder_id", "folders"."name" AS "A_name", "folders"."description" AS "A_description", "folders"."type" AS "A_type", "dashboards"."id" AS "B_id", "dashboards"."dashboard_id" AS "B_dashboard_id", "dashboards"."folder_id" AS "B_folder_id", "dashboards"."owner" AS "B_owner", "dashboards"."role" AS "B_role", "dashboards"."title" AS "B_title", "dashboards"."description" AS "B_description", "dashboards"."data" AS "B_data", "dashboards"."version" AS "B_version", "dashboards"."created_at" AS "B_created_at" FROM "folders" LEFT JOIN "dashboards" ON "folders"."id" = "dashboards"."folder_id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."id" ASC"#,
+                [
+                    "orgId".into(),
+                    0i16.into(),
+                    "folderId".into(),
+                    "%titlepat%".into()
+                ]
+            )]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn list_models_mysql() -> Result<(), DbErr> {
+        let db = MockDatabase::new(DatabaseBackend::MySql)
+            .append_query_results([Vec::<dashboards::Model>::new()])
+            .into_connection();
+        let params = ListParams {
+            org_id: "orgId".to_owned(),
+            folder_id: Some("folderId".to_owned()),
+            title_pat: Some("tItLePat".to_owned()),
+        };
+        list_models(&db, params).await?;
+        assert_eq!(
+            db.into_transaction_log(),
+            vec![Transaction::from_sql_and_values(
+                DatabaseBackend::MySql,
+                r#"SELECT `folders`.`id` AS `A_id`, `folders`.`org` AS `A_org`, `folders`.`folder_id` AS `A_folder_id`, `folders`.`name` AS `A_name`, `folders`.`description` AS `A_description`, `folders`.`type` AS `A_type`, `dashboards`.`id` AS `B_id`, `dashboards`.`dashboard_id` AS `B_dashboard_id`, `dashboards`.`folder_id` AS `B_folder_id`, `dashboards`.`owner` AS `B_owner`, `dashboards`.`role` AS `B_role`, `dashboards`.`title` AS `B_title`, `dashboards`.`description` AS `B_description`, `dashboards`.`data` AS `B_data`, `dashboards`.`version` AS `B_version`, `dashboards`.`created_at` AS `B_created_at` FROM `folders` LEFT JOIN `dashboards` ON `folders`.`id` = `dashboards`.`folder_id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`id` ASC"#,
+                [
+                    "orgId".into(),
+                    0i16.into(),
+                    "folderId".into(),
+                    "%titlepat%".into()
+                ]
+            )]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn list_models_sqlite() -> Result<(), DbErr> {
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([Vec::<dashboards::Model>::new()])
+            .into_connection();
+        let params = ListParams {
+            org_id: "orgId".to_owned(),
+            folder_id: Some("folderId".to_owned()),
+            title_pat: Some("tItLePat".to_owned()),
+        };
+        list_models(&db, params).await?;
+        assert_eq!(
+            db.into_transaction_log(),
+            vec![Transaction::from_sql_and_values(
+                DatabaseBackend::Sqlite,
+                r#"SELECT "folders"."id" AS "A_id", "folders"."org" AS "A_org", "folders"."folder_id" AS "A_folder_id", "folders"."name" AS "A_name", "folders"."description" AS "A_description", "folders"."type" AS "A_type", "dashboards"."id" AS "B_id", "dashboards"."dashboard_id" AS "B_dashboard_id", "dashboards"."folder_id" AS "B_folder_id", "dashboards"."owner" AS "B_owner", "dashboards"."role" AS "B_role", "dashboards"."title" AS "B_title", "dashboards"."description" AS "B_description", "dashboards"."data" AS "B_data", "dashboards"."version" AS "B_version", "dashboards"."created_at" AS "B_created_at" FROM "folders" LEFT JOIN "dashboards" ON "folders"."id" = "dashboards"."folder_id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."id" ASC"#,
+                [
+                    "orgId".into(),
+                    0i16.into(),
+                    "folderId".into(),
+                    "%titlepat%".into()
+                ]
+            )]
+        );
+        Ok(())
+    }
 }
