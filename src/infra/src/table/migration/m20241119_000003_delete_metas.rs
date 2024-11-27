@@ -25,13 +25,10 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let txn = manager.get_connection().begin().await?;
-        meta::Entity::delete_many().exec(&txn).await?;
-
         meta::Entity::delete_many()
             .filter(meta::Column::Module.eq("dashboard"))
             .exec(&txn)
             .await?;
-
         txn.commit().await?;
         Ok(())
     }

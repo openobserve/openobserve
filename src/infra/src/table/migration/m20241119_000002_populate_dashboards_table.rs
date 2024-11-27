@@ -136,7 +136,7 @@ impl TryFrom<MetaDashboard> for dashboards::ActiveModel {
             .folder_id
             .ok_or("Dashboard in meta table references folder that does not exist")?;
         let dashboard_id = if m.dashboard_id.is_empty() {
-            Err("Dasboard in meta table is missing a dasbhoard ID")
+            Err("Dashboard in meta table is missing a dasbhoard ID")
         } else {
             Ok(m.dashboard_id)
         }?;

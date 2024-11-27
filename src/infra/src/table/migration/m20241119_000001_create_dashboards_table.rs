@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
             .create_table(create_dashboards_table_statement())
             .await?;
         manager
-            .create_index(create_dashboards_dashboard_id_idx_stmnt())
+            .create_index(create_dashboards_folder_id_dashboard_id_idx_stmnt())
             .await?;
         Ok(())
     }
@@ -87,7 +87,7 @@ fn create_dashboards_table_statement() -> TableCreateStatement {
 }
 
 /// Statement to create unique index on dashboard_id.
-fn create_dashboards_dashboard_id_idx_stmnt() -> IndexCreateStatement {
+fn create_dashboards_folder_id_dashboard_id_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
@@ -139,7 +139,7 @@ mod tests {
                 "owner" varchar(256) NOT NULL, 
                 "role" varchar(256) NULL, 
                 "title" varchar(256) NOT NULL, 
-                "description" text, 
+                "description" text NULL, 
                 "data" json NOT NULL,
                 "version" integer NOT NULL, 
                 "created_at" bigint NOT NULL, 
@@ -148,7 +148,7 @@ mod tests {
         );
         assert_eq!(
             &create_dashboards_folder_id_dashboard_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_folder_id_dashboard_id_idx" ON "dasdhboards" ("folder_id", "dashboard_id")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_folder_id_dashboard_id_idx" ON "dashboards" ("folder_id", "dashboard_id")"#
         );
     }
 
@@ -159,11 +159,12 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS `dashboards` ( 
                 `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                `dashboard_id` varchar(256) NOT NULL, 
                 `folder_id` bigint NOT NULL, 
                 `owner` varchar(256) NOT NULL, 
                 `role` varchar(256) NULL, 
                 `title` varchar(256) NOT NULL, 
-                `description` text,
+                `description` text NULL,
                 `data` json NOT NULL,
                 `version` int NOT NULL, 
                 `created_at` bigint NOT NULL, 
@@ -183,20 +184,21 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "dashboards" ( 
                 "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "dashboard_id" varchar(256) NOT NULL, 
                 "folder_id" bigint NOT NULL, 
                 "owner" varchar(256) NOT NULL, 
                 "role" varchar(256) NULL, 
                 "title" varchar(256) NOT NULL, 
-                "description" text, 
+                "description" text NULL, 
                 "data" json_text NOT NULL, 
                 "version" integer NOT NULL, 
-                "created_at" integer NOT NULL, 
+                "created_at" bigint NOT NULL, 
                 FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") 
             )"#
         );
         assert_eq!(
-            &create_dashboards_dashboard_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_dashboard_id_idx" ON "dashboards" ("folder_id", "dashboard_id")"#
+            &create_dashboards_folder_id_dashboard_id_idx_stmnt().to_string(SqliteQueryBuilder),
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_folder_id_dashboard_id_idx" ON "dashboards" ("folder_id", "dashboard_id")"#
         );
     }
 }
