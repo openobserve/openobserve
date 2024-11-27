@@ -27,7 +27,7 @@ use crate::{
 
 /// Indicates the type of data that the folder can contain.
 #[derive(Debug, Clone, Copy)]
-enum FolderType {
+pub(crate) enum FolderType {
     Dashboards,
 }
 
