@@ -159,7 +159,7 @@ pub async fn search(
     let request = crate::service::search::request::Request::new(
         trace_id.clone(),
         org_id.to_string(),
-        stream_type.clone(),
+        stream_type,
         in_req.timeout,
         user_id.clone(),
         Some((query.start_time, query.end_time)),
