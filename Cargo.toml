@@ -292,7 +292,6 @@ sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
     "macros",
-    "mock",
 ] }
 sea-orm-migration = { version = "1.1.0", features = [
     "sqlx-mysql",
