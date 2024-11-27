@@ -73,13 +73,13 @@
           @click="refreshData"
           data-test="dashboard-viewpanel-refresh-data-btn"
           :disable="disable"
-          :color="isVariablesChanged ? 'yellow' : ''"
+          :color="isVariablesChanged ? '' : 'yellow'"
         >
           <q-tooltip>
             {{
               isVariablesChanged
-                ? "Variable values changed, refresh needed!"
-                : "Refresh data"
+                ? "Refresh"
+                : "Variable values changed, refresh needed!"
             }}
           </q-tooltip>
         </q-btn>
@@ -387,7 +387,7 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      }
+      },
     );
 
     const onDataZoom = (event: any) => {
@@ -486,10 +486,20 @@ export default defineComponent({
           JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef),
         );
 
-        isVariablesChanged.value =
-          JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef);
+        const isValueChanged =
+          refreshVariableDataRef?.values?.length > 0 &&
+          variablesData.values.every((variable: any, index: number) => {
+            const prevValue = refreshVariableDataRef.values[index]?.value;
+            const newValue = variable.value;
+            // Compare current and previous values; handle both string and array cases
+            return Array.isArray(newValue)
+              ? JSON.stringify(prevValue) === JSON.stringify(newValue)
+              : prevValue === newValue;
+          });
+        // Set the `isChanged` flag if values are different
+        isVariablesChanged.value = isValueChanged;
       },
-      { deep: true }, 
+      { deep: true },
     );
     const refreshData = () => {
       if (!disable.value) {
