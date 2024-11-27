@@ -344,7 +344,7 @@ impl TableProvider for NewListingTable {
             let mut parquet_projection =
                 index_condition.get_schema_projection(self.schema(), &self.fst_fields);
             if let Some(v) = projection.as_ref() {
-                parquet_projection.extend(v.iter().map(|x| *x));
+                parquet_projection.extend(v.iter().copied());
             }
             parquet_projection.sort();
             parquet_projection.dedup();
