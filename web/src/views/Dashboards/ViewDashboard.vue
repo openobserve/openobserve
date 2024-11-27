@@ -534,6 +534,11 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
 
+      if (!Object.keys(currentDashboardData?.data)?.length) {
+        goBackToDashboardList();
+        return;
+      }
+
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
@@ -683,7 +688,6 @@ export default defineComponent({
       return router.push({
         path: "/dashboards",
         query: {
-          dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
         },
       });
