@@ -23,47 +23,6 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashb
 
 pub mod reports;
 
-/// HTTP query parameters for listing dashboards.
-#[derive(Debug, Deserialize)]
-pub struct ListParams {
-    /// The optional folder ID surrogate key with which to filter dashboards.
-    folder: Option<String>,
-
-    /// The optional case-insensitive title substring with which to filter
-    /// dashboards.
-    title: Option<String>,
-}
-
-impl ListParams {
-    pub fn into(self, org_id: &str) -> dashboards::ListParams {
-        match self {
-            Self {
-                folder: Some(f),
-                title: Some(t),
-            } => dashboards::ListParams::new(org_id)
-                .with_folder_id(&f)
-                .where_title_contains(&t),
-            Self {
-                folder: None,
-                title: Some(t),
-            } => dashboards::ListParams::new(org_id).where_title_contains(&t),
-            Self {
-                folder: Some(f),
-                title: None,
-            } => dashboards::ListParams::new(org_id).with_folder_id(&f),
-            Self {
-                folder: None,
-                title: None,
-            } => {
-                // To preserve backwards-compatability when no filter parameters
-                // are given we will list the contents of the default folder.
-                dashboards::ListParams::new(org_id)
-                    .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
-            }
-        }
-    }
-}
-
 /// CreateDashboard
 #[utoipa::path(
     context_path = "/api",
@@ -138,6 +97,54 @@ async fn update_dashboard(
     dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body, hash).await
 }
 
+/// HTTP URL query component that contains parameters for listing dashboards.
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct ListQuery {
+    /// Optional folder ID filter parameter
+    ///
+    /// If neither `folder` nor any other filter parameter are set then this
+    /// will search for all dashboards in the "default" folder.
+    ///
+    /// If `folder` is not set and another filter parameter, such as `title`, is
+    /// set then this will search for dashboards in all folders.
+    folder: Option<String>,
+
+    /// The optional case-insensitive title substring with which to filter
+    /// dashboards.
+    title: Option<String>,
+}
+
+impl ListQuery {
+    pub fn into(self, org_id: &str) -> dashboards::ListParams {
+        match self {
+            Self {
+                folder: Some(f),
+                title: Some(t),
+            } => dashboards::ListParams::new(org_id)
+                .with_folder_id(&f)
+                .where_title_contains(&t),
+            Self {
+                folder: None,
+                title: Some(t),
+            } => dashboards::ListParams::new(org_id).where_title_contains(&t),
+            Self {
+                folder: Some(f),
+                title: None,
+            } => dashboards::ListParams::new(org_id).with_folder_id(&f),
+            Self {
+                folder: None,
+                title: None,
+            } => {
+                // To preserve backwards-compatability when no filter parameters
+                // are given we will list the contents of the default folder.
+                dashboards::ListParams::new(org_id)
+                    .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
+            }
+        }
+    }
+}
+
 /// ListDashboards
 #[utoipa::path(
     context_path = "/api",
@@ -148,8 +155,7 @@ async fn update_dashboard(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder" = Option<String>, Query, description = "Folder ID"),
-        ("title" = Option<String>, Query, description = "Case-insensitive substring to search for in dashboard titles"),
+        ListQuery
     ),
     responses(
         (status = StatusCode::OK, body = Dashboards),
@@ -157,7 +163,7 @@ async fn update_dashboard(
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let query = web::Query::<ListParams>::from_query(req.query_string()).unwrap(); // FIXME
+    let query = web::Query::<ListQuery>::from_query(req.query_string()).unwrap(); // FIXME
     let params = query.into_inner().into(&org_id.into_inner());
     dashboards::list_dashboards(params).await
 }
