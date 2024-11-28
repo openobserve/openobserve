@@ -68,6 +68,39 @@ pub async fn post_user(
             "Not Allowed".to_string(),
         )));
     };
+    if usr_req.role.custom_role.is_some() {
+        #[cfg(not(feature = "enterprise"))]
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Custom roles not allowed".to_string(),
+        )));
+        #[cfg(feature = "enterprise")]
+        if !get_o2_config().openfga.enabled {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Custom roles not allowed".to_string(),
+            )));
+        } else {
+            match o2_enterprise::enterprise::openfga::authorizer::roles::get_all_roles(org_id, None)
+                .await
+            {
+                Ok(res) => {
+                    if res.contains(usr_req.role.custom_role.as_ref().unwrap()) {
+                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                            http::StatusCode::BAD_REQUEST.into(),
+                            "Custom role not found".to_string(),
+                        )));
+                    }
+                }
+                Err(_) => {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        "Custom role not found".to_string(),
+                    )));
+                }
+            }
+        }
+    }
 
     // For non-enterprise, it is only Admin or Root user
     #[cfg(not(feature = "enterprise"))]
@@ -272,7 +305,7 @@ pub async fn update_user(
                     log::info!("Password by root updated for user: {}", email);
 
                     is_updated = true;
-                } else {
+                } else if user.new_password.is_some() {
                     message = "You are not authorised to change the password"
                 }
                 if user.first_name.is_some() && !local_user.is_external {
@@ -477,7 +510,7 @@ pub async fn add_user_to_org(
     let existing_user = db::user::get_user_record(email).await;
     let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
-        let _initiating_user = if is_root_user(initiator_id) {
+        let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
             let _ = organization::check_and_create_org(&local_org).await;
@@ -495,14 +528,14 @@ pub async fn add_user_to_org(
             }
         };
         let base_role = get_role(&role);
-        #[cfg(not(feature = "enterprise"))]
-        let is_allowed = true;
+        let is_allowed =
+            initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
         #[cfg(feature = "enterprise")]
         let is_allowed = if get_o2_config().openfga.enabled {
             // Permission already checked through RBAC
             true
         } else {
-            _initiating_user.role.eq(&UserRole::Root) || _initiating_user.role.eq(&UserRole::Admin)
+            is_allowed
         };
 
         if is_allowed {
@@ -717,7 +750,7 @@ pub async fn remove_user_from_org(
 ) -> Result<HttpResponse, Error> {
     let email_id = email_id.to_lowercase();
     let initiator_id = initiator_id.to_lowercase();
-    let _initiating_user = if is_root_user(&initiator_id) {
+    let initiating_user = if is_root_user(&initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
     } else {
         db::user::get(Some(org_id), &initiator_id)
@@ -726,14 +759,14 @@ pub async fn remove_user_from_org(
             .unwrap()
     };
 
-    #[cfg(not(feature = "enterprise"))]
-    let is_allowed = true;
+    let is_allowed =
+        initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
     #[cfg(feature = "enterprise")]
     let is_allowed = if get_o2_config().openfga.enabled {
         // Permission already checked through RBAC
         true
     } else {
-        _initiating_user.role.eq(&UserRole::Root) || _initiating_user.role.eq(&UserRole::Admin)
+        is_allowed
     };
 
     if is_allowed {
