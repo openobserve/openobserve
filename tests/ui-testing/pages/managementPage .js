@@ -8,9 +8,8 @@ export
         this.page = page;
 
         this.homeIcon = page.locator("[name ='home']");
-        //this.managementMenuItem = page.getByText('Management');
         this.managementMenuItem = page.locator('[data-test="menu-link-/settings/-item"]');
-        this.submitButton = page.locator("[type='submit']").nth(1);
+        this.submitButton = page.locator('[data-test="dashboard-add-submit"]'); // Add appropriate data-test attribute
         this.customLogoText = page.locator("[aria-label ='Custom Logo Text']");
         this.saveButton = page.locator('[data-test="settings_ent_logo_custom_text_save_btn"]');
         this.deleteLogoButton = page.locator('[data-test="setting_ent_custom_logo_img_delete_btn"]');
@@ -26,15 +25,27 @@ export
     }
 
     async updateCustomLogoText(text) {
-        //  await this.page.waitForSelector("[type='submit']").nth(1);
-        await this.page.waitForTimeout(5000);
+        await this.submitButton.waitFor({ state: 'visible' });
         await this.submitButton.click({ force: true });
+        await this.page.waitForResponse(
+            (response) =>
+                response.url().includes("/api/default/settings") && response.status() === 200
+        );
+        await this.page.getByText('Custom Logo Text').click();
+        await this.page.locator('[data-test="settings_ent_logo_custom_text_edit_btn"]').click();
+        await this.page.locator('[data-test="settings_ent_logo_custom_text"]').click();
+        await this.page.locator('[data-test="settings_ent_logo_custom_text"]').fill('logo Autom');
+        await this.customLogoText.click({ force: true });
         await this.customLogoText.fill(text);
         await this.page.waitForSelector('[data-test="settings_ent_logo_custom_text_save_btn"]');
         await this.saveButton.click({ force: true });
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForResponse(
+            (response) =>
+                response.url().includes("/api/default/settings/logo/text") && response.status() === 200
+        );
+       
 
-    }   
+    }
 
     async uploadLogo(filePath) {
         const isVisible = await this.deleteLogoButton.isVisible();
@@ -46,6 +57,10 @@ export
         }
         //  await this.fileUploadInput.setInputFiles(filePath);
         await this.page.setInputFiles('input[ data-test="setting_ent_custom_logo_img_file_upload"]', filePath);
-        await this.page.waitForTimeout(5000);
+        await expect(this.page.getByText("Logo updated successfully")).toBeVisible({
+            timeout: 30000,
+        });
+
+
     }
 }

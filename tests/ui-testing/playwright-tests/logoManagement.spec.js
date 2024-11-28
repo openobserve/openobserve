@@ -2,12 +2,7 @@ import { test, expect } from "./baseFixtures";
 
 import { ManagementPage } from "../pages/managementPage .js";
 
-
-// Implementation test.spec.js
-
 import { LoginPage } from '../pages/loginPage.js';
-
-// File: tests/fileUploadTest.spec.js
 
 
 const path = require('path');
@@ -30,8 +25,6 @@ test('Logo Upload on Management ', async ({ page }) => {
     await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
  
     // Step 2: Navigate to Logs Page
-    //await page.waitForTimeout(4000);  // Wait for login process
-    await page.waitForTimeout(4000);
 
 
     await managementPage.navigateToManagement();
