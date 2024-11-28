@@ -187,8 +187,9 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated
-no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"
@@ -873,7 +874,10 @@ export default defineComponent({
                 useLocalOrganization(optiondata);
               }
 
-              if (localOrg.value.identifier == data.identifier || url.searchParams.get("org_identifier") == data.identifier) {
+              if (
+                localOrg.value.identifier == data.identifier ||
+                url.searchParams.get("org_identifier") == data.identifier
+              ) {
                 localOrgFlag = true;
               }
 
@@ -886,7 +890,9 @@ export default defineComponent({
                 (store.state.organizations?.length == 1 &&
                   (customOrganization == "" || customOrganization == undefined))
               ) {
-                selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
+                selectedOrg.value = localOrg.value
+                  ? localOrg.value
+                  : optiondata;
                 useLocalOrganization(optiondata);
                 store.dispatch("setSelectedOrganization", optiondata);
               } else if (data.identifier == customOrganization) {
@@ -910,7 +916,10 @@ export default defineComponent({
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
         }
 
-        if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
+        if (
+          Object.keys(selectedOrg.value).length == 0 &&
+          store.state.organizations.length > 0
+        ) {
           let data = store.state.organizations[0];
           let optiondata = {
             label: data.name,
@@ -942,8 +951,14 @@ export default defineComponent({
           mainLayoutMixin.setup().getOrganizationThreshold(store);
         }
 
-        await getOrganizationSettings();
-        isLoading.value = true;
+        if (
+          Object.keys(selectedOrg.value).length > 0 &&
+          selectedOrg.value.identifier != "" &&
+          selectedOrg.value.identifier != undefined
+        ) {
+          await getOrganizationSettings();
+          isLoading.value = true;
+        }
       } catch (error) {
         console.error("Error in setSelectedOrganization:", error);
       }
