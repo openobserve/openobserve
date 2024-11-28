@@ -222,7 +222,9 @@ export default defineComponent({
         });
     };
 
-    getSummary(store.state.selectedOrganization.identifier);
+    if(Object.keys(store.state.selectedOrganization.length > 0 && store.state.selectedOrganization?.identifier != undefined) {
+      getSummary(store.state.selectedOrganization.identifier);
+    }
 
     return {
       t,
