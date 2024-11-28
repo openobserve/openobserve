@@ -35,7 +35,7 @@ use crate::service::search::{
 };
 
 #[derive(Debug)]
-pub struct TantivyExec {
+pub struct TantivyCountExec {
     query: Arc<QueryParams>,
     schema: SchemaRef,               // The schema for the produced row
     file_list: Vec<FileKey>,         // The list of files to read
@@ -43,8 +43,8 @@ pub struct TantivyExec {
     cache: PlanProperties,           // Cached properties of this plan
 }
 
-impl TantivyExec {
-    /// Create a new TantivyExec
+impl TantivyCountExec {
+    /// Create a new TantivyCountExec
     pub fn new(
         query: Arc<QueryParams>,
         schema: SchemaRef,
@@ -52,7 +52,7 @@ impl TantivyExec {
         index_condition: IndexCondition,
     ) -> Self {
         let cache = Self::compute_properties(Arc::clone(&schema));
-        TantivyExec {
+        TantivyCountExec {
             query,
             schema,
             file_list,
@@ -72,15 +72,15 @@ impl TantivyExec {
     }
 }
 
-impl DisplayAs for TantivyExec {
+impl DisplayAs for TantivyCountExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "TantivyExec")
+        write!(f, "TantivyCountExec")
     }
 }
 
-impl ExecutionPlan for TantivyExec {
+impl ExecutionPlan for TantivyCountExec {
     fn name(&self) -> &'static str {
-        "TantivyExec"
+        "TantivyCountExec"
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -109,7 +109,7 @@ impl ExecutionPlan for TantivyExec {
     ) -> Result<SendableRecordBatchStream> {
         if partition >= 1 {
             return internal_err!(
-                "TantivyExec invalid partition {partition} (expected partition: 0)"
+                "TantivyCountExec invalid partition {partition} (expected partition: 0)"
             );
         }
 
@@ -150,13 +150,9 @@ async fn adapt_tantivy_result(
         return internal_err!("Error while filtering file list by Tantivy index");
     }
 
-    if schema.fields().len() != 1 {
-        return internal_err!("TantivyExec schema must have exactly one field");
-    }
-
     let array = vec![Arc::new(Int64Array::from(vec![total_hits as i64])) as Arc<dyn Array>];
 
     RecordBatch::try_new(schema, array).map_err(|e| {
-        DataFusionError::Internal(format!("TantivyExec create record batch error: {e}",))
+        DataFusionError::Internal(format!("TantivyCountExec create record batch error: {e}",))
     })
 }
