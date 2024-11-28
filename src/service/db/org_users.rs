@@ -202,7 +202,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                log::info!("Put event org_user: {:?}", ev);
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 if item_key.starts_with("single") {
                     let item_key = item_key.strip_prefix("single/").unwrap();
