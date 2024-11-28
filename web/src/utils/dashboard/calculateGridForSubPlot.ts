@@ -170,11 +170,9 @@ function calculateOptimalGrid(
   if (numGrids <= 0) {
     throw new Error("Number of grids must be positive");
   }
+
   if (aspectRatio <= 0) {
     throw new Error("Aspect ratio must be positive");
-  }
-  if (forcedColumns !== undefined && forcedColumns <= 0) {
-    throw new Error("Forced columns must be positive");
   }
 
   if (forcedColumns && forcedColumns > 0) {
