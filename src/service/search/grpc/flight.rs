@@ -177,7 +177,7 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
-    let idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
+    let mut idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
@@ -224,6 +224,7 @@ pub async fn search(
             );
             tantivy_file_list = tantivy_files;
             file_list = datafusion_files;
+            idx_optimize_rule = None;
         }
 
         let (tbls, stats) = match super::storage::search(

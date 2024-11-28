@@ -74,7 +74,19 @@ impl TantivyCountExec {
 
 impl DisplayAs for TantivyCountExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "TantivyCountExec")
+        // display up to 5 file keys,
+        let file_keys = self
+            .file_list
+            .iter()
+            .take(5)
+            .map(|file_key| file_key.key.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(
+            f,
+            "TantivyCountExec: file num : {}, file_list: [{file_keys}]",
+            self.file_list.len()
+        )
     }
 }
 
