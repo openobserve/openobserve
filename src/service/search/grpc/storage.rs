@@ -70,7 +70,7 @@ pub async fn search(
     file_stat_cache: Option<FileStatisticsCache>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
-    idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {}] search->storage: enter", query.trace_id);
@@ -138,7 +138,7 @@ pub async fn search(
             query.clone(),
             &mut files,
             index_condition.clone(),
-            idx_optimze_rule,
+            idx_optimize_rule,
         )
         .await?;
         log::info!(
@@ -426,7 +426,7 @@ pub async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
-    idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
 ) -> Result<(usize, bool, usize), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -476,7 +476,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (mut index_parquet_files, query_limit) =
-        if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimze_rule {
+        if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
             if limit > 0 {
                 (
                     group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num),
@@ -545,7 +545,7 @@ pub async fn filter_file_list_by_tantivy_index(
                     &trace_id,
                     time_range,
                     index_condition_clone,
-                    idx_optimze_rule,
+                    idx_optimize_rule,
                     &file,
                 )
                 .await;
@@ -648,7 +648,7 @@ async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
     index_condition: Option<IndexCondition>,
-    idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
     let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(&parquet_file.key)
@@ -748,7 +748,7 @@ async fn search_tantivy_index(
     let file_in_range =
         parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
     let matched_docs =
-        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimze_rule) {
+        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
             (false, _) | (true, None) => {
                 tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
             }
@@ -785,7 +785,7 @@ async fn search_tantivy_index(
         && matched_docs.len()
             > (parquet_file.meta.records as usize / 100 * cfg.limit.inverted_index_skip_threshold)
         && !matches!(
-            idx_optimze_rule,
+            idx_optimize_rule,
             Some(InvertedIndexOptimizeMode::SimpleCount)
         )
     {

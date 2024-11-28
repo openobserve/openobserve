@@ -177,7 +177,7 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
-    let idx_optimze_rule: Option<InvertedIndexOptimizeMode> =
+    let idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
@@ -210,7 +210,7 @@ pub async fn search(
             file_list_took,
         );
 
-        if let Some(InvertedIndexOptimizeMode::SimpleCount) = idx_optimze_rule {
+        if let Some(InvertedIndexOptimizeMode::SimpleCount) = idx_optimize_rule {
             let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
                 file_list,
                 req.search_info.start_time,
@@ -228,7 +228,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            idx_optimze_rule,
+            idx_optimize_rule,
         )
         .await
         {
