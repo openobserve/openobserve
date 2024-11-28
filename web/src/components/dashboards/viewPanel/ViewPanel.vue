@@ -79,7 +79,7 @@
             {{
               isVariablesChanged
                 ? "Refresh"
-                : "Variable values changed, refresh needed!"
+                : "Refresh to apply latest variable changes"
             }}
           </q-tooltip>
         </q-btn>

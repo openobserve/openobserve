@@ -141,7 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'yellow' : ''"
-        />
+        >
+          <q-tooltip>
+            {{
+              variablesDataUpdated
+                ? "Refresh to apply latest variable changes"
+                : "Refresh"
+            }}
+          </q-tooltip>
+        </q-btn>
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           dense
@@ -538,7 +546,7 @@ export default defineComponent({
 
         // Find the corresponding variable in refreshVariableData
         const refreshedVariable = props.refreshVariableData.values.find(
-          (varData) => varData.name === dependentVariable.name,
+          (varData: any) => varData.name === dependentVariable.name,
         );
 
         if (!refreshedVariable) {

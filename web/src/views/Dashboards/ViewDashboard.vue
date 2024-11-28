@@ -136,7 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               :color="isVariablesChanged ? 'yellow' : ''"
             >
-              <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
+              <q-tooltip>
+                {{
+                  isVariablesChanged
+                    ? "Refresh to apply latest variable changes"
+                    : "Refresh"
+                }}
+              </q-tooltip>
             </q-btn>
 
             <ExportDashboard
