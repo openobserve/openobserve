@@ -82,8 +82,7 @@ impl FooterCache {
         for (path, slice_data) in r.iter() {
             let ext = path
                 .extension()
-                .unwrap_or_default()
-                .to_str()
+                .and_then(|s| s.to_str())
                 .unwrap_or_default();
             if EMPTY_FILE_EXT.contains(&ext) {
                 continue;
@@ -129,8 +128,7 @@ impl FooterCache {
             let path = PathBuf::from(path);
             let ext = path
                 .extension()
-                .unwrap_or_default()
-                .to_str()
+                .and_then(|s| s.to_str())
                 .unwrap_or_default();
             if EMPTY_FILE_EXT.contains(&ext) {
                 continue;

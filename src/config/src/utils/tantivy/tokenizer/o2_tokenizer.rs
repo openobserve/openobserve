@@ -124,8 +124,12 @@ fn split_camel_case(input: &str) -> Vec<&str> {
         if c.is_uppercase() {
             if i != 0
                 && (!prev_was_upper
-                    || (i < input.len() - 1
-                        && input[i + 1..].chars().next().unwrap().is_lowercase()))
+                    || (i + 1 < input.len()
+                        && input[i + 1..]
+                            .chars()
+                            .next()
+                            .map(|c| c.is_lowercase())
+                            .unwrap_or(false)))
             {
                 words.push(&input[start..i]);
                 start = i;
