@@ -510,18 +510,10 @@ export default defineComponent({
       });
 
       if (needsVariablesAutoUpdate) {
-        console.log(
-          "variablesDataUpdated: needs auto update, checking variables legth",
-          variablesData?.values?.length,
-        );
-
         // check if the length is > 0
         if (checkIfVariablesAreLoaded(variablesData)) {
-            console.log(
-              "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
-            );
-            needsVariablesAutoUpdate = false;
-          }
+          needsVariablesAutoUpdate = false;
+        }
         Object.assign(updatedVariablesData, variablesData);
       }
     };

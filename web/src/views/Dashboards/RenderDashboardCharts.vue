@@ -331,12 +331,6 @@ export default defineComponent({
     watch(
       () => props?.currentTimeObj?.__global,
       () => {
-        console.log("props.currentTimeObj", props.currentTimeObj);
-
-        // Object.assign(
-        //   refreshVariableDataRef,
-        //   JSON.parse(JSON.stringify(variablesData)),
-        // );
         refreshVariableDataRef.value = {
           __global: JSON.parse(JSON.stringify(variablesData.value)),
         };
@@ -403,40 +397,15 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
-        // console.log("variablesDataUpdated: entry", data);
         // update the variables data
-        // Object.assign(variablesData, data);
         variablesData.value = data;
-
-        // console.log(
-        //   "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
-        //   needsVariablesAutoUpdate,
-        // );
         if (needsVariablesAutoUpdate) {
-          // console.log(
-          //   "variablesDataUpdated: needs auto update, checking variables legth",
-          //   variablesData.value?.values?.length,
-          // );
-
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData.value)) {
-            // console.log(
-            //   "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
-            // );
             needsVariablesAutoUpdate = false;
           }
-
-          // console.log(
-          //   "variablesDataUpdated: setting refreshVariableDataRef",
-          //   JSON.stringify(variablesData.value, null, 2),
-          // );
-          // Object.assign(
-          //   refreshVariableDataRef.value.__global,
-          //   variablesData.value,
-          // );
           refreshVariableDataRef.value = { __global: variablesData.value };
         }
-
         return;
       } catch (error) {
         console.log(error);

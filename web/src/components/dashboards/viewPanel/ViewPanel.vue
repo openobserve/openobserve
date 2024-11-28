@@ -256,32 +256,15 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
-        console.log("variablesDataUpdated: entry", data);
         // update the variables data
         Object.assign(variablesData, data);
 
-        console.log(
-          "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
-          needsVariablesAutoUpdate,
-        );
         if (needsVariablesAutoUpdate) {
-          console.log(
-            "variablesDataUpdated: needs auto update, checking variables legth",
-            variablesData?.values?.length,
-          );
-
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData)) {
-            console.log(
-              "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
-            );
             needsVariablesAutoUpdate = false;
           }
 
-          console.log(
-            "variablesDataUpdated: setting refreshVariableDataRef",
-            JSON.stringify(variablesData, null, 2),
-          );
           Object.assign(refreshVariableDataRef, variablesData);
         }
 
@@ -474,18 +457,8 @@ export default defineComponent({
       }
     });
     watch(
-      () => variablesData, 
+      () => variablesData,
       (newVal) => {
-        console.log("newVal", newVal);
-        console.log(
-          "refreshVariableDataRef.value newVal",
-          refreshVariableDataRef,
-        );
-        console.log(
-          "JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef.value) newVal",
-          JSON.stringify(newVal) !== JSON.stringify(refreshVariableDataRef),
-        );
-
         const isValueChanged =
           refreshVariableDataRef?.values?.length > 0 &&
           variablesData.values.every((variable: any, index: number) => {
