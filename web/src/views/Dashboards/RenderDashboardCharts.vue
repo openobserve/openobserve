@@ -210,6 +210,7 @@ export default defineComponent({
     "onDeletePanel",
     "onViewPanel",
     "variablesData",
+    "refreshedVariablesDataUpdated",
     "updated:data-zoom",
     "refreshPanelRequest",
     "refresh",
@@ -342,11 +343,21 @@ export default defineComponent({
       },
     );
 
-    watch(() => refreshVariableDataRef.value, () => {
-      if(refreshVariableDataRef.value?.__global) {
-        emit("variablesData", refreshVariableDataRef.value?.__global);
-      }
-    })
+    watch(
+      () => refreshVariableDataRef.value,
+      () => {
+        if (refreshVariableDataRef.value?.__global) {
+          emit("variablesData", refreshVariableDataRef.value?.__global);
+        }
+      },
+    );
+
+    watch(
+      () => variablesData.value,
+      () => {
+        emit("refreshedVariablesDataUpdated", variablesData.value);
+      },
+    );
 
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
@@ -590,8 +601,8 @@ export default defineComponent({
 
       refreshVariableDataRef.value = {
         ...refreshVariableDataRef.value,
-        [panelId]: variablesData.value
-      }
+        [panelId]: variablesData.value,
+      };
     };
 
     const openEditLayout = (id: string) => {

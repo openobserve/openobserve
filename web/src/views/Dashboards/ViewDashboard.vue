@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshData"
               :disable="arePanelsLoading"
               data-test="dashboard-refresh-btn"
+              :color="isVariablesChanged ? 'yellow' : ''"
             >
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
@@ -219,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
+        @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
@@ -459,6 +461,8 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+    const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       const variableObj = {};
@@ -494,6 +498,15 @@ export default defineComponent({
       });
     };
 
+    const refreshedVariablesDataUpdated = (variablesData: any) => {
+      Object.assign(refreshedVariablesData, variablesData);
+    };
+
+    const isVariablesChanged = computed(() => {
+      return (
+        JSON.stringify(variablesData) !== JSON.stringify(refreshedVariablesData)
+      );
+    });
     // ======= [START] default variable values
 
     const initialVariableValues = { value: {} };
@@ -1004,6 +1017,8 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      isVariablesChanged,
+      refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
       variablesDataUpdated,
