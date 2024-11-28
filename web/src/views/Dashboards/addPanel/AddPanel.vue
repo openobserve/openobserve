@@ -642,6 +642,8 @@ export default defineComponent({
         typeof currentDashboardData.data !== "object" ||
         !Object.keys(currentDashboardData.data).length
       ) {
+        window.removeEventListener("beforeunload", beforeUnloadHandler);
+        forceSkipBeforeUnloadListener = true;
         goBack();
         return;
       }
@@ -853,7 +855,18 @@ export default defineComponent({
       return;
     };
 
+    // this is used to set to true, when we know we have to force the navigation
+    // in cases where org is changed, we need to force a nvaigation, without warning
+    let forceSkipBeforeUnloadListener = false;
+
     onBeforeRouteLeave((to, from, next) => {
+      // check if it is a force navigation, then allow
+      if(forceSkipBeforeUnloadListener) {
+        next()
+        return;
+      }
+
+      // else continue to warn user
       if (from.path === "/dashboards/add_panel" && isPanelConfigChanged.value) {
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
