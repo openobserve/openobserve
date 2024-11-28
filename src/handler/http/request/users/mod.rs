@@ -634,7 +634,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let roles = get_roles()
         .iter()
-        .filter_map(|role| check_role_available(role))
+        .filter_map(check_role_available)
         .collect::<Vec<RolesResponse>>();
 
     Ok(HttpResponse::Ok().json(roles))

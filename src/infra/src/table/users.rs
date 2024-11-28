@@ -61,33 +61,6 @@ pub struct UserRecord {
     pub updated_at: i64,
 }
 
-impl UserRecord {
-    pub fn new(
-        email: &str,
-        first_name: &str,
-        last_name: &str,
-        password: &str,
-        salt: &str,
-        is_root: bool,
-        password_ext: Option<String>,
-        user_type: UserType,
-    ) -> Self {
-        let now = chrono::Utc::now().timestamp_micros();
-        Self {
-            email: email.to_string(),
-            first_name: first_name.to_string(),
-            last_name: last_name.to_string(),
-            password: password.to_string(),
-            salt: salt.to_string(),
-            is_root,
-            password_ext,
-            user_type,
-            created_at: now,
-            updated_at: now,
-        }
-    }
-}
-
 impl From<&DBUser> for UserRecord {
     fn from(user: &DBUser) -> Self {
         let is_root = user
@@ -95,20 +68,22 @@ impl From<&DBUser> for UserRecord {
             .iter()
             .any(|org| org.role.eq(&UserRole::Root));
         let email = user.email.to_lowercase();
-        UserRecord::new(
-            &email,
-            &user.first_name,
-            &user.last_name,
-            &user.password,
-            &user.salt,
+        Self {
+            email,
+            first_name: user.first_name.clone(),
+            last_name: user.last_name.clone(),
+            password: user.password.clone(),
+            salt: user.salt.clone(),
             is_root,
-            user.password_ext.clone(),
-            if user.is_external {
+            password_ext: user.password_ext.clone(),
+            user_type: if user.is_external {
                 UserType::External
             } else {
                 UserType::Internal
             },
-        )
+            created_at: 0,
+            updated_at: 0,
+        }
     }
 }
 
@@ -248,7 +223,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<UserRecord>, errors::Error> 
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .into_iter()
-        .map(|record| UserRecord::from(record))
+        .map(UserRecord::from)
         .collect();
 
     Ok(records)

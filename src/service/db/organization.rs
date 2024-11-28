@@ -162,7 +162,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             let item_key = ev.key.strip_prefix(key).unwrap();
             let item_value = ev.value.unwrap();
             let json_val: Organization = if config::get_config().common.meta_store_external {
-                match get_org(&item_key).await {
+                match get_org(item_key).await {
                     Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);

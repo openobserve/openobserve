@@ -90,7 +90,6 @@ pub async fn add(
         org_type: Set(org_type.into()),
         created_at: Set(now),
         updated_at: Set(now),
-        ..Default::default()
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -144,7 +143,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<OrganizationRecord>, errors:
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .into_iter()
-        .map(|record| OrganizationRecord::from(record))
+        .map(OrganizationRecord::from)
         .collect();
 
     Ok(records)
@@ -158,7 +157,7 @@ pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, erro
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .into_iter()
-        .map(|record| OrganizationRecord::from(record))
+        .map(OrganizationRecord::from)
         .collect();
 
     Ok(records)

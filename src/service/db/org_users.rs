@@ -86,7 +86,7 @@ pub fn get_cached_user_org(org_id: &str, user_email: &str) -> Option<User> {
             Some(user) => Some(User {
                 email: user.email.clone(),
                 password: user.password.clone(),
-                role: org_user.role.clone().into(),
+                role: org_user.role.clone(),
                 salt: user.salt.clone(),
                 first_name: user.first_name.clone(),
                 last_name: user.last_name.clone(),
@@ -239,7 +239,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 role: item.role.clone(),
                                 token: item.token.clone(),
                                 rum_token: item.rum_token.clone(),
-                                created_at: item.created_at.clone(),
+                                created_at: item.created_at,
                             },
                         );
                         if let Some(rum_token) = &item.rum_token {
@@ -321,7 +321,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 User {
                     email: root.email,
                     password: root.password,
-                    role: UserRole::Root.into(),
+                    role: UserRole::Root,
                     salt: root.salt,
                     first_name: root.first_name,
                     last_name: root.last_name,
