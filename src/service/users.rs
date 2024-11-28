@@ -119,13 +119,11 @@ pub async fn post_user(
             db::user::get(Some(org_id), &usr_req.email).await
         };
         if existing_user.is_err() {
-            if !usr_req.is_external {
-                if usr_req.password.is_empty() {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Password required to create new user".to_string(),
-                    )));
-                }
+            if !usr_req.is_external && usr_req.password.is_empty() {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Password required to create new user".to_string(),
+                )));
             }
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
@@ -368,7 +366,7 @@ pub async fn update_user(
                         if let Err(e) = db::org_users::update(
                             org_id,
                             email,
-                            new_user.role.into(),
+                            new_user.role,
                             &new_user.token,
                             new_user.rum_token,
                         )
@@ -382,24 +380,22 @@ pub async fn update_user(
                                 ),
                             ));
                         }
-                    } else {
-                        if let Err(e) = db::org_users::add(
-                            org_id,
-                            email,
-                            new_user.role.into(),
-                            &new_user.token,
-                            new_user.rum_token,
-                        )
-                        .await
-                        {
-                            log::error!("Error adding org user relation: {}", e);
-                            return Ok(HttpResponse::InternalServerError().json(
-                                MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    "Failed to add organization membership for user".to_string(),
-                                ),
-                            ));
-                        }
+                    } else if let Err(e) = db::org_users::add(
+                        org_id,
+                        email,
+                        new_user.role,
+                        &new_user.token,
+                        new_user.rum_token,
+                    )
+                    .await
+                    {
+                        log::error!("Error adding org user relation: {}", e);
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                "Failed to add organization membership for user".to_string(),
+                            ),
+                        ));
                     }
 
                     #[cfg(feature = "enterprise")]
@@ -463,14 +459,7 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         let token = generate_random_string(16);
         let rum_token = format!("rum{}", generate_random_string(16));
         // Add user to the organization
-        db::org_users::add(
-            org_id,
-            user_email,
-            UserRole::Admin.into(),
-            &token,
-            Some(rum_token),
-        )
-        .await?;
+        db::org_users::add(org_id, user_email, UserRole::Admin, &token, Some(rum_token)).await?;
 
         // Update OFGA
         #[cfg(feature = "enterprise")]
@@ -549,15 +538,9 @@ pub async fn add_user_to_org(
                 )));
             }
 
-            if db::org_users::add(
-                org_id,
-                email,
-                base_role.clone().into(),
-                &token,
-                Some(rum_token),
-            )
-            .await
-            .is_err()
+            if db::org_users::add(org_id, email, base_role.clone(), &token, Some(rum_token))
+                .await
+                .is_err()
             {
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -646,7 +629,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
         log::info!("get_user_by_token: User found updating cache");
         let org_user_record = OrgUserRecord {
             email: user_from_db.email.clone(),
-            role: user_from_db.role.clone().into(),
+            role: user_from_db.role.clone(),
             org_id: user_from_db.org.clone(),
             token: user_from_db.token.clone(),
             rum_token: user_from_db.rum_token.clone(),
@@ -685,7 +668,7 @@ pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Er
                 let user_org = user_orgs.entry(id.to_string()).or_insert(vec![]);
                 user_org.push(OrgRoleMapping {
                     org_id: org.to_string(),
-                    role: org_user.value().role.clone().into(),
+                    role: org_user.value().role.clone(),
                     org_name: org_record.name,
                 });
             }

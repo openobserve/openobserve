@@ -383,7 +383,7 @@ pub async fn accept_invitation(
         org_users::add(
             org_id,
             user_email,
-            invite_role.into(),
+            invite_role,
             &generate_random_string(16),
             Some(format!("rum{}", generate_random_string(16))),
         )

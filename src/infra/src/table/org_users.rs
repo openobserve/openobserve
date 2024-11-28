@@ -397,7 +397,7 @@ pub async fn list_users_by_org(org_id: &str) -> Result<Vec<OrgUserRecord>, error
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .into_iter()
-        .map(|record| OrgUserRecord::from(record))
+        .map(OrgUserRecord::from)
         .collect();
 
     Ok(records)
@@ -436,7 +436,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<OrgUserRecord>, errors::Erro
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .into_iter()
-        .map(|record| OrgUserRecord::from(record))
+        .map(OrgUserRecord::from)
         .collect();
 
     Ok(records)
