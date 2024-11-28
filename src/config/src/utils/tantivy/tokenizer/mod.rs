@@ -27,12 +27,12 @@ pub fn o2_tokenizer_build() -> TextAnalyzer {
         .build()
 }
 
-pub fn collect_tokens(text: &str) -> Vec<String> {
+pub fn o2_collect_tokens(text: &str) -> Vec<String> {
     let mut a = TextAnalyzer::from(O2Tokenizer::default());
     let mut token_stream = a.token_stream(text);
     let mut tokens: Vec<String> = Vec::new();
     let mut add_token = |token: &Token| {
-        tokens.push(token.text.clone());
+        tokens.push(token.text.to_lowercase());
     };
     token_stream.process(&mut add_token);
     tokens

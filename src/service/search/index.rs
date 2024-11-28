@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
-use config::{utils::tantivy::tokenizer::collect_tokens, INDEX_FIELD_NAME_FOR_ALL};
+use config::{utils::tantivy::tokenizer::o2_collect_tokens, INDEX_FIELD_NAME_FOR_ALL};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
@@ -146,15 +146,9 @@ impl IndexCondition {
 impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
-        let cfg = config::get_config();
-        let (prefix, suffix) = match cfg.common.full_text_search_type.as_str() {
-            "eq" => ("", ""),
-            "contains" => ("*", "*"),
-            _ => ("", "*"),
-        };
         match self {
-            Condition::Equal(field, value) => format!("{}:{}", field, value),
-            Condition::MatchAll(value) => format!("{}{}{}", prefix, value, suffix),
+            Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
@@ -224,38 +218,38 @@ impl Condition {
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
             Condition::MatchAll(value) => {
-                let cfg = config::get_config();
-                match cfg.common.full_text_search_type.as_str() {
-                    "contains" => Box::new(RegexQuery::from_pattern(
-                        &format!(".*{}.*", value),
-                        default_fields,
-                    )?),
-                    "prefix" => {
-                        let term = Term::from_field_text(default_fields, value);
-                        Box::new(PhrasePrefixQuery::new_with_offset(vec![(0, term)]))
+                if value.starts_with("*") && value.ends_with("*") {
+                    let value = format!(".*{}.*", value.trim_matches('*'));
+                    Box::new(RegexQuery::from_pattern(&value, default_fields)?)
+                } else if value.to_lowercase().starts_with("re:") {
+                    let value = value[3..].trim();
+                    Box::new(RegexQuery::from_pattern(value, default_fields)?)
+                } else if value.ends_with("*") {
+                    let value = value.strip_suffix("*").unwrap();
+                    Box::new(PhrasePrefixQuery::new_with_offset(vec![(
+                        0,
+                        Term::from_field_text(default_fields, value),
+                    )]))
+                } else {
+                    if value.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "The value of match_all() function can't be empty"
+                        ));
                     }
-                    // default is eq
-                    _ => {
-                        if value.is_empty() {
-                            return Err(anyhow::anyhow!(
-                                "The value of match_all() function can't be empty"
-                            ));
-                        }
-                        let mut terms: Vec<(Occur, Box<dyn Query>)> = collect_tokens(value)
-                            .into_iter()
-                            .map(|value| {
-                                let term = Term::from_field_text(default_fields, &value);
-                                (
-                                    Occur::Must,
-                                    Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
-                                )
-                            })
-                            .collect();
-                        if terms.len() > 1 {
-                            Box::new(BooleanQuery::new(terms))
-                        } else {
-                            terms.remove(0).1
-                        }
+                    let mut terms: Vec<(Occur, Box<dyn Query>)> = o2_collect_tokens(value)
+                        .into_iter()
+                        .map(|value| {
+                            let term = Term::from_field_text(default_fields, &value);
+                            (
+                                Occur::Must,
+                                Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
+                            )
+                        })
+                        .collect();
+                    if terms.len() > 1 {
+                        Box::new(BooleanQuery::new(terms))
+                    } else {
+                        terms.remove(0).1
                     }
                 }
             }
