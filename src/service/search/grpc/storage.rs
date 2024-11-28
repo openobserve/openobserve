@@ -134,7 +134,7 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if use_inverted_index {
-        (idx_took, is_add_filter_back) = filter_file_list_by_tantivy_index(
+        (idx_took, is_add_filter_back, _) = filter_file_list_by_tantivy_index(
             query.clone(),
             &mut files,
             index_condition.clone(),
@@ -422,12 +422,12 @@ pub async fn cache_files(
 /// If the query does not match any FST in the index file, the file will be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
 /// If the query not find corresponding index file, the file will *not* be filtered out.
-async fn filter_file_list_by_tantivy_index(
+pub async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
     idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
-) -> Result<(usize, bool), Error> {
+) -> Result<(usize, bool, usize), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -615,13 +615,18 @@ async fn filter_file_list_by_tantivy_index(
     }
 
     log::info!(
-        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}",
+        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}, is_add_filter_back: {}",
         query.trace_id,
         index_condition,
-        total_hits
+        total_hits,
+        is_add_filter_back,
     );
     file_list.extend(file_list_map.into_values());
-    Ok((start.elapsed().as_millis() as usize, is_add_filter_back))
+    Ok((
+        start.elapsed().as_millis() as usize,
+        is_add_filter_back,
+        total_hits,
+    ))
 }
 
 pub async fn get_tantivy_directory(
@@ -779,6 +784,10 @@ async fn search_tantivy_index(
     if cfg.limit.inverted_index_skip_threshold > 0
         && matched_docs.len()
             > (parquet_file.meta.records as usize / 100 * cfg.limit.inverted_index_skip_threshold)
+        && !matches!(
+            idx_optimze_rule,
+            Some(InvertedIndexOptimizeMode::SimpleCount)
+        )
     {
         log::debug!(
             "matched docs over [{}/100] in tantivy index, skip this file: {}",

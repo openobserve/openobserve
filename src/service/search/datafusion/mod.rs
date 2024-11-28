@@ -19,11 +19,11 @@ pub mod distributed_plan;
 pub mod exec;
 pub mod file_type;
 pub mod optimizer;
+pub mod plan;
 pub mod storage;
 pub mod table_provider;
 pub mod udaf;
 pub mod udf;
-pub mod plan;
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {

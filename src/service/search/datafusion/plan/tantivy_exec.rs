@@ -15,20 +15,24 @@
 
 use std::{any::Any, sync::Arc};
 
-use config::{get_config, meta::stream::FileKey};
+use arrow::array::{Array, Int64Array};
+use config::meta::{inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{internal_err, Result, Statistics},
+    error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
+    physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        common, expressions::Column, memory::MemoryStream, DisplayAs, DisplayFormatType,
-        ExecutionMode, ExecutionPlan, PlanProperties,
+        stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode,
+        ExecutionPlan, PlanProperties,
     },
-    prelude::Expr,
 };
 
-use crate::service::search::{grpc::QueryParams, index::IndexCondition};
+use crate::service::search::{
+    grpc::{storage::filter_file_list_by_tantivy_index, QueryParams},
+    index::IndexCondition,
+};
 
 #[derive(Debug)]
 pub struct TantivyExec {
@@ -109,14 +113,50 @@ impl ExecutionPlan for TantivyExec {
             );
         }
 
-        Ok(Box::pin(MemoryStream::try_new(
-            vec![],
-            Arc::clone(&self.schema),
-            None,
-        )?))
+        let fut = adapt_tantivy_result(
+            self.query.clone(),
+            self.file_list.clone(),
+            Some(self.index_condition.clone()),
+            self.schema.clone(),
+        );
+        let stream = futures::stream::once(fut);
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            self.schema.clone(),
+            stream,
+        )))
     }
 
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema))
     }
+}
+
+async fn adapt_tantivy_result(
+    query: Arc<QueryParams>,
+    mut file_list: Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    schema: SchemaRef,
+) -> Result<RecordBatch> {
+    let (_, error, total_hits) = filter_file_list_by_tantivy_index(
+        query,
+        &mut file_list,
+        index_condition,
+        Some(InvertedIndexOptimizeMode::SimpleCount),
+    )
+    .await
+    .map_err(|e| DataFusionError::External(Box::new(e)))?;
+
+    if error {
+        return internal_err!("Error while filtering file list by Tantivy index");
+    }
+
+    if schema.fields().len() != 1 {
+        return internal_err!("TantivyExec schema must have exactly one field");
+    }
+
+    let array = vec![Arc::new(Int64Array::from(vec![total_hits as i64])) as Arc<dyn Array>];
+
+    RecordBatch::try_new(schema, array).map_err(|e| {
+        DataFusionError::Internal(format!("TantivyExec create record batch error: {e}",))
+    })
 }
