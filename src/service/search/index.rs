@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
-use config::INDEX_FIELD_NAME_FOR_ALL;
+use config::{utils::tantivy::tokenizer::collect_tokens, INDEX_FIELD_NAME_FOR_ALL};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
@@ -241,10 +241,10 @@ impl Condition {
                                 "The value of match_all() function can't be empty"
                             ));
                         }
-                        let mut terms: Vec<(Occur, Box<dyn Query>)> = value
-                            .split_whitespace()
+                        let mut terms: Vec<(Occur, Box<dyn Query>)> = collect_tokens(value)
+                            .into_iter()
                             .map(|value| {
-                                let term = Term::from_field_text(default_fields, value);
+                                let term = Term::from_field_text(default_fields, &value);
                                 (
                                     Occur::Must,
                                     Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,

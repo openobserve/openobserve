@@ -51,6 +51,7 @@ use config::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
+        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
 };
@@ -1431,6 +1432,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer(O2_TOKENIZER)
                 .set_fieldnorms(false),
         );
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
@@ -1494,8 +1496,11 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         }
     }
 
+    let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
+    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build());
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema)
+        .tokenizers(tokenizer_manager)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
