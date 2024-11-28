@@ -663,6 +663,13 @@ export default defineComponent({
           searchObj.data.stream.streamType =
             router.currentRoute.value.query.stream_type;
           resetSearchObj();
+
+          // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
+          searchBarRef.value.dateTimeRef.setRelativeTime(
+            router.currentRoute.value.query.period,
+          );
+          searchObj.data.datetime.type = "relative";
+
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
           resetStreamData();
@@ -1058,7 +1065,7 @@ export default defineComponent({
         field,
         isFieldExistInSQL,
       );
-      
+
       // Modify the query based on stream name
       const streamName = searchObj.data.stream.selectedStream[0].replace(
         /[.*+?^${}()|[\]\\]/g,
