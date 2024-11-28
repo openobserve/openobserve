@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onRefreshPanel"
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
+          :color="variablesDataUpdated ? 'yellow' : ''"
         />
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
@@ -326,6 +327,7 @@ export default defineComponent({
     "searchType",
     "folderId",
     "reportId",
+    "refreshVariableData",,
   ],
   components: {
     PanelSchemaRenderer,
@@ -502,6 +504,58 @@ export default defineComponent({
       emit("refreshPanelRequest", props.data.id);
     };
 
+    const getDependentVariablesData = () =>
+      props.variablesData?.values
+        ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+        ?.filter((it: any) => {
+          const regexForVariable = new RegExp(
+            `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+          );
+
+          return props.data.queries
+            ?.map((q: any) => regexForVariable.test(q?.query))
+            ?.includes(true);
+        });
+
+    // Check if any dependent variable's value has changed
+    const variablesDataUpdated = computed(() => {
+      // Get dependent variables
+      const dependentVariables = getDependentVariablesData();
+
+      // Validate dependentVariables and refreshVariableData
+      if (!Array.isArray(dependentVariables)) {
+        return false;
+      }
+      if (!Array.isArray(props.refreshVariableData.values)) {
+        return false;
+      }
+
+      // Check if any dependent variable's value has changed
+      return dependentVariables.some((dependentVariable) => {
+        if (!dependentVariable || !dependentVariable.name) {
+          return false;
+        }
+
+        // Find the corresponding variable in refreshVariableData
+        const refreshedVariable = props.refreshVariableData.values.find(
+          (varData) => varData.name === dependentVariable.name,
+        );
+
+        if (!refreshedVariable) {
+          return false; // Assume no change if no matching variable
+        }
+
+        // Compare values
+        const currentValue = dependentVariable.value;
+        const refreshedValue = refreshedVariable.value;
+
+        // Handle both array and primitive types for value comparison
+        return Array.isArray(currentValue)
+          ? JSON.stringify(currentValue) !== JSON.stringify(refreshedValue)
+          : currentValue !== refreshedValue;
+      });
+    });
+
     return {
       props,
       onEditPanel,
@@ -527,6 +581,7 @@ export default defineComponent({
       confirmMovePanelDialog,
       movePanelDialog,
       onRefreshPanel,
+      variablesDataUpdated,
     };
   },
   methods: {

@@ -125,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 refreshVariableDataRef[item.id] ||
                 refreshVariableDataRef['__global']
               "
+              :refreshVariableData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
@@ -391,33 +392,33 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
-        console.log("variablesDataUpdated: entry", data);
+        // console.log("variablesDataUpdated: entry", data);
         // update the variables data
         // Object.assign(variablesData, data);
         variablesData.value = data;
 
-        console.log(
-          "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
-          needsVariablesAutoUpdate,
-        );
+        // console.log(
+        //   "variablesDataUpdated: checking if it needs auto update, if all vaiables are loaded for the first time",
+        //   needsVariablesAutoUpdate,
+        // );
         if (needsVariablesAutoUpdate) {
-          console.log(
-            "variablesDataUpdated: needs auto update, checking variables legth",
-            variablesData.value?.values?.length,
-          );
+          // console.log(
+          //   "variablesDataUpdated: needs auto update, checking variables legth",
+          //   variablesData.value?.values?.length,
+          // );
 
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData.value)) {
-            console.log(
-              "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
-            );
+            // console.log(
+            //   "variablesDataUpdated: everything is loaded, setting needsVariablesAutoUpdate to false",
+            // );
             needsVariablesAutoUpdate = false;
           }
 
-          console.log(
-            "variablesDataUpdated: setting refreshVariableDataRef",
-            JSON.stringify(variablesData.value, null, 2),
-          );
+          // console.log(
+          //   "variablesDataUpdated: setting refreshVariableDataRef",
+          //   JSON.stringify(variablesData.value, null, 2),
+          // );
           // Object.assign(
           //   refreshVariableDataRef.value.__global,
           //   variablesData.value,
