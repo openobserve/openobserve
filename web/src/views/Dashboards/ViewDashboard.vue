@@ -534,7 +534,11 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
 
-      if (!Object.keys(currentDashboardData?.data)?.length) {
+      if (
+        !currentDashboardData?.data ||
+        typeof currentDashboardData.data !== "object" ||
+        !Object.keys(currentDashboardData.data).length
+      ) {
         goBackToDashboardList();
         return;
       }
@@ -698,6 +702,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/add_panel",
         query: {
+          org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
           tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,

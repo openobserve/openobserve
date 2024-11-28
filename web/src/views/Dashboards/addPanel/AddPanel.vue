@@ -563,7 +563,7 @@ export default defineComponent({
 
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData))
+          JSON.parse(JSON.stringify(panelData ?? {})),
         );
 
         // check if vrl function exists
@@ -637,10 +637,15 @@ export default defineComponent({
       // console.time("AddPanel:loadDashboard:after");
       currentDashboardData.data = data;
 
-      if (!Object.keys(currentDashboardData?.data)?.length) {
+      if (
+        !currentDashboardData?.data ||
+        typeof currentDashboardData.data !== "object" ||
+        !Object.keys(currentDashboardData.data).length
+      ) {
         goBack();
         return;
       }
+
       // if variables data is null, set it to empty list
       if (
         !(
