@@ -649,7 +649,6 @@ export const convertSQLData = async (
 
       options.legend.show = false;
     } catch (err: any) {
-      console.error(`Trellis configuration failed: ${err?.message}`);
       console.error(`Trellis configuration failed: ${err}`);
       // Fallback to default single grid configuration
       options.grid = [
@@ -1121,7 +1120,6 @@ export const convertSQLData = async (
     const seriesData = options.xAxis[0].data.map(
       (it: any) =>
         data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxisKey] ?? null,
-        data.find((it2: any) => it2[xAxisKeys[0]] == it)[yAxisKey] ?? null,
     );
 
     return seriesData;
