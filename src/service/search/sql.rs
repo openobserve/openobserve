@@ -97,6 +97,7 @@ impl Sql {
         org_id: &str,
         stream_type: StreamType,
     ) -> Result<Sql, Error> {
+        let cfg = get_config();
         let sql = query.sql.clone();
         let limit = query.size as i64;
         let offset = query.from as i64;
@@ -143,10 +144,10 @@ impl Sql {
             && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
-            order_by.push((get_config().common.column_timestamp.clone(), OrderBy::Desc));
+            order_by.push((cfg.common.column_timestamp.clone(), OrderBy::Desc));
         }
         let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == get_config().common.column_timestamp
+            && order_by[0].0 == cfg.common.column_timestamp
             && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
@@ -220,32 +221,37 @@ impl Sql {
         // 11. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
-        if get_config()
-            .common
-            .inverted_index_search_format
-            .eq("tantivy")
+        if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
-            && get_config().common.inverted_index_enabled
+            && cfg.common.inverted_index_enabled
             && use_inverted_index
         {
-            let is_remove_filter = get_config().common.feature_query_remove_filter_with_index;
+            let is_remove_filter = cfg.common.feature_query_remove_filter_with_index;
             let mut index_visitor = IndexVisitor::new(&used_schemas, is_remove_filter);
             statement.visit(&mut index_visitor);
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
         }
 
-        // 12. get index optimizer rule
+        // 12. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
-            && order_by[0].0 == get_config().common.column_timestamp
+            && order_by[0].0 == cfg.common.column_timestamp
             && can_optimize
         {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
                 (offset + limit) as usize,
                 order_by[0].1 == OrderBy::Asc,
             ));
+        }
+
+        // 13. check `select count(*) from table where match_all` optimizer
+        if can_optimize
+            && is_simple_count_query(&mut statement)
+            && cfg.common.inverted_index_count_optimizer_enabled
+        {
+            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
         }
 
         Ok(Sql {
@@ -508,14 +514,8 @@ impl VisitorMut for ColumnVisitor<'_> {
             for select_item in select.projection.iter_mut() {
                 match select_item {
                     SelectItem::ExprWithAlias { expr, alias } => {
-                        let mut name_visitor = FieldNameVisitor::new();
-                        expr.visit(&mut name_visitor);
-                        if name_visitor.field_names.len() == 1 {
-                            let expr_name =
-                                name_visitor.field_names.iter().next().unwrap().to_string();
-                            self.columns_alias
-                                .insert((expr_name, alias.value.to_string()));
-                        }
+                        self.columns_alias
+                            .insert((expr.to_string(), alias.value.to_string()));
                     }
                     SelectItem::Wildcard(_) => {
                         self.is_wildcard = true;
@@ -599,7 +599,8 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
-                if other_expr.is_none() {
+                // make sure all filter in where clause can be used in inverted index
+                if other_expr.is_none() && select.selection.is_some() {
                     self.can_optimize = true;
                 }
                 if self.is_remove_filter {
@@ -988,6 +989,83 @@ impl VisitorMut for AddO2IdVisitor {
     }
 }
 
+fn is_simple_count_query(statement: &mut Statement) -> bool {
+    let mut visitor = SimpleCountVisitor::new();
+    statement.visit(&mut visitor);
+    visitor.is_simple_count
+}
+
+// check if the query is simple count query
+// 1. don't has subquery
+// 2. don't has join
+// 3. don't has group by
+// 4. only has count(*)
+// 5. don't has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
+// 6. don't has distinct
+struct SimpleCountVisitor {
+    pub is_simple_count: bool,
+}
+
+impl SimpleCountVisitor {
+    fn new() -> Self {
+        Self {
+            is_simple_count: false,
+        }
+    }
+}
+
+impl VisitorMut for SimpleCountVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        // Check if the query is select *
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            if select.projection.len() != 1
+                || select.distinct.is_some()
+                || select.from.len() > 1
+                || select.from.iter().any(|from| !from.joins.is_empty())
+                || !matches!(select.group_by, GroupByExpr::Expressions(ref expr, _) if expr.is_empty())
+            {
+                return ControlFlow::Break(());
+            }
+
+            self.is_simple_count = match &select.projection[0] {
+                SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+                    if let Expr::Function(func) = expr {
+                        let name = trim_quotes(&func.name.to_string().to_lowercase());
+                        name == "count"
+                            && func.filter.is_none()
+                            && func.over.is_none()
+                            && func.within_group.is_empty()
+                            && matches!(
+                                &func.args,
+                                FunctionArguments::List(list) if list.args.len() == 1 && trim_quotes(&list.args[0].to_string()) == "*"
+                            )
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+        }
+        if !self.is_simple_count {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if matches!(
+            expr,
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. }
+        ) {
+            self.is_simple_count = false;
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 fn is_complex_query(statement: &mut Statement) -> bool {
     let mut visitor = ComplexQueryVisitor::new();
     statement.visit(&mut visitor);
@@ -1001,6 +1079,7 @@ fn is_complex_query(statement: &mut Statement) -> bool {
 // 4. has aggregate
 // 5. has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
 // 6. has distinct
+// 7. has wildcard
 struct ComplexQueryVisitor {
     pub is_complex: bool,
 }
@@ -1541,5 +1620,65 @@ mod tests {
         statement.visit(&mut track_total_hits_visitor);
         let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT name FROM t1 UNION SELECT name FROM t2 UNION SELECT name FROM t3)";
         assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_is_simple_count_visit1() {
+        let sql = "SELECT count(*) from t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_count_query(&mut statement), true);
+    }
+
+    #[test]
+    fn test_is_simple_count_visit2() {
+        let sql = "SELECT count(*) as cnt from t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_count_query(&mut statement), true);
+    }
+
+    #[test]
+    fn test_is_simple_count_visit3() {
+        let sql = "SELECT count(*) as cnt from t where name = 'a'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_count_query(&mut statement), true);
+    }
+
+    #[test]
+    fn test_is_simple_count_visit4() {
+        let sql = "SELECT name, count(*) as cnt from t group by name order by name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_is_simple_count_visit5() {
+        let sql = "SELECT count(_timestamp) as cnt from t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_is_simple_count_visit6() {
+        let sql = "SELECT count(*) as cnt from (select * from t)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(is_simple_count_query(&mut statement), false);
     }
 }
