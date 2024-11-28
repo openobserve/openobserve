@@ -560,18 +560,17 @@ pub async fn filter_file_list_by_tantivy_index(
             .await
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
         {
-            let result: anyhow::Result<(String, Option<BitVec>)> = result;
+            let result: anyhow::Result<(String, Option<BitVec>, usize)> = result;
             // Each result corresponds to a file in the file list
             match result {
-                Ok((file_name, bitvec)) => {
+                Ok((file_name, bitvec, hits_in_file)) => {
+                    total_hits += hits_in_file;
                     if file_name.is_empty() && bitvec.is_none() {
                         // no need inverted index for this file, need add filter back
                         is_add_filter_back = true;
                         continue;
                     }
                     if let Some(res) = bitvec {
-                        let hits_in_file = res.count_ones();
-                        total_hits += hits_in_file;
                         log::debug!(
                             "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
                             query.trace_id,
@@ -650,7 +649,7 @@ async fn search_tantivy_index(
     index_condition: Option<IndexCondition>,
     idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
     parquet_file: &FileKey,
-) -> anyhow::Result<(String, Option<BitVec>)> {
+) -> anyhow::Result<(String, Option<BitVec>, usize)> {
     let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(&parquet_file.key)
     else {
         return Err(anyhow::anyhow!(
@@ -749,9 +748,9 @@ async fn search_tantivy_index(
         parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
     let matched_docs =
         tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
-            (false, _) | (true, None) => {
-                tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
-            }
+            (false, _) | (true, None) => tantivy_searcher
+                .search(&query, &tantivy::collector::DocSetCollector)
+                .map(|ret| (ret, 0)),
             (true, Some(InvertedIndexOptimizeMode::SimpleSelect(limit, ascend))) => {
                 tantivy_searcher
                     .search(
@@ -768,17 +767,26 @@ async fn search_tantivy_index(
                             },
                         ),
                     )
-                    .map(|ret| ret.into_iter().map(|(_, doc)| doc).collect::<HashSet<_>>())
+                    .map(|ret| {
+                        (
+                            ret.into_iter().map(|(_, doc)| doc).collect::<HashSet<_>>(),
+                            0,
+                        )
+                    })
             }
-            (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => {
-                tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
-            }
+            (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => tantivy_searcher
+                .search(&query, &tantivy::collector::Count)
+                .map(|ret| (HashSet::new(), ret)),
         })
         .await??;
 
     // return early if no matches in tantivy
+    let (matched_docs, total_hits) = matched_docs;
+    if total_hits > 0 {
+        return Ok((parquet_file.key.to_string(), None, total_hits));
+    }
     if matched_docs.is_empty() {
-        return Ok((parquet_file.key.to_string(), None));
+        return Ok((parquet_file.key.to_string(), None, 0));
     }
     // return early if the number of matched docs is too large
     if cfg.limit.inverted_index_skip_threshold > 0
@@ -794,7 +802,7 @@ async fn search_tantivy_index(
             cfg.limit.inverted_index_skip_threshold,
             parquet_file.key
         );
-        return Ok(("".to_string(), None));
+        return Ok(("".to_string(), None, 0));
     }
 
     // Prepare a vec of segment offsets
@@ -808,10 +816,11 @@ async fn search_tantivy_index(
         ));
     }
     let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+    let matched_num = matched_docs.len();
     for doc in matched_docs {
         res.set(doc.doc_id as usize, true);
     }
-    Ok((parquet_file.key.to_string(), Some(res)))
+    Ok((parquet_file.key.to_string(), Some(res), matched_num))
 }
 
 // Group files by time range
