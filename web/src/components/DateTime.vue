@@ -557,9 +557,7 @@ export default defineComponent({
     );
 
     watch(
-      () => {
-        props.defaultType;
-      },
+      () => props.defaultType,
       () => {
         if (props.defaultType !== selectedType.value) {
           selectedType.value = props.defaultType;
