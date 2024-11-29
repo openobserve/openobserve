@@ -2518,6 +2518,7 @@ dependencies = [
  "sqlx",
  "svix-ksuid",
  "sysinfo",
+ "tantivy",
  "tokio",
  "tokio-util",
  "tracing",

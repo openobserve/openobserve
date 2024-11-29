@@ -172,7 +172,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMAPCT] add file_list_jobs failed: {}",
+            "[COMPACT] add file_list_jobs failed: {}",
             e
         ));
     }
@@ -291,7 +291,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMAPCT] add file_list_jobs for old data failed: {}",
+                "[COMPACT] add file_list_jobs for old data failed: {}",
                 e
             ));
         }
