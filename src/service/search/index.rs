@@ -1,4 +1,8 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    fmt::{self, Debug, Formatter},
+    sync::Arc,
+};
 
 use config::{utils::tantivy::tokenizer::o2_collect_tokens, INDEX_FIELD_NAME_FOR_ALL};
 use datafusion::{
@@ -46,7 +50,7 @@ pub fn get_index_condition_from_expr(
 }
 
 // note the condition in IndexCondition is connection by AND operator
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct IndexCondition {
     pub conditions: Vec<Condition>,
 }
@@ -60,6 +64,12 @@ impl IndexCondition {
 
     pub fn add_condition(&mut self, condition: Condition) {
         self.conditions.push(condition);
+    }
+}
+
+impl Debug for IndexCondition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_query())
     }
 }
 
@@ -146,6 +156,12 @@ impl IndexCondition {
 impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
+        let cfg = config::get_config();
+        let (prefix, suffix) = match cfg.common.full_text_search_type.as_str() {
+            "eq" => ("", ""),
+            "contains" => ("*", "*"),
+            _ => ("", "*"),
+        };
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
