@@ -24,7 +24,7 @@ use crate::{
         infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
-    service::{db, usage, users},
+    service::{db, self_reporting, users},
 };
 
 mod alert_manager;
@@ -38,6 +38,8 @@ mod prom_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
+
+pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
@@ -87,7 +89,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { usage::run_audit_publish().await });
+    tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
 
     tokio::task::spawn(async move { prom_self_consume::run().await });
     // Router doesn't need to initialize job
@@ -100,7 +102,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
-    tokio::task::spawn(async move { usage::run().await });
+    tokio::task::spawn(async move { self_reporting::run().await });
 
     // cache short_urls
     tokio::task::spawn(async move { db::short_url::watch().await });
@@ -170,7 +172,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
-    tokio::task::spawn(async move { db::file_list::remote::cache_stats().await });
+    tokio::task::spawn(async move { db::file_list::cache_stats().await });
 
     #[cfg(feature = "enterprise")]
     db::ofga::cache().await.expect("ofga model cache failed");

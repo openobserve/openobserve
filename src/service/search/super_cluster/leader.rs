@@ -37,7 +37,7 @@ use crate::service::search::{
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     request::Request,
     sql::Sql,
-    utlis::ScanStatsVisitor,
+    utils::ScanStatsVisitor,
     DATAFUSION_RUNTIME,
 };
 
@@ -217,6 +217,8 @@ async fn run_datafusion(
         Vec::new(),
         partition_keys,
         match_all_keys,
+        sql.index_condition.clone(),
+        sql.index_optimize_mode,
         true,
         context,
     );
@@ -232,19 +234,8 @@ async fn run_datafusion(
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
-            rewrite.file_id_lists.get(table_name).unwrap().clone(),
-            rewrite.idx_file_list.clone(),
-            rewrite
-                .equal_keys
-                .get(table_name)
-                .cloned()
-                .unwrap_or_default(),
-            rewrite.match_all_keys.clone(),
-            false,
-            rewrite.req,
-            rewrite.nodes,
-            rewrite.context,
-        ));
+            rewrite.remote_scan_nodes.get_remote_node(table_name),
+        )?);
     }
 
     if cfg.common.print_key_sql {

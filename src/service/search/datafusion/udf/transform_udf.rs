@@ -40,7 +40,7 @@ fn create_user_df(fn_name: &str, num_args: u8, pow_scalar: FnType) -> ScalarUDF 
     create_udf(
         fn_name,
         input_vec,
-        Arc::new(DataType::Utf8),
+        DataType::Utf8,
         Volatility::Immutable,
         pow_scalar,
     )
@@ -171,11 +171,11 @@ mod tests {
             schema.clone(),
             vec![
                 Arc::new(StringArray::from(vec![
-                    "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
-                    "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", 
-                    "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", 
-                    "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
-                ])),
+                "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
+                "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
+                "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
+                "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
+            ])),
                 Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
             ],
         )

@@ -28,7 +28,7 @@ use datafusion::{
     },
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct JoinReorderRule;
 
 impl JoinReorderRule {
@@ -141,7 +141,9 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
-            .with_runtime_env(Arc::new(RuntimeEnv::new(RuntimeConfig::default()).unwrap()))
+            .with_runtime_env(Arc::new(
+                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
+            ))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();

@@ -30,7 +30,7 @@ use crate::service::search::datafusion::udf::match_all_udf::{
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RewriteMatch {
     fields: Vec<String>,
 }
@@ -68,9 +68,7 @@ impl OptimizerRule for RewriteMatch {
                     .map(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
                     .any(|x| x)
                 {
-                    let mut expr_rewriter = MatchToFullTextMatch {
-                        fields: self.fields.clone(),
-                    };
+                    let mut expr_rewriter = MatchToFullTextMatch::new(self.fields.clone());
                     let name_preserver = NamePreserver::new(&plan);
                     plan.map_expressions(|expr| {
                         let original_name = name_preserver.save(&expr);
@@ -182,28 +180,22 @@ mod tests {
     #[tokio::test]
     async fn test_rewrite_match() {
         let sqls = [
-            (
-                "select * from t where match_all('open')",
-                vec![
-                    "+------------+-------------+-------------+",
-                    "| _timestamp | name        | log         |",
-                    "+------------+-------------+-------------+",
-                    "| 1          | open        | o2          |",
-                    "| 3          | openobserve | openobserve |",
-                    "+------------+-------------+-------------+",
-                ],
-            ),
-            (
-                "select _timestamp from t where match_all('open')",
-                vec![
-                    "+------------+",
-                    "| _timestamp |",
-                    "+------------+",
-                    "| 1          |",
-                    "| 3          |",
-                    "+------------+",
-                ],
-            ),
+            ("select * from t where match_all('open')", vec![
+                "+------------+-------------+-------------+",
+                "| _timestamp | name        | log         |",
+                "+------------+-------------+-------------+",
+                "| 1          | open        | o2          |",
+                "| 3          | openobserve | openobserve |",
+                "+------------+-------------+-------------+",
+            ]),
+            ("select _timestamp from t where match_all('open')", vec![
+                "+------------+",
+                "| _timestamp |",
+                "+------------+",
+                "| 1          |",
+                "| 3          |",
+                "+------------+",
+            ]),
             (
                 "select _timestamp from t where match_all_raw_ignore_case('observe')",
                 vec![
@@ -262,7 +254,9 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(RuntimeEnv::new(RuntimeConfig::default()).unwrap()))
+            .with_runtime_env(Arc::new(
+                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
+            ))
             .with_default_features()
             .with_optimizer_rules(vec![Arc::new(RewriteMatch::new(fields.clone()))])
             .build();

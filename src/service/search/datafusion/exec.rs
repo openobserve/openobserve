@@ -61,6 +61,7 @@ use super::{
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
 };
+use crate::service::search::index::IndexCondition;
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
@@ -79,8 +80,8 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE) ORDER BY {} DESC",
-            cfg.common.column_timestamp
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
+            cfg.common.column_timestamp, cfg.common.column_timestamp
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -223,7 +224,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         }
         super::MemoryPoolType::None => {}
     };
-    RuntimeEnv::new(rn_config)
+    RuntimeEnv::try_new(rn_config)
 }
 
 pub async fn prepare_datafusion_context(
@@ -282,6 +283,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::regexp_matches_udf::REGEX_MATCHES_UDF.clone());
     ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
     ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
     ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
@@ -339,6 +341,8 @@ pub async fn register_table(
         rules.clone(),
         sorted_by_time,
         ctx.runtime_env().cache_manager.get_file_statistic_cache(),
+        None,
+        vec![],
     )
     .await?;
     ctx.register_table(table_name, table)?;
@@ -346,6 +350,7 @@ pub async fn register_table(
     Ok(ctx)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_parquet_table(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -353,6 +358,8 @@ pub async fn create_parquet_table(
     rules: HashMap<String, DataType>,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
     let mut target_partitions = if session.target_partitions == 0 {
@@ -431,7 +438,7 @@ pub async fn create_parquet_table(
         schema
     };
     config = config.with_schema(schema);
-    let mut table = NewListingTable::try_new(config, rules)?;
+    let mut table = NewListingTable::try_new(config, rules, index_condition, fst_fields)?;
     if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }

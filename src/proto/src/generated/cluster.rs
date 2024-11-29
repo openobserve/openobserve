@@ -1913,312 +1913,6 @@ pub mod ingest_server {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UsageData {
-    #[prost(bytes = "vec", tag = "1")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UsageRequest {
-    #[prost(string, tag = "1")]
-    pub stream_name: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub data: ::core::option::Option<UsageData>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UsageResponse {
-    #[prost(int32, tag = "1")]
-    pub status_code: i32,
-    #[prost(string, tag = "2")]
-    pub message: ::prost::alloc::string::String,
-}
-/// Generated client implementations.
-pub mod usage_client {
-    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::*;
-    use tonic::codegen::http::Uri;
-    #[derive(Debug, Clone)]
-    pub struct UsageClient<T> {
-        inner: tonic::client::Grpc<T>,
-    }
-    impl UsageClient<tonic::transport::Channel> {
-        /// Attempt to create a new client by connecting to a given endpoint.
-        pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
-        where
-            D: TryInto<tonic::transport::Endpoint>,
-            D::Error: Into<StdError>,
-        {
-            let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
-            Ok(Self::new(conn))
-        }
-    }
-    impl<T> UsageClient<T>
-    where
-        T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
-    {
-        pub fn new(inner: T) -> Self {
-            let inner = tonic::client::Grpc::new(inner);
-            Self { inner }
-        }
-        pub fn with_origin(inner: T, origin: Uri) -> Self {
-            let inner = tonic::client::Grpc::with_origin(inner, origin);
-            Self { inner }
-        }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> UsageClient<InterceptedService<T, F>>
-        where
-            F: tonic::service::Interceptor,
-            T::ResponseBody: Default,
-            T: tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
-                Response = http::Response<
-                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                >,
-            >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
-        {
-            UsageClient::new(InterceptedService::new(inner, interceptor))
-        }
-        /// Compress requests with the given encoding.
-        ///
-        /// This requires the server to support it otherwise it might respond with an
-        /// error.
-        #[must_use]
-        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.inner = self.inner.send_compressed(encoding);
-            self
-        }
-        /// Enable decompressing responses.
-        #[must_use]
-        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.inner = self.inner.accept_compressed(encoding);
-            self
-        }
-        /// Limits the maximum size of a decoded message.
-        ///
-        /// Default: `4MB`
-        #[must_use]
-        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
-            self.inner = self.inner.max_decoding_message_size(limit);
-            self
-        }
-        /// Limits the maximum size of an encoded message.
-        ///
-        /// Default: `usize::MAX`
-        #[must_use]
-        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
-            self.inner = self.inner.max_encoding_message_size(limit);
-            self
-        }
-        pub async fn report_usage(
-            &mut self,
-            request: impl tonic::IntoRequest<super::UsageRequest>,
-        ) -> std::result::Result<tonic::Response<super::UsageResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/cluster.Usage/ReportUsage",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Usage", "ReportUsage"));
-            self.inner.unary(req, path, codec).await
-        }
-    }
-}
-/// Generated server implementations.
-pub mod usage_server {
-    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with UsageServer.
-    #[async_trait]
-    pub trait Usage: Send + Sync + 'static {
-        async fn report_usage(
-            &self,
-            request: tonic::Request<super::UsageRequest>,
-        ) -> std::result::Result<tonic::Response<super::UsageResponse>, tonic::Status>;
-    }
-    #[derive(Debug)]
-    pub struct UsageServer<T: Usage> {
-        inner: _Inner<T>,
-        accept_compression_encodings: EnabledCompressionEncodings,
-        send_compression_encodings: EnabledCompressionEncodings,
-        max_decoding_message_size: Option<usize>,
-        max_encoding_message_size: Option<usize>,
-    }
-    struct _Inner<T>(Arc<T>);
-    impl<T: Usage> UsageServer<T> {
-        pub fn new(inner: T) -> Self {
-            Self::from_arc(Arc::new(inner))
-        }
-        pub fn from_arc(inner: Arc<T>) -> Self {
-            let inner = _Inner(inner);
-            Self {
-                inner,
-                accept_compression_encodings: Default::default(),
-                send_compression_encodings: Default::default(),
-                max_decoding_message_size: None,
-                max_encoding_message_size: None,
-            }
-        }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
-        where
-            F: tonic::service::Interceptor,
-        {
-            InterceptedService::new(Self::new(inner), interceptor)
-        }
-        /// Enable decompressing requests with the given encoding.
-        #[must_use]
-        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.accept_compression_encodings.enable(encoding);
-            self
-        }
-        /// Compress responses with the given encoding, if the client supports it.
-        #[must_use]
-        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
-            self.send_compression_encodings.enable(encoding);
-            self
-        }
-        /// Limits the maximum size of a decoded message.
-        ///
-        /// Default: `4MB`
-        #[must_use]
-        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
-            self.max_decoding_message_size = Some(limit);
-            self
-        }
-        /// Limits the maximum size of an encoded message.
-        ///
-        /// Default: `usize::MAX`
-        #[must_use]
-        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
-            self.max_encoding_message_size = Some(limit);
-            self
-        }
-    }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for UsageServer<T>
-    where
-        T: Usage,
-        B: Body + Send + 'static,
-        B::Error: Into<StdError> + Send + 'static,
-    {
-        type Response = http::Response<tonic::body::BoxBody>;
-        type Error = std::convert::Infallible;
-        type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(
-            &mut self,
-            _cx: &mut Context<'_>,
-        ) -> Poll<std::result::Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-        fn call(&mut self, req: http::Request<B>) -> Self::Future {
-            let inner = self.inner.clone();
-            match req.uri().path() {
-                "/cluster.Usage/ReportUsage" => {
-                    #[allow(non_camel_case_types)]
-                    struct ReportUsageSvc<T: Usage>(pub Arc<T>);
-                    impl<T: Usage> tonic::server::UnaryService<super::UsageRequest>
-                    for ReportUsageSvc<T> {
-                        type Response = super::UsageResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::UsageRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Usage>::report_usage(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = ReportUsageSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                _ => {
-                    Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", "12")
-                                .header("content-type", "application/grpc")
-                                .body(empty_body())
-                                .unwrap(),
-                        )
-                    })
-                }
-            }
-        }
-    }
-    impl<T: Usage> Clone for UsageServer<T> {
-        fn clone(&self) -> Self {
-            let inner = self.inner.clone();
-            Self {
-                inner,
-                accept_compression_encodings: self.accept_compression_encodings,
-                send_compression_encodings: self.send_compression_encodings,
-                max_decoding_message_size: self.max_decoding_message_size,
-                max_encoding_message_size: self.max_encoding_message_size,
-            }
-        }
-    }
-    impl<T: Usage> Clone for _Inner<T> {
-        fn clone(&self) -> Self {
-            Self(Arc::clone(&self.0))
-        }
-    }
-    impl<T: std::fmt::Debug> std::fmt::Debug for _Inner<T> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{:?}", self.0)
-        }
-    }
-    impl<T: Usage> tonic::server::NamedService for UsageServer<T> {
-        const NAME: &'static str = "cluster.Usage";
-    }
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QueryDelta {
     #[prost(int64, tag = "1")]
     pub delta_start_time: i64,
@@ -2766,49 +2460,109 @@ pub struct NewEmptyExecNode {
     pub limit: ::core::option::Option<u64>,
     #[prost(bool, tag = "6")]
     pub sorted_by_time: bool,
+    #[prost(message, optional, tag = "7")]
+    pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FlightSearchRequest {
-    /// query identifier
+    #[prost(message, optional, tag = "1")]
+    pub query_identifier: ::core::option::Option<QueryIdentifier>,
+    #[prost(message, optional, tag = "2")]
+    pub search_info: ::core::option::Option<SearchInfo>,
+    #[prost(message, optional, tag = "3")]
+    pub index_info: ::core::option::Option<IndexInfo>,
+    #[prost(message, optional, tag = "4")]
+    pub super_cluster_info: ::core::option::Option<SuperClusterInfo>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryIdentifier {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
-    #[prost(uint32, tag = "2")]
-    pub partition: u32,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag = "2")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "4")]
+    #[prost(string, tag = "3")]
     pub stream_type: ::prost::alloc::string::String,
-    /// used for search
-    #[prost(bytes = "vec", tag = "6")]
+    /// the partition number of the remote scan
+    #[prost(uint32, tag = "4")]
+    pub partition: u32,
+    /// the unique id for each remote scan
+    #[prost(string, tag = "5")]
+    pub job_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchInfo {
+    #[prost(bytes = "vec", tag = "1")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
-    #[prost(int64, repeated, tag = "7")]
+    #[prost(int64, repeated, tag = "2")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "8")]
+    #[prost(message, repeated, tag = "3")]
     pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
-    #[prost(message, repeated, tag = "9")]
-    pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
-    #[prost(string, repeated, tag = "10")]
-    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(int64, tag = "11")]
+    #[prost(int64, tag = "4")]
     pub start_time: i64,
-    #[prost(int64, tag = "12")]
+    #[prost(int64, tag = "5")]
     pub end_time: i64,
-    #[prost(int64, tag = "13")]
+    #[prost(int64, tag = "6")]
     pub timeout: i64,
-    /// used for super cluster and enterprise
-    #[prost(bool, tag = "14")]
-    pub is_super_cluster: bool,
-    #[prost(bool, tag = "15")]
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IndexInfo {
+    #[prost(bool, tag = "1")]
     pub use_inverted_index: bool,
-    #[prost(string, optional, tag = "16")]
-    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "18")]
+    #[prost(string, tag = "2")]
+    pub index_condition: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "3")]
+    pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
+    #[prost(string, repeated, tag = "4")]
+    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "5")]
+    pub index_optimize_mode: ::core::option::Option<IdxOptimizeMode>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SuperClusterInfo {
+    #[prost(bool, tag = "1")]
+    pub is_super_cluster: bool,
+    #[prost(string, optional, tag = "2")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "19")]
+    #[prost(string, optional, tag = "3")]
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
+    /// use for super cluster
+    #[prost(string, optional, tag = "4")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdxOptimizeMode {
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2")]
+    pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
+}
+/// Nested message and enum types in `IdxOptimizeMode`.
+pub mod idx_optimize_mode {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Mode {
+        #[prost(message, tag = "1")]
+        SimpleSelect(super::SimpleSelect),
+        #[prost(message, tag = "2")]
+        SimpleCount(super::SimpleCount),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleSelect {
+    #[prost(uint32, tag = "1")]
+    pub index: u32,
+    #[prost(bool, tag = "2")]
+    pub asc: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleCount {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KvItem {

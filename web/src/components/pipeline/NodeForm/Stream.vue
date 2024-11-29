@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-input-stream-routing-section"
-    class="full-width full-height"
+    class=" full-height"
+    style="width: 40vw;"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
@@ -115,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            data-test="input-node-stream-select"
-            class="o2-input full-width"
+            data-test="input-node-stream-type-select"
+            class="alert-stream-type o2-input q-mr-sm full-width"
             style="padding-top: 0"
           >
           <q-select
@@ -136,13 +137,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             use-input
             hide-selected
             fill-input
-            :input-debounce="400"
             @filter="filterStreams"
             behavior="menu"
+            @input-debounce="100"
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
+            @input-value="handleDynamicStreamName"
+           
             />
+
+
+
+
           </div>
+          <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
+          <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+            </div>
         </div>
 
         <div
@@ -211,6 +221,8 @@ import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+
 const emit = defineEmits(["cancel:hideform"]);
 
 
@@ -240,6 +252,8 @@ const streamTypes = ["logs", "metrics", "traces"];
 //for testing purpose but remove metrics and traces as discuessedf
 const outputStreamTypes = ["logs", "metrics", "traces"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
 onMounted(async () => {
@@ -272,16 +286,37 @@ onMounted(async () => {
 watch(selected, (newValue:any) => {
       pipelineObj.userSelectedNode = newValue; 
 });
+
+watch(() => dynamic_stream_name.value,
+()=>{
+  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
+    const regex = /^[a-zA-Z0-9_]*\{[a-zA-Z0-9_]+\}[a-zA-Z0-9_]*$/;
+    // Check if there is any value between {{ stream_name }}
+      if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
+        saveDynamicStream();
+      }
+   
+  }
+})
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;
-  await pipelineService.getPipelineStreams(org_identifier)
-    .then((res: any) => {
-      usedStreams.value[stream_type.value] = res.data.list;
-    })
+  try {
+    const res = await pipelineService.getPipelineStreams(org_identifier);
+    usedStreams.value = res.data.list;
+  } catch (error) {
+    console.error('Failed to fetch pipeline streams:', error);
+    usedStreams.value = [];
+    $q.notify({
+      message: "Failed to fetch Streams that are used in pipelines",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+  }
 }
 async function getStreamList() {
-  const streamType = pipelineObj.currentSelectedNodeData.hasOwnProperty("stream_type")
-    ? pipelineObj.currentSelectedNodeData.stream_type
+  const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty("stream_type")
+    ? pipelineObj.currentSelectedNodeData.data.stream_type
     : "logs";
   
   
@@ -292,12 +327,13 @@ async function getStreamList() {
     
     if (res.list.length > 0 && pipelineObj.currentSelectedNodeData.hasOwnProperty("type") && pipelineObj.currentSelectedNodeData.type === "input") {
       res.list.forEach((stream : any) => {
-        stream.isDisable = usedStreams.value[streamType].some(
-          (usedStream : any) => usedStream.stream_name === stream.name
+        stream.isDisable = usedStreams.value.some(
+          (usedStream : any) => 
+            (usedStream.stream_name === stream.name  && usedStream.stream_type === stream.stream_type)
+          
         );
       });
     }
-    
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
     indexOptions.value = res.list.map((data : any) => data.name);
@@ -310,11 +346,30 @@ const updateStreams = () => {
   
 };
 
+
+
+const handleDynamicStreamName = (val:any) =>{
+  val = val.replace(/-/g, '_');
+  dynamic_stream_name.value = {label: val, value: val, isDisable: false};
+}
+
+const saveDynamicStream = () =>{
+  if(typeof dynamic_stream_name.value == 'object' && dynamic_stream_name.value.hasOwnProperty('value') && dynamic_stream_name.value.hasOwnProperty('label')){
+    const{label,value} = dynamic_stream_name.value;
+    stream_name.value = {label: label, value:value, isDisable: false}; 
+  }
+  //this condition will never be true but we are keeping it for future reference
+  else{
+    stream_name.value = dynamic_stream_name.value;
+  }
+}
+
 const filteredStreamTypes = computed(() => {
       return selectedNodeType.value === 'output' ? outputStreamTypes : streamTypes;
     });
 
 const getLogStream = (data: any) =>{
+
   data.name = data.name.replace(/-/g, '_');
 
   stream_name.value = {label: data.name, value: data.name, isDisable: false};
@@ -378,7 +433,7 @@ const saveStream = () => {
 };
 
 const filterStreams = (val: string, update: any) => {
-  const streamType = pipelineObj.currentSelectedNodeData.stream_type || 'logs';
+  const streamType = pipelineObj.currentSelectedNodeData.data.stream_type || 'logs';
   if( pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&  pipelineObj.currentSelectedNodeData.type === 'input') {
     const filtered = streams.value[streamType].filter((stream :any) => {
     return stream.name.toLowerCase().includes(val.toLowerCase());
@@ -448,6 +503,16 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   text-transform: none !important;
   font-size: 0.875rem; /* Keep the font size and weight as needed */
   font-weight: 600;
+}
+
+.note-message{
+  background-color: #F9F290 ;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
+  width: 100%;
+  margin-bottom: 20px;
 }
 
 

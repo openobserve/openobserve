@@ -51,6 +51,7 @@ use config::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
+        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
 };
@@ -66,10 +67,7 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tokio::{
-    sync::{Mutex, RwLock},
-    time,
-};
+use tokio::sync::{Mutex, RwLock};
 
 use crate::{
     common::{
@@ -119,7 +117,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if cluster::is_offline() {
             break;
         }
-        time::sleep(time::Duration::from_secs(cfg.limit.file_push_interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            cfg.limit.file_push_interval,
+        ))
+        .await;
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
         }
@@ -520,7 +521,7 @@ async fn move_files(
                         "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
                         file.key
                     );
-                    time::sleep(time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 } else {
                     need_skip = false;
                     break;
@@ -687,9 +688,17 @@ async fn merge_files(
         target_partitions: 0,
     };
     let rules = hashbrown::HashMap::new();
-    let table =
-        exec::create_parquet_table(&session, schema.clone(), &new_file_list, rules, true, None)
-            .await?;
+    let table = exec::create_parquet_table(
+        &session,
+        schema.clone(),
+        &new_file_list,
+        rules,
+        true,
+        None,
+        None,
+        vec![],
+    )
+    .await?;
     let tables = vec![table];
 
     let start = std::time::Instant::now();
@@ -1290,7 +1299,7 @@ async fn prepare_index_record_batches(
                 .iter()
                 .map(|i| i / INDEX_SEGMENT_LENGTH)
                 .collect::<HashSet<_>>();
-            let segment_num = (total_num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+            let segment_num = total_num_rows.div_ceil(INDEX_SEGMENT_LENGTH);
             let mut bv = BitVec::with_capacity(segment_num);
             for i in 0..segment_num {
                 bv.push(segment_ids.contains(&i));
@@ -1370,7 +1379,7 @@ pub(crate) async fn create_tantivy_index(
                 caller,
                 e.to_string()
             );
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -1423,6 +1432,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_tokenizer(O2_TOKENIZER)
                 .set_fieldnorms(false),
         );
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
@@ -1486,8 +1496,11 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         }
     }
 
+    let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
+    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build());
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema)
+        .tokenizers(tokenizer_manager)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 

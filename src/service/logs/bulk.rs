@@ -24,8 +24,8 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
+        self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
-        usage::UsageType,
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},

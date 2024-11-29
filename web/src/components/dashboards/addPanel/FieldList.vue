@@ -238,7 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
                         props.pageIndex >= customQueryFieldsLength) ||
-                      dashboardPanelData.data.type == 'geomap'
+                      dashboardPanelData.data.type == 'geomap' ||
+                      dashboardPanelData.data.type == 'maps'
                     )
                   "
                 >
@@ -383,6 +384,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+F</div>
                   </q-btn>
                 </div>
+                <div
+                  class="field_icons"
+                  v-if="
+                    !(
+                      promqlMode ||
+                      (dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                        props.pageIndex >= customQueryFieldsLength)
+                    ) && dashboardPanelData.data.type == 'maps'
+                  "
+                >
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.name != null
+                    "
+                    no-caps
+                    padding="sm"
+                    @click="addMapName(props.row)"
+                    data-test="dashboard-add-x-data"
+                  >
+                    <div>+N</div>
+                  </q-btn>
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.value_for_maps != null
+                    "
+                    no-caps
+                    padding="sm"
+                    @click="addMapValue(props.row)"
+                    data-test="dashboard-add-y-data"
+                  >
+                    <div>+V</div>
+                  </q-btn>
+                  <q-btn
+                    padding="sm"
+                    @click="addFilteredItem(props.row.name)"
+                    data-test="dashboard-add-filter-maps-data"
+                  >
+                    <div>+F</div>
+                  </q-btn>
+                </div>
+
                 <div
                   class="field_icons"
                   v-if="
@@ -673,6 +721,8 @@ export default defineComponent({
       addLatitude,
       addLongitude,
       addWeight,
+      addMapName,
+      addMapValue,
       addSource,
       addTarget,
       addValue,
@@ -741,6 +791,7 @@ export default defineComponent({
     watch(
       () => [
         dashboardPanelData.meta.stream.streamResults,
+        dashboardPanelData.meta.stream.streamResultsType,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
@@ -762,8 +813,14 @@ export default defineComponent({
               ].fields.stream_type
         );
 
-        // if fields found
-        if (fields) {
+        // if fields found and stream result is of same type
+        if (
+          fields &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type ===
+            dashboardPanelData.meta.stream.streamResultsType
+        ) {
           try {
             await extractFields();
           } catch (error: any) {
@@ -781,6 +838,7 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
         dashboardPanelData.meta.stream.streamResults,
+        dashboardPanelData.meta.stream.streamResultsType,
       ],
       () => {
         // if (!props.editMode) {
@@ -798,12 +856,17 @@ export default defineComponent({
         // );
 
         // set the first stream as the selected stream when the api loads the data
+        // Here, we need to check if the stream results are same as the selected stream type
         if (
           // !props.editMode &&
           // !dashboardPanelData.data.queries[
           //   dashboardPanelData.layout.currentQueryIndex
           // ].fields.stream &&
-          dashboardPanelData.meta.stream.streamResults.length > 0
+          dashboardPanelData.meta.stream.streamResults.length > 0 &&
+          dashboardPanelData.meta.stream.streamResultsType ===
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
           // Check if selected stream for current query exists in index options
@@ -889,6 +952,8 @@ export default defineComponent({
         dashboardPanelData.meta.stream.streamResults = [];
 
         dashboardPanelData.meta.stream.streamResults = res.list;
+
+        dashboardPanelData.meta.stream.streamResultsType = stream_type;
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
@@ -998,7 +1063,13 @@ export default defineComponent({
         const schemaFields: any = [];
         let userDefineSchemaSettings: any = [];
 
-        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
+        if (
+          dashboardPanelData.meta.stream.streamResults.length > 0 &&
+          dashboardPanelData.meta.stream.streamResultsType ===
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type
+        ) {
           for (const stream of dashboardPanelData.meta.stream.streamResults) {
             if (
               dashboardPanelData.data.queries[
@@ -1094,6 +1165,8 @@ export default defineComponent({
       addLatitude,
       addLongitude,
       addWeight,
+      addMapName,
+      addMapValue,
       addSource,
       addTarget,
       addValue,

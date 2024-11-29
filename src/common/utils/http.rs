@@ -113,7 +113,7 @@ pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>)
 pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
-        None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
+        None => config::meta::folder::DEFAULT_FOLDER.to_owned(),
     }
 }
 
@@ -186,7 +186,7 @@ impl<'a> RequestHeaderExtractor<'a> {
     }
 }
 
-impl<'a> Extractor for RequestHeaderExtractor<'a> {
+impl Extractor for RequestHeaderExtractor<'_> {
     fn get(&self, key: &str) -> Option<&str> {
         // Convert the key to a HeaderName, ignoring case
         HeaderName::try_from(key)
@@ -254,12 +254,10 @@ mod tests {
             .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
             .collect();
 
-        assert!(
-            parsed_addresses
-                .iter()
-                .zip(valid_addresses)
-                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
-                .fold(true, |acc, x| { acc | x })
-        );
+        assert!(parsed_addresses
+            .iter()
+            .zip(valid_addresses)
+            .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+            .fold(true, |acc, x| { acc | x }));
     }
 }

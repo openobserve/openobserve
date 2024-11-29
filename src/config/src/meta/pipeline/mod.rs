@@ -231,6 +231,15 @@ impl Pipeline {
             }
         })
     }
+
+    pub fn get_source_stream_params(&self) -> StreamParams {
+        match &self.source {
+            PipelineSource::Realtime(stream_params) => stream_params.clone(),
+            PipelineSource::Scheduled(ds) => {
+                StreamParams::new(&ds.org_id, "DerivedStream", ds.stream_type)
+            }
+        }
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline

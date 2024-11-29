@@ -36,7 +36,7 @@ pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean
-        Arc::new(DataType::Boolean),
+        DataType::Boolean,
         Volatility::Stable,
         match_expr_impl(false),
     )
@@ -49,7 +49,7 @@ pub(crate) static MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean
-        Arc::new(DataType::Boolean),
+        DataType::Boolean,
         Volatility::Stable,
         match_expr_impl(true),
     )

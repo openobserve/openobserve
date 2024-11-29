@@ -30,7 +30,7 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::usage::audit,
+    crate::service::self_reporting::audit,
     o2_enterprise::enterprise::common::{
         auditor::AuditMessage, infra::config::get_config as get_o2_config,
     },
@@ -588,10 +588,10 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             );
             audit_message._timestamp = Utc::now().timestamp_micros();
             audit(audit_message).await;
-            return Ok(HttpResponse::Found()
+            Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, url))
                 .cookie(auth_cookie)
-                .json(resp));
+                .json(resp))
         } else {
             audit_unauthorized_error(audit_message).await;
             unauthorized_error(resp)

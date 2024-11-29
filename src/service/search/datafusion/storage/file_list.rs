@@ -48,8 +48,7 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
             version: None,
         });
         if let Some(bin_data) = file.segment_ids.as_ref() {
-            let bv = BitVec::from_slice(bin_data);
-            segment_data.insert(file.key.clone(), bv);
+            segment_data.insert(file.key.clone(), bin_data.clone());
         }
     }
     FILES.write().insert(key.clone(), values);

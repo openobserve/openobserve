@@ -22,12 +22,14 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    get_config, is_local_disk_storage, metrics,
+    get_config, is_local_disk_storage,
+    meta::inverted_index::InvertedIndexTantivyMode,
+    metrics,
     utils::{
         asynchronism::file::*,
         hash::{gxhash, Sum64},
     },
-    RwAHashMap,
+    RwAHashMap, FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -115,17 +117,18 @@ impl FileData {
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        let data = match get_file_contents(&file_path).await {
-            Ok(data) => Bytes::from(data),
-            Err(_) => {
-                return None;
-            }
-        };
-        Some(if let Some(range) = range {
-            data.slice(range)
-        } else {
-            data
-        })
+        match get_file_contents(&file_path, range).await {
+            Ok(data) => Some(Bytes::from(data)),
+            Err(_) => None,
+        }
+    }
+
+    async fn get_size(&self, file: &str) -> Option<usize> {
+        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
+        match get_file_len(&file_path).await {
+            Ok(v) => Some(v as usize),
+            Err(_) => None,
+        }
     }
 
     async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
@@ -170,6 +173,7 @@ impl FileData {
     }
 
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let cfg = get_config();
         log::info!(
             "[trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
@@ -201,6 +205,21 @@ impl FileData {
                     e
                 );
             }
+
+            // Handle for tantivy index
+            if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Mmap.to_string()
+                && file_path.ends_with(FILE_EXT_TANTIVY)
+            {
+                let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
+                if let Err(e) = fs::remove_dir_all(&file_path).await {
+                    log::error!(
+                        "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                        file_path,
+                        e
+                    );
+                }
+            }
+
             if key.starts_with("results/") {
                 let columns = key.split('/').collect::<Vec<&str>>();
                 let query_key = format!(
@@ -371,6 +390,20 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
 }
 
 #[inline]
+pub async fn get_size(file: &str) -> Option<usize> {
+    if !get_config().disk_cache.enabled {
+        return None;
+    }
+    let idx = get_bucket_idx(file);
+    let files = if file.starts_with("files") {
+        FILES[idx].read().await
+    } else {
+        RESULT_FILES[idx].read().await
+    };
+    files.get_size(file).await
+}
+
+#[inline]
 pub async fn exist(file: &str) -> bool {
     if !get_config().disk_cache.enabled {
         return false;
@@ -404,7 +437,7 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
 
 #[inline]
 pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
-    if !get_config().disk_cache.enabled || is_local_disk_storage() {
+    if !get_config().disk_cache.enabled {
         return Ok(());
     }
     let idx = get_bucket_idx(file);

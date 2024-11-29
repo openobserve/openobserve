@@ -23,14 +23,16 @@ use config::{
 use infra::errors::{Error, Result};
 
 pub mod flight;
-mod storage;
+pub mod storage;
 mod wal;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
 
+#[derive(Debug)]
 pub struct QueryParams {
     pub trace_id: String,
     pub org_id: String,
+    pub job_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
     pub time_range: Option<(i64, i64)>,

@@ -16,13 +16,10 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use config::meta::dashboards::MoveDashboard;
 
-use crate::{
-    common::meta::{dashboards::MoveDashboard, http::HttpResponse as MetaHttpResponse},
-    service::dashboards,
-};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards};
 
-pub mod folders;
 pub mod reports;
 
 /// CreateDashboard
@@ -57,7 +54,11 @@ pub async fn create_dashboard(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    dashboards::create_dashboard(&org_id, &folder, body).await
+    let resp = match dashboards::create_dashboard(&org_id, &folder, body).await {
+        Ok(resp) => resp,
+        Err(_) => HttpResponse::InternalServerError().into(),
+    };
+    Ok(resp)
 }
 
 /// UpdateDashboard
@@ -205,7 +206,12 @@ async fn move_dashboard(
         );
     };
 
-    dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await
+    let resp =
+        match dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await {
+            Ok(resp) => resp,
+            Err(_) => HttpResponse::InternalServerError().into(),
+        };
+    Ok(resp)
 }
 
 fn get_folder(req: HttpRequest) -> String {

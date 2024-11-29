@@ -17,21 +17,30 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use chrono::Utc;
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
         pipeline::{components::NodeData, Pipeline},
+        self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
     utils::{flatten, json::Value},
 };
 use futures::future::try_join_all;
+use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
-    service::ingestion::{apply_vrl_fn, compile_vrl_function},
+    service::{
+        ingestion::{apply_vrl_fn, compile_vrl_function},
+        self_reporting::publish_error,
+    },
 };
+
+static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
+    Lazy::new(|| regex::Regex::new(r"\{([^}]+)\}").unwrap());
 
 #[async_trait]
 pub trait PipelineExt: Sync + Send + 'static {
@@ -47,21 +56,19 @@ impl PipelineExt for Pipeline {
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
                 let transform = get_transforms(&self.org, &func_params.name).await?;
-                if let Ok(vrl_runtime_config) = compile_vrl_function(&transform.function, &self.org)
-                {
-                    let registry = vrl_runtime_config
-                        .config
-                        .get_custom::<vector_enrichment::TableRegistry>()
-                        .unwrap();
-                    registry.finish_load();
-                    vrl_map.insert(
-                        node.get_node_id(),
-                        VRLResultResolver {
-                            program: vrl_runtime_config.program,
-                            fields: vrl_runtime_config.fields,
-                        },
-                    );
-                }
+                let vrl_runtime_config = compile_vrl_function(&transform.function, &self.org)?;
+                let registry = vrl_runtime_config
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                vrl_map.insert(
+                    node.get_node_id(),
+                    VRLResultResolver {
+                        program: vrl_runtime_config.program,
+                        fields: vrl_runtime_config.fields,
+                    },
+                );
             }
         }
         Ok(vrl_map)
@@ -70,6 +77,8 @@ impl PipelineExt for Pipeline {
 
 #[derive(Debug, Clone)]
 pub struct ExecutablePipeline {
+    id: String,
+    name: String,
     source_node_id: String,
     sorted_nodes: Vec<String>,
     vrl_map: HashMap<String, VRLResultResolver>,
@@ -78,6 +87,7 @@ pub struct ExecutablePipeline {
 
 #[derive(Debug, Clone)]
 pub struct ExecutableNode {
+    id: String,
     node_data: NodeData,
     children: Vec<String>,
 }
@@ -109,6 +119,7 @@ impl ExecutablePipeline {
                 (
                     node.get_node_id(),
                     ExecutableNode {
+                        id: node.get_node_id(),
                         node_data: node.get_node_data(),
                         children: pipeline
                             .edges
@@ -121,11 +132,49 @@ impl ExecutablePipeline {
             })
             .collect();
 
-        let vrl_map = pipeline.register_functions().await?;
-        let sorted_nodes = topological_sort(&node_map)?;
+        let vrl_map = match pipeline.register_functions().await {
+            Ok(vrl_map) => vrl_map,
+            Err(e) => {
+                let pipeline_error = PipelineError {
+                    pipeline_id: pipeline.id.to_string(),
+                    pipeline_name: pipeline.name.to_string(),
+                    error: Some(format!("Init error: failed to compile function: {e}")),
+                    node_errors: HashMap::new(),
+                };
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: pipeline.get_source_stream_params(),
+                    error_source: ErrorSource::Pipeline(pipeline_error),
+                })
+                .await;
+                return Err(e);
+            }
+        };
+        let sorted_nodes = match topological_sort(&node_map) {
+            Ok(sorted) => sorted,
+            Err(e) => {
+                let pipeline_error = PipelineError {
+                    pipeline_id: pipeline.id.to_string(),
+                    pipeline_name: pipeline.name.to_string(),
+                    error: Some(
+                        "Init error: failed to sort pipeline nodes for execution".to_string(),
+                    ),
+                    node_errors: HashMap::new(),
+                };
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: pipeline.get_source_stream_params(),
+                    error_source: ErrorSource::Pipeline(pipeline_error),
+                })
+                .await;
+                return Err(e);
+            }
+        };
         let source_node_id = sorted_nodes[0].to_owned();
 
         Ok(Self {
+            id: pipeline.id.to_string(),
+            name: pipeline.name.to_string(),
             source_node_id,
             node_map,
             sorted_nodes,
@@ -141,8 +190,12 @@ impl ExecutablePipeline {
         let batch_size = records.len();
         log::debug!("[Pipeline]: process batch of size {}", batch_size);
 
+        // result_channel
         let (result_sender, mut result_receiver) =
             channel::<(usize, StreamParams, Value)>(batch_size);
+
+        // error_channel
+        let (error_sender, mut error_receiver) = channel::<(String, String, String)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -165,6 +218,7 @@ impl ExecutablePipeline {
                 .map(|child| node_senders.get(child).unwrap().clone())
                 .collect();
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
+            let error_sender_cp = error_sender.clone();
             let vrl_runtime = self.vrl_map.get(node_id).cloned();
 
             let task = tokio::spawn(async move {
@@ -176,18 +230,32 @@ impl ExecutablePipeline {
                     child_senders,
                     vrl_runtime,
                     result_sender_cp,
+                    error_sender_cp,
                 )
                 .await
             });
             node_tasks.push(task);
         }
 
+        // task to collect results
         let result_task = tokio::spawn(async move {
-            // Collect results
             log::debug!("[Pipeline]: starts result collecting job");
             let mut count: usize = 0;
             let mut results = HashMap::new();
-            while let Some((idx, stream_params, record)) = result_receiver.recv().await {
+            while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
+                if stream_params.stream_name.contains("{") {
+                    match resolve_stream_name(&stream_params.stream_name, &record) {
+                        Ok(stream_name) => {
+                            stream_params.stream_name = stream_name.into();
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[Pipeline]: dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped."
+                            );
+                            continue;
+                        }
+                    }
+                }
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
@@ -196,6 +264,23 @@ impl ExecutablePipeline {
             }
             log::debug!("[Pipeline]: collected {count} records");
             results
+        });
+
+        // task to collect errors
+        let mut pipeline_error = PipelineError::new(&self.id, &self.name);
+        let error_task = tokio::spawn(async move {
+            log::debug!("[Pipeline]: starts error collecting job");
+            let mut count = 0;
+            while let Some((node_id, node_type, error)) = error_receiver.recv().await {
+                pipeline_error.add_node_error(node_id, node_type, error);
+                count += 1;
+            }
+            log::debug!("[Pipeline]: collected {count} errors");
+            if count > 0 {
+                Some(pipeline_error)
+            } else {
+                None
+            }
         });
 
         // Send records to the source node to begin processing
@@ -214,12 +299,28 @@ impl ExecutablePipeline {
         }
         drop(source_sender);
         drop(result_sender);
+        drop(error_sender);
         drop(node_senders);
         log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!("[Pipeline] node processing jobs failed: {}", e);
+        }
+
+        // Publish errors if received any
+        if let Some(pipeline_errors) = error_task.await.map_err(|e| {
+            log::error!("[Pipeline] error collecting job failed: {}", e);
+            anyhow!("[Pipeline] error collecting job failed: {}", e)
+        })? {
+            let stream_params = self.get_source_stream_params();
+            let error_data = ErrorData {
+                _timestamp: Utc::now().timestamp_micros(),
+                stream_params,
+                error_source: ErrorSource::Pipeline(pipeline_errors),
+            };
+            log::debug!("[Pipeline]: execution errors occurred and published");
+            publish_error(error_data).await;
         }
 
         let results = result_task.await.map_err(|e| {
@@ -252,6 +353,40 @@ impl ExecutablePipeline {
             .values()
             .filter(|exec_node| matches!(exec_node.node_data, NodeData::Function(_)))
             .count()
+    }
+
+    pub fn get_pipeline_id(&self) -> &str {
+        &self.id
+    }
+
+    fn get_source_stream_params(&self) -> StreamParams {
+        // source_node_id must exist in node_map
+        match &self.node_map.get(&self.source_node_id).unwrap().node_data {
+            NodeData::Stream(stream_params) => stream_params.clone(),
+            NodeData::Query(derived_stream) => StreamParams::new(
+                &derived_stream.org_id,
+                "DerivedStream",
+                derived_stream.stream_type,
+            ),
+            _ => unreachable!(), // SourceNode can only be of type Stream of Query
+        }
+    }
+}
+
+impl ExecutableNode {
+    pub fn node_type(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl std::fmt::Display for ExecutableNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.node_data {
+            NodeData::Stream(_) => write!(f, "stream"),
+            NodeData::Query(_) => write!(f, "query"),
+            NodeData::Function(_) => write!(f, "function"),
+            NodeData::Condition(_) => write!(f, "condition"),
+        }
     }
 }
 
@@ -350,6 +485,7 @@ impl Default for ExecutablePipelineTraceInputs {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn process_node(
     node_id: usize,
     org_id: String,
@@ -358,6 +494,7 @@ async fn process_node(
     mut child_senders: Vec<Sender<(usize, Value, bool)>>,
     vrl_runtime: Option<VRLResultResolver>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
+    error_sender: Sender<(String, String, String)>,
 ) -> Result<()> {
     let cfg = config::get_config();
     let mut count: usize = 0;
@@ -370,22 +507,39 @@ async fn process_node(
                 let result_sender = result_sender.unwrap();
                 while let Some((idx, mut record, flattened)) = receiver.recv().await {
                     if !flattened {
-                        record =
-                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
-                                .map_err(|e| anyhow!("LeafNode error with flattening: {}", e))?;
+                        record = match flatten::flatten_with_level(
+                            record,
+                            cfg.limit.ingest_flatten_level,
+                        ) {
+                            Ok(flattened) => flattened,
+                            Err(e) => {
+                                let err_msg = format!("LeafNode error with flattening: {}", e);
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                    );
+                                    break;
+                                }
+                                continue;
+                            }
+                        };
                     }
+
                     if let Err(send_err) = result_sender
                         .send((idx, stream_params.clone(), record))
                         .await
                     {
                         log::error!(
-                            "[Pipeline]: Leaf node errors sending result for collection caused by: {send_err}"
+                            "[Pipeline]: LeafNode errors sending result for collection caused by: {send_err}"
                         );
                         break;
                     }
                     count += 1;
                 }
-                log::debug!("[Pipeline]: leaf node {node_id} done processing {count} records");
+                log::debug!("[Pipeline]: LeafNode {node_id} done processing {count} records");
             } else {
                 log::debug!("[Pipeline]: source node {node_id} starts processing");
                 // source stream node: send received record to all its children
@@ -401,8 +555,25 @@ async fn process_node(
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 // value must be flattened before condition params can take effect
                 if !flattened {
-                    record = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
-                        .map_err(|e| anyhow!("ConditionNode error with flattening: {}", e))?;
+                    record = match flatten::flatten_with_level(
+                        record,
+                        cfg.limit.ingest_flatten_level,
+                    ) {
+                        Ok(flattened) => flattened,
+                        Err(e) => {
+                            let err_msg = format!("ConditionNode error with flattening: {}", e);
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline]: ConditionNode failed sending errors for collection caused by: {send_err}"
+                                );
+                                break;
+                            }
+                            continue;
+                        }
+                    };
                     flattened = true;
                 }
                 // only send to children when passing all condition evaluations
@@ -428,19 +599,48 @@ async fn process_node(
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 if let Some(vrl_runtime) = &vrl_runtime {
                     if func_params.after_flatten && !flattened {
-                        record =
-                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level)
-                                .map_err(|e| {
-                                    anyhow!("FunctionNode error with flattening: {}", e)
-                                })?;
+                        record = match flatten::flatten_with_level(
+                            record,
+                            cfg.limit.ingest_flatten_level,
+                        ) {
+                            Ok(flattened) => flattened,
+                            Err(e) => {
+                                let err_msg = format!("FunctionNode error with flattening: {}", e);
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                    );
+                                    break;
+                                }
+                                continue;
+                            }
+                        };
                     }
-                    record = apply_vrl_fn(
+                    record = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
                         record,
                         &org_id,
                         &["pipeline".to_string()],
-                    );
+                    ) {
+                        (res, None) => res,
+                        (res, Some(error)) => {
+                            let err_msg = format!("FunctionNode error: {}", error);
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                );
+                                break;
+                            }
+                            res
+                        }
+                    };
                     flattened = false; // since apply_vrl_fn can produce unflattened data
                 }
                 send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
@@ -544,4 +744,73 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
     }
     // get from database
     crate::service::db::functions::get(org_id, fn_name).await
+}
+
+fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
+    // Fast path: if it's a complete pattern like "{field}", avoid regex
+    if haystack.starts_with("{") && haystack.ends_with("}") {
+        let field_name = &haystack[1..haystack.len() - 1];
+        return match record.get(field_name) {
+            Some(stream_name) => stream_name
+                .as_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| anyhow!("Matched stream name {stream_name} is not a string")),
+            None => Err(anyhow!("Field name {field_name} not found in record")),
+        };
+    }
+
+    // Slow path: handle partial matches using regex
+    let mut result = String::with_capacity(haystack.len());
+    let mut last_match = 0;
+    for cap in DYNAMIC_STREAM_NAME_PATTERN.captures_iter(haystack) {
+        let field_name = cap.get(1).unwrap().as_str();
+        let full_match = cap.get(0).unwrap();
+
+        // Add the text between the last match and this one
+        result.push_str(&haystack[last_match..full_match.start()]);
+
+        // Get and validate the field value
+        match record.get(field_name) {
+            Some(stream_name) => match stream_name.as_str() {
+                Some(s) => result.push_str(s),
+                None => return Err(anyhow!("Matched stream name {stream_name} is not a string")),
+            },
+            None => return Err(anyhow!("Field name {field_name} not found in record")),
+        }
+
+        last_match = full_match.end();
+    }
+    result.push_str(&haystack[last_match..]);
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::json;
+
+    use super::resolve_stream_name;
+
+    #[test]
+    fn test_my_regex() {
+        let record = json::json!({
+            "app_name": "o2",
+            "container_name": "compactor",
+            "value": 123
+        });
+        let ok_cases = vec![
+            ("container_name", "container_name"),
+            ("{container_name}", "compactor"),
+            ("abc-{container_name}", "abc-compactor"),
+            ("abc-{container_name}-xyz", "abc-compactor-xyz"),
+        ];
+        for (test, expected) in ok_cases {
+            let result = resolve_stream_name(test, &record);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected);
+        }
+        let err1 = resolve_stream_name("{{value}}", &record);
+        assert!(err1.is_err());
+        let err1 = resolve_stream_name("{{eulav}}", &record);
+        assert!(err1.is_err());
+    }
 }

@@ -25,7 +25,7 @@ use datafusion::{
 /// Optimization rule that add _timestamp constraint to table scan
 ///
 /// Note: should apply before push down filter rule
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AddTimestampRule {
     filter: Expr,
 }
@@ -195,10 +195,10 @@ mod tests {
         let expected = "Projection: test.name\
         \n  Filter: test.name IN (<subquery>) AND test.id = UInt32(1) AND test.id < UInt32(30)\
         \n    Subquery:\
-        \n      TableScan: sq\
+        \n      Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
+        \n        TableScan: sq\
         \n    Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
         \n      TableScan: test";
-
         // after DecorrelatePredicateSubquery, the plan look like below
         // let expected = "Projection: test.name
         // \n  Filter: test.id = UInt32(1) AND test.id < UInt32(30)
@@ -239,27 +239,21 @@ mod tests {
     #[tokio::test]
     async fn test_real_sql_for_timestamp() {
         let sqls = [
-            (
-                "select * from t order by _timestamp",
-                vec![
-                    "+------------+-------------+",
-                    "| _timestamp | name        |",
-                    "+------------+-------------+",
-                    "| 2          | observe     |",
-                    "| 3          | openobserve |",
-                    "+------------+-------------+",
-                ],
-            ),
-            (
-                "select name from t where name = 'openobserve'",
-                vec![
-                    "+-------------+",
-                    "| name        |",
-                    "+-------------+",
-                    "| openobserve |",
-                    "+-------------+",
-                ],
-            ),
+            ("select * from t order by _timestamp", vec![
+                "+------------+-------------+",
+                "| _timestamp | name        |",
+                "+------------+-------------+",
+                "| 2          | observe     |",
+                "| 3          | openobserve |",
+                "+------------+-------------+",
+            ]),
+            ("select name from t where name = 'openobserve'", vec![
+                "+-------------+",
+                "| name        |",
+                "+-------------+",
+                "| openobserve |",
+                "+-------------+",
+            ]),
             (
                 "select t1._timestamp, t1.name from t as t1 join t as t2 on t1.name = t2.name order by t1._timestamp",
                 vec![
@@ -308,7 +302,9 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(RuntimeEnv::new(RuntimeConfig::default()).unwrap()))
+            .with_runtime_env(Arc::new(
+                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
+            ))
             .with_default_features()
             .with_optimizer_rules(vec![
                 Arc::new(AddTimestampRule::new(2, 4)),

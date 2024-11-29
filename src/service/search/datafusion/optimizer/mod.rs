@@ -28,7 +28,6 @@ use datafusion::optimizer::{
     filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
     propagate_empty_relation::PropagateEmptyRelation, push_down_filter::PushDownFilter,
     push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
-    rewrite_disjunctive_predicate::RewriteDisjunctivePredicate,
     scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
     single_distinct_to_groupby::SingleDistinctToGroupBy,
     unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
@@ -91,7 +90,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // run it again after running the optimizations that potentially converted
     // subqueries to joins
     rules.push(Arc::new(SimplifyExpressions::new()));
-    rules.push(Arc::new(RewriteDisjunctivePredicate::new()));
     rules.push(Arc::new(EliminateDuplicatedExpr::new()));
     rules.push(Arc::new(EliminateFilter::new()));
     rules.push(Arc::new(EliminateCrossJoin::new()));

@@ -17,6 +17,7 @@ use chrono::Utc;
 use config::{
     meta::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
+        dashboards::reports::Report,
         stream::StreamType,
     },
     utils::json,
@@ -38,7 +39,6 @@ use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
 use crate::{
     common::{
         infra::config::VERSION,
-        meta::dashboards::reports::Report,
         utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
     },
     service::db,
@@ -233,7 +233,11 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
         std::result::Result::Ok(val) => {
             let val_str = std::str::from_utf8(&val).unwrap();
             let val = val_str.parse::<i64>().unwrap_or(0);
-            if val > 0 { Ok(false) } else { Ok(true) }
+            if val > 0 {
+                Ok(false)
+            } else {
+                Ok(true)
+            }
         }
         Err(_) => Ok(true),
     }

@@ -42,7 +42,9 @@ use crate::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_filter_from_equal_items, generate_search_schema_diff, match_source,
+            generate_filter_from_equal_items, generate_search_schema_diff,
+            index::IndexCondition,
+            match_source,
         },
     },
 };
@@ -55,6 +57,8 @@ pub async fn search_parquet(
     search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> super::SearchTable {
     // get file list
     let stream_settings =
@@ -82,17 +86,17 @@ pub async fn search_parquet(
         .map(|file| async move {
             let cfg = get_config();
             let r = WAL_PARQUET_METADATA.read().await;
+            let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
             if let Some(meta) = r.get(file.key.as_str()) {
                 let mut file = file;
                 file.meta = meta.clone();
                 // reset file meta if it already removed
-                if !is_exists(file.key.as_str()) {
+                if !is_exists(&source_file) {
                     file.meta = Default::default();
                 }
                 return file;
             }
             drop(r);
-            let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();
@@ -257,7 +261,7 @@ pub async fn search_parquet(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let session = config::meta::search::Session {
-            id: format!("{}-wal-{ver}", query.trace_id),
+            id: format!("{}-{}-wal-{ver}", query.trace_id, query.job_id),
             storage_type: StorageType::Wal,
             work_group: query.work_group.clone(),
             target_partitions: cfg.limit.cpu_num,
@@ -271,6 +275,8 @@ pub async fn search_parquet(
             diff_fields,
             sorted_by_time,
             file_stat_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
@@ -296,6 +302,8 @@ pub async fn search_memtable(
     schema: Arc<Schema>,
     search_partition_keys: &[(String, String)],
     sorted_by_time: bool,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> super::SearchTable {
     let mut scan_stats = ScanStats::new();
 
@@ -367,7 +375,6 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    // construct latest schema map
     let schema_latest = Arc::new(
         schema
             .as_ref()
@@ -392,10 +399,12 @@ pub async fn search_memtable(
         }
 
         let table = Arc::new(NewMemTable::try_new(
-            schema_latest.clone(),
+            record_batches[0].schema().clone(),
             vec![record_batches],
             diff_fields,
             sorted_by_time,
+            index_condition.clone(),
+            fst_fields.clone(),
         )?);
         tables.push(table as _);
     }
@@ -516,17 +525,21 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(table_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+pub fn adapt_batch(schema_latest: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
-    let mut cols: Vec<ArrayRef> = Vec::with_capacity(table_schema.fields().len());
-    for table_field in table_schema.fields() {
-        if let Some((batch_idx, _)) = batch_schema.column_with_name(table_field.name().as_str()) {
-            cols.push(Arc::clone(&batch_cols[batch_idx]));
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema_latest.fields().len());
+    let mut fields = Vec::with_capacity(schema_latest.fields().len());
+    for field_latest in schema_latest.fields() {
+        if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
+            cols.push(Arc::clone(&batch_cols[idx]));
+            fields.push(field.clone());
         } else {
-            cols.push(new_null_array(table_field.data_type(), batch.num_rows()))
+            cols.push(new_null_array(field_latest.data_type(), batch.num_rows()));
+            fields.push(field_latest.as_ref().clone());
         }
     }
-    RecordBatch::try_new(table_schema, cols).unwrap()
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, cols).unwrap()
 }
