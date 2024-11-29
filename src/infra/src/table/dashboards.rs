@@ -15,7 +15,7 @@
 
 use config::meta::dashboards::{
     v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3,
-    v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
+    v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard, ListDashboardsParams,
 };
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
@@ -31,20 +31,6 @@ use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors::{self, GetDashboardError, PutDashboardError},
 };
-
-/// Parameters for listing dashboards.
-#[derive(Debug, Clone)]
-pub struct ListParams {
-    /// The org ID surrogate key with which to filter dashboards.
-    pub org_id: String,
-
-    /// The optional folder ID surrogate key with which to filter dashboards.
-    pub folder_id: Option<String>,
-
-    /// The optional case-insensitive title substring with which to filter
-    /// dashboards.
-    pub title_pat: Option<String>,
-}
 
 impl TryFrom<dashboards::Model> for Dashboard {
     type Error = errors::Error;
@@ -117,9 +103,9 @@ pub async fn get(
 }
 
 /// Lists all dashboards belonging to the given org and folder.
-pub async fn list(filter: ListParams) -> Result<Vec<Dashboard>, errors::Error> {
+pub async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let dashboards = list_models(client, filter)
+    let dashboards = list_models(client, params)
         .await?
         .into_iter()
         .map(Dashboard::try_from)
@@ -275,7 +261,7 @@ async fn get_model(
 /// Lists all dashboard ORM models that belong to the given org and folder.
 async fn list_models(
     db: &DatabaseConnection,
-    params: ListParams,
+    params: ListDashboardsParams,
 ) -> Result<Vec<dashboards::Model>, sea_orm::DbErr> {
     let query = folders::Entity::find()
         .filter(folders::Column::Org.eq(params.org_id))
@@ -379,7 +365,7 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([Vec::<dashboards::Model>::new()])
             .into_connection();
-        let params = ListParams {
+        let params = ListDashboardsParams {
             org_id: "orgId".to_owned(),
             folder_id: Some("folderId".to_owned()),
             title_pat: Some("tItLePat".to_owned()),
@@ -406,7 +392,7 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::MySql)
             .append_query_results([Vec::<dashboards::Model>::new()])
             .into_connection();
-        let params = ListParams {
+        let params = ListDashboardsParams {
             org_id: "orgId".to_owned(),
             folder_id: Some("folderId".to_owned()),
             title_pat: Some("tItLePat".to_owned()),
@@ -433,7 +419,7 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Sqlite)
             .append_query_results([Vec::<dashboards::Model>::new()])
             .into_connection();
-        let params = ListParams {
+        let params = ListDashboardsParams {
             org_id: "orgId".to_owned(),
             folder_id: Some("folderId".to_owned()),
             title_pat: Some("tItLePat".to_owned()),

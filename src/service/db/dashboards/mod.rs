@@ -15,63 +15,12 @@
 
 use actix_web::web;
 use config::{
-    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
+    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion, ListDashboardsParams},
     utils::json,
 };
 use infra::table::dashboards;
 
 pub mod reports;
-
-/// Parameters for listing dashboards.
-#[derive(Debug, Clone)]
-pub struct ListParams {
-    /// The org ID surrogate key with which to filter dashboards.
-    org_id: String,
-
-    /// The optional folder ID surrogate key with which to filter dashboards.
-    folder_id: Option<String>,
-
-    /// The optional case-insensitive title substring with which to filter
-    /// dashboards.
-    title: Option<String>,
-}
-
-impl ListParams {
-    /// Returns new parameters to list dashboards for the given org ID surrogate
-    /// key.
-    pub fn new(org_id: &str) -> Self {
-        Self {
-            org_id: org_id.to_string(),
-            folder_id: None,
-            title: None,
-        }
-    }
-
-    /// Filter dashboards by the given folder ID surrogate key.
-    pub fn with_folder_id(mut self, folder_id: &str) -> Self {
-        self.folder_id = Some(folder_id.to_string());
-        self
-    }
-
-    /// Filter dashboards by the case-insensitive title pattern.
-    ///
-    /// Listed dashboards will only include dashboards with a title that
-    /// contains the case-insitive title pattern.
-    pub fn where_title_contains(mut self, title_pat: &str) -> Self {
-        self.title = Some(title_pat.to_string());
-        self
-    }
-}
-
-impl From<ListParams> for infra::table::dashboards::ListParams {
-    fn from(value: ListParams) -> Self {
-        Self {
-            org_id: value.org_id,
-            folder_id: value.folder_id,
-            title_pat: value.title,
-        }
-    }
-}
 
 #[tracing::instrument]
 pub(crate) async fn get(
@@ -122,7 +71,7 @@ pub(crate) async fn put(
 }
 
 #[tracing::instrument]
-pub(crate) async fn list(params: ListParams) -> Result<Vec<Dashboard>, anyhow::Error> {
+pub(crate) async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, anyhow::Error> {
     let ds = dashboards::list(params.into()).await?;
     Ok(ds)
 }

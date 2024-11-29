@@ -18,7 +18,10 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 use config::{
     ider,
-    meta::folder::{Folder, FolderList, DEFAULT_FOLDER},
+    meta::{
+        dashboards::ListDashboardsParams,
+        folder::{Folder, FolderList, DEFAULT_FOLDER},
+    },
 };
 
 use crate::{
@@ -145,7 +148,7 @@ pub async fn get_folder(org_id: &str, folder_id: &str) -> HttpResponse {
 
 #[tracing::instrument()]
 pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse, Error> {
-    let filter = db::dashboards::ListParams::new(org_id).with_folder_id(folder_id);
+    let filter = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
     let Ok(dashboards) = db::dashboards::list(filter).await else {
         return Ok(HttpResponse::InternalServerError().into());
     };

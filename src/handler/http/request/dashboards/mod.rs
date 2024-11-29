@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::dashboards::MoveDashboard;
+use config::meta::dashboards::{ListDashboardsParams, MoveDashboard};
 use serde::Deserialize;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards};
@@ -116,29 +116,29 @@ pub struct ListQuery {
 }
 
 impl ListQuery {
-    pub fn into(self, org_id: &str) -> dashboards::ListParams {
+    pub fn into(self, org_id: &str) -> ListDashboardsParams {
         match self {
             Self {
                 folder: Some(f),
                 title: Some(t),
-            } => dashboards::ListParams::new(org_id)
+            } => ListDashboardsParams::new(org_id)
                 .with_folder_id(&f)
                 .where_title_contains(&t),
             Self {
                 folder: None,
                 title: Some(t),
-            } => dashboards::ListParams::new(org_id).where_title_contains(&t),
+            } => ListDashboardsParams::new(org_id).where_title_contains(&t),
             Self {
                 folder: Some(f),
                 title: None,
-            } => dashboards::ListParams::new(org_id).with_folder_id(&f),
+            } => ListDashboardsParams::new(org_id).with_folder_id(&f),
             Self {
                 folder: None,
                 title: None,
             } => {
                 // To preserve backwards-compatability when no filter parameters
                 // are given we will list the contents of the default folder.
-                dashboards::ListParams::new(org_id)
+                ListDashboardsParams::new(org_id)
                     .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
             }
         }

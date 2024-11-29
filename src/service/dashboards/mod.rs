@@ -19,14 +19,13 @@ use actix_web::{http, web, HttpResponse};
 use config::{
     ider,
     meta::{
-        dashboards::Dashboards,
+        dashboards::{Dashboards, ListDashboardsParams},
         folder::{Folder, DEFAULT_FOLDER},
     },
     utils::json,
 };
 
 use super::folders;
-pub use crate::service::db::dashboards::ListParams;
 use crate::{
     common::{
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
@@ -118,7 +117,7 @@ pub async fn update_dashboard(
 }
 
 #[tracing::instrument]
-pub async fn list_dashboards(params: ListParams) -> Result<HttpResponse, io::Error> {
+pub async fn list_dashboards(params: ListDashboardsParams) -> Result<HttpResponse, io::Error> {
     let resp = match db::dashboards::list(params).await {
         Ok(dashboards) => HttpResponse::Ok().json(Dashboards { dashboards }),
         Err(error) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
